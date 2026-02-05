@@ -1,0 +1,158 @@
+{
+  "_comentario": "Configuración de tiempos para etapas de construcción. Tiempos en DÍAS.",
+  "_instrucciones": {
+    "tiempo_optimo": "Días esperados para iniciar la siguiente etapa (verde -> amarillo)",
+    "tiempo_alerta": "Días máximos antes de alerta crítica (amarillo -> rojo)",
+    "duracion": "Tiempo que demora ejecutar la etapa en obra",
+    "dependencia": "Código de etapa(s) que debe(n) completarse antes"
+  },
+
+  "etapas": {
+    "01_FUNDACIONES": {
+      "codigo": "01",
+      "nombre": "Fundaciones Viv.",
+      "duracion": 3,
+      "tiempo_optimo": null,
+      "tiempo_alerta": null,
+      "dependencia": null,
+      "es_inicio": true,
+      "critico": false
+    },
+
+    "12_ALCANTARILLADO": {
+      "codigo": "12",
+      "nombre": "Alcantarillado Ext.",
+      "duracion": 3,
+      "tiempo_optimo": null,
+      "tiempo_alerta": null,
+      "dependencia": "01_FUNDACIONES",
+      "flexible": true,
+      "critico": false
+    },
+
+    "02_1ERA_ETAPA": {
+      "codigo": "02",
+      "nombre": "1era Etapa Viv.",
+      "duracion": 21,
+      "tiempo_optimo": 7,
+      "tiempo_alerta": 14,
+      "dependencia": "01_FUNDACIONES",
+      "critico": true
+    },
+
+    "28_VENTANAS": {
+      "codigo": "28",
+      "nombre": "Ventanas",
+      "duracion": 1,
+      "tiempo_optimo": 3,
+      "tiempo_alerta": 7,
+      "dependencia": "02_1ERA_ETAPA",
+      "desde_inicio_dependencia": true,
+      "_nota": "Se necesitan DURANTE la ejecución de 1era Etapa, no después",
+      "critico": true
+    },
+
+    "29_EIFS": {
+      "codigo": "29",
+      "nombre": "EIFS (Aislación)",
+      "duracion": 3,
+      "tiempo_optimo": 7,
+      "tiempo_alerta": 14,
+      "dependencia": "02_1ERA_ETAPA",
+      "critico": false
+    },
+
+    "03_2DA_ETAPA": {
+      "codigo": "03",
+      "nombre": "2da Etapa Viv.",
+      "duracion": 10,
+      "tiempo_optimo": 7,
+      "tiempo_alerta": 14,
+      "dependencia": "02_1ERA_ETAPA",
+      "critico": true
+    },
+
+    "07_CERAMICO_PISO": {
+      "codigo": "07",
+      "nombre": "Cerámicos Piso",
+      "duracion": 7,
+      "tiempo_optimo": 7,
+      "tiempo_alerta": 14,
+      "dependencia": "02_1ERA_ETAPA",
+      "ventana_flexible": {
+        "desde_etapa": "02_1ERA_ETAPA",
+        "desde_dias": 15,
+        "hasta_etapa": "03_2DA_ETAPA",
+        "hasta_dias_post": 20
+      },
+      "critico": false
+    },
+
+    "09_PINTURA_EXT": {
+      "codigo": "09",
+      "nombre": "Pintura Exterior",
+      "duracion": 7,
+      "tiempo_optimo": 7,
+      "tiempo_alerta": 14,
+      "dependencia": "02_1ERA_ETAPA",
+      "ventana_flexible": {
+        "desde_etapa": "02_1ERA_ETAPA",
+        "desde_dias": 15,
+        "hasta_etapa": "03_2DA_ETAPA",
+        "hasta_dias_post": 20
+      },
+      "critico": false
+    },
+
+    "08_CERAMICO_MURO": {
+      "codigo": "08",
+      "nombre": "Cerámicos Muro",
+      "duracion": 3,
+      "tiempo_optimo": 7,
+      "tiempo_alerta": 14,
+      "dependencia": "03_2DA_ETAPA",
+      "critico": true
+    },
+
+    "10_PINTURA_INT": {
+      "codigo": "10",
+      "nombre": "Pintura Interior",
+      "duracion": 7,
+      "tiempo_optimo": 7,
+      "tiempo_alerta": 14,
+      "dependencia": "03_2DA_ETAPA",
+      "critico": false
+    },
+
+    "13_GASFITERIA": {
+      "codigo": "13",
+      "nombre": "Gasfitería + Artefactos",
+      "duracion": 5,
+      "tiempo_optimo": 7,
+      "tiempo_alerta": 14,
+      "dependencia": "08_CERAMICO_MURO",
+      "critico": true,
+      "_nota": "Incluye instalación de artefactos (cocina, calefont). Es la etapa final de la ruta crítica."
+    },
+
+  },
+
+  "colores": {
+    "en_tiempo": "#22c55e",
+    "atencion": "#eab308",
+    "critico": "#ef4444",
+    "bloqueado": "#9ca3af",
+    "completado": "#3b82f6"
+  },
+
+  "secuencia_principal": [
+    "01_FUNDACIONES",
+    "02_1ERA_ETAPA",
+    "03_2DA_ETAPA",
+    "08_CERAMICO_MURO",
+    "13_GASFITERIA"
+  ],
+
+  "_version": "1.0",
+  "_ultima_modificacion": "2026-01-26"
+}
