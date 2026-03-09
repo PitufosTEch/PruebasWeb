@@ -656,6 +656,13 @@ const getAvancePorFamilia = (idBenef) => {{
     return result;
 }};
 
+const fechaChile = () => {{
+    const d = new Date();
+    const o = d.getTimezoneOffset();
+    const cl = new Date(d.getTime() - (o * 60000) + (-3 * 3600000) - (-o * 60000));
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${{cl.getFullYear()}}-${{pad(cl.getMonth()+1)}}-${{pad(cl.getDate())}}T${{pad(cl.getHours())}}:${{pad(cl.getMinutes())}}`;
+}};
 const formatPeso = (n) => "$" + Number(n).toLocaleString("es-CL");
 const getSolpago = (idBenef) => SOLPAGO_DATA.filter(s => String(s.ID_Benef) === String(idBenef));
 const getTotalPagado = (idBenef) => getSolpago(idBenef).reduce((s, p) => s + p.monto, 0);
@@ -2915,7 +2922,7 @@ const App = () => {{
                 if (Object.keys(rest).length === 0) delete next[idBenef];
                 else next[idBenef] = rest;
             }} else {{
-                next[idBenef] = {{ ...benCons, [etapaKey]: {{ done: true, fecha: new Date().toISOString().substring(0, 16) }} }};
+                next[idBenef] = {{ ...benCons, [etapaKey]: {{ done: true, fecha: fechaChile() }} }};
             }}
             fbDB.ref('consultas').set(next);
             return next;
@@ -2931,7 +2938,7 @@ const App = () => {{
                 if (Object.keys(rest).length === 0) delete next[idBenef];
                 else next[idBenef] = rest;
             }} else {{
-                next[idBenef] = {{ ...benActs, [actNombre]: {{ done: true, fecha: new Date().toISOString().substring(0, 16) }} }};
+                next[idBenef] = {{ ...benActs, [actNombre]: {{ done: true, fecha: fechaChile() }} }};
             }}
             fbDB.ref('actividades').set(next);
             return next;
@@ -2941,7 +2948,7 @@ const App = () => {{
     const addObservacion = (idBenef, texto) => {{
         setObservaciones(prev => {{
             const obs = prev[idBenef] || [];
-            const next = {{ ...prev, [idBenef]: [...obs, {{ texto, fecha: new Date().toISOString().substring(0,16), id: Date.now() }}] }};
+            const next = {{ ...prev, [idBenef]: [...obs, {{ texto, fecha: fechaChile(), id: Date.now() }}] }};
             fbDB.ref('observaciones').set(next);
             return next;
         }});
