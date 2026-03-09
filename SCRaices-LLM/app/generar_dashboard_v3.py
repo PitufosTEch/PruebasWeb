@@ -614,12 +614,12 @@ const SECUENCIA_PRINCIPAL = ETAPAS_CONFIG_FULL.secuencia_principal || [];
 
 // ========== FAMILIA PAGO MAP ==========
 const FAMILIA_PAGO_MAP = {{
-    "01 - Fundaciones": ["01_FUNDACIONES"],
-    "02 - 1era Etapa": ["02_1ERA_ETAPA", "03_VENTANAS"],
-    "03 - 2da Etapa": ["04_2DA_ETAPA"],
-    "04 - Gasfiteria": ["06_GASFITERIA"],
-    "05 - Cerámica": ["05_CERAMICO_MURO"],
-    "06 - Pintura": [],
+    "01 - Fundaciones": ["01_FUNDACIONES", "12_ALCANTARILLADO"],
+    "02 - 1era Etapa": ["02_1ERA_ETAPA", "28_VENTANAS", "29_EIFS"],
+    "03 - 2da Etapa": ["03_2DA_ETAPA", "07_CERAMICO_PISO", "09_PINTURA_EXT", "10_PINTURA_INT"],
+    "04 - Gasfiteria": ["13_GASFITERIA"],
+    "05 - Cerámica": ["08_CERAMICO_MURO"],
+    "06 - Pintura": ["09_PINTURA_EXT", "10_PINTURA_INT"],
     "07 - Eléctricidad": [],
     "08 - Obras Exteriores": [],
     "11 - Recepcion": []
@@ -787,19 +787,37 @@ const calcCoherencia = (idBenef, estadoEtapas) => {{
     const alertas = [];
     const pagos = getSolpago(idBenef);
     const insp = getInspeccion(idBenef);
+    const avanceFam = getAvancePorFamilia(idBenef);
+
+    // Alertas por familia: cruce Despacho + Pago + Inspeccion
     Object.entries(FAMILIA_PAGO_MAP).forEach(([fam, etapasKeys]) => {{
         const pagosFam = pagos.filter(p => p.Familia_pago === fam);
         const totalPagado = pagosFam.reduce((s, p) => s + p.monto, 0);
         const tieneDespacho = etapasKeys.some(k => estadoEtapas[k]?.estado === "despachado");
-        const avanceFam = getAvancePorFamilia(idBenef);
         const avance = avanceFam[fam];
         const avPct = avance ? avance.pct : null;
+
+        // ROJO: Despacho + Pago pero inspeccion baja (<30%)
         if (totalPagado > 0 && tieneDespacho && avPct !== null && avPct < 30) {{
             alertas.push({{ tipo: "rojo", etapa: FAMILIA_LABELS[fam] || fam, msg: `Desp+Pago pero Insp ${{avPct}}% en ${{FAMILIA_LABELS[fam]}}` }});
-        }} else if (tieneDespacho && totalPagado === 0 && FAMILIAS_CRITICAS.includes(fam)) {{
+        }}
+        // ROJO: Inspeccion alta (>=70%) sin despacho registrado — datos inconsistentes
+        else if (!tieneDespacho && avPct !== null && avPct >= 70 && etapasKeys.length > 0) {{
+            alertas.push({{ tipo: "rojo", etapa: FAMILIA_LABELS[fam] || fam, msg: `Insp ${{avPct}}% pero sin despacho en ${{FAMILIA_LABELS[fam]}}` }});
+        }}
+        // NARANJA: Despacho sin pago en familia critica
+        else if (tieneDespacho && totalPagado === 0 && FAMILIAS_CRITICAS.includes(fam)) {{
             alertas.push({{ tipo: "naranja", etapa: FAMILIA_LABELS[fam] || fam, msg: `Despacho sin pago M.O. en ${{FAMILIA_LABELS[fam]}}` }});
         }}
     }});
+
+    // Alertas por solicitudes vencidas (solicitado hace mas de 14 dias sin despacho)
+    Object.entries(estadoEtapas).forEach(([key, info]) => {{
+        if (info.estado === "solicitado" && info.diasSolicitud > 14) {{
+            alertas.push({{ tipo: "naranja", etapa: info.nombre, msg: `Solicitud hace ${{info.diasSolicitud}}d sin despacho` }});
+        }}
+    }});
+
     return alertas;
 }};
 
