@@ -145,17 +145,28 @@ def get_data_loader_js(apps_script_url):
     function processRawData(raw) {{
         updateLoading('Procesando proyectos...', 40);
 
-        // 1. PROYECTOS
+        // 1. PROYECTOS (ejecucion + finalizados)
         const proyectosRaw = raw.Proyectos?.rows || [];
         PROYECTOS_DATA = proyectosRaw
-            .filter(p => (p.estado_general || '').toLowerCase().includes('ejecuci'))
-            .map(p => ({{
-                ID_proy: String(p.ID_proy || ''),
-                NOMBRE_PROYECTO: String(p.NOMBRE_PROYECTO || ''),
-                COMUNA: String(p.COMUNA || ''),
-                fecha_inicio: parseDate(p.fecha_inicio) || '',
-                duracion: parseInt(p.duracion) || 0
-            }}));
+            .filter(p => {{
+                const est = (p.estado_general || '').toLowerCase();
+                return est.includes('ejecuci') || est.includes('finalizado');
+            }})
+            .map(p => {{
+                const est = (p.estado_general || '').toLowerCase();
+                return {{
+                    ID_proy: String(p.ID_proy || ''),
+                    NOMBRE_PROYECTO: String(p.NOMBRE_PROYECTO || ''),
+                    COMUNA: String(p.COMUNA || ''),
+                    fecha_inicio: parseDate(p.fecha_inicio) || '',
+                    duracion: parseInt(p.duracion) || 0,
+                    estado: est.includes('finalizado') ? 'finalizado' : 'ejecucion'
+                }};
+            }})
+            .sort((a, b) => {{
+                if (a.estado !== b.estado) return a.estado === 'ejecucion' ? -1 : 1;
+                return (b.fecha_inicio || '').localeCompare(a.fecha_inicio || '');
+            }});
 
         const idsProyActivos = new Set(PROYECTOS_DATA.map(p => p.ID_proy));
 
@@ -163,7 +174,26 @@ def get_data_loader_js(apps_script_url):
 
         // 2. BENEFICIARIOS
         const benRaw = raw.Beneficiario?.rows || [];
-        const estadosValidos = ['ejecuci', 'subsidiad', 'preparaci'];
+        const estadosValidos = ['ejecuci', 'subsidiad', 'preparaci', 'terminad'];
+
+        // Tipologias dict
+        const tipRaw = raw.Tipologias?.rows || [];
+        const tipDict = {{}};
+        tipRaw.forEach(t => {{
+            const id = String(t.IDU_tipol || '').trim();
+            if (id && id !== 'nan') {{
+                const fam = String(t.Familia || '').trim();
+                const dorm = String(t.dormitorios || '').trim();
+                const plantas = String(t.plantas || '').trim();
+                const caract = String(t.caracterizacion || '').trim();
+                let label = 'Vivienda';
+                if (dorm && dorm !== 'nan') label += ` ${{dorm}}D`;
+                if (plantas && plantas !== 'nan') label += ` ${{plantas}}P`;
+                if (caract && caract !== 'nan') label += ` ${{caract}}`;
+                tipDict[id] = label;
+            }}
+        }});
+
         BENEFICIARIOS_DATA = benRaw
             .filter(b => {{
                 const proy = String(b.ID_Proy || '');
@@ -175,14 +205,28 @@ def get_data_loader_js(apps_script_url):
                 const tipRC = String(b['Tipologia RC'] || '');
                 const tipVivId = (tipViv && tipViv.toLowerCase() !== 'nan' && tipViv !== '') ? tipViv : '';
                 const tipRCId = (tipRC && tipRC.toLowerCase() !== 'nan' && tipRC !== '') ? tipRC : '';
+                const habilRaw = String(b['Habil para construir'] || '').toLowerCase();
+                const habil = habilRaw === 'si' || habilRaw === 'sí' || habilRaw === 'true' || habilRaw === '1';
+
+                // Tipologia descriptiva
+                let tipLabel = tipRCId ? 'Casa + RC' : 'Casa';
+                const mainTipId = tipRCId || tipVivId;
+                if (mainTipId && tipDict[mainTipId]) {{
+                    tipLabel = tipDict[mainTipId];
+                    // Agregar nombre proyecto
+                    const proy = PROYECTOS_DATA.find(p => String(p.ID_proy) === String(b.ID_Proy));
+                    if (proy) tipLabel += ` ${{proy.NOMBRE_PROYECTO}}`;
+                }}
+
                 return {{
                     ID_Benef: String(b.ID_Benef || b.IDU_Benef || ''),
                     ID_Proy: String(b.ID_Proy || ''),
                     NOMBRES: String(b.NOMBRES || ''),
                     APELLIDOS: String(b.APELLIDOS || ''),
-                    tipologia: tipRCId ? 'Casa + RC' : 'Casa',
+                    tipologia: tipLabel,
                     tipologia_viv_id: tipVivId,
-                    tipologia_rc_id: tipRCId
+                    tipologia_rc_id: tipRCId,
+                    habil: habil
                 }};
             }});
 
@@ -558,7 +602,7 @@ def make_live_dashboard(apps_script_url):
 
 
 def main():
-    DEFAULT_URL = "http://localhost:5050/api/data"
+    DEFAULT_URL = "https://script.google.com/macros/s/AKfycbxcJowX3a3XBmSNiKOCesj1jRkQWS1VIsMbvdt-x7ckK8ZXMauI6gRgCGsoT77xYxpP/exec"
     url = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_URL
 
     print("=" * 60)
