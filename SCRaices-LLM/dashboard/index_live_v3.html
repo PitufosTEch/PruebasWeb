@@ -434,10 +434,10 @@ const ETAPAS_CONFIG_FULL = {
                 const dorm = String(t.dormitorios || '').trim();
                 const plantas = String(t.plantas || '').trim();
                 const caract = String(t.caracterizacion || '').trim();
-                let label = 'Vivienda';
-                if (dorm && dorm !== 'nan') label += ` ${dorm}D`;
-                if (plantas && plantas !== 'nan') label += ` ${plantas}P`;
-                if (caract && caract !== 'nan') label += ` ${caract}`;
+                let label = (fam && fam !== 'nan') ? fam : 'Vivienda';
+                if (dorm && dorm !== 'nan' && dorm !== '0') label += ` ${dorm}D`;
+                if (plantas && plantas !== 'nan' && plantas !== '0') label += ` ${plantas}P`;
+                if (caract && caract !== 'nan' && caract.toLowerCase() !== 'none') label += ` ${caract}`;
                 tipDict[id] = label;
             }
         });
@@ -456,12 +456,14 @@ const ETAPAS_CONFIG_FULL = {
                 const habilRaw = String(b['Habil para construir'] || '').toLowerCase();
                 const habil = habilRaw === 'si' || habilRaw === 'sí' || habilRaw === 'true' || habilRaw === '1';
 
-                // Tipologia descriptiva
+                // Tipologia descriptiva - siempre usar vivienda como principal
                 let tipLabel = tipRCId ? 'Casa + RC' : 'Casa';
-                const mainTipId = tipRCId || tipVivId;
-                if (mainTipId && tipDict[mainTipId]) {
-                    tipLabel = tipDict[mainTipId];
-                    // Agregar nombre proyecto
+                if (tipVivId && tipDict[tipVivId]) {
+                    tipLabel = tipDict[tipVivId];
+                    const proy = PROYECTOS_DATA.find(p => String(p.ID_proy) === String(b.ID_Proy));
+                    if (proy) tipLabel += ` ${proy.NOMBRE_PROYECTO}`;
+                } else if (tipRCId && tipDict[tipRCId]) {
+                    tipLabel = tipDict[tipRCId];
                     const proy = PROYECTOS_DATA.find(p => String(p.ID_proy) === String(b.ID_Proy));
                     if (proy) tipLabel += ` ${proy.NOMBRE_PROYECTO}`;
                 }
