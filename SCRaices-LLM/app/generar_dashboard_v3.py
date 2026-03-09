@@ -180,6 +180,21 @@ def generar_dashboard_v3_html():
             tipo_display = "Casa + RC" if tip_rc_id else "Casa"
         hpc_raw = str(b.get('Habil para construir', '')).strip().upper()
         habil = hpc_raw == 'TRUE'
+        fecha_hpc_raw = str(b.get('fecha_habil_para_const', '')).strip()
+        fecha_hpc = ''
+        if fecha_hpc_raw and fecha_hpc_raw.lower() not in ['nan', '', 'nat', 'none']:
+            try:
+                if '-' in fecha_hpc_raw and len(fecha_hpc_raw) >= 10:
+                    parts = fecha_hpc_raw.split('-')
+                    if len(parts[0]) == 4:
+                        fecha_hpc = fecha_hpc_raw[:10]
+                    else:
+                        fecha_hpc = f"{parts[2][:4]}-{parts[1].zfill(2)}-{parts[0].zfill(2)}"
+                elif '/' in fecha_hpc_raw:
+                    parts = fecha_hpc_raw.split('/')
+                    fecha_hpc = f"{parts[2][:4]}-{parts[1].zfill(2)}-{parts[0].zfill(2)}"
+            except:
+                fecha_hpc = ''
         beneficiarios_data.append({
             'ID_Benef': int(b['ID_Benef']) if str(b['ID_Benef']).isdigit() else str(b['ID_Benef']),
             'ID_Proy': str(b.get('ID_Proy', '')),
@@ -188,7 +203,8 @@ def generar_dashboard_v3_html():
             'tipologia': tipo_display,
             'tipologia_viv_id': tip_viv_id,
             'tipologia_rc_id': tip_rc_id,
-            'habil': habil
+            'habil': habil,
+            'fecha_hpc': fecha_hpc
         })
 
     ids_beneficiarios = set([str(b['ID_Benef']) for b in beneficiarios_data])
@@ -816,6 +832,15 @@ const getEstadoGeneral = (estadoEtapas) => {{
 }};
 
 // ========== GRUPO COLORS & HELPERS ==========
+const ACTIVIDADES_HAB = ["Empalme", "Pre-F1", "Desarme", "Escombros", "Aseo"];
+
+const CONSULTAS_ETAPA = {{
+    "02_1ERA_ETAPA": "Postes instalados?",
+    "03_2DA_ETAPA": "TE1 solicitado?",
+    "08_CERAMICO_MURO": "Empalme solicitado?",
+    "13_GASFITERIA": "Accion Sanitaria?"
+}};
+
 const GRUPO_COLORS = [
     {{ bg:"bg-blue-50", border:"border-blue-200", text:"text-blue-700", accent:"bg-blue-500", light:"bg-blue-100", headerBg:"bg-blue-50", ring:"ring-blue-300" }},
     {{ bg:"bg-amber-50", border:"border-amber-200", text:"text-amber-700", accent:"bg-amber-500", light:"bg-amber-100", headerBg:"bg-amber-50", ring:"ring-amber-300" }},
@@ -906,37 +931,103 @@ const KPICard = ({{ titulo, valor, icono, color, subtitulo }}) => {{
     );
 }};
 
-const LineaTiempo = ({{ estadoEtapas }}) => (
-    <div className="flex items-stretch gap-0.5 overflow-x-auto hide-scrollbar">
-        {{SECUENCIA_PRINCIPAL.map((key, idx) => {{
+const LineaTiempo = ({{ estadoEtapas, fechaHPC }}) => {{
+    // Calcular Dia 0: fecha HPC, o si no existe, fecha fundacion
+    const fundFecha = estadoEtapas["01_FUNDACIONES"]?.fechaDespacho;
+    const dia0Str = fechaHPC || fundFecha || null;
+    const dia0 = dia0Str ? new Date(dia0Str) : null;
+    const hoy = new Date();
+    const diasHoy = dia0 ? Math.floor((hoy - dia0) / (1000*60*60*24)) : null;
+
+    // Calcular dias acumulados desde dia0 para cada etapa
+    const diasAcum = {{}};
+    const diasAcumSol = {{}};
+    if (dia0) {{
+        SECUENCIA_PRINCIPAL.forEach(key => {{
             const info = estadoEtapas[key];
-            const config = ETAPAS_CONFIG[key];
-            const colores = {{ despachado: "bg-blue-500 text-white", solicitado: "bg-purple-500 text-white", en_tiempo: "bg-green-50 text-green-700 border border-green-200", atencion: "bg-yellow-50 text-yellow-700 border border-yellow-200", critico: "bg-red-50 text-red-700 border border-red-200 pulse-soft", bloqueado: "bg-gray-100 text-gray-400 border border-gray-200" }};
-            return (
-                <React.Fragment key={{key}}>
-                    <div className={{`flex flex-col items-center rounded-lg px-2 py-1.5 ${{colores[info?.estado || "bloqueado"]}}`}} style={{{{minWidth:"72px"}}}}>
-                        <span className="text-xs font-bold">
-                            {{info?.estado === "despachado" ? `D${{info.diasTranscurridos || 0}}d` : info?.estado === "solicitado" ? `S${{info.diasSolicitud || 0}}d` : info?.estado === "bloqueado" ? "\u2014" : `+${{info?.diasTranscurridos || 0}}d`}}
-                        </span>
-                        <span className="text-[10px] leading-tight text-center mt-0.5">{{config?.nombre || key}}</span>
-                        {{info?.estado === "despachado" && info?.guia && <span className="text-[9px] opacity-75">#{{info.guia}}</span>}}
-                        {{info?.estado === "solicitado" && <span className="text-[9px] opacity-75">Solicitado</span>}}
-                    </div>
-                    {{idx < SECUENCIA_PRINCIPAL.length - 1 && (
-                        <div className="flex items-center">
-                            <div className={{`w-3 h-0.5 ${{info?.estado === "despachado" ? "bg-blue-400" : info?.estado === "solicitado" ? "bg-purple-400" : "bg-gray-200"}}`}} />
-                            <span className="text-gray-300 text-[10px]">&rarr;</span>
-                            <div className={{`w-3 h-0.5 ${{estadoEtapas[SECUENCIA_PRINCIPAL[idx+1]]?.estado === "despachado" ? "bg-blue-400" : "bg-gray-200"}}`}} />
+            if (info?.estado === "despachado" && info.fechaDespacho) {{
+                diasAcum[key] = Math.max(0, Math.floor((new Date(info.fechaDespacho) - dia0) / (1000*60*60*24)));
+            }} else if (info?.estado === "solicitado" && info.fechaSolicitud) {{
+                diasAcumSol[key] = Math.max(0, Math.floor((new Date(info.fechaSolicitud) - dia0) / (1000*60*60*24)));
+            }}
+        }});
+    }}
+
+    const colores = {{ despachado: "bg-blue-500 text-white", solicitado: "bg-purple-500 text-white", en_tiempo: "bg-green-50 text-green-700 border border-green-200", atencion: "bg-yellow-50 text-yellow-700 border border-yellow-200", critico: "bg-red-50 text-red-700 border border-red-200 pulse-soft", bloqueado: "bg-gray-100 text-gray-400 border border-gray-200" }};
+
+    // Delta: diferencia con la etapa anterior despachada o solicitada
+    const getAcumValue = (key) => diasAcum[key] ?? diasAcumSol[key] ?? null;
+    const getDelta = (idx) => {{
+        const curr = getAcumValue(SECUENCIA_PRINCIPAL[idx]);
+        if (curr === null) return null;
+        for (let j = idx - 1; j >= 0; j--) {{
+            const prev = getAcumValue(SECUENCIA_PRINCIPAL[j]);
+            if (prev !== null) return curr - prev;
+        }}
+        return curr;
+    }};
+
+    // Ultimo evento (despachado o solicitado) para calcular delta hasta HOY
+    let ultimoAcum = null;
+    for (let j = SECUENCIA_PRINCIPAL.length - 1; j >= 0; j--) {{
+        const v = getAcumValue(SECUENCIA_PRINCIPAL[j]);
+        if (v !== null) {{ ultimoAcum = v; break; }}
+    }}
+    const deltaHoy = (diasHoy !== null && ultimoAcum !== null) ? diasHoy - ultimoAcum : null;
+
+    const formatFechaCorta = (iso) => {{ if (!iso) return ""; const p = iso.split("-"); return `${{p[2]}}/${{p[1]}}`; }};
+
+    return (
+        <div className="flex items-stretch gap-0 overflow-x-auto hide-scrollbar">
+            {{/* HPC / Dia 0 */}}
+            <div className={{`flex flex-col items-center rounded-l-lg px-2 py-1.5 ${{dia0 ? "bg-emerald-600 text-white" : "bg-gray-200 text-gray-500"}}`}} style={{{{minWidth:"56px"}}}}>
+                <span className="text-[10px] font-bold">Dia 0</span>
+                <span className="text-[9px] leading-tight text-center mt-0.5">{{fechaHPC ? "HPC" : fundFecha ? "Fund" : "---"}}</span>
+            </div>
+            {{SECUENCIA_PRINCIPAL.map((key, idx) => {{
+                const info = estadoEtapas[key];
+                const config = ETAPAS_CONFIG[key];
+                const acum = diasAcum[key];
+                const acumSol = diasAcumSol[key];
+                const delta = getDelta(idx);
+
+                return (
+                    <React.Fragment key={{key}}>
+                        {{/* Flecha con delta */}}
+                        <div className="flex flex-col items-center justify-center px-0.5" style={{{{minWidth:"32px"}}}}>
+                            <div className={{`h-0.5 w-full ${{info?.estado === "despachado" ? "bg-blue-400" : info?.estado === "solicitado" ? "bg-purple-300" : "bg-gray-200"}}`}} />
+                            {{delta !== null && <span className="text-[8px] text-gray-400 font-mono mt-0.5">+{{delta}}d</span>}}
                         </div>
-                    )}}
+                        {{/* Etapa */}}
+                        <div className={{`flex flex-col items-center px-2 py-1.5 ${{colores[info?.estado || "bloqueado"]}}`}} style={{{{minWidth:"68px"}}}} title={{acum !== undefined ? `Dia ${{acum}} desde inicio` : acumSol !== undefined ? `Solicitado dia ${{acumSol}} (${{formatFechaCorta(info?.fechaSolicitud)}})` : ""}}>
+                            <span className="text-xs font-bold">
+                                {{acum !== undefined ? `d${{acum}}` : acumSol !== undefined ? `d${{acumSol}}` : "\u2014"}}
+                            </span>
+                            <span className="text-[10px] leading-tight text-center mt-0.5">{{config?.nombre || key}}</span>
+                            {{info?.estado === "solicitado" && <span className="text-[9px] opacity-75">{{formatFechaCorta(info.fechaSolicitud)}}</span>}}
+                        </div>
+                    </React.Fragment>
+                );
+            }})}}
+            {{/* HOY */}}
+            {{diasHoy !== null && (
+                <React.Fragment>
+                    <div className="flex flex-col items-center justify-center px-0.5" style={{{{minWidth:"32px"}}}}>
+                        <div className="h-0.5 w-full bg-gray-300" style={{{{backgroundImage:"repeating-linear-gradient(90deg, #d1d5db 0, #d1d5db 4px, transparent 4px, transparent 8px)"}}}} />
+                        {{deltaHoy !== null && deltaHoy > 0 && <span className="text-[8px] text-gray-400 font-mono mt-0.5">+{{deltaHoy}}d</span>}}
+                    </div>
+                    <div className="flex flex-col items-center rounded-r-lg px-2 py-1.5 bg-gray-700 text-white" style={{{{minWidth:"56px"}}}}>
+                        <span className="text-[10px] font-bold">d{{diasHoy}}</span>
+                        <span className="text-[9px] leading-tight text-center mt-0.5">HOY</span>
+                    </div>
                 </React.Fragment>
-            );
-        }})}}
-    </div>
-);
+            )}}
+        </div>
+    );
+}};
 
 // ===== VIVIENDA CARD =====
-const ViviendaCard = ({{ beneficiario, estadoEtapas, expanded, onToggle, grupoColor, obsCount, observaciones, addObservacion, deleteObservacion }}) => {{
+const ViviendaCard = ({{ beneficiario, estadoEtapas, expanded, onToggle, grupoColor, obsCount, observaciones, addObservacion, deleteObservacion, actividades, toggleActividad, consultas, toggleConsulta }}) => {{
     const [obsTexto, setObsTexto] = React.useState("");
     const [showObsInput, setShowObsInput] = React.useState(false);
     const b = beneficiario;
@@ -987,6 +1078,16 @@ const ViviendaCard = ({{ beneficiario, estadoEtapas, expanded, onToggle, grupoCo
                                 <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden"><div className="triple-bar bg-emerald-500" style={{{{width:`${{insp ? insp.pct_total : 0}}%`}}}} /></div>
                                 <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden"><div className="triple-bar bg-violet-500" style={{{{width:`${{Math.min(avance.porcentaje, 100)}}%`}}}} /></div>
                             </div>
+                            <div className="flex gap-0.5 mt-1.5" onClick={{(e) => e.stopPropagation()}}>
+                                {{ACTIVIDADES_HAB.map(act => {{
+                                    const done = actividades && actividades[act];
+                                    return (
+                                        <button key={{act}} onClick={{() => toggleActividad(b.ID_Benef, act)}} className={{`w-6 h-6 rounded text-[7px] leading-tight font-bold border transition-all flex items-center justify-center ${{done ? "bg-green-500 text-white border-green-600 shadow-sm" : "bg-gray-100 text-gray-400 border-gray-200 hover:border-gray-400 hover:bg-gray-200"}}`}} title={{done ? `${{act}}: Terminado (${{done.fecha.replace('T', ' ')}})` : `${{act}}: Pendiente — Click para marcar`}}>
+                                            {{done ? "\u2713" : act.substring(0, 2)}}
+                                        </button>
+                                    );
+                                }})}}
+                            </div>
                         </div>
                         <div className="flex flex-col items-center gap-1">
                             <EstadoBadge estado={{estadoGeneral}} />
@@ -995,7 +1096,7 @@ const ViviendaCard = ({{ beneficiario, estadoEtapas, expanded, onToggle, grupoCo
                         </div>
                     </div>
                 </div>
-                <LineaTiempo estadoEtapas={{estadoEtapas}} />
+                <LineaTiempo estadoEtapas={{estadoEtapas}} fechaHPC={{b.fecha_hpc}} />
                 <div className="mt-3 flex items-center justify-between text-sm">
                     <div className="text-gray-500">
                         {{ultima ? <span>Ultima: <span className="text-gray-700 font-medium">{{ultima.nombre}}</span> \u2014 {{ultima.guia ? `#${{ultima.guia}}` : ""}} \u2014 <span className={{estadoGeneral === "critico" ? "text-red-600 font-medium" : estadoGeneral === "atencion" ? "text-yellow-600" : "text-green-600"}}>{{ultima.diasTranscurridos}}d</span></span> : <span className="text-yellow-600">Sin despachos registrados</span>}}
@@ -1011,28 +1112,77 @@ const ViviendaCard = ({{ beneficiario, estadoEtapas, expanded, onToggle, grupoCo
             </div>
             {{expanded && (
                 <div className="border-t border-gray-100 p-4 bg-gray-50">
-                    <h4 className="text-sm font-medium text-gray-700 mb-3">Detalle de Etapas</h4>
-                    <div className="space-y-2 mb-4">
-                        {{SECUENCIA_PRINCIPAL.map(key => {{
-                            const info = estadoEtapas[key];
-                            const config = ETAPAS_CONFIG[key];
-                            const coloresChip = {{ despachado: "bg-blue-500", solicitado: "bg-purple-500", en_tiempo: "bg-green-500", atencion: "bg-yellow-500", critico: "bg-red-500 pulse-soft", bloqueado: "bg-gray-300" }};
-                            return (
-                                <div key={{key}} className="flex items-center gap-3 text-sm">
-                                    <div className={{`w-8 h-8 rounded-full ${{coloresChip[info?.estado || "bloqueado"]}} flex items-center justify-center text-white text-xs font-bold shadow`}}>{{info?.estado === "solicitado" ? "S" : config?.codigo || "?"}}</div>
-                                    <span className="text-gray-700 flex-1">{{config?.nombre || key}}</span>
-                                    <span className="text-gray-500">
-                                        {{info?.estado === "despachado" && `Guia #${{info.guia}} \u2014 ${{info.diasTranscurridos}}d`}}
-                                        {{info?.estado === "solicitado" && <span className="text-purple-600">Solicitado hace {{info.diasSolicitud}}d</span>}}
-                                        {{info?.estado === "critico" && <span className="text-red-600">{{info.diasTranscurridos}}d</span>}}
-                                        {{info?.estado === "atencion" && <span className="text-yellow-600">{{info.diasTranscurridos}}d</span>}}
-                                        {{info?.estado === "en_tiempo" && <span className="text-green-600">{{info.diasTranscurridos}}d</span>}}
-                                        {{info?.estado === "bloqueado" && "Bloqueado"}}
-                                    </span>
+                    <h4 className="text-sm font-medium text-gray-700 mb-3">Detalle de Etapas (dias desde inicio)</h4>
+                    {{(() => {{
+                        const fundFecha = estadoEtapas["01_FUNDACIONES"]?.fechaDespacho;
+                        const dia0Str = b.fecha_hpc || fundFecha || null;
+                        const dia0 = dia0Str ? new Date(dia0Str) : null;
+                        const diasAcumDet = {{}};
+                        if (dia0) {{
+                            SECUENCIA_PRINCIPAL.forEach(key => {{
+                                const inf = estadoEtapas[key];
+                                if (inf?.estado === "despachado" && inf.fechaDespacho) {{
+                                    diasAcumDet[key] = Math.max(0, Math.floor((new Date(inf.fechaDespacho) - dia0) / (1000*60*60*24)));
+                                }}
+                            }});
+                        }}
+                        const getDeltaDet = (idx) => {{
+                            const curr = diasAcumDet[SECUENCIA_PRINCIPAL[idx]];
+                            if (curr === undefined) return null;
+                            for (let j = idx - 1; j >= 0; j--) {{
+                                const prev = diasAcumDet[SECUENCIA_PRINCIPAL[j]];
+                                if (prev !== undefined) return curr - prev;
+                            }}
+                            return curr;
+                        }};
+                        const formatFechaDet = (iso) => {{ if (!iso) return ""; const [y,m,d] = iso.split("-"); return `${{d}}/${{m}}`; }};
+                        return (
+                            <div className="space-y-1.5 mb-4">
+                                <div className="flex items-center gap-3 text-sm mb-2 pb-2 border-b border-gray-200">
+                                    <div className="w-8 h-8 rounded-full bg-emerald-600 flex items-center justify-center text-white text-xs font-bold shadow">0</div>
+                                    <span className="text-gray-700 flex-1 font-medium">{{b.fecha_hpc ? "Habilitacion para Construir" : fundFecha ? "Fundacion (sin fecha HPC)" : "Sin fecha de inicio"}}</span>
+                                    <span className="text-emerald-600 font-mono text-xs">{{dia0Str ? formatFechaDet(dia0Str) : "\u2014"}} \u2014 Dia 0</span>
+                                </div>
+                                {{SECUENCIA_PRINCIPAL.map((key, idx) => {{
+                                    const info = estadoEtapas[key];
+                                    const config = ETAPAS_CONFIG[key];
+                                    const coloresChip = {{ despachado: "bg-blue-500", solicitado: "bg-purple-500", en_tiempo: "bg-green-500", atencion: "bg-yellow-500", critico: "bg-red-500 pulse-soft", bloqueado: "bg-gray-300" }};
+                                    const acum = diasAcumDet[key];
+                                    const delta = getDeltaDet(idx);
+                                    const consultaTexto = CONSULTAS_ETAPA[key];
+                                    const consDone = consultaTexto && consultas && consultas[key];
+                                    return (
+                                        <div key={{key}} className="flex items-center gap-3 text-sm">
+                                            <div className={{`w-8 h-8 rounded-full ${{coloresChip[info?.estado || "bloqueado"]}} flex items-center justify-center text-white text-xs font-bold shadow`}}>{{info?.estado === "solicitado" ? "S" : config?.codigo || "?"}}</div>
+                                            <span className="text-gray-700 flex-1">
+                                                {{config?.nombre || key}}
+                                                {{consultaTexto && info?.estado === "despachado" && (
+                                                    <button onClick={{(e) => {{ e.stopPropagation(); toggleConsulta(b.ID_Benef, key); }}}} className={{`ml-2 inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded-full border cursor-pointer transition-all ${{consDone ? "bg-green-100 text-green-700 border-green-300" : "bg-orange-100 text-orange-700 border-orange-300 pulse-soft"}}`}} title={{consDone ? `${{consultaTexto}} Hecho (${{consDone.fecha.replace('T', ' ')}})` : `${{consultaTexto}} — Click para marcar`}}>
+                                                        {{consDone ? "\u2713" : "\u26A0"}} {{consultaTexto}}
+                                                    </button>
+                                                )}}
+                                            </span>
+                                            <span className="text-gray-500 flex items-center gap-2">
+                                                {{info?.estado === "despachado" && (
+                                                    <span className="flex items-center gap-2">
+                                                        <span className="text-[10px] text-gray-400">{{formatFechaDet(info.fechaDespacho)}}</span>
+                                                        {{delta !== null && <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-200 font-mono">+{{delta}}d</span>}}
+                                                        <span className="font-mono font-bold text-blue-700">d{{acum}}</span>
+                                                        {{info.guia && <span className="text-[10px] text-gray-400">#{{info.guia}}</span>}}
+                                                    </span>
+                                                )}}
+                                                {{info?.estado === "solicitado" && <span className="text-purple-600">Solicitado hace {{info.diasSolicitud}}d</span>}}
+                                                {{info?.estado === "critico" && <span className="text-red-600">Esperando {{info.diasTranscurridos}}d</span>}}
+                                                {{info?.estado === "atencion" && <span className="text-yellow-600">Esperando {{info.diasTranscurridos}}d</span>}}
+                                                {{info?.estado === "en_tiempo" && <span className="text-green-600">Esperando {{info.diasTranscurridos}}d</span>}}
+                                                {{info?.estado === "bloqueado" && "Pendiente"}}
+                                            </span>
                                 </div>
                             );
                         }})}}
-                    </div>
+                            </div>
+                        );
+                    }})()}}
                     {{/* Inspecciones */}}
                     {{insp ? (
                         <div className="mt-4 pt-4 border-t border-gray-200">
@@ -1240,7 +1390,7 @@ const GrupoHeader = ({{ grupo, colorIdx, open, onToggle }}) => {{
 }};
 
 // ===== VIVIENDAS TAB =====
-const ViviendasTab = ({{ viviendas, grupos, expandida, setExpandida, filtro, setFiltro, busqueda, setBusqueda, observaciones, addObservacion, deleteObservacion, showResumenObs, setShowResumenObs }}) => {{
+const ViviendasTab = ({{ viviendas, grupos, expandida, setExpandida, filtro, setFiltro, busqueda, setBusqueda, observaciones, addObservacion, deleteObservacion, showResumenObs, setShowResumenObs, actividades, toggleActividad, consultas, toggleConsulta }}) => {{
     const criticas = viviendas.filter(v => v.estadoGeneral === "critico").length;
     const atencion_ = viviendas.filter(v => v.estadoGeneral === "atencion").length;
     const enTiempo = viviendas.filter(v => v.estadoGeneral === "en_tiempo").length;
@@ -1263,52 +1413,179 @@ const ViviendasTab = ({{ viviendas, grupos, expandida, setExpandida, filtro, set
                 {{[["todos","Todas",viviendas.length],["critico","Criticas",criticas],["atencion","Atencion",atencion_],["en_tiempo","En Tiempo",enTiempo]].map(([k,l,c]) =>
                     <button key={{k}} onClick={{() => setFiltro(k)}} className={{`px-3 py-1.5 rounded-lg text-xs font-medium ${{filtro===k ? "bg-violet-600 text-white shadow-sm" : "bg-white text-gray-500 border border-gray-200 hover:border-gray-300"}}`}}>{{l}} <span className="ml-1 opacity-60">{{c}}</span></button>
                 )}}
-                {{Object.keys(observaciones).length > 0 && (
-                    <button onClick={{() => setShowResumenObs(true)}} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-700 border border-amber-300 hover:bg-amber-100 flex items-center gap-1" title="Ver resumen de todas las observaciones">&#9998; Resumen</button>
-                )}}
+                <button onClick={{() => setShowResumenObs("obs")}} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-700 border border-amber-300 hover:bg-amber-100 flex items-center gap-1" title="Ver resumen general">&#9998; Resumen</button>
                 <div className="relative ml-auto">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"><IconSearch /></span>
                     <input type="text" placeholder="Buscar beneficiario..." value={{busqueda}} onChange={{(e) => setBusqueda(e.target.value)}}
                         className="w-56 bg-white border border-gray-200 rounded-lg pl-10 pr-4 py-1.5 text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500 focus:outline-none" />
                 </div>
             </div>
-            {{/* Modal Resumen Observaciones */}}
-            {{showResumenObs && (
-                <div className="fixed inset-0 bg-black/40 z-[100] flex items-center justify-center p-4" onClick={{() => setShowResumenObs(false)}}>
-                    <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto" onClick={{(e) => e.stopPropagation()}}>
-                        <div className="sticky top-0 bg-white border-b border-gray-200 px-5 py-4 flex items-center justify-between rounded-t-xl">
-                            <h3 className="text-lg font-bold text-gray-800">Resumen de Observaciones</h3>
-                            <button onClick={{() => setShowResumenObs(false)}} className="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
-                        </div>
-                        <div className="p-5 space-y-4">
-                            {{Object.entries(observaciones).filter(([,obs]) => obs.length > 0).map(([idBenef, obs]) => {{
-                                const v = viviendas.find(vv => String(vv.ID_Benef) === String(idBenef));
-                                const nombre = v ? `${{v.NOMBRES}} ${{v.APELLIDOS}}` : idBenef;
-                                return (
-                                    <div key={{idBenef}} className="border border-amber-200 rounded-lg overflow-hidden">
-                                        <div className="bg-amber-50 px-4 py-2 border-b border-amber-200">
-                                            <span className="font-semibold text-gray-800 text-sm">{{nombre}}</span>
-                                            <span className="text-[10px] text-gray-400 ml-2">{{obs.length}} obs.</span>
-                                        </div>
-                                        <div className="p-3 space-y-2">
-                                            {{obs.map(o => (
-                                                <div key={{o.id}} className="flex items-start gap-2 text-sm">
-                                                    <span className="text-amber-400 mt-0.5">&#8226;</span>
-                                                    <div className="flex-1">
-                                                        <span className="text-gray-700">{{o.texto}}</span>
-                                                        <span className="text-[10px] text-gray-400 ml-2">{{o.fecha.replace('T', ' ')}}</span>
+            {{/* Modal Resumen con 3 tabs */}}
+            {{showResumenObs && (() => {{
+                const [resTab, setResTab] = [showResumenObs, setShowResumenObs];
+                const actualTab = typeof resTab === "string" ? resTab : "obs";
+                const setActualTab = (t) => setResTab(t || true);
+                const closeModal = () => setResTab(false);
+
+                // Consultas gatilladas: recorrer viviendas y ver cuales tienen etapas despachadas con consulta
+                const consultasData = viviendas.flatMap(v => {{
+                    const estados = v.estadoEtapas || {{}};
+                    return Object.entries(CONSULTAS_ETAPA).filter(([etKey]) => estados[etKey]?.estado === "despachado").map(([etKey, pregunta]) => {{
+                        const done = consultas[v.ID_Benef] && consultas[v.ID_Benef][etKey];
+                        return {{ idBenef: v.ID_Benef, nombre: `${{v.NOMBRES}} ${{v.APELLIDOS}}`, etapa: ETAPAS_CONFIG[etKey]?.nombre || etKey, pregunta, done, etKey }};
+                    }});
+                }});
+                const consPendientes = consultasData.filter(c => !c.done);
+                const consHechas = consultasData.filter(c => c.done);
+
+                // Actividades 5%: recorrer viviendas
+                const actData = viviendas.map(v => {{
+                    const benActs = actividades[v.ID_Benef] || {{}};
+                    const hechas = ACTIVIDADES_HAB.filter(a => benActs[a]);
+                    const pendientes = ACTIVIDADES_HAB.filter(a => !benActs[a]);
+                    return {{ idBenef: v.ID_Benef, nombre: `${{v.NOMBRES}} ${{v.APELLIDOS}}`, benActs, hechas, pendientes, pct: hechas.length }};
+                }});
+                const actConAlgo = actData.filter(a => a.hechas.length > 0);
+                const actCompletas = actData.filter(a => a.hechas.length === 5);
+                const actParciales = actData.filter(a => a.hechas.length > 0 && a.hechas.length < 5);
+
+                const tabBtns = [
+                    ["obs", `Observaciones (${{Object.values(observaciones).filter(o => o.length > 0).length}})`],
+                    ["cons", `Consultas (${{consPendientes.length}} pend.)`],
+                    ["act5", `Actividades 5% (${{actCompletas.length}}/${{viviendas.length}})`]
+                ];
+
+                return (
+                    <div className="fixed inset-0 bg-black/40 z-[100] flex items-center justify-center p-4" onClick={{closeModal}}>
+                        <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col" onClick={{(e) => e.stopPropagation()}}>
+                            <div className="sticky top-0 bg-white border-b border-gray-200 px-5 py-3 flex items-center justify-between rounded-t-xl z-10">
+                                <h3 className="text-lg font-bold text-gray-800">Resumen</h3>
+                                <button onClick={{closeModal}} className="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+                            </div>
+                            <div className="flex border-b border-gray-200 bg-gray-50 px-5">
+                                {{tabBtns.map(([k, label]) => (
+                                    <button key={{k}} onClick={{() => setActualTab(k)}} className={{`px-4 py-2.5 text-xs font-medium border-b-2 transition-colors ${{actualTab === k ? "border-violet-600 text-violet-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}}`}}>{{label}}</button>
+                                ))}}
+                            </div>
+                            <div className="flex-1 overflow-y-auto p-5">
+                                {{/* Tab Observaciones */}}
+                                {{actualTab === "obs" && (
+                                    <div className="space-y-3">
+                                        {{Object.entries(observaciones).filter(([,obs]) => obs.length > 0).map(([idBenef, obs]) => {{
+                                            const v = viviendas.find(vv => String(vv.ID_Benef) === String(idBenef));
+                                            const nombre = v ? `${{v.NOMBRES}} ${{v.APELLIDOS}}` : idBenef;
+                                            return (
+                                                <div key={{idBenef}} className="border border-amber-200 rounded-lg overflow-hidden">
+                                                    <div className="bg-amber-50 px-4 py-2 border-b border-amber-200">
+                                                        <span className="font-semibold text-gray-800 text-sm">{{nombre}}</span>
+                                                        <span className="text-[10px] text-gray-400 ml-2">{{obs.length}} obs.</span>
+                                                    </div>
+                                                    <div className="p-3 space-y-1.5">
+                                                        {{obs.map(o => (
+                                                            <div key={{o.id}} className="flex items-start gap-2 text-sm">
+                                                                <span className="text-amber-400 mt-0.5">&#8226;</span>
+                                                                <span className="text-gray-700 flex-1">{{o.texto}}</span>
+                                                                <span className="text-[10px] text-gray-400 whitespace-nowrap">{{o.fecha.replace('T', ' ')}}</span>
+                                                            </div>
+                                                        ))}}
                                                     </div>
                                                 </div>
-                                            ))}}
+                                            );
+                                        }})}}
+                                        {{Object.values(observaciones).filter(o => o.length > 0).length === 0 && <p className="text-gray-400 text-center py-8">Sin observaciones registradas</p>}}
+                                    </div>
+                                )}}
+                                {{/* Tab Consultas */}}
+                                {{actualTab === "cons" && (
+                                    <div className="space-y-4">
+                                        {{consPendientes.length > 0 && (
+                                            <div>
+                                                <h4 className="text-sm font-bold text-orange-700 mb-2 flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-orange-500 pulse-soft"></span> Pendientes ({{consPendientes.length}})</h4>
+                                                <div className="border border-orange-200 rounded-lg overflow-hidden">
+                                                    <table className="w-full text-sm">
+                                                        <thead><tr className="bg-orange-50 text-orange-800 text-xs"><th className="py-2 px-3 text-left">Beneficiario</th><th className="py-2 px-3 text-left">Etapa</th><th className="py-2 px-3 text-left">Consulta</th><th className="py-2 px-2 w-16"></th></tr></thead>
+                                                        <tbody>
+                                                            {{consPendientes.map((c, i) => (
+                                                                <tr key={{i}} className={{i % 2 === 0 ? "bg-white" : "bg-orange-50/30"}}>
+                                                                    <td className="py-1.5 px-3 text-gray-800 font-medium">{{c.nombre}}</td>
+                                                                    <td className="py-1.5 px-3 text-gray-600">{{c.etapa}}</td>
+                                                                    <td className="py-1.5 px-3 text-orange-700 font-medium">{{c.pregunta}}</td>
+                                                                    <td className="py-1.5 px-2"><button onClick={{() => toggleConsulta(c.idBenef, c.etKey)}} className="text-[10px] bg-green-100 text-green-700 border border-green-300 rounded px-2 py-0.5 hover:bg-green-200">Hecho</button></td>
+                                                                </tr>
+                                                            ))}}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        )}}
+                                        {{consHechas.length > 0 && (
+                                            <div>
+                                                <h4 className="text-sm font-bold text-green-700 mb-2 flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-green-500"></span> Respondidas ({{consHechas.length}})</h4>
+                                                <div className="border border-green-200 rounded-lg overflow-hidden">
+                                                    <table className="w-full text-sm">
+                                                        <thead><tr className="bg-green-50 text-green-800 text-xs"><th className="py-2 px-3 text-left">Beneficiario</th><th className="py-2 px-3 text-left">Etapa</th><th className="py-2 px-3 text-left">Consulta</th><th className="py-2 px-3 text-left">Fecha</th></tr></thead>
+                                                        <tbody>
+                                                            {{consHechas.map((c, i) => (
+                                                                <tr key={{i}} className={{i % 2 === 0 ? "bg-white" : "bg-green-50/30"}}>
+                                                                    <td className="py-1.5 px-3 text-gray-800">{{c.nombre}}</td>
+                                                                    <td className="py-1.5 px-3 text-gray-600">{{c.etapa}}</td>
+                                                                    <td className="py-1.5 px-3 text-green-700">{{c.pregunta}}</td>
+                                                                    <td className="py-1.5 px-3 text-[10px] text-gray-500">{{c.done.fecha.replace('T', ' ')}}</td>
+                                                                </tr>
+                                                            ))}}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        )}}
+                                        {{consultasData.length === 0 && <p className="text-gray-400 text-center py-8">No hay consultas gatilladas aun (ninguna etapa con consulta ha sido despachada)</p>}}
+                                    </div>
+                                )}}
+                                {{/* Tab Actividades 5% */}}
+                                {{actualTab === "act5" && (
+                                    <div className="space-y-4">
+                                        <div className="flex items-center gap-4 text-sm mb-3">
+                                            <span className="text-gray-600">Completas: <strong className="text-green-600">{{actCompletas.length}}</strong></span>
+                                            <span className="text-gray-600">Parciales: <strong className="text-amber-600">{{actParciales.length}}</strong></span>
+                                            <span className="text-gray-600">Sin iniciar: <strong className="text-gray-400">{{viviendas.length - actConAlgo.length}}</strong></span>
+                                            <span className="text-gray-600">Total: <strong>{{viviendas.length}}</strong></span>
+                                        </div>
+                                        <div className="border border-gray-200 rounded-lg overflow-hidden">
+                                            <table className="w-full text-sm">
+                                                <thead><tr className="bg-gray-50 text-gray-600 text-xs">
+                                                    <th className="py-2 px-3 text-left">Beneficiario</th>
+                                                    {{ACTIVIDADES_HAB.map(a => <th key={{a}} className="py-2 px-2 text-center w-20">{{a}}</th>)}}
+                                                    <th className="py-2 px-2 text-center w-12">%</th>
+                                                </tr></thead>
+                                                <tbody>
+                                                    {{actData.filter(a => a.hechas.length > 0 || a.pendientes.length < 5).concat(actData.filter(a => a.hechas.length === 0 && a.pendientes.length === 5)).map((row, i) => (
+                                                        <tr key={{row.idBenef}} className={{row.hechas.length === 5 ? "bg-green-50/50" : i % 2 === 0 ? "bg-white" : "bg-gray-50/30"}}>
+                                                            <td className="py-1.5 px-3 text-gray-800 font-medium">{{row.nombre}}</td>
+                                                            {{ACTIVIDADES_HAB.map(act => {{
+                                                                const done = row.benActs[act];
+                                                                return (
+                                                                    <td key={{act}} className="py-1.5 px-2 text-center">
+                                                                        <button onClick={{() => toggleActividad(row.idBenef, act)}} className={{`w-6 h-6 rounded text-xs font-bold border transition-all ${{done ? "bg-green-500 text-white border-green-600" : "bg-gray-100 text-gray-300 border-gray-200 hover:border-gray-400"}}`}} title={{done ? `Hecho: ${{done.fecha.replace('T', ' ')}}` : "Pendiente"}}>
+                                                                            {{done ? "\u2713" : "\u00B7"}}
+                                                                        </button>
+                                                                    </td>
+                                                                );
+                                                            }})}}
+                                                            <td className="py-1.5 px-2 text-center font-mono font-bold text-xs">
+                                                                <span className={{row.pct === 5 ? "text-green-600" : row.pct > 0 ? "text-amber-600" : "text-gray-300"}}>{{row.pct}}%</span>
+                                                            </td>
+                                                        </tr>
+                                                    ))}}
+                                                </tbody>
+                                            </table>
                                         </div>
                                     </div>
-                                );
-                            }})}}
-                            {{Object.keys(observaciones).length === 0 && <p className="text-gray-400 text-center py-8">Sin observaciones registradas</p>}}
+                                )}}
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}}
+                );
+            }})()}}
             <div className="space-y-3">
                 {{gruposData.map(grupo => (
                     <div key={{grupo.id}}>
@@ -1316,7 +1593,7 @@ const ViviendasTab = ({{ viviendas, grupos, expandida, setExpandida, filtro, set
                         {{(gruposAbiertos[grupo.id] !== false) && (
                             <div className={{`space-y-2 ${{grupo.nombre ? "ml-2 pl-3 border-l-2 " + (grupo.colorIdx >= 0 ? GRUPO_COLORS[grupo.colorIdx].border : "border-gray-200") : ""}} mt-2`}}>
                                 {{grupo.viviendas.map(v =>
-                                    <ViviendaCard key={{v.ID_Benef}} beneficiario={{v}} estadoEtapas={{v.estadoEtapas}} expanded={{expandida === v.ID_Benef}} onToggle={{() => setExpandida(expandida === v.ID_Benef ? null : v.ID_Benef)}} grupoColor={{grupo.colorIdx}} obsCount={{(observaciones[v.ID_Benef] || []).length}} observaciones={{observaciones[v.ID_Benef] || []}} addObservacion={{addObservacion}} deleteObservacion={{deleteObservacion}} />
+                                    <ViviendaCard key={{v.ID_Benef}} beneficiario={{v}} estadoEtapas={{v.estadoEtapas}} expanded={{expandida === v.ID_Benef}} onToggle={{() => setExpandida(expandida === v.ID_Benef ? null : v.ID_Benef)}} grupoColor={{grupo.colorIdx}} obsCount={{(observaciones[v.ID_Benef] || []).length}} observaciones={{observaciones[v.ID_Benef] || []}} addObservacion={{addObservacion}} deleteObservacion={{deleteObservacion}} actividades={{actividades[v.ID_Benef] || {{}}}} toggleActividad={{toggleActividad}} consultas={{consultas[v.ID_Benef] || {{}}}} toggleConsulta={{toggleConsulta}} />
                                 )}}
                             </div>
                         )}}
@@ -2534,8 +2811,12 @@ const App = () => {{
     const [fbReady, setFbReady] = React.useState(false);
     const gruposRef = React.useRef(null);
     const obsRef = React.useRef(null);
+    const actRef = React.useRef(null);
+    const consultasRef = React.useRef(null);
     const skipGruposPush = React.useRef(true);
     const skipObsPush = React.useRef(true);
+    const skipActPush = React.useRef(true);
+    const skipConsPush = React.useRef(true);
 
     React.useEffect(() => {{
         // Listener Firebase para Grupos
@@ -2553,9 +2834,25 @@ const App = () => {{
             setObservaciones(val || {{}});
             setFbReady(true);
         }});
+        // Listener Firebase para Actividades de Habilitacion
+        actRef.current = fbDB.ref('actividades');
+        actRef.current.on('value', (snap) => {{
+            const val = snap.val();
+            skipActPush.current = true;
+            setActividades(val || {{}});
+        }});
+        // Listener Firebase para Consultas por Etapa
+        consultasRef.current = fbDB.ref('consultas');
+        consultasRef.current.on('value', (snap) => {{
+            const val = snap.val();
+            skipConsPush.current = true;
+            setConsultas(val || {{}});
+        }});
         return () => {{
             if (gruposRef.current) gruposRef.current.off();
             if (obsRef.current) obsRef.current.off();
+            if (actRef.current) actRef.current.off();
+            if (consultasRef.current) consultasRef.current.off();
         }};
     }}, []);
 
@@ -2574,6 +2871,54 @@ const App = () => {{
         if (skipObsPush.current) {{ skipObsPush.current = false; return; }}
         if (obsRef.current) obsRef.current.set(observaciones);
     }}, [observaciones]);
+
+    // Actividades de habilitacion por beneficiario (Firebase)
+    const [actividades, setActividades] = React.useState({{}});
+
+    React.useEffect(() => {{
+        if (skipActPush.current) {{ skipActPush.current = false; return; }}
+        if (actRef.current) actRef.current.set(actividades);
+    }}, [actividades]);
+
+    // Consultas por etapa (Firebase)
+    const [consultas, setConsultas] = React.useState({{}});
+
+    React.useEffect(() => {{
+        if (skipConsPush.current) {{ skipConsPush.current = false; return; }}
+        if (consultasRef.current) consultasRef.current.set(consultas);
+    }}, [consultas]);
+
+    const toggleConsulta = (idBenef, etapaKey) => {{
+        setConsultas(prev => {{
+            const benCons = prev[idBenef] || {{}};
+            const next = {{ ...prev }};
+            if (benCons[etapaKey]) {{
+                const {{ [etapaKey]: _, ...rest }} = benCons;
+                if (Object.keys(rest).length === 0) delete next[idBenef];
+                else next[idBenef] = rest;
+            }} else {{
+                next[idBenef] = {{ ...benCons, [etapaKey]: {{ done: true, fecha: new Date().toISOString().substring(0, 16) }} }};
+            }}
+            fbDB.ref('consultas').set(next);
+            return next;
+        }});
+    }};
+
+    const toggleActividad = (idBenef, actNombre) => {{
+        setActividades(prev => {{
+            const benActs = prev[idBenef] || {{}};
+            const next = {{ ...prev }};
+            if (benActs[actNombre]) {{
+                const {{ [actNombre]: _, ...rest }} = benActs;
+                if (Object.keys(rest).length === 0) delete next[idBenef];
+                else next[idBenef] = rest;
+            }} else {{
+                next[idBenef] = {{ ...benActs, [actNombre]: {{ done: true, fecha: new Date().toISOString().substring(0, 16) }} }};
+            }}
+            fbDB.ref('actividades').set(next);
+            return next;
+        }});
+    }};
 
     const addObservacion = (idBenef, texto) => {{
         setObservaciones(prev => {{
@@ -2755,7 +3100,7 @@ const App = () => {{
 
                 {{/* CONTENIDO */}}
                 <div className="min-h-[500px]">
-                    {{tab === "viviendas" && <ViviendasTab viviendas={{viviendas}} grupos={{grupos}} expandida={{expandida}} setExpandida={{setExpandida}} filtro={{filtro}} setFiltro={{setFiltro}} busqueda={{busqueda}} setBusqueda={{setBusqueda}} observaciones={{observaciones}} addObservacion={{addObservacion}} deleteObservacion={{deleteObservacion}} showResumenObs={{showResumenObs}} setShowResumenObs={{setShowResumenObs}} />}}
+                    {{tab === "viviendas" && <ViviendasTab viviendas={{viviendas}} grupos={{grupos}} expandida={{expandida}} setExpandida={{setExpandida}} filtro={{filtro}} setFiltro={{setFiltro}} busqueda={{busqueda}} setBusqueda={{setBusqueda}} observaciones={{observaciones}} addObservacion={{addObservacion}} deleteObservacion={{deleteObservacion}} showResumenObs={{showResumenObs}} setShowResumenObs={{setShowResumenObs}} actividades={{actividades}} toggleActividad={{toggleActividad}} consultas={{consultas}} toggleConsulta={{toggleConsulta}} />}}
                     {{tab === "matriz" && <MatrizAvance viviendas={{viviendas}} grupos={{grupos}} />}}
                     {{tab === "distribucion" && <DistribucionTab viviendas={{viviendas}} />}}
                     {{tab === "financiero" && <FinancieroTab viviendas={{viviendas}} />}}
