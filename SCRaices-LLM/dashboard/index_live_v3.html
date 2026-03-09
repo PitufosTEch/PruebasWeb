@@ -887,19 +887,21 @@ const GRUPO_COLORS = [
 ];
 
 function agruparViviendas(viviendas, grupos) {
+    const sortByInicio = (a, b) => (a.primerDespacho || "9999").localeCompare(b.primerDespacho || "9999");
     if (!grupos || grupos.length === 0) {
-        const sorted = [...viviendas].sort((a,b) => b.numDespachos - a.numDespachos);
+        const sorted = [...viviendas].sort(sortByInicio);
         return [{ id:"_all", nombre:null, capataz:null, viviendas:sorted, colorIdx:-1 }];
     }
     const asignados = new Set();
     const result = grupos.map((g, idx) => {
         const vivs = g.beneficiarios.map(bid => viviendas.find(v => String(v.ID_Benef) === String(bid))).filter(Boolean);
+        vivs.sort(sortByInicio);
         vivs.forEach(v => asignados.add(String(v.ID_Benef)));
         return { id:g.id, nombre:g.nombre, capataz:g.capataz, viviendas:vivs, colorIdx:idx % GRUPO_COLORS.length };
     });
     const sinAsignar = viviendas.filter(v => !asignados.has(String(v.ID_Benef)));
     if (sinAsignar.length > 0) {
-        sinAsignar.sort((a,b) => b.numDespachos - a.numDespachos);
+        sinAsignar.sort(sortByInicio);
         result.push({ id:"_sin_asignar", nombre:"Sin Asignar", capataz:null, viviendas:sinAsignar, colorIdx:-1 });
     }
     return result;
@@ -1425,7 +1427,7 @@ const MatrizAvance = ({ viviendas, grupos }) => {
                                     </td>
                                 </tr>
                             )}
-                            {grupo.viviendas.sort((a, b) => b.numDespachos - a.numDespachos).map(v => {
+                            {grupo.viviendas.sort((a, b) => (a.primerDespacho || "9999").localeCompare(b.primerDespacho || "9999")).map(v => {
                                 const insp = getInspeccion(v.ID_Benef);
                                 const totalPag = getTotalPagado(v.ID_Benef);
                                 const alerts = calcCoherencia(v.ID_Benef, v.estadoEtapas);
@@ -2659,8 +2661,10 @@ const App = () => {
 
     const viviendas = React.useMemo(() => beneficiarios.map(b => {
         const estados = calcularEstadoEtapas(b.ID_Benef);
-        const numDespachos = DESPACHOS_DATA.filter(d => String(d.ID_Benef) === String(b.ID_Benef)).length;
-        return { ...b, estadoEtapas: estados, estadoGeneral: getEstadoGeneral(estados), avance: calcularAvance(estados), numDespachos };
+        const desps = DESPACHOS_DATA.filter(d => String(d.ID_Benef) === String(b.ID_Benef));
+        const numDespachos = desps.length;
+        const primerDespacho = desps.length > 0 ? desps.reduce((min, d) => d.Fecha < min ? d.Fecha : min, desps[0].Fecha) : "9999";
+        return { ...b, estadoEtapas: estados, estadoGeneral: getEstadoGeneral(estados), avance: calcularAvance(estados), numDespachos, primerDespacho };
     }), [beneficiarios]);
 
     const proy = PROYECTOS_DATA.find(p => String(p.ID_proy) === String(proyectoSel));
