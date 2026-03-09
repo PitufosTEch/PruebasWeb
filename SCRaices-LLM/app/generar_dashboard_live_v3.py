@@ -126,20 +126,35 @@ def get_data_loader_js(apps_script_url):
         return null;
     }}
 
-    async function fetchAllData() {{
-        updateLoading('Descargando datos...', 10, 'Conectando a Google Sheets');
-        const url = APPS_SCRIPT_URL + '?tables=' + encodeURIComponent(TABLES_TO_FETCH);
-        let response;
-        try {{
-            response = await fetch(url);
-        }} catch (e) {{
-            throw new Error('No se pudo conectar al servidor de datos. Verifica tu conexion a internet.');
-        }}
-        if (!response.ok) throw new Error(`Error del servidor: ${{response.status}}`);
-        updateLoading('Procesando respuesta...', 30, 'Datos recibidos, procesando...');
+    async function fetchBatch(tables, label) {{
+        const url = APPS_SCRIPT_URL + '?tables=' + encodeURIComponent(tables);
+        console.log('[LIVE] Fetching:', label, tables);
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`Error ${{response.status}} al cargar ${{label}}`);
         const data = await response.json();
-        if (data.error) throw new Error('Error en Apps Script: ' + data.error);
+        if (data.error) throw new Error('Error Apps Script (' + label + '): ' + data.error);
+        console.log('[LIVE] OK:', label);
         return data;
+    }}
+
+    async function fetchAllData() {{
+        updateLoading('Descargando datos...', 5, 'Conectando a Google Sheets (3 lotes en paralelo)');
+
+        // Dividir en 3 lotes paralelos para evitar timeout
+        const batch1 = fetchBatch('Proyectos,Beneficiario,Tipologias,Maestros,controlBGB,controlEEPP', 'Lote 1: Proyectos+Benef');
+        const batch2 = fetchBatch('Despacho,soldepacho,Tabla_pago', 'Lote 2: Despachos+Sol');
+        const batch3 = fetchBatch('Ejecucion,Solpago', 'Lote 3: Insp+Pagos');
+
+        let r1, r2, r3;
+        try {{
+            updateLoading('Descargando lotes en paralelo...', 10, 'Lote 1: Proyectos | Lote 2: Despachos | Lote 3: Inspecciones+Pagos');
+            [r1, r2, r3] = await Promise.all([batch1, batch2, batch3]);
+        }} catch (e) {{
+            throw new Error('Error al descargar datos: ' + e.message);
+        }}
+
+        updateLoading('Combinando datos...', 30, 'Todos los lotes recibidos');
+        return {{ ...r1, ...r2, ...r3 }};
     }}
 
     function processRawData(raw) {{
