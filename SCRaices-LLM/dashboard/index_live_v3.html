@@ -56,6 +56,50 @@
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800 min-h-screen">
+
+<div id="loginOverlay" style="position:fixed;inset:0;z-index:9999;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans',sans-serif;">
+    <div style="text-align:center;max-width:380px;width:90%;">
+        <div style="width:56px;height:56px;background:#7c3aed;border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;">
+            <span style="color:white;font-size:18px;font-weight:700;font-family:'IBM Plex Mono',monospace;">SC</span>
+        </div>
+        <h2 style="color:#1f2937;font-size:20px;font-weight:600;margin-bottom:4px;">Panel de Control v3</h2>
+        <p style="color:#9ca3af;font-size:13px;margin-bottom:24px;">SG Raices - Acceso protegido</p>
+        <div style="display:flex;gap:8px;">
+            <input type="password" id="pwdInput" placeholder="Contrasena" autocomplete="off" autofocus
+                style="flex:1;padding:10px 16px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;outline:none;font-family:'IBM Plex Sans',sans-serif;"
+                onkeydown="if(event.key==='Enter')checkPwd()" />
+            <button onclick="checkPwd()"
+                style="padding:10px 20px;background:#7c3aed;color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:500;">Entrar</button>
+        </div>
+        <p id="pwdError" style="color:#ef4444;font-size:12px;margin-top:10px;display:none;">Contrasena incorrecta</p>
+    </div>
+</div>
+<script>
+async function hashPwd(pwd) {
+    const enc = new TextEncoder().encode(pwd);
+    const buf = await crypto.subtle.digest('SHA-256', enc);
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+async function checkPwd() {
+    const input = document.getElementById('pwdInput').value;
+    const hash = await hashPwd(input);
+    if (hash === sessionStorage.getItem('_sc_hash') || input === '') { return; }
+    // Hash correcto de SCRAICES.2026
+    if (hash === 'b5346b30a063c762b881008377ddb2746ce6075a0eb8518eca696937ef2cd6c0') {
+        sessionStorage.setItem('_sc_auth', '1');
+        document.getElementById('loginOverlay').style.display = 'none';
+    } else {
+        document.getElementById('pwdError').style.display = 'block';
+        document.getElementById('pwdInput').value = '';
+        document.getElementById('pwdInput').focus();
+    }
+}
+// Auto-check si ya autenticado en esta sesion
+if (sessionStorage.getItem('_sc_auth') === '1') {
+    document.getElementById('loginOverlay').style.display = 'none';
+}
+</script>
+
 <div id="root"></div>
 <script type="text/babel">
 
