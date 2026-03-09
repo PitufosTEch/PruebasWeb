@@ -1,0 +1,38 @@
+# Credenciales y config sensible
+credentials/
+app/.env
+app/config.py
+app/__pycache__/
+
+# Archivos temporales
+*.pyc
+nul
+app/nul
+.claude/
+
+# Archivos grandes no esenciales
+output/
+reportes/
+app/comparador_data.json
+app/schema.json
+
+# Documentacion AppSheet
+Application Documentation.html
+Application Documentation_files/
+
+# Otros proyectos fuera de scope
+../CLAUDE.md
+../Control de Proyectos/
+../Filtro-Cientifico/
+../ONNE/
+../PermisoBOT/
+
+# Imagenes sueltas
+*.png
+*.gdoc
+
+# Temp
+temp_*.py
+ejemplo de estructura/
+Arreglos/
+proveedores_aridos*.csv

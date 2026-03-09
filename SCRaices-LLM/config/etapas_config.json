@@ -133,8 +133,7 @@
       "dependencia": "08_CERAMICO_MURO",
       "critico": true,
       "_nota": "Incluye instalación de artefactos (cocina, calefont). Es la etapa final de la ruta crítica."
-    },
-
+    }
   },
 
   "colores": {

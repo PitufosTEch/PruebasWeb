@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SCRaices — Comparador de Proyectos</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-primary: #0a0f1a;
+    --bg-card: #111827;
+    --bg-hover: #1f2937;
+    --border: #1e293b;
+    --text-primary: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --accent-jairo: #3b82f6;
+    --accent-arturo: #f59e0b;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg-primary); color: var(--text-primary); font-family: 'IBM Plex Sans', sans-serif; }
+  .font-mono { font-family: 'IBM Plex Mono', monospace; }
+  .hide-scrollbar::-webkit-scrollbar { display: none; }
+  .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  .bar-jairo { background: linear-gradient(90deg, #3b82f6, #60a5fa); }
+  .bar-arturo { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useMemo, useCallback } = React;
+
+const PROJECTS = [{"id": "122", "nombre": "Com. Pedro Antivil", "comuna": "Teodoro Schmidt", "residente": "Arturo Neira", "n_viv": 9, "n_desp": 173, "dias_activo": 133, "fecha_ini": "2025-10-20", "fecha_fin": "2026-03-02", "desp_por_mes": 39.0, "desp_por_viv": 19.2, "avg_avance": 57.9, "por_mes": {"2025-10": 12, "2025-11": 83, "2025-12": 58, "2026-01": 17, "2026-02": 2, "2026-03": 1}, "total_pagado": 0}, {"id": "P03", "nombre": "Casa Rápida", "comuna": "Lonquimay", "residente": "Arturo Neira", "n_viv": 30, "n_desp": 356, "dias_activo": 1101, "fecha_ini": "2021-11-10", "fecha_fin": "2024-11-15", "desp_por_mes": 9.7, "desp_por_viv": 11.9, "avg_avance": 0.0, "por_mes": {"2021-11": 5, "2021-12": 8, "2022-01": 15, "2022-02": 42, "2022-03": 39, "2022-04": 50, "2022-05": 45, "2022-06": 27, "2022-07": 2, "2022-09": 2, "2022-10": 29, "2022-11": 18, "2022-12": 20, "2023-01": 35, "2023-02": 9, "2023-03": 6, "2024-11": 4}, "total_pagado": 0}, {"id": "P05", "nombre": "Peumayen 2021", "comuna": "Freire", "residente": "Arturo Neira", "n_viv": 21, "n_desp": 321, "dias_activo": 723, "fecha_ini": "2023-02-21", "fecha_fin": "2025-02-13", "desp_por_mes": 13.3, "desp_por_viv": 15.3, "avg_avance": 0.0, "por_mes": {"2023-02": 4, "2023-03": 14, "2023-04": 8, "2023-05": 21, "2023-06": 50, "2023-07": 37, "2023-08": 32, "2023-09": 25, "2023-10": 46, "2023-11": 16, "2023-12": 15, "2024-01": 27, "2024-02": 9, "2024-03": 3, "2024-04": 8, "2024-05": 2, "2024-06": 1, "2024-11": 2, "2025-02": 1}, "total_pagado": 0}, {"id": "P07", "nombre": "Allipen", "comuna": "Melipeuco", "residente": "Arturo Neira", "n_viv": 13, "n_desp": 217, "dias_activo": 524, "fecha_ini": "2023-12-06", "fecha_fin": "2025-05-13", "desp_por_mes": 12.4, "desp_por_viv": 16.7, "avg_avance": 100.0, "por_mes": {"2023-12": 7, "2024-01": 16, "2024-02": 29, "2024-03": 46, "2024-04": 51, "2024-05": 25, "2024-06": 11, "2024-07": 6, "2024-10": 10, "2024-11": 12, "2024-12": 2, "2025-02": 1, "2025-05": 1}, "total_pagado": 0}, {"id": "P08", "nombre": "Com. Victorio Millan", "comuna": "Victoria", "residente": "Arturo Neira", "n_viv": 6, "n_desp": 109, "dias_activo": 246, "fecha_ini": "2022-09-27", "fecha_fin": "2023-05-31", "desp_por_mes": 13.3, "desp_por_viv": 18.2, "avg_avance": 0.0, "por_mes": {"2022-09": 4, "2022-10": 12, "2022-11": 19, "2022-12": 14, "2023-01": 13, "2023-02": 17, "2023-03": 19, "2023-04": 8, "2023-05": 3}, "total_pagado": 0}, {"id": "P16", "nombre": "Unidos de Cunco", "comuna": "Cunco", "residente": "Arturo Neira", "n_viv": 4, "n_desp": 47, "dias_activo": 230, "fecha_ini": "2023-06-27", "fecha_fin": "2024-02-12", "desp_por_mes": 6.1, "desp_por_viv": 11.8, "avg_avance": 100.0, "por_mes": {"2023-06": 1, "2023-07": 2, "2023-08": 5, "2023-09": 4, "2023-10": 10, "2023-11": 13, "2023-12": 5, "2024-01": 4, "2024-02": 3}, "total_pagado": 0}, {"id": "P18", "nombre": "Peumayen 2020-1", "comuna": "Freire", "residente": "Arturo Neira", "n_viv": 13, "n_desp": 201, "dias_activo": 622, "fecha_ini": "2023-08-30", "fecha_fin": "2025-05-13", "desp_por_mes": 9.7, "desp_por_viv": 15.5, "avg_avance": 100.0, "por_mes": {"2023-08": 1, "2023-09": 3, "2023-10": 9, "2023-11": 40, "2023-12": 15, "2024-01": 31, "2024-02": 11, "2024-03": 19, "2024-04": 35, "2024-05": 25, "2024-06": 7, "2024-07": 1, "2025-02": 1, "2025-03": 1, "2025-05": 2}, "total_pagado": 0}, {"id": "P23", "nombre": "Aguas Claras", "comuna": "Cunco", "residente": "Arturo Neira", "n_viv": 10, "n_desp": 147, "dias_activo": 377, "fecha_ini": "2022-07-27", "fecha_fin": "2023-08-08", "desp_por_mes": 11.7, "desp_por_viv": 14.7, "avg_avance": 100.0, "por_mes": {"2022-07": 2, "2022-08": 13, "2022-09": 33, "2022-10": 13, "2022-11": 31, "2022-12": 12, "2023-01": 18, "2023-02": 13, "2023-03": 4, "2023-04": 3, "2023-07": 4, "2023-08": 1}, "total_pagado": 0}, {"id": "P26", "nombre": "Truful Truful", "comuna": "Melipeuco", "residente": "Arturo Neira", "n_viv": 12, "n_desp": 195, "dias_activo": 454, "fecha_ini": "2022-12-27", "fecha_fin": "2024-03-25", "desp_por_mes": 12.9, "desp_por_viv": 16.2, "avg_avance": 100.0, "por_mes": {"2022-12": 1, "2023-01": 6, "2023-02": 5, "2023-03": 24, "2023-04": 24, "2023-05": 52, "2023-06": 19, "2023-07": 35, "2023-08": 19, "2023-09": 6, "2023-10": 2, "2023-11": 1, "2024-03": 1}, "total_pagado": 0}, {"id": "P27", "nombre": "Adulto Mayor", "comuna": "Melipeuco", "residente": "Arturo Neira", "n_viv": 40, "n_desp": 146, "dias_activo": 263, "fecha_ini": "2021-11-08", "fecha_fin": "2022-07-29", "desp_por_mes": 16.7, "desp_por_viv": 3.6, "avg_avance": 0.0, "por_mes": {"2021-11": 14, "2021-12": 28, "2022-01": 46, "2022-02": 29, "2022-03": 5, "2022-04": 12, "2022-05": 4, "2022-06": 5, "2022-07": 3}, "total_pagado": 0}, {"id": "P30", "nombre": "Mapu Rayen 2022", "comuna": "Villarrica", "residente": "Arturo Neira", "n_viv": 19, "n_desp": 351, "dias_activo": 303, "fecha_ini": "2025-04-28", "fecha_fin": "2026-02-25", "desp_por_mes": 34.8, "desp_por_viv": 18.5, "avg_avance": 0.0, "por_mes": {"2025-04": 3, "2025-05": 31, "2025-06": 75, "2025-07": 71, "2025-08": 73, "2025-09": 42, "2025-10": 32, "2025-11": 3, "2025-12": 1, "2026-01": 11, "2026-02": 9}, "total_pagado": 0}, {"id": "P31", "nombre": "Trovolhue", "comuna": "Carahue", "residente": "Arturo Neira", "n_viv": 3, "n_desp": 19, "dias_activo": 57, "fecha_ini": "2026-01-07", "fecha_fin": "2026-03-05", "desp_por_mes": 10.0, "desp_por_viv": 6.3, "avg_avance": 5.8, "por_mes": {"2026-01": 6, "2026-02": 10, "2026-03": 3}, "total_pagado": 0}, {"id": "P33", "nombre": "Pukem Ruka", "comuna": "Gorbea", "residente": "Arturo Neira", "n_viv": 5, "n_desp": 103, "dias_activo": 251, "fecha_ini": "2025-05-20", "fecha_fin": "2026-01-26", "desp_por_mes": 12.3, "desp_por_viv": 20.6, "avg_avance": 92.5, "por_mes": {"2025-05": 5, "2025-06": 12, "2025-07": 22, "2025-08": 13, "2025-09": 12, "2025-10": 15, "2025-11": 16, "2025-12": 5, "2026-01": 3}, "total_pagado": 0}, {"id": "P34", "nombre": "Likankura", "comuna": "Cunco", "residente": "Arturo Neira", "n_viv": 16, "n_desp": 315, "dias_activo": 365, "fecha_ini": "2024-11-12", "fecha_fin": "2025-11-12", "desp_por_mes": 25.9, "desp_por_viv": 19.7, "avg_avance": 100.0, "por_mes": {"2024-11": 11, "2024-12": 39, "2025-01": 72, "2025-02": 85, "2025-03": 53, "2025-04": 46, "2025-06": 4, "2025-07": 2, "2025-08": 2, "2025-11": 1}, "total_pagado": 0}, {"id": "P36", "nombre": "La Esperanza (F)", "comuna": "Freire", "residente": "Arturo Neira", "n_viv": 8, "n_desp": 158, "dias_activo": 7562, "fecha_ini": "2005-02-24", "fecha_fin": "2025-11-08", "desp_por_mes": 0.6, "desp_por_viv": 19.8, "avg_avance": 100.0, "por_mes": {"2005-02": 1, "2024-08": 3, "2024-09": 17, "2024-10": 12, "2024-11": 14, "2024-12": 29, "2025-01": 15, "2025-02": 21, "2025-03": 11, "2025-04": 11, "2025-05": 11, "2025-06": 3, "2025-07": 3, "2025-09": 5, "2025-10": 1, "2025-11": 1}, "total_pagado": 0}, {"id": "P41", "nombre": "Individuales Curacautín", "comuna": "Curacautín", "residente": "Arturo Neira", "n_viv": 4, "n_desp": 69, "dias_activo": 281, "fecha_ini": "2022-08-09", "fecha_fin": "2023-05-17", "desp_por_mes": 7.4, "desp_por_viv": 17.2, "avg_avance": 100.0, "por_mes": {"2022-08": 6, "2022-10": 6, "2022-11": 7, "2022-12": 8, "2023-01": 7, "2023-02": 11, "2023-03": 22, "2023-04": 1, "2023-05": 1}, "total_pagado": 0}, {"id": "P42", "nombre": "Condinhue", "comuna": "Vilcún", "residente": "Arturo Neira", "n_viv": 3, "n_desp": 49, "dias_activo": 95, "fecha_ini": "2025-11-14", "fecha_fin": "2026-02-17", "desp_por_mes": 15.5, "desp_por_viv": 16.3, "avg_avance": 33.3, "por_mes": {"2025-11": 13, "2025-12": 28, "2026-01": 7, "2026-02": 1}, "total_pagado": 0}, {"id": "P48", "nombre": "Amuley Ruka", "comuna": "Melipeuco", "residente": "Arturo Neira", "n_viv": 24, "n_desp": 437, "dias_activo": 355, "fecha_ini": "2024-05-23", "fecha_fin": "2025-05-13", "desp_por_mes": 36.9, "desp_por_viv": 18.2, "avg_avance": 91.7, "por_mes": {"2024-05": 4, "2024-06": 10, "2024-07": 54, "2024-08": 48, "2024-09": 45, "2024-10": 75, "2024-11": 48, "2024-12": 45, "2025-01": 33, "2025-02": 39, "2025-03": 12, "2025-04": 5, "2025-05": 19}, "total_pagado": 0}, {"id": "P50", "nombre": "Boyeco 2022", "comuna": "Temuco", "residente": "Arturo Neira", "n_viv": 4, "n_desp": 95, "dias_activo": 214, "fecha_ini": "2025-06-09", "fecha_fin": "2026-01-09", "desp_por_mes": 13.3, "desp_por_viv": 23.8, "avg_avance": 73.0, "por_mes": {"2025-06": 5, "2025-07": 9, "2025-08": 18, "2025-09": 35, "2025-10": 21, "2025-11": 5, "2025-12": 1, "2026-01": 1}, "total_pagado": 0}, {"id": "P53", "nombre": "La Union de Freire", "comuna": "Freire", "residente": "Arturo Neira", "n_viv": 7, "n_desp": 123, "dias_activo": 334, "fecha_ini": "2024-08-21", "fecha_fin": "2025-07-21", "desp_por_mes": 11.0, "desp_por_viv": 17.6, "avg_avance": 100.0, "por_mes": {"2024-08": 2, "2024-09": 10, "2024-10": 17, "2024-11": 14, "2024-12": 24, "2025-01": 24, "2025-02": 11, "2025-03": 8, "2025-04": 10, "2025-05": 1, "2025-07": 2}, "total_pagado": 0}, {"id": "P04", "nombre": "Adi Budi", "comuna": "Teodoro Schmidt", "residente": "Jairo Alvarez", "n_viv": 40, "n_desp": 984, "dias_activo": 402, "fecha_ini": "2021-04-26", "fecha_fin": "2022-06-02", "desp_por_mes": 73.4, "desp_por_viv": 24.6, "avg_avance": 0.0, "por_mes": {"2021-04": 6, "2021-05": 39, "2021-06": 31, "2021-07": 132, "2021-08": 83, "2021-09": 85, "2021-10": 102, "2021-11": 108, "2021-12": 116, "2022-01": 121, "2022-02": 93, "2022-03": 44, "2022-04": 16, "2022-05": 7, "2022-06": 1}, "total_pagado": 0}, {"id": "P06", "nombre": "We Ruca Rural", "comuna": "Teodoro Schmidt", "residente": "Jairo Alvarez", "n_viv": 19, "n_desp": 294, "dias_activo": 766, "fecha_ini": "2023-08-08", "fecha_fin": "2025-09-12", "desp_por_mes": 11.5, "desp_por_viv": 15.5, "avg_avance": 100.0, "por_mes": {"2023-08": 7, "2023-09": 19, "2023-10": 34, "2023-11": 53, "2023-12": 41, "2024-01": 25, "2024-02": 28, "2024-03": 10, "2024-04": 10, "2024-05": 32, "2024-06": 12, "2024-07": 11, "2024-08": 9, "2024-10": 1, "2025-09": 1}, "total_pagado": 0}, {"id": "P10", "nombre": "Com. Juan Huenchuman", "comuna": "Teodoro Schmidt", "residente": "Jairo Alvarez", "n_viv": 11, "n_desp": 201, "dias_activo": 750, "fecha_ini": "2023-07-25", "fecha_fin": "2025-08-13", "desp_por_mes": 8.0, "desp_por_viv": 18.3, "avg_avance": 81.8, "por_mes": {"2023-07": 3, "2023-08": 10, "2023-09": 14, "2023-10": 17, "2023-11": 21, "2023-12": 15, "2024-01": 16, "2024-02": 29, "2024-03": 9, "2024-04": 8, "2024-05": 12, "2024-07": 4, "2024-08": 2, "2024-09": 3, "2024-10": 11, "2024-11": 9, "2024-12": 5, "2025-01": 4, "2025-04": 1, "2025-05": 6, "2025-08": 2}, "total_pagado": 0}, {"id": "P11", "nombre": "Com. Francisco Pichun", "comuna": "Teodoro Schmidt", "residente": "Jairo Alvarez", "n_viv": 6, "n_desp": 117, "dias_activo": 386, "fecha_ini": "2023-05-16", "fecha_fin": "2024-06-05", "desp_por_mes": 9.1, "desp_por_viv": 19.5, "avg_avance": 0.0, "por_mes": {"2023-05": 4, "2023-06": 9, "2023-07": 6, "2023-08": 16, "2023-09": 6, "2023-10": 21, "2023-11": 10, "2023-12": 5, "2024-01": 12, "2024-02": 2, "2024-03": 12, "2024-04": 9, "2024-05": 4, "2024-06": 1}, "total_pagado": 0}, {"id": "P13", "nombre": "Com. Juan Huilcan Rucacura", "comuna": "Teodoro Schmidt", "residente": "Jairo Alvarez", "n_viv": 5, "n_desp": 127, "dias_activo": 480, "fecha_ini": "2024-04-04", "fecha_fin": "2025-07-28", "desp_por_mes": 7.9, "desp_por_viv": 25.4, "avg_avance": 0.0, "por_mes": {"2024-04": 7, "2024-05": 2, "2024-06": 10, "2024-07": 14, "2024-08": 4, "2024-09": 18, "2024-10": 22, "2024-11": 10, "2024-12": 5, "2025-01": 14, "2025-02": 4, "2025-05": 14, "2025-07": 3}, "total_pagado": 0}, {"id": "P15", "nombre": "Com. Jose Quiñilef", "comuna": "Teodoro Schmidt", "residente": "Jairo Alvarez", "n_viv": 4, "n_desp": 97, "dias_activo": 372, "fecha_ini": "2025-02-03", "fecha_fin": "2026-02-10", "desp_por_mes": 7.8, "desp_por_viv": 24.2, "avg_avance": 0.0, "por_mes": {"2025-02": 7, "2025-05": 7, "2025-06": 11, "2025-07": 18, "2025-08": 2, "2025-09": 13, "2025-10": 23, "2025-11": 15, "2026-02": 1}, "total_pagado": 0}, {"id": "P19", "nombre": "Los Valles de Gorbea", "comuna": "Gorbea", "residente": "Jairo Alvarez", "n_viv": 25, "n_desp": 463, "dias_activo": 607, "fecha_ini": "2024-01-04", "fecha_fin": "2025-09-02", "desp_por_mes": 22.9, "desp_por_viv": 18.5, "avg_avance": 0.0, "por_mes": {"2024-01": 3, "2024-02": 14, "2024-03": 15, "2024-04": 23, "2024-05": 23, "2024-06": 38, "2024-07": 22, "2024-08": 33, "2024-09": 30, "2024-10": 72, "2024-11": 35, "2024-12": 57, "2025-01": 25, "2025-02": 36, "2025-03": 17, "2025-04": 4, "2025-05": 14, "2025-07": 1, "2025-09": 1}, "total_pagado": 0}, {"id": "P20", "nombre": "Mi Nuevo Hogar", "comuna": "Teodoro Schmidt", "residente": "Jairo Alvarez", "n_viv": 10, "n_desp": 213, "dias_activo": 391, "fecha_ini": "2024-12-17", "fecha_fin": "2026-01-12", "desp_por_mes": 16.3, "desp_por_viv": 21.3, "avg_avance": 0.0, "por_mes": {"2024-12": 1, "2025-01": 11, "2025-02": 12, "2025-03": 7, "2025-04": 8, "2025-05": 10, "2025-06": 18, "2025-07": 25, "2025-08": 11, "2025-09": 18, "2025-10": 44, "2025-11": 39, "2025-12": 7, "2026-01": 2}, "total_pagado": 0}, {"id": "P21", "nombre": "Nuevo Poculon", "comuna": "Teodoro Schmidt", "residente": "Jairo Alvarez", "n_viv": 20, "n_desp": 402, "dias_activo": 421, "fecha_ini": "2024-11-27", "fecha_fin": "2026-01-22", "desp_por_mes": 28.6, "desp_por_viv": 20.1, "avg_avance": 0.0, "por_mes": {"2024-11": 1, "2024-12": 13, "2025-01": 10, "2025-02": 5, "2025-03": 11, "2025-04": 19, "2025-05": 32, "2025-06": 33, "2025-07": 40, "2025-08": 45, "2025-09": 30, "2025-10": 70, "2025-11": 66, "2025-12": 21, "2026-01": 6}, "total_pagado": 0}, {"id": "P24", "nombre": "Huilio", "comuna": "Teodoro Schmidt", "residente": "Jairo Alvarez", "n_viv": 14, "n_desp": 261, "dias_activo": 2308, "fecha_ini": "2017-08-09", "fecha_fin": "2023-12-04", "desp_por_mes": 3.4, "desp_por_viv": 18.6, "avg_avance": 100.0, "por_mes": {"2017-08": 1, "2022-05": 1, "2022-12": 2, "2023-01": 26, "2023-02": 25, "2023-03": 56, "2023-04": 52, "2023-05": 37, "2023-06": 24, "2023-07": 22, "2023-08": 7, "2023-09": 1, "2023-10": 1, "2023-11": 3, "2023-12": 3}, "total_pagado": 0}, {"id": "P25", "nombre": "Los Avellanos", "comuna": "Gorbea", "residente": "Jairo Alvarez", "n_viv": 19, "n_desp": 370, "dias_activo": 451, "fecha_ini": "2022-07-25", "fecha_fin": "2023-10-19", "desp_por_mes": 24.6, "desp_por_viv": 19.5, "avg_avance": 89.5, "por_mes": {"2022-07": 3, "2022-08": 40, "2022-09": 63, "2022-10": 71, "2022-11": 102, "2022-12": 35, "2023-01": 29, "2023-02": 1, "2023-03": 5, "2023-04": 2, "2023-05": 12, "2023-06": 4, "2023-07": 2, "2023-10": 1}, "total_pagado": 0}, {"id": "P32", "nombre": "Newen Ruka", "comuna": "Puerto Saavedra", "residente": "Jairo Alvarez", "n_viv": 8, "n_desp": 185, "dias_activo": 575, "fecha_ini": "2025-05-30", "fecha_fin": "2026-12-26", "desp_por_mes": 9.7, "desp_por_viv": 23.1, "avg_avance": 64.1, "por_mes": {"2025-05": 2, "2025-06": 2, "2025-07": 2, "2025-08": 7, "2025-09": 6, "2025-10": 31, "2025-11": 30, "2025-12": 28, "2026-01": 57, "2026-02": 18, "2026-12": 2}, "total_pagado": 0}, {"id": "P49", "nombre": "El Ocaso", "comuna": "Loncoche", "residente": "Jairo Alvarez", "n_viv": 14, "n_desp": 263, "dias_activo": 532, "fecha_ini": "2022-06-28", "fecha_fin": "2023-12-12", "desp_por_mes": 14.8, "desp_por_viv": 18.8, "avg_avance": 92.9, "por_mes": {"2022-06": 2, "2022-07": 16, "2022-08": 22, "2022-09": 30, "2022-10": 18, "2022-11": 28, "2022-12": 13, "2023-01": 14, "2023-02": 21, "2023-03": 11, "2023-04": 14, "2023-05": 22, "2023-06": 19, "2023-07": 25, "2023-08": 3, "2023-09": 4, "2023-12": 1}, "total_pagado": 0}, {"id": "P51", "nombre": "Puyehue", "comuna": "Teodoro Schmidt", "residente": "Jairo Alvarez", "n_viv": 29, "n_desp": 605, "dias_activo": 571, "fecha_ini": "2024-07-01", "fecha_fin": "2026-01-23", "desp_por_mes": 31.8, "desp_por_viv": 20.9, "avg_avance": 48.3, "por_mes": {"2024-07": 9, "2024-08": 11, "2024-09": 13, "2024-10": 38, "2024-11": 26, "2024-12": 25, "2025-01": 45, "2025-02": 36, "2025-03": 45, "2025-04": 119, "2025-05": 70, "2025-06": 79, "2025-07": 54, "2025-08": 16, "2025-09": 14, "2025-10": 3, "2025-11": 1, "2026-01": 1}, "total_pagado": 0}];
+
+const JAIRO_COLOR = '#3b82f6';
+const ARTURO_COLOR = '#f59e0b';
+
+function formatPeso(n) {
+  if (n >= 1e6) return '$' + (n/1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return '$' + (n/1e3).toFixed(0) + 'K';
+  return '$' + n;
+}
+
+// ===== KPI Card =====
+function KPI({ label, jairo, arturo, unit, better }) {
+  const jVal = typeof jairo === 'number' ? jairo : 0;
+  const aVal = typeof arturo === 'number' ? arturo : 0;
+  const jWins = better === 'higher' ? jVal >= aVal : jVal <= aVal;
+  return (
+    <div className="bg-[#111827] rounded-xl p-4 border border-[#1e293b]">
+      <div className="text-xs text-slate-400 mb-3 uppercase tracking-wider">{label}</div>
+      <div className="flex items-end gap-4">
+        <div className="flex-1">
+          <div className="text-[10px] text-blue-400 mb-1">Jairo</div>
+          <div className={`text-2xl font-bold font-mono ${jWins ? 'text-blue-400' : 'text-slate-400'}`}>
+            {typeof jairo === 'string' ? jairo : jairo?.toFixed?.(1) ?? '-'}
+            <span className="text-xs text-slate-500 ml-1">{unit}</span>
+          </div>
+        </div>
+        <div className="flex-1 text-right">
+          <div className="text-[10px] text-amber-400 mb-1">Arturo</div>
+          <div className={`text-2xl font-bold font-mono ${!jWins ? 'text-amber-400' : 'text-slate-400'}`}>
+            {typeof arturo === 'string' ? arturo : arturo?.toFixed?.(1) ?? '-'}
+            <span className="text-xs text-slate-500 ml-1">{unit}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ===== Bar Chart =====
+function BarChart({ data, metric, label, unit, color }) {
+  const maxVal = Math.max(...data.map(d => d[metric] || 0), 1);
+  return (
+    <div className="bg-[#111827] rounded-xl p-4 border border-[#1e293b]">
+      <div className="text-xs text-slate-400 mb-3 uppercase tracking-wider">{label}</div>
+      <div className="space-y-1.5 max-h-[400px] overflow-y-auto hide-scrollbar">
+        {data.map(d => (
+          <div key={d.id} className="flex items-center gap-2 text-xs">
+            <div className="w-12 text-slate-500 font-mono shrink-0">{d.id}</div>
+            <div className="flex-1 h-5 bg-[#0a0f1a] rounded overflow-hidden relative">
+              <div
+                className={`h-full rounded ${d.residente.includes('Jairo') ? 'bar-jairo' : 'bar-arturo'}`}
+                style={{ width: `${Math.max((d[metric] / maxVal) * 100, 2)}%` }}
+              />
+            </div>
+            <div className="w-16 text-right font-mono text-slate-300">
+              {typeof d[metric] === 'number' ? (d[metric] % 1 === 0 ? d[metric] : d[metric].toFixed(1)) : d[metric]}
+              {unit && <span className="text-slate-500 text-[10px] ml-0.5">{unit}</span>}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ===== Timeline Chart (despachos/mes) =====
+function TimelineChart({ jairoProjects, arturoProjects }) {
+  // Aggregate monthly despachos per resident
+  const allMonths = new Set();
+  const aggregate = (projects) => {
+    const byMonth = {};
+    projects.forEach(p => {
+      Object.entries(p.por_mes).forEach(([m, count]) => {
+        allMonths.add(m);
+        byMonth[m] = (byMonth[m] || 0) + count;
+      });
+    });
+    return byMonth;
+  };
+
+  const jByMonth = aggregate(jairoProjects);
+  const aByMonth = aggregate(arturoProjects);
+  const months = [...allMonths].sort();
+
+  // Show last 24 months
+  const recentMonths = months.slice(-24);
+  const maxVal = Math.max(
+    ...recentMonths.map(m => Math.max(jByMonth[m] || 0, aByMonth[m] || 0)),
+    1
+  );
+
+  return (
+    <div className="bg-[#111827] rounded-xl p-4 border border-[#1e293b]">
+      <div className="text-xs text-slate-400 mb-3 uppercase tracking-wider">Despachos por Mes (agregado)</div>
+      <div className="flex items-end gap-[2px] h-48 overflow-x-auto hide-scrollbar">
+        {recentMonths.map(m => {
+          const jH = ((jByMonth[m] || 0) / maxVal) * 100;
+          const aH = ((aByMonth[m] || 0) / maxVal) * 100;
+          return (
+            <div key={m} className="flex flex-col items-center gap-0.5 min-w-[20px] flex-1 h-full justify-end group relative">
+              <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-800 px-2 py-1 rounded text-[10px] whitespace-nowrap hidden group-hover:block z-10 border border-slate-700">
+                {m}: J={jByMonth[m]||0} A={aByMonth[m]||0}
+              </div>
+              <div className="flex gap-[1px] items-end flex-1 w-full">
+                <div className="flex-1 bar-jairo rounded-t" style={{ height: `${Math.max(jH, 1)}%` }} />
+                <div className="flex-1 bar-arturo rounded-t" style={{ height: `${Math.max(aH, 1)}%` }} />
+              </div>
+              <div className="text-[8px] text-slate-600 -rotate-45 origin-top-left w-[30px]">
+                {m.slice(2)}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ===== Project Table =====
+function ProjectTable({ projects, sortBy, onSort }) {
+  const sorted = [...projects].sort((a, b) => {
+    const dir = sortBy.dir === 'asc' ? 1 : -1;
+    return ((a[sortBy.key] || 0) - (b[sortBy.key] || 0)) * dir;
+  });
+
+  const cols = [
+    { key: 'id', label: 'Proy', w: 'w-14' },
+    { key: 'residente', label: 'Residente', w: 'w-24' },
+    { key: 'n_viv', label: 'Viv', w: 'w-10' },
+    { key: 'n_desp', label: 'Desp', w: 'w-12' },
+    { key: 'desp_por_mes', label: 'D/Mes', w: 'w-14' },
+    { key: 'desp_por_viv', label: 'D/Viv', w: 'w-14' },
+    { key: 'avg_avance', label: 'Avance', w: 'w-16' },
+    { key: 'dias_activo', label: 'Dias', w: 'w-14' },
+    { key: 'total_pagado', label: 'Pagado', w: 'w-20' },
+  ];
+
+  return (
+    <div className="bg-[#111827] rounded-xl border border-[#1e293b] overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="bg-[#0f172a]">
+              {cols.map(c => (
+                <th key={c.key}
+                    className={`px-3 py-2.5 text-left text-slate-400 font-medium cursor-pointer hover:text-slate-200 ${c.w}`}
+                    onClick={() => onSort(c.key)}>
+                  {c.label}
+                  {sortBy.key === c.key && <span className="ml-1">{sortBy.dir === 'asc' ? '▲' : '▼'}</span>}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map(p => (
+              <tr key={p.id} className="border-t border-[#1e293b] hover:bg-[#1f2937] transition-colors">
+                <td className="px-3 py-2 font-mono font-bold">{p.id}</td>
+                <td className="px-3 py-2">
+                  <span className={`inline-block w-2 h-2 rounded-full mr-1.5 ${p.residente.includes('Jairo') ? 'bg-blue-500' : 'bg-amber-500'}`} />
+                  {p.residente.split(' ')[0]}
+                </td>
+                <td className="px-3 py-2 font-mono">{p.n_viv}</td>
+                <td className="px-3 py-2 font-mono">{p.n_desp}</td>
+                <td className="px-3 py-2 font-mono">{p.desp_por_mes}</td>
+                <td className="px-3 py-2 font-mono">{p.desp_por_viv}</td>
+                <td className="px-3 py-2">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-16 h-2 bg-[#0a0f1a] rounded-full overflow-hidden">
+                      <div className={`h-full rounded-full ${p.avg_avance >= 100 ? 'bg-emerald-500' : p.avg_avance >= 50 ? 'bg-blue-500' : 'bg-amber-500'}`}
+                           style={{ width: `${Math.min(p.avg_avance, 100)}%` }} />
+                    </div>
+                    <span className="font-mono">{p.avg_avance}%</span>
+                  </div>
+                </td>
+                <td className="px-3 py-2 font-mono">{p.dias_activo}</td>
+                <td className="px-3 py-2 font-mono text-slate-400">{formatPeso(p.total_pagado)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ===== Scatter Plot =====
+function ScatterPlot({ projects, xKey, yKey, xLabel, yLabel }) {
+  const padding = 40;
+  const w = 600, h = 300;
+  const xVals = projects.map(p => p[xKey] || 0);
+  const yVals = projects.map(p => p[yKey] || 0);
+  const xMax = Math.max(...xVals, 1);
+  const yMax = Math.max(...yVals, 1);
+
+  return (
+    <div className="bg-[#111827] rounded-xl p-4 border border-[#1e293b]">
+      <div className="text-xs text-slate-400 mb-3 uppercase tracking-wider">
+        {xLabel} vs {yLabel}
+      </div>
+      <svg viewBox={`0 0 ${w + padding*2} ${h + padding*2}`} className="w-full">
+        {/* Axes */}
+        <line x1={padding} y1={h+padding} x2={w+padding} y2={h+padding} stroke="#334155" strokeWidth="1"/>
+        <line x1={padding} y1={padding} x2={padding} y2={h+padding} stroke="#334155" strokeWidth="1"/>
+        {/* Labels */}
+        <text x={w/2+padding} y={h+padding+30} fill="#64748b" fontSize="11" textAnchor="middle">{xLabel}</text>
+        <text x={12} y={h/2+padding} fill="#64748b" fontSize="11" textAnchor="middle" transform={`rotate(-90, 12, ${h/2+padding})`}>{yLabel}</text>
+        {/* Grid */}
+        {[0.25, 0.5, 0.75, 1].map(frac => (
+          <g key={frac}>
+            <line x1={padding} y1={h+padding - h*frac} x2={w+padding} y2={h+padding - h*frac} stroke="#1e293b" strokeWidth="0.5"/>
+            <text x={padding-5} y={h+padding - h*frac + 4} fill="#475569" fontSize="9" textAnchor="end">{(yMax*frac).toFixed(0)}</text>
+          </g>
+        ))}
+        {[0.25, 0.5, 0.75, 1].map(frac => (
+          <g key={frac}>
+            <line x1={padding + w*frac} y1={padding} x2={padding + w*frac} y2={h+padding} stroke="#1e293b" strokeWidth="0.5"/>
+            <text x={padding + w*frac} y={h+padding+14} fill="#475569" fontSize="9" textAnchor="middle">{(xMax*frac).toFixed(0)}</text>
+          </g>
+        ))}
+        {/* Points */}
+        {projects.map(p => {
+          const cx = padding + (p[xKey] / xMax) * w;
+          const cy = h + padding - (p[yKey] / yMax) * h;
+          const isJairo = p.residente.includes('Jairo');
+          return (
+            <g key={p.id}>
+              <circle cx={cx} cy={cy} r={5 + p.n_viv * 0.3}
+                fill={isJairo ? '#3b82f680' : '#f59e0b80'}
+                stroke={isJairo ? '#3b82f6' : '#f59e0b'}
+                strokeWidth="1.5"/>
+              <text x={cx} y={cy - 8} fill="#94a3b8" fontSize="9" textAnchor="middle">{p.id}</text>
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+// ===== App =====
+function App() {
+  const [filter, setFilter] = useState('all');
+  const [sortBy, setSortBy] = useState({ key: 'desp_por_mes', dir: 'desc' });
+
+  const filtered = useMemo(() => {
+    if (filter === 'jairo') return PROJECTS.filter(p => p.residente.includes('Jairo'));
+    if (filter === 'arturo') return PROJECTS.filter(p => p.residente.includes('Arturo'));
+    return PROJECTS;
+  }, [filter]);
+
+  const jairoProjects = PROJECTS.filter(p => p.residente.includes('Jairo'));
+  const arturoProjects = PROJECTS.filter(p => p.residente.includes('Arturo'));
+
+  // Aggregate KPIs
+  const avg = (arr, key) => arr.length ? arr.reduce((s, p) => s + (p[key]||0), 0) / arr.length : 0;
+
+  const handleSort = useCallback((key) => {
+    setSortBy(prev => ({ key, dir: prev.key === key && prev.dir === 'desc' ? 'asc' : 'desc' }));
+  }, []);
+
+  return (
+    <div className="min-h-screen p-4 md:p-6 max-w-7xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight">
+            <span className="text-slate-500 font-mono text-sm mr-2">SC</span>
+            Comparador de Proyectos
+          </h1>
+          <p className="text-xs text-slate-500 mt-1">
+            {PROJECTS.length} proyectos | Jairo Alvarez vs Arturo Neira
+          </p>
+        </div>
+        <div className="flex gap-1.5 text-xs">
+          {['all', 'jairo', 'arturo'].map(f => (
+            <button key={f}
+              onClick={() => setFilter(f)}
+              className={`px-3 py-1.5 rounded-lg transition-colors ${
+                filter === f
+                  ? f === 'jairo' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                  : f === 'arturo' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                  : 'bg-slate-700 text-slate-200 border border-slate-600'
+                  : 'bg-[#111827] text-slate-400 border border-[#1e293b] hover:border-slate-600'
+              }`}>
+              {f === 'all' ? 'Todos' : f === 'jairo' ? 'Jairo' : 'Arturo'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Legend */}
+      <div className="flex gap-6 mb-4 text-xs text-slate-400">
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-full bg-blue-500"/> Jairo Alvarez ({jairoProjects.length} proy)
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-full bg-amber-500"/> Arturo Neira ({arturoProjects.length} proy)
+        </span>
+      </div>
+
+      {/* KPIs */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        <KPI label="Despachos/Mes (prom)" jairo={avg(jairoProjects, 'desp_por_mes')} arturo={avg(arturoProjects, 'desp_por_mes')} unit="d/m" better="higher"/>
+        <KPI label="Despachos/Vivienda" jairo={avg(jairoProjects, 'desp_por_viv')} arturo={avg(arturoProjects, 'desp_por_viv')} unit="d/v" better="higher"/>
+        <KPI label="Avance Promedio" jairo={avg(jairoProjects, 'avg_avance')} arturo={avg(arturoProjects, 'avg_avance')} unit="%" better="higher"/>
+        <KPI label="Dias Activo (prom)" jairo={avg(jairoProjects, 'dias_activo')} arturo={avg(arturoProjects, 'dias_activo')} unit="d" better="lower"/>
+      </div>
+
+      {/* Charts Row 1 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+        <BarChart data={filtered} metric="desp_por_mes" label="Ritmo de Despachos (por mes)" unit="d/m"/>
+        <BarChart data={filtered} metric="avg_avance" label="Avance Inspeccion (%)" unit="%"/>
+      </div>
+
+      {/* Charts Row 2 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+        <ScatterPlot projects={filtered} xKey="dias_activo" yKey="desp_por_mes" xLabel="Dias Activo" yLabel="Despachos/Mes"/>
+        <ScatterPlot projects={filtered} xKey="n_viv" yKey="avg_avance" xLabel="Viviendas" yLabel="Avance %"/>
+      </div>
+
+      {/* Timeline */}
+      <div className="mb-4">
+        <TimelineChart jairoProjects={jairoProjects} arturoProjects={arturoProjects} />
+      </div>
+
+      {/* Table */}
+      <ProjectTable projects={filtered} sortBy={sortBy} onSort={handleSort} />
+
+      {/* Footer */}
+      <div className="text-center text-[10px] text-slate-600 mt-6 font-mono">
+        SCRaices Comparador v1.0 | Generado {new Date().toLocaleDateString('es-CL')}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
