@@ -1472,7 +1472,7 @@ const ViviendasTab = ({{ viviendas, grupos, expandida, setExpandida, filtro, set
                                 {{actualTab === "obs" && (
                                     <div className="space-y-3">
                                         {{Object.entries(observaciones).filter(([,obs]) => obs.length > 0).map(([idBenef, obs]) => {{
-                                            const v = viviendas.find(vv => String(vv.ID_Benef) === String(idBenef));
+                                            const v = viviendas.find(vv => String(vv.ID_Benef) === String(idBenef)) || BENEFICIARIOS_DATA.find(bb => String(bb.ID_Benef) === String(idBenef));
                                             const nombre = v ? `${{v.NOMBRES}} ${{v.APELLIDOS}}` : idBenef;
                                             return (
                                                 <div key={{idBenef}} className="border border-amber-200 rounded-lg overflow-hidden">
