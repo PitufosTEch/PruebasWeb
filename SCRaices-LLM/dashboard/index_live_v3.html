@@ -3186,6 +3186,8 @@ const App = () => {
     const skipObsPush = React.useRef(true);
     const skipActPush = React.useRef(true);
     const skipConsPush = React.useRef(true);
+    const sugRef = React.useRef(null);
+    const skipSugPush = React.useRef(true);
 
     React.useEffect(() => {
         // Listener Firebase para Grupos
@@ -3251,8 +3253,6 @@ const App = () => {
     // Sugerencias de mejora (Firebase)
     const [showSugerencias, setShowSugerencias] = React.useState(false);
     const [sugerencias, setSugerencias] = React.useState([]);
-    const sugRef = React.useRef(null);
-    const skipSugPush = React.useRef(true);
 
     // Push observaciones a Firebase cuando cambia localmente
     React.useEffect(() => {
