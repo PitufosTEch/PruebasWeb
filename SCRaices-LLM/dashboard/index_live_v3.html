@@ -3710,7 +3710,7 @@ const App = () => {
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                             </button>
                         )}
-                        <button onClick={() => setShowSugerencias(true)} title="Sugerencias de mejora" className="relative p-1.5 rounded-lg text-gray-400 hover:text-violet-600 hover:bg-violet-50 transition-colors">
+                        <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowSugerencias(true); }} title="Sugerencias de mejora" className="relative p-1.5 rounded-lg text-gray-400 hover:text-violet-600 hover:bg-violet-50 transition-colors">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                             {pendientesSug > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">{pendientesSug}</span>}
                         </button>
@@ -4020,10 +4020,14 @@ const App = () => {
 };
 
 // Función de render (llamada después de cargar datos)
+        let _reactRoot = null;
         function renderApp() {
             try {
                 console.log('[v3 LIVE] renderApp() - PROYECTOS:', PROYECTOS_DATA.length, 'BENEF:', BENEFICIARIOS_DATA.length, 'DESP:', DESPACHOS_DATA.length, 'SOLPAGO:', SOLPAGO_DATA.length);
-                ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+                if (!_reactRoot) {
+                    _reactRoot = ReactDOM.createRoot(document.getElementById('root'));
+                }
+                _reactRoot.render(<App />);
                 console.log('[v3 LIVE] render() OK');
             } catch(e) {
                 console.error('[v3 LIVE] Error en renderApp:', e);

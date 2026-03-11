@@ -731,10 +731,14 @@ def make_live_dashboard(apps_script_url):
     ]
 
     new_render = """// Función de render (llamada después de cargar datos)
+        let _reactRoot = null;
         function renderApp() {
             try {
                 console.log('[v3 LIVE] renderApp() - PROYECTOS:', PROYECTOS_DATA.length, 'BENEF:', BENEFICIARIOS_DATA.length, 'DESP:', DESPACHOS_DATA.length, 'SOLPAGO:', SOLPAGO_DATA.length);
-                ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+                if (!_reactRoot) {
+                    _reactRoot = ReactDOM.createRoot(document.getElementById('root'));
+                }
+                _reactRoot.render(<App />);
                 console.log('[v3 LIVE] render() OK');
             } catch(e) {
                 console.error('[v3 LIVE] Error en renderApp:', e);
