@@ -3549,17 +3549,26 @@ const App = () => {
         });
 
         // CHECK 6: Posible Pago en Exceso
-        // Compara: Solpago (total pagado por familia) vs Tabla_pago (presupuesto M.O. por tipología)
-        // Detecta: Lo pagado supera lo presupuestado para esa partida según la planilla base
+        // Compara: Solpago (total pagado por familia) vs Tabla_pago (presupuesto M.O. Vivienda + RC)
+        // Detecta: Lo pagado supera la suma de presupuestos Vivienda + Recinto Complementario
         const c6 = [];
         viviendas.forEach(v => {
-            const tipId = v.tipologia_viv_id || v.tipologia_rc_id;
-            if (!tipId || !PRESUPUESTO_DATA[tipId]) return;
-            const presupTip = PRESUPUESTO_DATA[tipId];
+            const tipViv = v.tipologia_viv_id;
+            const tipRC = v.tipologia_rc_id;
+            if (!tipViv && !tipRC) return;
+            const presViv = PRESUPUESTO_DATA[tipViv] || {};
+            const presRC = PRESUPUESTO_DATA[tipRC] || {};
+
+            // Unir familias de ambas tipologías
+            const todasFamilias = new Set([...Object.keys(presViv), ...Object.keys(presRC)]);
             const pagos = getSolpago(v.ID_Benef);
 
-            Object.entries(presupTip).forEach(([familia, montoBase]) => {
+            todasFamilias.forEach(familia => {
+                const montoViv = presViv[familia] || 0;
+                const montoRC = presRC[familia] || 0;
+                const montoBase = montoViv + montoRC;
                 if (montoBase <= 0) return;
+
                 const pagosFam = pagos.filter(p => p.Familia_pago === familia);
                 const totalPagado = pagosFam.reduce((s, p) => s + p.monto, 0);
                 if (totalPagado > montoBase) {
@@ -3572,7 +3581,8 @@ const App = () => {
                         pagado: totalPagado,
                         presupuesto: montoBase,
                         exceso,
-                        pctExceso
+                        pctExceso,
+                        tieneRC: montoRC > 0
                     });
                 }
             });
@@ -3581,11 +3591,11 @@ const App = () => {
         checks.push({
             id: 'pago_exceso',
             titulo: 'Posible Pago en Exceso',
-            desc: 'El total pagado en Mano de Obra para esta partida supera el monto presupuestado en la Planilla Base (Tabla_pago) asociada a la tipología de la vivienda. Verificar si hay pagos adicionales justificados o si es un error.',
-            compara: 'Solpago (suma pagos aprobados por familia) vs Tabla_pago (presupuesto M.O. por tipología)',
+            desc: 'El total pagado en Mano de Obra supera la suma de presupuestos Vivienda + Recinto Complementario (Tabla_pago). Solo compara pagos aprobados.',
+            compara: 'Solpago (pagos aprobados) vs Tabla_pago (presupuesto Viv + RC por tipología)',
             tipo: 'rojo',
             items: c6,
-            render: (it) => `${it.benef} — ${it.familia}: Pagado ${formatPeso(it.pagado)} vs Presup. ${formatPeso(it.presupuesto)} (+${formatPeso(it.exceso)}, +${it.pctExceso}%)`
+            render: (it) => `${it.benef} — ${it.familia}: Pagado ${formatPeso(it.pagado)} vs Presup. ${formatPeso(it.presupuesto)}${it.tieneRC ? ' (Viv+RC)' : ''} (+${formatPeso(it.exceso)}, +${it.pctExceso}%)`
         });
 
         return checks;
