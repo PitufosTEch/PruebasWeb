@@ -138,23 +138,32 @@ def get_data_loader_js(apps_script_url):
     }}
 
     async function fetchAllData() {{
-        updateLoading('Descargando datos...', 5, 'Conectando a Google Sheets (3 lotes en paralelo)');
+        updateLoading('Descargando datos...', 5, 'Conectando a Google Sheets (4 lotes en paralelo)');
 
-        // Dividir en 3 lotes paralelos para evitar timeout
+        // Dividir en 4 lotes paralelos para evitar timeout
         const batch1 = fetchBatch('Proyectos,Beneficiario,Tipologias,Maestros,controlBGB,controlEEPP', 'Lote 1: Proyectos+Benef');
-        const batch2 = fetchBatch('Despacho,soldepacho,Tabla_pago,cominsp,Pendientes', 'Lote 2: Despachos+Sol+Com');
+        const batch2 = fetchBatch('Despacho,soldepacho,Tabla_pago', 'Lote 2: Despachos');
         const batch3 = fetchBatch('Ejecucion,Solpago', 'Lote 3: Insp+Pagos');
 
-        let r1, r2, r3;
+        let r1, r2, r3, r4;
         try {{
-            updateLoading('Descargando lotes en paralelo...', 10, 'Lote 1: Proyectos | Lote 2: Despachos | Lote 3: Inspecciones+Pagos');
+            updateLoading('Descargando lotes principales...', 10, 'Lotes 1-3 en paralelo');
             [r1, r2, r3] = await Promise.all([batch1, batch2, batch3]);
         }} catch (e) {{
             throw new Error('Error al descargar datos: ' + e.message);
         }}
 
+        // Lote 4 (comentarios) separado y no bloquea si falla
+        try {{
+            updateLoading('Descargando comentarios...', 25, 'Lote 4: Comentarios');
+            r4 = await fetchBatch('cominsp,Pendientes', 'Lote 4: Comentarios');
+        }} catch (e) {{
+            console.warn('[LIVE] Lote 4 (comentarios) fallo:', e.message);
+            r4 = {{ cominsp: {{ rows: [] }}, Pendientes: {{ rows: [] }} }};
+        }}
+
         updateLoading('Combinando datos...', 30, 'Todos los lotes recibidos');
-        return {{ ...r1, ...r2, ...r3 }};
+        return {{ ...r1, ...r2, ...r3, ...r4 }};
     }}
 
     function processRawData(raw) {{
@@ -500,24 +509,146 @@ def get_data_loader_js(apps_script_url):
         updateLoading('Listo!', 100, `${{PROYECTOS_DATA.length}} proyectos, ${{BENEFICIARIOS_DATA.length}} beneficiarios, ${{DESPACHOS_DATA.length}} despachos, ${{SOLPAGO_DATA.length}} pagos`);
     }}
 
-    async function initLiveData() {{
-        showLoadingScreen();
+    // ============================================================
+    // CACHE - Guarda datos PROCESADOS (no crudos) en localStorage
+    // ============================================================
+    const CACHE_KEY = 'scraices_v3_cache';
+    const CACHE_MAX_AGE = 4 * 60 * 60 * 1000; // 4 horas
+
+    function saveProcessedCache() {{
         try {{
-            const raw = await fetchAllData();
-            processRawData(raw);
-            await new Promise(r => setTimeout(r, 500));
+            const payload = {{
+                ts: Date.now(),
+                PROYECTOS_DATA,
+                BENEFICIARIOS_DATA,
+                DESPACHOS_DATA,
+                SOLICITUDES_DATA,
+                INSPECCIONES_DATA,
+                SOLPAGO_DATA,
+                MAESTROS_DATA,
+                PRESUPUESTO_DATA,
+                GARANTIAS_DATA,
+                EEPP_DATA,
+                COMENTARIOS_DATA
+            }};
+            const json = JSON.stringify(payload);
+            const sizeKB = Math.round(json.length / 1024);
+            if (sizeKB > 4500) {{
+                console.warn('[CACHE] Datos procesados muy grandes (' + sizeKB + 'KB), no cachear');
+                return;
+            }}
+            localStorage.setItem(CACHE_KEY, json);
+            console.log('[CACHE] Guardado:', sizeKB, 'KB');
+        }} catch (e) {{
+            console.warn('[CACHE] Error al guardar:', e.message);
+            try {{ localStorage.removeItem(CACHE_KEY); }} catch(_) {{}}
+        }}
+    }}
+
+    function loadProcessedCache() {{
+        try {{
+            const stored = localStorage.getItem(CACHE_KEY);
+            if (!stored) return null;
+            const payload = JSON.parse(stored);
+            if (Date.now() - payload.ts > CACHE_MAX_AGE) {{
+                localStorage.removeItem(CACHE_KEY);
+                return null;
+            }}
+            return payload;
+        }} catch (e) {{
+            console.warn('[CACHE] Error al leer:', e.message);
+            try {{ localStorage.removeItem(CACHE_KEY); }} catch(_) {{}}
+            return null;
+        }}
+    }}
+
+    function restoreFromCache(cache) {{
+        PROYECTOS_DATA = cache.PROYECTOS_DATA || [];
+        BENEFICIARIOS_DATA = cache.BENEFICIARIOS_DATA || [];
+        DESPACHOS_DATA = cache.DESPACHOS_DATA || [];
+        SOLICITUDES_DATA = cache.SOLICITUDES_DATA || [];
+        INSPECCIONES_DATA = cache.INSPECCIONES_DATA || [];
+        SOLPAGO_DATA = cache.SOLPAGO_DATA || [];
+        MAESTROS_DATA = cache.MAESTROS_DATA || {{}};
+        PRESUPUESTO_DATA = cache.PRESUPUESTO_DATA || {{}};
+        GARANTIAS_DATA = cache.GARANTIAS_DATA || [];
+        EEPP_DATA = cache.EEPP_DATA || [];
+        COMENTARIOS_DATA = cache.COMENTARIOS_DATA || [];
+    }}
+
+    function formatCacheAge(ts) {{
+        const mins = Math.round((Date.now() - ts) / 60000);
+        if (mins < 1) return 'hace menos de 1 min';
+        if (mins < 60) return `hace ${{mins}} min`;
+        const hrs = Math.floor(mins / 60);
+        return `hace ${{hrs}}h ${{mins % 60}}m`;
+    }}
+
+    function showCacheBanner(ts) {{
+        let banner = document.getElementById('cacheBanner');
+        if (!banner) {{
+            banner = document.createElement('div');
+            banner.id = 'cacheBanner';
+            document.body.prepend(banner);
+        }}
+        banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#fef3c7;color:#92400e;text-align:center;padding:6px 16px;font-size:12px;font-family:IBM Plex Sans,sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 1px 3px rgba(0,0,0,0.1);';
+        banner.innerHTML = '<span>Mostrando datos en cache (' + formatCacheAge(ts) + '). Actualizando en segundo plano...</span>';
+    }}
+
+    function removeCacheBanner() {{
+        const b = document.getElementById('cacheBanner');
+        if (b) b.remove();
+    }}
+
+    async function initLiveData() {{
+        // 1. Intentar cache de datos procesados
+        const cached = loadProcessedCache();
+
+        if (cached) {{
+            // Render inmediato con cache
+            restoreFromCache(cached);
             renderApp();
-        }} catch (err) {{
-            document.getElementById('root').innerHTML = `
-                <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f3f4f6;font-family:'IBM Plex Sans',sans-serif;">
-                    <div style="text-align:center;max-width:450px;padding:40px;">
-                        <div style="color:#ef4444;font-size:48px;margin-bottom:16px;">&#9888;</div>
-                        <h2 style="color:#1f2937;font-size:18px;font-weight:600;margin-bottom:8px;">Error al cargar datos</h2>
-                        <p style="color:#6b7280;font-size:13px;margin-bottom:16px;">${{err.message}}</p>
-                        <button onclick="location.reload()" style="padding:10px 24px;background:#7c3aed;color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;">Reintentar</button>
-                        <p style="color:#9ca3af;font-size:11px;margin-top:20px;">Si el problema persiste, verifica que el Apps Script este desplegado correctamente.</p>
-                    </div>
-                </div>`;
+            showCacheBanner(cached.ts);
+            console.log('[CACHE] Render desde cache (' + formatCacheAge(cached.ts) + ')');
+
+            // Fetch fresco en segundo plano
+            try {{
+                const raw = await fetchAllData();
+                processRawData(raw);
+                saveProcessedCache();
+                removeCacheBanner();
+                renderApp();
+                console.log('[LIVE] Datos actualizados en segundo plano');
+            }} catch (err) {{
+                // Mantener datos de cache, avisar que no se pudo actualizar
+                const b = document.getElementById('cacheBanner');
+                if (b) {{
+                    b.style.background = '#fee2e2';
+                    b.style.color = '#991b1b';
+                    b.innerHTML = '<span>No se pudo actualizar: ' + err.message + '. Usando cache (' + formatCacheAge(cached.ts) + ')</span><button onclick="location.reload()" style="margin-left:12px;padding:3px 12px;background:#991b1b;color:white;border:none;border-radius:4px;cursor:pointer;font-size:11px;">Reintentar</button>';
+                }}
+            }}
+        }} else {{
+            // Sin cache: carga normal
+            showLoadingScreen();
+            try {{
+                const raw = await fetchAllData();
+                processRawData(raw);
+                saveProcessedCache();
+                await new Promise(r => setTimeout(r, 300));
+                renderApp();
+            }} catch (err) {{
+                document.getElementById('root').innerHTML = `
+                    <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f3f4f6;font-family:'IBM Plex Sans',sans-serif;">
+                        <div style="text-align:center;max-width:450px;padding:40px;">
+                            <div style="color:#ef4444;font-size:48px;margin-bottom:16px;">&#9888;</div>
+                            <h2 style="color:#1f2937;font-size:18px;font-weight:600;margin-bottom:8px;">Error al cargar datos</h2>
+                            <p style="color:#6b7280;font-size:13px;margin-bottom:16px;">${{err.message}}</p>
+                            <button onclick="location.reload()" style="padding:10px 24px;background:#7c3aed;color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;">Reintentar</button>
+                            <p style="color:#9ca3af;font-size:11px;margin-top:20px;">Si el problema persiste, verifica que el Apps Script este desplegado correctamente.</p>
+                        </div>
+                    </div>`;
+            }}
         }}
     }}
 """
@@ -718,7 +849,7 @@ if (sessionStorage.getItem('_sc_auth') === '1') {
 
 
 def main():
-    DEFAULT_URL = "https://script.google.com/macros/s/AKfycbxcJowX3a3XBmSNiKOCesj1jRkQWS1VIsMbvdt-x7ckK8ZXMauI6gRgCGsoT77xYxpP/exec"
+    DEFAULT_URL = "https://script.google.com/macros/s/AKfycbx_mSt3xEeXZYn7R2fkt5drp3Pfllxdj71tJo0-2iSqW28OAgwgpzoH_2NI_erM5yB-/exec"
     url = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_URL
 
     print("=" * 60)
