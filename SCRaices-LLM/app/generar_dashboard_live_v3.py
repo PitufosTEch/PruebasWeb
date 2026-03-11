@@ -142,7 +142,7 @@ def get_data_loader_js(apps_script_url):
 
         // Dividir en 3 lotes paralelos para evitar timeout
         const batch1 = fetchBatch('Proyectos,Beneficiario,Tipologias,Maestros,controlBGB,controlEEPP', 'Lote 1: Proyectos+Benef');
-        const batch2 = fetchBatch('Despacho,soldepacho,Tabla_pago', 'Lote 2: Despachos+Sol');
+        const batch2 = fetchBatch('Despacho,soldepacho,Tabla_pago,cominsp,Pendientes', 'Lote 2: Despachos+Sol+Com');
         const batch3 = fetchBatch('Ejecucion,Solpago', 'Lote 3: Insp+Pagos');
 
         let r1, r2, r3;
@@ -457,6 +457,46 @@ def get_data_loader_js(apps_script_url):
                 Fecha: parseDate(ep.Fecha) || ''
             }}));
 
+        updateLoading('Procesando comentarios...', 97);
+
+        // 11. COMENTARIOS APPSHEET (cominsp + Pendientes)
+        const comRaw = raw.cominsp?.rows || [];
+        const pendRaw = raw.Pendientes?.rows || [];
+        COMENTARIOS_DATA = [];
+        comRaw.forEach(c => {{
+            const idB = String(c.ID_Benef || '');
+            if (!idsBenef.has(idB)) return;
+            const texto = String(c.comentario || '').trim();
+            if (!texto || texto === 'nan') return;
+            const resp = String(c.respuesta || '').trim();
+            const cerrar = String(c.cerrar || '').toLowerCase();
+            COMENTARIOS_DATA.push({{
+                ID_Benef: idB,
+                fecha: parseDate(c.fecha) || '',
+                texto: texto,
+                respuesta: (resp && resp !== 'nan') ? resp : '',
+                usuario: String(c.usuario || ''),
+                cerrado: cerrar === 'true' || cerrar === 'si' || cerrar === '1',
+                origen: 'Inspeccion'
+            }});
+        }});
+        pendRaw.forEach(p => {{
+            const idB = String(p.ID_Benef || '');
+            if (!idsBenef.has(idB)) return;
+            const texto = String(p.Observaciones || '').trim();
+            if (!texto || texto === 'nan') return;
+            const estado = String(p.Estado || '').toLowerCase();
+            COMENTARIOS_DATA.push({{
+                ID_Benef: idB,
+                fecha: parseDate(p.Fecha) || '',
+                texto: texto,
+                respuesta: '',
+                usuario: String(p.usuario || ''),
+                cerrado: estado === 'cerrado' || estado === 'terminado' || estado === 'completado',
+                origen: 'Pendiente'
+            }});
+        }});
+
         updateLoading('Listo!', 100, `${{PROYECTOS_DATA.length}} proyectos, ${{BENEFICIARIOS_DATA.length}} beneficiarios, ${{DESPACHOS_DATA.length}} despachos, ${{SOLPAGO_DATA.length}} pagos`);
     }}
 
@@ -507,6 +547,7 @@ def make_live_dashboard(apps_script_url):
         ('PRESUPUESTO_DATA', '{}'),
         ('GARANTIAS_DATA', '[]'),
         ('EEPP_DATA', '[]'),
+        ('COMENTARIOS_DATA', '[]'),
     ]
 
     for var_name, empty_val in data_vars:

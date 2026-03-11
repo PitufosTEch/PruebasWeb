@@ -75,6 +75,8 @@ def generar_dashboard_v3_html():
     tabla_pago = dm.get_table_data('Tabla_pago')
     tipologias = dm.get_table_data('Tipologias')
     control_bgb = dm.get_table_data('controlBGB')
+    cominsp = dm.get_table_data('cominsp')
+    pendientes = dm.get_table_data('Pendientes')
     control_eepp_raw = dm.conn.spreadsheet.worksheet('controlEEPP').get_all_values()
     control_eepp_headers = control_eepp_raw[0] if control_eepp_raw else []
     control_eepp_rows = []
@@ -485,12 +487,67 @@ def generar_dashboard_v3_html():
         })
     print(f"Estados de Pago (EEPP): {len(eepp_data)} para proyectos activos")
 
+    # ===== COMENTARIOS APPSHEET (cominsp + Pendientes) =====
+    comentarios_data = []
+    for _, c in cominsp.iterrows():
+        id_benef = str(c.get('ID_Benef', ''))
+        if not id_benef or id_benef == 'nan':
+            continue
+        fecha = str(c.get('fecha', ''))
+        f_iso = ''
+        if fecha and fecha not in ['nan', 'NaT', '']:
+            for fmt in ['%m/%d/%Y', '%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d']:
+                try:
+                    dt = datetime.strptime(fecha.split()[0], fmt)
+                    f_iso = dt.strftime('%Y-%m-%d')
+                    break
+                except:
+                    pass
+        texto = str(c.get('comentario', '')).strip()
+        if texto and texto != 'nan':
+            resp = str(c.get('respuesta', '')).strip()
+            comentarios_data.append({
+                'ID_Benef': id_benef,
+                'fecha': f_iso,
+                'texto': texto,
+                'respuesta': resp if resp and resp != 'nan' else '',
+                'usuario': str(c.get('usuario', '')),
+                'cerrado': str(c.get('cerrar', '')).lower() in ['true', 'si', 'sí', '1', 'yes'],
+                'origen': 'Inspección'
+            })
+    for _, p in pendientes.iterrows():
+        id_benef = str(p.get('ID_Benef', ''))
+        if not id_benef or id_benef == 'nan':
+            continue
+        fecha = str(p.get('Fecha', ''))
+        f_iso = ''
+        if fecha and fecha not in ['nan', 'NaT', '']:
+            for fmt in ['%m/%d/%Y', '%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d']:
+                try:
+                    dt = datetime.strptime(fecha.split()[0], fmt)
+                    f_iso = dt.strftime('%Y-%m-%d')
+                    break
+                except:
+                    pass
+        texto = str(p.get('Observaciones', '')).strip()
+        if texto and texto != 'nan':
+            comentarios_data.append({
+                'ID_Benef': id_benef,
+                'fecha': f_iso,
+                'texto': texto,
+                'respuesta': '',
+                'usuario': str(p.get('usuario', '')),
+                'cerrado': str(p.get('Estado', '')).lower() in ['cerrado', 'terminado', 'completado'],
+                'origen': 'Pendiente'
+            })
+    print(f"Comentarios AppSheet: {len(comentarios_data)} (cominsp + Pendientes)")
+
     # v3: NO genera reportes
 
     html_content = generate_html_template_v3(
         proyectos_data, beneficiarios_data, despachos_data, solicitudes_data,
         inspecciones_data, solpago_data, maestros_dict,
-        presupuesto_por_tipologia, garantias_data, eepp_data
+        presupuesto_por_tipologia, garantias_data, eepp_data, comentarios_data
     )
 
     output_path = Path(__file__).parent.parent / 'dashboard' / 'index_v3.html'
@@ -511,7 +568,7 @@ def generar_dashboard_v3_html():
 
 def generate_html_template_v3(proyectos, beneficiarios, despachos, solicitudes,
                                inspecciones, solpago=None, maestros=None,
-                               presupuesto=None, garantias=None, eepp=None):
+                               presupuesto=None, garantias=None, eepp=None, comentarios=None):
     """Genera HTML v3 con datos embebidos"""
 
     proyectos_json = json.dumps(proyectos, ensure_ascii=False, indent=2)
@@ -524,6 +581,7 @@ def generate_html_template_v3(proyectos, beneficiarios, despachos, solicitudes,
     presupuesto_json = json.dumps(presupuesto or {{}}, ensure_ascii=False)
     garantias_json = json.dumps(garantias or [], ensure_ascii=False)
     eepp_json = json.dumps(eepp or [], ensure_ascii=False)
+    comentarios_json = json.dumps(comentarios or [], ensure_ascii=False)
 
     etapas_config_path = Path(__file__).parent.parent / 'config' / 'etapas_config.json'
     try:
@@ -606,6 +664,7 @@ const MAESTROS_DATA = {maestros_json};
 const PRESUPUESTO_DATA = {presupuesto_json};
 const GARANTIAS_DATA = {garantias_json};
 const EEPP_DATA = {eepp_json};
+const COMENTARIOS_DATA = {comentarios_json};
 const ETAPAS_CONFIG_FULL = {etapas_config_full_json};
 
 // ========== ETAPAS CONFIG ==========
@@ -1480,10 +1539,15 @@ const ViviendasTab = ({{ viviendas, grupos, expandida, setExpandida, filtro, set
                 // Observaciones filtradas por proyecto
                 const obsProy = Object.entries(observaciones).filter(([id, obs]) => vivIds.has(String(id)) && obs.length > 0);
 
+                // Comentarios AppSheet filtrados por proyecto
+                const comProy = COMENTARIOS_DATA.filter(c => vivIds.has(String(c.ID_Benef)));
+                const comAbiertos = comProy.filter(c => !c.cerrado);
+
                 const tabBtns = [
                     ["obs", `Observaciones (${{obsProy.length}})`],
                     ["cons", `Consultas (${{consPendientes.length}} pend.)`],
-                    ["act5", `Actividades 5% (${{actCompletas.length}}/${{viviendas.length}})`]
+                    ["act5", `Actividades 5% (${{actCompletas.length}}/${{viviendas.length}})`],
+                    ["comapp", `AppSheet (${{comProy.length}})`]
                 ];
 
                 return (
@@ -1610,6 +1674,60 @@ const ViviendasTab = ({{ viviendas, grupos, expandida, setExpandida, filtro, set
                                                 </tbody>
                                             </table>
                                         </div>
+                                    </div>
+                                )}}
+                                {{/* Tab Comentarios AppSheet */}}
+                                {{actualTab === "comapp" && (
+                                    <div className="space-y-4">
+                                        <div className="flex items-center gap-4 text-sm mb-3">
+                                            <span className="text-gray-600">Total: <strong>{{comProy.length}}</strong></span>
+                                            <span className="text-gray-600">Abiertos: <strong className="text-orange-600">{{comAbiertos.length}}</strong></span>
+                                            <span className="text-gray-600">Cerrados: <strong className="text-green-600">{{comProy.length - comAbiertos.length}}</strong></span>
+                                        </div>
+                                        {{comProy.length > 0 ? (
+                                            <div className="space-y-3">
+                                                {{(() => {{
+                                                    const grouped = {{}};
+                                                    comProy.forEach(c => {{
+                                                        if (!grouped[c.ID_Benef]) grouped[c.ID_Benef] = [];
+                                                        grouped[c.ID_Benef].push(c);
+                                                    }});
+                                                    return Object.entries(grouped).map(([idBenef, coms]) => {{
+                                                        const v = viviendas.find(vv => String(vv.ID_Benef) === String(idBenef));
+                                                        const nombre = v ? `${{v.NOMBRES}} ${{v.APELLIDOS}}` : idBenef;
+                                                        const abiertos = coms.filter(c => !c.cerrado);
+                                                        return (
+                                                            <div key={{idBenef}} className="border border-gray-200 rounded-lg overflow-hidden">
+                                                                <div className={{`px-4 py-2 border-b flex items-center justify-between ${{abiertos.length > 0 ? "bg-orange-50 border-orange-200" : "bg-green-50 border-green-200"}}`}}>
+                                                                    <span className="font-semibold text-gray-800 text-sm">{{nombre}}</span>
+                                                                    <div className="flex items-center gap-2">
+                                                                        {{abiertos.length > 0 && <span className="text-[10px] bg-orange-100 text-orange-700 border border-orange-300 rounded px-1.5 py-0.5">{{abiertos.length}} abiertos</span>}}
+                                                                        <span className="text-[10px] text-gray-400">{{coms.length}} total</span>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="p-3 space-y-1.5 max-h-48 overflow-y-auto">
+                                                                    {{coms.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '')).map((c, i) => (
+                                                                        <div key={{i}} className={{`flex items-start gap-2 text-sm ${{c.cerrado ? "opacity-50" : ""}}`}}>
+                                                                            <span className={{c.cerrado ? "text-green-400 mt-0.5" : "text-orange-400 mt-0.5"}}>{{c.cerrado ? "\u2713" : "\u25CF"}}</span>
+                                                                            <div className="flex-1 min-w-0">
+                                                                                <span className="text-gray-700">{{c.texto}}</span>
+                                                                                {{c.respuesta && <div className="text-[11px] text-blue-600 mt-0.5 pl-2 border-l-2 border-blue-200">R: {{c.respuesta}}</div>}}
+                                                                            </div>
+                                                                            <div className="text-right shrink-0">
+                                                                                <div className="text-[10px] text-gray-400 whitespace-nowrap">{{c.fecha}}</div>
+                                                                                <div className="text-[9px] text-gray-300">{{c.origen}}</div>
+                                                                            </div>
+                                                                        </div>
+                                                                    ))}}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    }});
+                                                }})()}}
+                                            </div>
+                                        ) : (
+                                            <p className="text-gray-400 text-center py-8">Sin comentarios en AppSheet para este proyecto</p>
+                                        )}}
                                     </div>
                                 )}}
                             </div>
