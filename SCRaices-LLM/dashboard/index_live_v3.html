@@ -3653,13 +3653,13 @@ const App = () => {
                                 setShowTE1(true);
                                 try {
                                     const TE1_SHEET_ID = '1QCoIpiQKV1LB6XgUwwoC_e4crRD5mIANLxon9ZVwsg8';
-                                    const url = APPS_SCRIPT_URL + '?sheetId=' + TE1_SHEET_ID + '&tables=TE1';
+                                    const url = APPS_SCRIPT_URL + '?sheetId=' + TE1_SHEET_ID + '&tables=' + encodeURIComponent('Hoja 1');
                                     console.log('[TE1] Fetching...');
                                     const resp = await fetch(url);
                                     if (!resp.ok) throw new Error('Error ' + resp.status);
                                     const data = await resp.json();
                                     if (data.error) throw new Error(data.error);
-                                    const rows = data.TE1?.rows || data[Object.keys(data)[0]]?.rows || [];
+                                    const rows = data['Hoja 1']?.rows || data[Object.keys(data)[0]]?.rows || [];
                                     console.log('[TE1] OK:', rows.length, 'registros');
                                     setTe1Data(rows);
                                 } catch(e) {
