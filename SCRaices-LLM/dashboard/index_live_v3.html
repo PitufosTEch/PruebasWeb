@@ -3234,6 +3234,7 @@ const App = () => {
     // Observaciones por beneficiario (Firebase)
     const [observaciones, setObservaciones] = React.useState({});
     const [showResumenObs, setShowResumenObs] = React.useState(false);
+    const [showValidacion, setShowValidacion] = React.useState(false);
 
     // Push observaciones a Firebase cuando cambia localmente
     React.useEffect(() => {
@@ -3420,6 +3421,165 @@ const App = () => {
         return `${d}/${m}/${y}`;
     };
 
+    // ========== VALIDACION CRUZADA ==========
+    const validaciones = React.useMemo(() => {
+        const checks = [];
+
+        // CHECK 1: Pago M.O. sin Despacho
+        // Compara: Solpago (pagos aprobados) vs Despachos por familia
+        // Detecta: Se pagó maestro pero no hay registro de que se haya despachado material
+        const c1 = [];
+        viviendas.forEach(v => {
+            const pagos = getSolpago(v.ID_Benef);
+            Object.entries(FAMILIA_PAGO_MAP).forEach(([fam, etapasKeys]) => {
+                if (etapasKeys.length === 0) return;
+                const pagosFam = pagos.filter(p => p.Familia_pago === fam);
+                const totalPagado = pagosFam.reduce((s, p) => s + p.monto, 0);
+                const tieneDespacho = etapasKeys.some(k => v.estadoEtapas[k]?.estado === "despachado");
+                if (totalPagado > 0 && !tieneDespacho) {
+                    c1.push({ benef: v.NOMBRES + ' ' + v.APELLIDOS, id: v.ID_Benef, familia: FAMILIA_LABELS[fam] || fam, monto: totalPagado });
+                }
+            });
+        });
+        checks.push({
+            id: 'pago_sin_despacho',
+            titulo: 'Pago sin Despacho',
+            desc: 'Se registró pago de Mano de Obra en una familia, pero no existe despacho de material para esa etapa. Puede indicar que falta registrar el despacho en AppSheet.',
+            compara: 'Solpago (pagos aprobados) vs Despacho (entregas de material)',
+            tipo: 'rojo',
+            items: c1,
+            render: (it) => `${it.benef} — ${it.familia} (${formatPeso(it.monto)} pagado)`
+        });
+
+        // CHECK 2: Inspección alta sin Despacho
+        // Compara: Ejecucion (inspecciones acumuladas) vs Despacho
+        // Detecta: El inspector marcó avance alto pero nunca se despachó esa familia
+        const c2 = [];
+        viviendas.forEach(v => {
+            const avanceFam = getAvancePorFamilia(v.ID_Benef);
+            Object.entries(FAMILIA_PAGO_MAP).forEach(([fam, etapasKeys]) => {
+                if (etapasKeys.length === 0) return;
+                const tieneDespacho = etapasKeys.some(k => v.estadoEtapas[k]?.estado === "despachado");
+                const avance = avanceFam[fam];
+                if (!tieneDespacho && avance && avance.pct >= 50) {
+                    c2.push({ benef: v.NOMBRES + ' ' + v.APELLIDOS, id: v.ID_Benef, familia: FAMILIA_LABELS[fam] || fam, pct: avance.pct });
+                }
+            });
+        });
+        checks.push({
+            id: 'insp_sin_despacho',
+            titulo: 'Inspección sin Despacho',
+            desc: 'La inspección registra avance significativo (>=50%) en partidas de una familia, pero no hay despacho de material. Puede que se esté trabajando con material de otra fuente o falta registrar despacho.',
+            compara: 'Ejecucion (% inspección por partida) vs Despacho (entregas)',
+            tipo: 'rojo',
+            items: c2,
+            render: (it) => `${it.benef} — ${it.familia} (Insp: ${it.pct}%)`
+        });
+
+        // CHECK 3: Despacho sin Inspección
+        // Compara: Despacho vs Ejecucion
+        // Detecta: Se despachó material pero la inspección no registra avance
+        const c3 = [];
+        viviendas.forEach(v => {
+            const insp = getInspeccion(v.ID_Benef);
+            Object.entries(FAMILIA_PAGO_MAP).forEach(([fam, etapasKeys]) => {
+                if (etapasKeys.length === 0) return;
+                const tieneDespacho = etapasKeys.some(k => v.estadoEtapas[k]?.estado === "despachado");
+                const fechaDesp = etapasKeys.reduce((min, k) => {
+                    const f = v.estadoEtapas[k]?.fechaDespacho;
+                    return f && (!min || f < min) ? f : min;
+                }, null);
+                if (!tieneDespacho || !fechaDesp) return;
+                const diasDesdeDesp = Math.floor((new Date() - new Date(fechaDesp)) / (1000*60*60*24));
+                const avanceFam = getAvancePorFamilia(v.ID_Benef);
+                const avance = avanceFam[fam];
+                if (diasDesdeDesp > 21 && (!avance || avance.pct < 10)) {
+                    c3.push({ benef: v.NOMBRES + ' ' + v.APELLIDOS, id: v.ID_Benef, familia: FAMILIA_LABELS[fam] || fam, dias: diasDesdeDesp, pct: avance ? avance.pct : 0 });
+                }
+            });
+        });
+        checks.push({
+            id: 'desp_sin_insp',
+            titulo: 'Despacho sin Inspección',
+            desc: 'Se despachó material hace más de 21 días pero la inspección registra menos de 10% de avance. Puede que falte una inspección o que el trabajo no haya comenzado.',
+            compara: 'Despacho (fecha entrega) vs Ejecucion (% avance acumulado)',
+            tipo: 'naranja',
+            items: c3,
+            render: (it) => `${it.benef} — ${it.familia} (${it.dias}d desde despacho, Insp: ${it.pct}%)`
+        });
+
+        // CHECK 4: Solicitud vencida (>14 días sin despacho)
+        // Compara: soldepacho (solicitudes) vs Despacho
+        // Detecta: Se pidió material hace más de 14 días y no se ha despachado
+        const c4 = [];
+        viviendas.forEach(v => {
+            Object.entries(v.estadoEtapas).forEach(([key, info]) => {
+                if (info.estado === "solicitado" && info.diasSolicitud > 14) {
+                    c4.push({ benef: v.NOMBRES + ' ' + v.APELLIDOS, id: v.ID_Benef, etapa: info.nombre, dias: info.diasSolicitud });
+                }
+            });
+        });
+        checks.push({
+            id: 'sol_vencida',
+            titulo: 'Solicitud Vencida (+14 días)',
+            desc: 'Se solicitó despacho de material hace más de 14 días y aún no se registra la entrega. Verificar si hubo problemas de stock o si falta registrar el despacho.',
+            compara: 'soldepacho (fecha solicitud) vs Despacho (fecha entrega)',
+            tipo: 'naranja',
+            items: c4,
+            render: (it) => `${it.benef} — ${it.etapa} (${it.dias} días esperando)`
+        });
+
+        // CHECK 5: Vivienda habilitada sin actividad
+        // Compara: Beneficiario (habilitado) vs Despacho
+        // Detecta: Beneficiario marcado como hábil pero sin ningún despacho
+        const c5 = [];
+        viviendas.forEach(v => {
+            if (v.habil && v.numDespachos === 0) {
+                c5.push({ benef: v.NOMBRES + ' ' + v.APELLIDOS, id: v.ID_Benef });
+            }
+        });
+        checks.push({
+            id: 'habil_sin_desp',
+            titulo: 'Habilitada sin Despachos',
+            desc: 'El beneficiario está marcado como "Hábil para construir" pero no tiene ningún despacho registrado. Verificar si está pendiente el inicio de obra.',
+            compara: 'Beneficiario (Habil para construir) vs Despacho (registros)',
+            tipo: 'amarillo',
+            items: c5,
+            render: (it) => `${it.benef}`
+        });
+
+        // CHECK 6: Pago duplicado sospechoso
+        // Compara: Solpago internamente
+        // Detecta: Mismo beneficiario + misma familia + mismo monto + misma fecha
+        const c6 = [];
+        viviendas.forEach(v => {
+            const pagos = getSolpago(v.ID_Benef);
+            const seen = {};
+            pagos.forEach(p => {
+                const key = `${p.Familia_pago}|${p.monto}|${p.fecha}`;
+                if (seen[key]) {
+                    if (!c6.find(x => x.id === v.ID_Benef && x.key === key)) {
+                        c6.push({ benef: v.NOMBRES + ' ' + v.APELLIDOS, id: v.ID_Benef, key, familia: p.Familia_pago, monto: p.monto, fecha: p.fecha });
+                    }
+                }
+                seen[key] = true;
+            });
+        });
+        checks.push({
+            id: 'pago_duplicado',
+            titulo: 'Pago Posiblemente Duplicado',
+            desc: 'Se encontró más de un pago con la misma familia, monto y fecha para el mismo beneficiario. Puede ser legítimo (ej: dos maestros) o un registro duplicado.',
+            compara: 'Solpago: misma familia + mismo monto + misma fecha por beneficiario',
+            tipo: 'amarillo',
+            items: c6,
+            render: (it) => `${it.benef} — ${it.familia} (${formatPeso(it.monto)} el ${it.fecha})`
+        });
+
+        return checks;
+    }, [viviendas]);
+
+    const totalHallazgos = validaciones.reduce((s, c) => s + c.items.length, 0);
+
     const tabs = [["viviendas","Viviendas"],["matriz","Matriz"],["distribucion","Distribución"],["financiero","Financiero"],["mano_obra","M.O."],["estados_pago","Estados de Pago"],["configuracion","Configuración"]];
 
     return (
@@ -3477,6 +3637,57 @@ const App = () => {
                     <div className="bg-white rounded-xl p-3 border border-gray-200 shadow-sm"><p className="text-[10px] text-gray-500">Días Prom.</p><p className="text-xl font-bold font-mono">{kpis.diasPromedio}d</p><p className="text-[9px] text-gray-400">Fund → última</p></div>
                     <div className="bg-white rounded-xl p-3 border border-violet-200 shadow-sm"><p className="text-[10px] text-violet-600">Total Pagado</p><p className="text-lg font-bold font-mono text-violet-700">{formatPeso(kpis.totalPagado)}</p></div>
                 </div>
+
+                {/* VALIDACION CRUZADA - Botón + Modal */}
+                {totalHallazgos > 0 && (
+                    <button onClick={() => setShowValidacion(true)} className="mb-3 flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100 transition-colors">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                        {totalHallazgos} hallazgo{totalHallazgos !== 1 ? 's' : ''} en validación cruzada
+                    </button>
+                )}
+                {showValidacion && (
+                    <div className="fixed inset-0 z-[60] bg-black/40 flex items-start justify-center pt-12 px-4" onClick={(e) => e.target === e.currentTarget && setShowValidacion(false)}>
+                        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+                            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+                                <div>
+                                    <h2 className="text-lg font-bold text-gray-800">Validación Cruzada</h2>
+                                    <p className="text-xs text-gray-500 mt-0.5">Compara datos entre tablas para detectar inconsistencias</p>
+                                </div>
+                                <button onClick={() => setShowValidacion(false)} className="text-gray-400 hover:text-gray-600 text-xl font-bold w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100">x</button>
+                            </div>
+                            <div className="overflow-y-auto p-6 space-y-4">
+                                {validaciones.map(check => (
+                                    <div key={check.id} className={`rounded-xl border ${check.items.length === 0 ? 'border-green-200 bg-green-50/50' : check.tipo === 'rojo' ? 'border-red-200 bg-red-50/30' : check.tipo === 'naranja' ? 'border-orange-200 bg-orange-50/30' : 'border-yellow-200 bg-yellow-50/30'}`}>
+                                        <div className="px-4 py-3">
+                                            <div className="flex items-center gap-2">
+                                                {check.items.length === 0
+                                                    ? <span className="w-5 h-5 rounded-full bg-green-500 text-white flex items-center justify-center text-xs font-bold">&#10003;</span>
+                                                    : <span className={`w-5 h-5 rounded-full text-white flex items-center justify-center text-xs font-bold ${check.tipo === 'rojo' ? 'bg-red-500' : check.tipo === 'naranja' ? 'bg-orange-500' : 'bg-yellow-500'}`}>{check.items.length}</span>
+                                                }
+                                                <h3 className="font-semibold text-sm text-gray-800">{check.titulo}</h3>
+                                            </div>
+                                            <p className="text-[11px] text-gray-500 mt-1 leading-relaxed">{check.desc}</p>
+                                            <p className="text-[10px] text-gray-400 mt-0.5 font-mono">Compara: {check.compara}</p>
+                                        </div>
+                                        {check.items.length > 0 && (
+                                            <div className="border-t border-gray-200/60 px-4 py-2 space-y-1 max-h-40 overflow-y-auto">
+                                                {check.items.map((it, i) => (
+                                                    <p key={i} className="text-xs text-gray-700 py-0.5 flex items-start gap-1.5">
+                                                        <span className="text-gray-300 font-mono text-[10px] mt-px">{i+1}.</span>
+                                                        <span>{check.render(it)}</span>
+                                                    </p>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="px-6 py-3 border-t border-gray-100 bg-gray-50/50">
+                                <p className="text-[10px] text-gray-400 text-center">Los hallazgos no son necesariamente errores. Verificar caso a caso en AppSheet.</p>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* TABS */}
                 <div className="flex items-center gap-1 mb-4 overflow-x-auto hide-scrollbar border-b border-gray-200 pb-px">
