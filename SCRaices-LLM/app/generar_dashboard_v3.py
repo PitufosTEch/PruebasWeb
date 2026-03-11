@@ -197,6 +197,12 @@ def generar_dashboard_v3_html():
                     fecha_hpc = f"{parts[2][:4]}-{parts[1].zfill(2)}-{parts[0].zfill(2)}"
             except:
                 fecha_hpc = ''
+        # Observaciones / Alerta logística
+        obs_raw = str(b.get('Observacion ', '')).strip()
+        obs_seg = str(b.get('Observaciones_seg', '')).strip()
+        alerta_log = obs_raw if obs_raw.lower() not in ['nan', '', 'none'] else ''
+        obs_seguimiento = obs_seg if obs_seg.lower() not in ['nan', '', 'none'] else ''
+
         beneficiarios_data.append({
             'ID_Benef': int(b['ID_Benef']) if str(b['ID_Benef']).isdigit() else str(b['ID_Benef']),
             'ID_Proy': str(b.get('ID_Proy', '')),
@@ -206,7 +212,9 @@ def generar_dashboard_v3_html():
             'tipologia_viv_id': tip_viv_id,
             'tipologia_rc_id': tip_rc_id,
             'habil': habil,
-            'fecha_hpc': fecha_hpc
+            'fecha_hpc': fecha_hpc,
+            'alerta_logistica': alerta_log,
+            'obs_seguimiento': obs_seguimiento
         })
 
     ids_beneficiarios = set([str(b['ID_Benef']) for b in beneficiarios_data])
@@ -1138,8 +1146,10 @@ const ViviendaCard = ({{ beneficiario, estadoEtapas, expanded, onToggle, grupoCo
                         {{gc && <div className={{`w-1.5 h-10 rounded-full ${{gc.accent}}`}} />}}
                         <span className={{b.tipologia === "Casa + RC" ? "text-blue-600" : "text-gray-400"}}><IconHome /></span>
                         <div>
-                            <h3 className="font-semibold text-gray-800">{{b.NOMBRES}} {{b.APELLIDOS}} {{obsCount > 0 && <span className="ml-1 inline-flex items-center gap-0.5 text-[9px] bg-amber-100 text-amber-700 border border-amber-300 rounded px-1 py-0.5 font-medium align-middle cursor-pointer" title={{`${{obsCount}} observacion(es)`}} onClick={{(e) => {{ e.stopPropagation(); if (!expanded) onToggle(); }}}}>&#9998; {{obsCount}}</span>}} {{b.habil ? <span className="ml-1 text-[9px] bg-green-100 text-green-700 border border-green-300 rounded px-1 py-0.5 font-medium align-middle">Habil para Construir</span> : <span className="ml-1 text-[9px] bg-red-100 text-red-600 border border-red-300 rounded px-1 py-0.5 font-medium align-middle">No Habilitada</span>}}</h3>
+                            <h3 className="font-semibold text-gray-800">{{b.NOMBRES}} {{b.APELLIDOS}} {{obsCount > 0 && <span className="ml-1 inline-flex items-center gap-0.5 text-[9px] bg-amber-100 text-amber-700 border border-amber-300 rounded px-1 py-0.5 font-medium align-middle cursor-pointer" title={{`${{obsCount}} observacion(es)`}} onClick={{(e) => {{ e.stopPropagation(); if (!expanded) onToggle(); }}}}>&#9998; {{obsCount}}</span>}} {{b.habil ? <span className="ml-1 text-[9px] bg-green-100 text-green-700 border border-green-300 rounded px-1 py-0.5 font-medium align-middle">Habil para Construir</span> : <span className="ml-1 text-[9px] bg-red-100 text-red-600 border border-red-300 rounded px-1 py-0.5 font-medium align-middle">No Habilitada</span>}} {{b.alerta_logistica && <span className="ml-1 text-[9px] bg-amber-500 text-white border border-amber-600 rounded px-1.5 py-0.5 font-bold align-middle" title={{b.alerta_logistica}}>&#9888; Alerta</span>}}</h3>
                             <p className="text-xs text-gray-500">{{b.tipologia}}</p>
+                            {{b.alerta_logistica && <p className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 mt-1 leading-snug" onClick={{(e) => e.stopPropagation()}}>{{b.alerta_logistica}}</p>}}
+                            {{b.obs_seguimiento && <p className="text-[10px] text-gray-500 bg-gray-50 border border-gray-200 rounded px-2 py-0.5 mt-0.5 italic" onClick={{(e) => e.stopPropagation()}}>{{b.obs_seguimiento}}</p>}}
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -3491,17 +3501,16 @@ const App = () => {{
         }});
 
         // CHECK 7: Muestras de Hormigon pendientes
-        // Detecta: Proyecto con Fundaciones despachadas pero sin suficientes muestras
-        // Regla: 1 muestra cada 8 casas con fundaciones despachadas
+        // Detecta: Proyecto sin suficientes muestras registradas
+        // Regla: 1 muestra cada 6 casas del proyecto (total beneficiarios)
         const c7 = [];
-        const conFundProy = viviendas.filter(v => v.estadoEtapas["01_FUNDACIONES"]?.estado === "despachado");
         const muestrasArr = (() => {{ const raw = muestrasHormigon[proyectoSel]; return Array.isArray(raw) ? raw : []; }})();
-        if (conFundProy.length > 0) {{
+        if (viviendas.length > 0) {{
             const totalMuestras = muestrasArr.reduce((s, m) => s + (m.cantidad || 0), 0);
-            const muestrasRequeridas = Math.ceil(conFundProy.length / 8);
+            const muestrasRequeridas = Math.ceil(viviendas.length / 6);
             if (totalMuestras < muestrasRequeridas) {{
                 c7.push({{
-                    casasConFund: conFundProy.length,
+                    totalCasas: viviendas.length,
                     muestrasRequeridas,
                     muestrasTomadas: totalMuestras,
                     faltantes: muestrasRequeridas - totalMuestras
@@ -3511,11 +3520,11 @@ const App = () => {{
         checks.push({{
             id: 'muestras_hormigon',
             titulo: 'Muestras Hormigon Pendientes',
-            desc: 'El proyecto tiene casas con fundaciones despachadas pero no se han registrado suficientes muestras de hormigon. Se requiere 1 muestra cada 8 radieres.',
+            desc: 'El proyecto no tiene suficientes muestras de hormigon registradas. Se requiere 1 muestra cada 6 casas (total beneficiarios del proyecto).',
             compara: 'Despacho (Fundaciones) vs Registro Muestras (Firebase)',
             tipo: 'naranja',
             items: c7,
-            render: (it) => `${{it.casasConFund}} casas con fundacion, requiere ${{it.muestrasRequeridas}} muestra(s), tiene ${{it.muestrasTomadas}} (faltan ${{it.faltantes}})`
+            render: (it) => `${{it.totalCasas}} casas en proyecto, requiere ${{it.muestrasRequeridas}} muestra(s), tiene ${{it.muestrasTomadas}} (faltan ${{it.faltantes}})`
         }});
 
         // CHECK 8: Resultados de laboratorio pendientes (30 dias)
@@ -3654,11 +3663,10 @@ const App = () => {{
                 </button>
                 {{/* MUESTRAS HORMIGON - Botón + Modal */}}
                 {{(() => {{
-                    const conFundProy = viviendas.filter(v => v.estadoEtapas["01_FUNDACIONES"]?.estado === "despachado");
-                    if (conFundProy.length === 0) return null;
+                    if (viviendas.length === 0) return null;
                     const muestrasArr = getMuestrasProy();
                     const totalMuestras = muestrasArr.reduce((s, m) => s + (m.cantidad || 0), 0);
-                    const requeridas = Math.ceil(conFundProy.length / 8);
+                    const requeridas = Math.ceil(viviendas.length / 6);
                     const alertaLab = muestrasArr.filter(m => !m.resultadoPedido && Math.floor((new Date() - new Date(m.fecha)) / (1000*60*60*24)) >= 30).length;
                     return <button onClick={{() => setShowMuestras(true)}} className={{`mb-3 ml-2 flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${{alertaLab > 0 ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100' : totalMuestras >= requeridas ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100' : totalMuestras > 0 ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100' : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'}}`}}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -3669,17 +3677,16 @@ const App = () => {{
                     </button>;
                 }})()}}
                 {{showMuestras && (() => {{
-                    const conFundProy = viviendas.filter(v => v.estadoEtapas["01_FUNDACIONES"]?.estado === "despachado");
                     const muestrasArr = getMuestrasProy();
                     const totalMuestras = muestrasArr.reduce((s, m) => s + (m.cantidad || 0), 0);
-                    const requeridas = Math.ceil(conFundProy.length / 8);
+                    const requeridas = Math.ceil(viviendas.length / 6);
                     const hoy = new Date();
                     return <div className="fixed inset-0 z-[60] bg-black/40 flex items-start justify-center pt-8 px-4" onClick={{(e) => e.target === e.currentTarget && setShowMuestras(false)}}>
                         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
                             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
                                 <div>
                                     <h2 className="text-lg font-bold text-gray-800">Muestras de Hormigón — Fundaciones</h2>
-                                    <p className="text-xs text-gray-500 mt-0.5">1 muestra (probeta) cada 8 radieres. Registra toma y seguimiento de resultados.</p>
+                                    <p className="text-xs text-gray-500 mt-0.5">1 muestra (probeta) cada 6 casas. Registra toma y seguimiento de resultados.</p>
                                 </div>
                                 <button onClick={{() => setShowMuestras(false)}} className="text-gray-400 hover:text-gray-600 text-xl font-bold w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100">x</button>
                             </div>
@@ -3690,24 +3697,13 @@ const App = () => {{
                                         <div>
                                             <p className="text-sm font-semibold text-blue-800">{{proy?.NOMBRE_PROYECTO || proyectoSel}}</p>
                                             <p className="text-[11px] text-blue-600 mt-0.5">
-                                                {{conFundProy.length}} casa{{conFundProy.length !== 1 ? 's' : ''}} con fundación despachada | Requiere {{requeridas}} muestra{{requeridas !== 1 ? 's' : ''}} | Registradas: {{totalMuestras}}
+                                                {{viviendas.length}} casa{{viviendas.length !== 1 ? 's' : ''}} en proyecto | Requiere {{requeridas}} muestra{{requeridas !== 1 ? 's' : ''}} (1 cada 6) | Registradas: {{totalMuestras}}
                                             </p>
                                         </div>
                                         {{totalMuestras >= requeridas
                                             ? <span className="text-[10px] bg-green-100 text-green-700 px-2.5 py-1 rounded-full font-medium">Completo</span>
                                             : <span className="text-[10px] bg-orange-100 text-orange-700 px-2.5 py-1 rounded-full font-medium">Faltan {{requeridas - totalMuestras}}</span>
                                         }}
-                                    </div>
-                                    {{conFundProy.length > 0 && (
-                                        <details className="mt-2">
-                                            <summary className="text-[10px] text-blue-500 cursor-pointer hover:text-blue-700">Ver casas con fundación</summary>
-                                            <div className="mt-1 flex flex-wrap gap-1">
-                                                {{conFundProy.map(v => (
-                                                    <span key={{v.ID_Benef}} className="text-[9px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">{{v.APELLIDOS}}, {{v.NOMBRES}}</span>
-                                                ))}}
-                                            </div>
-                                        </details>
-                                    )}}
                                 </div>
 
                                 {{/* Lista de muestras registradas */}}
@@ -3783,7 +3779,7 @@ const App = () => {{
                                 </div>
                             </div>
                             <div className="px-6 py-3 border-t border-gray-100 bg-gray-50/50">
-                                <p className="text-[10px] text-gray-400 text-center">Regla: 1 probeta cada 8 radieres (casas con fundación). A los 30 días de la toma, pedir resultados al laboratorio.</p>
+                                <p className="text-[10px] text-gray-400 text-center">Regla: 1 probeta cada 6 casas (casas con fundación). A los 30 días de la toma, pedir resultados al laboratorio.</p>
                             </div>
                         </div>
                     </div>;
