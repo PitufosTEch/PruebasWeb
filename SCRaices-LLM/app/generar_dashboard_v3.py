@@ -1452,6 +1452,9 @@ const ViviendasTab = ({{ viviendas, grupos, expandida, setExpandida, filtro, set
                 const setActualTab = (t) => setResTab(t || true);
                 const closeModal = () => setResTab(false);
 
+                // IDs del proyecto actual
+                const vivIds = new Set(viviendas.map(v => String(v.ID_Benef)));
+
                 // Consultas gatilladas: recorrer viviendas y ver cuales tienen etapas despachadas con consulta
                 const consultasData = viviendas.flatMap(v => {{
                     const estados = v.estadoEtapas || {{}};
@@ -1474,8 +1477,11 @@ const ViviendasTab = ({{ viviendas, grupos, expandida, setExpandida, filtro, set
                 const actCompletas = actData.filter(a => a.hechas.length === 5);
                 const actParciales = actData.filter(a => a.hechas.length > 0 && a.hechas.length < 5);
 
+                // Observaciones filtradas por proyecto
+                const obsProy = Object.entries(observaciones).filter(([id, obs]) => vivIds.has(String(id)) && obs.length > 0);
+
                 const tabBtns = [
-                    ["obs", `Observaciones (${{Object.values(observaciones).filter(o => o.length > 0).length}})`],
+                    ["obs", `Observaciones (${{obsProy.length}})`],
                     ["cons", `Consultas (${{consPendientes.length}} pend.)`],
                     ["act5", `Actividades 5% (${{actCompletas.length}}/${{viviendas.length}})`]
                 ];
@@ -1496,8 +1502,8 @@ const ViviendasTab = ({{ viviendas, grupos, expandida, setExpandida, filtro, set
                                 {{/* Tab Observaciones */}}
                                 {{actualTab === "obs" && (
                                     <div className="space-y-3">
-                                        {{Object.entries(observaciones).filter(([,obs]) => obs.length > 0).map(([idBenef, obs]) => {{
-                                            const v = viviendas.find(vv => String(vv.ID_Benef) === String(idBenef)) || BENEFICIARIOS_DATA.find(bb => String(bb.ID_Benef) === String(idBenef));
+                                        {{obsProy.map(([idBenef, obs]) => {{
+                                            const v = viviendas.find(vv => String(vv.ID_Benef) === String(idBenef));
                                             const nombre = v ? `${{v.NOMBRES}} ${{v.APELLIDOS}}` : idBenef;
                                             return (
                                                 <div key={{idBenef}} className="border border-amber-200 rounded-lg overflow-hidden">
@@ -1517,7 +1523,7 @@ const ViviendasTab = ({{ viviendas, grupos, expandida, setExpandida, filtro, set
                                                 </div>
                                             );
                                         }})}}
-                                        {{Object.values(observaciones).filter(o => o.length > 0).length === 0 && <p className="text-gray-400 text-center py-8">Sin observaciones registradas</p>}}
+                                        {{obsProy.length === 0 && <p className="text-gray-400 text-center py-8">Sin observaciones en este proyecto</p>}}
                                     </div>
                                 )}}
                                 {{/* Tab Consultas */}}
