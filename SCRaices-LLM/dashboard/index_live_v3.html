@@ -3271,6 +3271,19 @@ const App = () => {
     // Consultas por etapa (Firebase)
     const [consultas, setConsultas] = React.useState({});
 
+    // Refresh button state (top-level para evitar hooks en IIFE)
+    const [refreshing, setRefreshing] = React.useState(false);
+    const [lastUpdate, setLastUpdate] = React.useState(null);
+
+    // Sugerencias form state (top-level)
+    const [textoSug, setTextoSug] = React.useState('');
+    const [imgSug, setImgSug] = React.useState(null);
+    const [imgPreview, setImgPreview] = React.useState(null);
+    const textareaRef = React.useRef(null);
+
+    // TE1 filter state (top-level)
+    const [filtroTE1, setFiltroTE1] = React.useState('');
+
     React.useEffect(() => {
         if (skipConsPush.current) { skipConsPush.current = false; return; }
         if (consultasRef.current) consultasRef.current.set(consultas);
@@ -3656,10 +3669,8 @@ const App = () => {
                             {PROYECTOS_DATA.map(p => <option key={p.ID_proy} value={p.ID_proy}>{p.estado === 'finalizado' ? '[F] ' : ''}{p.NOMBRE_PROYECTO} — {p.COMUNA} ({BENEFICIARIOS_DATA.filter(b => String(b.ID_Proy) === String(p.ID_proy)).length} viv.)</option>)}
                         </select>
                         {grupos.length > 0 && <div className="flex items-center gap-1.5 text-xs text-gray-500"><IconGroup /><span>{grupos.length} grupos</span></div>}
-                        {typeof APPS_SCRIPT_URL !== 'undefined' && (() => {
-                            const [refreshing, setRefreshing] = React.useState(false);
-                            const [lastUpdate, setLastUpdate] = React.useState(null);
-                            const doRefresh = async () => {
+                        {typeof APPS_SCRIPT_URL !== 'undefined' && (
+                            <button onClick={async () => {
                                 if (refreshing) return;
                                 setRefreshing(true);
                                 try {
@@ -3673,11 +3684,10 @@ const App = () => {
                                 } finally {
                                     setRefreshing(false);
                                 }
-                            };
-                            return <button onClick={doRefresh} title={lastUpdate ? 'Actualizado ' + lastUpdate.toLocaleTimeString('es-CL') : 'Actualizar datos'} className={`ml-auto p-1.5 rounded-lg text-gray-400 hover:text-violet-600 hover:bg-violet-50 transition-colors ${refreshing ? 'animate-spin' : ''}`}>
+                            }} title={lastUpdate ? 'Actualizado ' + lastUpdate.toLocaleTimeString('es-CL') : 'Actualizar datos'} className={`ml-auto p-1.5 rounded-lg text-gray-400 hover:text-violet-600 hover:bg-violet-50 transition-colors ${refreshing ? 'animate-spin' : ''}`}>
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
-                            </button>;
-                        })()}
+                            </button>
+                        )}
                         {typeof APPS_SCRIPT_URL !== 'undefined' && (
                             <button onClick={async () => {
                                 if (te1Loading) return;
@@ -3832,22 +3842,59 @@ const App = () => {
                         </div>
 
                         {/* Formulario nueva sugerencia */}
-                        {(() => {
-                            const [textoSug, setTextoSug] = React.useState('');
-                            const [imgSug, setImgSug] = React.useState(null);
-                            const [imgPreview, setImgPreview] = React.useState(null);
-                            const textareaRef = React.useRef(null);
-
-                            const handlePaste = (e) => {
-                                const items = e.clipboardData?.items;
-                                if (!items) return;
-                                for (let i = 0; i < items.length; i++) {
-                                    if (items[i].type.startsWith('image/')) {
-                                        e.preventDefault();
-                                        const file = items[i].getAsFile();
+                        <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+                            <textarea
+                                ref={textareaRef}
+                                value={textoSug}
+                                onChange={(e) => setTextoSug(e.target.value)}
+                                onPaste={(e) => {
+                                    const items = e.clipboardData?.items;
+                                    if (!items) return;
+                                    for (let i = 0; i < items.length; i++) {
+                                        if (items[i].type.startsWith('image/')) {
+                                            e.preventDefault();
+                                            const file = items[i].getAsFile();
+                                            const reader = new FileReader();
+                                            reader.onload = (ev) => {
+                                                const img = new Image();
+                                                img.onload = () => {
+                                                    const canvas = document.createElement('canvas');
+                                                    const maxW = 800;
+                                                    const scale = img.width > maxW ? maxW / img.width : 1;
+                                                    canvas.width = img.width * scale;
+                                                    canvas.height = img.height * scale;
+                                                    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                                                    const compressed = canvas.toDataURL('image/jpeg', 0.7);
+                                                    setImgSug(compressed);
+                                                    setImgPreview(compressed);
+                                                };
+                                                img.src = ev.target.result;
+                                            };
+                                            reader.readAsDataURL(file);
+                                            break;
+                                        }
+                                    }
+                                }}
+                                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (textoSug.trim()) { addSugerencia(textoSug.trim(), imgSug); setTextoSug(''); setImgSug(null); setImgPreview(null); } } }}
+                                placeholder="Describir mejora... (Ctrl+V para pegar imagen)"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-violet-400"
+                                rows={3}
+                            />
+                            {imgPreview && (
+                                <div className="mt-2 relative inline-block">
+                                    <img src={imgPreview} className="max-h-32 rounded-lg border border-gray-200" />
+                                    <button onClick={() => { setImgSug(null); setImgPreview(null); }} className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center hover:bg-red-600">x</button>
+                                </div>
+                            )}
+                            <div className="flex items-center gap-2 mt-2">
+                                <button onClick={() => { if (!textoSug.trim()) return; addSugerencia(textoSug.trim(), imgSug); setTextoSug(''); setImgSug(null); setImgPreview(null); }} disabled={!textoSug.trim()} className="px-4 py-1.5 bg-violet-600 text-white text-sm rounded-lg hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Enviar</button>
+                                <label className="px-3 py-1.5 text-xs text-gray-500 border border-gray-300 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors">
+                                    Adjuntar imagen
+                                    <input type="file" accept="image/*" onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (!file || !file.type.startsWith('image/')) return;
                                         const reader = new FileReader();
                                         reader.onload = (ev) => {
-                                            // Comprimir si es muy grande
                                             const img = new Image();
                                             img.onload = () => {
                                                 const canvas = document.createElement('canvas');
@@ -3863,67 +3910,10 @@ const App = () => {
                                             img.src = ev.target.result;
                                         };
                                         reader.readAsDataURL(file);
-                                        break;
-                                    }
-                                }
-                            };
-
-                            const handleFileSelect = (e) => {
-                                const file = e.target.files?.[0];
-                                if (!file || !file.type.startsWith('image/')) return;
-                                const reader = new FileReader();
-                                reader.onload = (ev) => {
-                                    const img = new Image();
-                                    img.onload = () => {
-                                        const canvas = document.createElement('canvas');
-                                        const maxW = 800;
-                                        const scale = img.width > maxW ? maxW / img.width : 1;
-                                        canvas.width = img.width * scale;
-                                        canvas.height = img.height * scale;
-                                        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-                                        const compressed = canvas.toDataURL('image/jpeg', 0.7);
-                                        setImgSug(compressed);
-                                        setImgPreview(compressed);
-                                    };
-                                    img.src = ev.target.result;
-                                };
-                                reader.readAsDataURL(file);
-                            };
-
-                            const enviar = () => {
-                                if (!textoSug.trim()) return;
-                                addSugerencia(textoSug.trim(), imgSug);
-                                setTextoSug('');
-                                setImgSug(null);
-                                setImgPreview(null);
-                            };
-
-                            return <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
-                                <textarea
-                                    ref={textareaRef}
-                                    value={textoSug}
-                                    onChange={(e) => setTextoSug(e.target.value)}
-                                    onPaste={handlePaste}
-                                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviar(); } }}
-                                    placeholder="Describir mejora... (Ctrl+V para pegar imagen)"
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-violet-400"
-                                    rows={3}
-                                />
-                                {imgPreview && (
-                                    <div className="mt-2 relative inline-block">
-                                        <img src={imgPreview} className="max-h-32 rounded-lg border border-gray-200" />
-                                        <button onClick={() => { setImgSug(null); setImgPreview(null); }} className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center hover:bg-red-600">x</button>
-                                    </div>
-                                )}
-                                <div className="flex items-center gap-2 mt-2">
-                                    <button onClick={enviar} disabled={!textoSug.trim()} className="px-4 py-1.5 bg-violet-600 text-white text-sm rounded-lg hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Enviar</button>
-                                    <label className="px-3 py-1.5 text-xs text-gray-500 border border-gray-300 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors">
-                                        Adjuntar imagen
-                                        <input type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
-                                    </label>
-                                </div>
-                            </div>;
-                        })()}
+                                    }} className="hidden" />
+                                </label>
+                            </div>
+                        </div>
 
                         {/* Lista de sugerencias */}
                         <div className="overflow-y-auto flex-1 p-6 space-y-3">
@@ -3980,7 +3970,6 @@ const App = () => {
                             )}
                             {te1Data && !te1Loading && (() => {
                                 const cols = te1Data.length > 0 ? Object.keys(te1Data[0]) : [];
-                                const [filtroTE1, setFiltroTE1] = React.useState('');
                                 const filtered = filtroTE1
                                     ? te1Data.filter(r => Object.values(r).some(v => String(v).toLowerCase().includes(filtroTE1.toLowerCase())))
                                     : te1Data;

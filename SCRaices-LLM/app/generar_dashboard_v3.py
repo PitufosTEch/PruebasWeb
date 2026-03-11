@@ -2966,6 +2966,8 @@ const App = () => {{
     const skipObsPush = React.useRef(true);
     const skipActPush = React.useRef(true);
     const skipConsPush = React.useRef(true);
+    const sugRef = React.useRef(null);
+    const skipSugPush = React.useRef(true);
 
     React.useEffect(() => {{
         // Listener Firebase para Grupos
@@ -2997,11 +2999,19 @@ const App = () => {{
             skipConsPush.current = true;
             setConsultas(val || {{}});
         }});
+        // Listener Firebase para Sugerencias
+        sugRef.current = fbDB.ref('sugerencias');
+        sugRef.current.on('value', (snap) => {{
+            const val = snap.val();
+            skipSugPush.current = true;
+            setSugerencias(val ? Object.values(val).sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '')) : []);
+        }});
         return () => {{
             if (gruposRef.current) gruposRef.current.off();
             if (obsRef.current) obsRef.current.off();
             if (actRef.current) actRef.current.off();
             if (consultasRef.current) consultasRef.current.off();
+            if (sugRef.current) sugRef.current.off();
         }};
     }}, []);
 
@@ -3014,6 +3024,15 @@ const App = () => {{
     // Observaciones por beneficiario (Firebase)
     const [observaciones, setObservaciones] = React.useState({{}});
     const [showResumenObs, setShowResumenObs] = React.useState(false);
+    const [showValidacion, setShowValidacion] = React.useState(false);
+    const [showTE1, setShowTE1] = React.useState(false);
+    const [te1Data, setTe1Data] = React.useState(null);
+    const [te1Loading, setTe1Loading] = React.useState(false);
+    const [te1Error, setTe1Error] = React.useState(null);
+
+    // Sugerencias de mejora (Firebase)
+    const [showSugerencias, setShowSugerencias] = React.useState(false);
+    const [sugerencias, setSugerencias] = React.useState([]);
 
     // Push observaciones a Firebase cuando cambia localmente
     React.useEffect(() => {{
@@ -3031,6 +3050,19 @@ const App = () => {{
 
     // Consultas por etapa (Firebase)
     const [consultas, setConsultas] = React.useState({{}});
+
+    // Refresh button state (top-level para evitar hooks en IIFE)
+    const [refreshing, setRefreshing] = React.useState(false);
+    const [lastUpdate, setLastUpdate] = React.useState(null);
+
+    // Sugerencias form state (top-level)
+    const [textoSug, setTextoSug] = React.useState('');
+    const [imgSug, setImgSug] = React.useState(null);
+    const [imgPreview, setImgPreview] = React.useState(null);
+    const textareaRef = React.useRef(null);
+
+    // TE1 filter state (top-level)
+    const [filtroTE1, setFiltroTE1] = React.useState('');
 
     React.useEffect(() => {{
         if (skipConsPush.current) {{ skipConsPush.current = false; return; }}
@@ -3088,6 +3120,25 @@ const App = () => {{
             return next;
         }});
     }};
+
+    const addSugerencia = (texto, imagen) => {{
+        const id = Date.now();
+        const sug = {{ id, texto, imagen: imagen || null, fecha: fechaChile(), resuelta: false }};
+        fbDB.ref('sugerencias/' + id).set(sug);
+    }};
+
+    const toggleSugResuelta = (sugId) => {{
+        const sug = sugerencias.find(s => s.id === sugId);
+        if (sug) {{
+            fbDB.ref('sugerencias/' + sugId).update({{ resuelta: !sug.resuelta, fechaResolucion: !sug.resuelta ? fechaChile() : null }});
+        }}
+    }};
+
+    const deleteSugerencia = (sugId) => {{
+        fbDB.ref('sugerencias/' + sugId).remove();
+    }};
+
+    const pendientesSug = sugerencias.filter(s => !s.resuelta).length;
 
     const beneficiarios = React.useMemo(() => BENEFICIARIOS_DATA.filter(b => String(b.ID_Proy) === String(proyectoSel)), [proyectoSel]);
 
@@ -3200,6 +3251,188 @@ const App = () => {{
         return `${{d}}/${{m}}/${{y}}`;
     }};
 
+    // ========== VALIDACION CRUZADA ==========
+    const validaciones = React.useMemo(() => {{
+        const checks = [];
+
+        // CHECK 1: Pago M.O. sin Despacho
+        // Compara: Solpago (pagos aprobados) vs Despachos por familia
+        // Detecta: Se pagó maestro pero no hay registro de que se haya despachado material
+        const c1 = [];
+        viviendas.forEach(v => {{
+            const pagos = getSolpago(v.ID_Benef);
+            Object.entries(FAMILIA_PAGO_MAP).forEach(([fam, etapasKeys]) => {{
+                if (etapasKeys.length === 0) return;
+                const pagosFam = pagos.filter(p => p.Familia_pago === fam);
+                const totalPagado = pagosFam.reduce((s, p) => s + p.monto, 0);
+                const tieneDespacho = etapasKeys.some(k => v.estadoEtapas[k]?.estado === "despachado");
+                if (totalPagado > 0 && !tieneDespacho) {{
+                    c1.push({{ benef: v.NOMBRES + ' ' + v.APELLIDOS, id: v.ID_Benef, familia: FAMILIA_LABELS[fam] || fam, monto: totalPagado }});
+                }}
+            }});
+        }});
+        checks.push({{
+            id: 'pago_sin_despacho',
+            titulo: 'Pago sin Despacho',
+            desc: 'Se registró pago de Mano de Obra en una familia, pero no existe despacho de material para esa etapa. Puede indicar que falta registrar el despacho en AppSheet.',
+            compara: 'Solpago (pagos aprobados) vs Despacho (entregas de material)',
+            tipo: 'rojo',
+            items: c1,
+            render: (it) => `${{it.benef}} — ${{it.familia}} (${{formatPeso(it.monto)}} pagado)`
+        }});
+
+        // CHECK 2: Inspección alta sin Despacho
+        // Compara: Ejecucion (inspecciones acumuladas) vs Despacho
+        // Detecta: El inspector marcó avance alto pero nunca se despachó esa familia
+        const c2 = [];
+        viviendas.forEach(v => {{
+            const avanceFam = getAvancePorFamilia(v.ID_Benef);
+            Object.entries(FAMILIA_PAGO_MAP).forEach(([fam, etapasKeys]) => {{
+                if (etapasKeys.length === 0) return;
+                const tieneDespacho = etapasKeys.some(k => v.estadoEtapas[k]?.estado === "despachado");
+                const avance = avanceFam[fam];
+                if (!tieneDespacho && avance && avance.pct >= 50) {{
+                    c2.push({{ benef: v.NOMBRES + ' ' + v.APELLIDOS, id: v.ID_Benef, familia: FAMILIA_LABELS[fam] || fam, pct: avance.pct }});
+                }}
+            }});
+        }});
+        checks.push({{
+            id: 'insp_sin_despacho',
+            titulo: 'Inspección sin Despacho',
+            desc: 'La inspección registra avance significativo (>=50%) en partidas de una familia, pero no hay despacho de material. Puede que se esté trabajando con material de otra fuente o falta registrar despacho.',
+            compara: 'Ejecucion (% inspección por partida) vs Despacho (entregas)',
+            tipo: 'rojo',
+            items: c2,
+            render: (it) => `${{it.benef}} — ${{it.familia}} (Insp: ${{it.pct}}%)`
+        }});
+
+        // CHECK 3: Despacho sin Inspección
+        // Compara: Despacho vs Ejecucion
+        // Detecta: Se despachó material pero la inspección no registra avance
+        const c3 = [];
+        viviendas.forEach(v => {{
+            const insp = getInspeccion(v.ID_Benef);
+            Object.entries(FAMILIA_PAGO_MAP).forEach(([fam, etapasKeys]) => {{
+                if (etapasKeys.length === 0) return;
+                const tieneDespacho = etapasKeys.some(k => v.estadoEtapas[k]?.estado === "despachado");
+                const fechaDesp = etapasKeys.reduce((min, k) => {{
+                    const f = v.estadoEtapas[k]?.fechaDespacho;
+                    return f && (!min || f < min) ? f : min;
+                }}, null);
+                if (!tieneDespacho || !fechaDesp) return;
+                const diasDesdeDesp = Math.floor((new Date() - new Date(fechaDesp)) / (1000*60*60*24));
+                const avanceFam = getAvancePorFamilia(v.ID_Benef);
+                const avance = avanceFam[fam];
+                if (diasDesdeDesp > 21 && (!avance || avance.pct < 10)) {{
+                    c3.push({{ benef: v.NOMBRES + ' ' + v.APELLIDOS, id: v.ID_Benef, familia: FAMILIA_LABELS[fam] || fam, dias: diasDesdeDesp, pct: avance ? avance.pct : 0 }});
+                }}
+            }});
+        }});
+        checks.push({{
+            id: 'desp_sin_insp',
+            titulo: 'Despacho sin Inspección',
+            desc: 'Se despachó material hace más de 21 días pero la inspección registra menos de 10% de avance. Puede que falte una inspección o que el trabajo no haya comenzado.',
+            compara: 'Despacho (fecha entrega) vs Ejecucion (% avance acumulado)',
+            tipo: 'naranja',
+            items: c3,
+            render: (it) => `${{it.benef}} — ${{it.familia}} (${{it.dias}}d desde despacho, Insp: ${{it.pct}}%)`
+        }});
+
+        // CHECK 4: Solicitud vencida (>14 días sin despacho)
+        // Compara: soldepacho (solicitudes) vs Despacho
+        // Detecta: Se pidió material hace más de 14 días y no se ha despachado
+        const c4 = [];
+        viviendas.forEach(v => {{
+            Object.entries(v.estadoEtapas).forEach(([key, info]) => {{
+                if (info.estado === "solicitado" && info.diasSolicitud > 14) {{
+                    c4.push({{ benef: v.NOMBRES + ' ' + v.APELLIDOS, id: v.ID_Benef, etapa: info.nombre, dias: info.diasSolicitud }});
+                }}
+            }});
+        }});
+        checks.push({{
+            id: 'sol_vencida',
+            titulo: 'Solicitud Vencida (+14 días)',
+            desc: 'Se solicitó despacho de material hace más de 14 días y aún no se registra la entrega. Verificar si hubo problemas de stock o si falta registrar el despacho.',
+            compara: 'soldepacho (fecha solicitud) vs Despacho (fecha entrega)',
+            tipo: 'naranja',
+            items: c4,
+            render: (it) => `${{it.benef}} — ${{it.etapa}} (${{it.dias}} días esperando)`
+        }});
+
+        // CHECK 5: Vivienda habilitada sin actividad
+        // Compara: Beneficiario (habilitado) vs Despacho
+        // Detecta: Beneficiario marcado como hábil pero sin ningún despacho
+        const c5 = [];
+        viviendas.forEach(v => {{
+            if (v.habil && v.numDespachos === 0) {{
+                c5.push({{ benef: v.NOMBRES + ' ' + v.APELLIDOS, id: v.ID_Benef }});
+            }}
+        }});
+        checks.push({{
+            id: 'habil_sin_desp',
+            titulo: 'Habilitada sin Despachos',
+            desc: 'El beneficiario está marcado como "Hábil para construir" pero no tiene ningún despacho registrado. Verificar si está pendiente el inicio de obra.',
+            compara: 'Beneficiario (Habil para construir) vs Despacho (registros)',
+            tipo: 'amarillo',
+            items: c5,
+            render: (it) => `${{it.benef}}`
+        }});
+
+        // CHECK 6: Posible Pago en Exceso
+        // Compara: Solpago (total pagado por familia) vs Tabla_pago (presupuesto M.O. Vivienda + RC)
+        // Detecta: Lo pagado supera la suma de presupuestos Vivienda + Recinto Complementario
+        const c6 = [];
+        viviendas.forEach(v => {{
+            const tipViv = v.tipologia_viv_id;
+            const tipRC = v.tipologia_rc_id;
+            if (!tipViv && !tipRC) return;
+            const presViv = PRESUPUESTO_DATA[tipViv] || {{}};
+            const presRC = PRESUPUESTO_DATA[tipRC] || {{}};
+
+            // Unir familias de ambas tipologías
+            const todasFamilias = new Set([...Object.keys(presViv), ...Object.keys(presRC)]);
+            const pagos = getSolpago(v.ID_Benef);
+
+            todasFamilias.forEach(familia => {{
+                const montoViv = presViv[familia] || 0;
+                const montoRC = presRC[familia] || 0;
+                const montoBase = montoViv + montoRC;
+                if (montoBase <= 0) return;
+
+                const pagosFam = pagos.filter(p => p.Familia_pago === familia);
+                const totalPagado = pagosFam.reduce((s, p) => s + p.monto, 0);
+                if (totalPagado > montoBase) {{
+                    const exceso = totalPagado - montoBase;
+                    const pctExceso = Math.round((exceso / montoBase) * 100);
+                    c6.push({{
+                        benef: v.NOMBRES + ' ' + v.APELLIDOS,
+                        id: v.ID_Benef,
+                        familia,
+                        pagado: totalPagado,
+                        presupuesto: montoBase,
+                        exceso,
+                        pctExceso,
+                        tieneRC: montoRC > 0
+                    }});
+                }}
+            }});
+        }});
+        c6.sort((a, b) => b.exceso - a.exceso);
+        checks.push({{
+            id: 'pago_exceso',
+            titulo: 'Posible Pago en Exceso',
+            desc: 'El total pagado en Mano de Obra supera la suma de presupuestos Vivienda + Recinto Complementario (Tabla_pago). Solo compara pagos aprobados.',
+            compara: 'Solpago (pagos aprobados) vs Tabla_pago (presupuesto Viv + RC por tipología)',
+            tipo: 'rojo',
+            items: c6,
+            render: (it) => `${{it.benef}} — ${{it.familia}}: Pagado ${{formatPeso(it.pagado)}} vs Presup. ${{formatPeso(it.presupuesto)}}${{it.tieneRC ? ' (Viv+RC)' : ''}} (+${{formatPeso(it.exceso)}}, +${{it.pctExceso}}%)`
+        }});
+
+        return checks;
+    }}, [viviendas]);
+
+    const totalHallazgos = validaciones.reduce((s, c) => s + c.items.length, 0);
+
     const tabs = [["viviendas","Viviendas"],["matriz","Matriz"],["distribucion","Distribución"],["financiero","Financiero"],["mano_obra","M.O."],["estados_pago","Estados de Pago"],["configuracion","Configuración"]];
 
     return (
@@ -3216,6 +3449,61 @@ const App = () => {{
                             {{PROYECTOS_DATA.map(p => <option key={{p.ID_proy}} value={{p.ID_proy}}>{{p.estado === 'finalizado' ? '[F] ' : ''}}{{p.NOMBRE_PROYECTO}} — {{p.COMUNA}} ({{BENEFICIARIOS_DATA.filter(b => String(b.ID_Proy) === String(p.ID_proy)).length}} viv.)</option>)}}
                         </select>
                         {{grupos.length > 0 && <div className="flex items-center gap-1.5 text-xs text-gray-500"><IconGroup /><span>{{grupos.length}} grupos</span></div>}}
+                        {{typeof APPS_SCRIPT_URL !== 'undefined' && (
+                            <button onClick={{async () => {{
+                                if (refreshing) return;
+                                setRefreshing(true);
+                                try {{
+                                    const raw = await fetchAllData();
+                                    processRawData(raw);
+                                    if (typeof saveProcessedCache === 'function') saveProcessedCache();
+                                    setLastUpdate(new Date());
+                                    renderApp();
+                                }} catch(e) {{
+                                    console.error('[REFRESH]', e);
+                                }} finally {{
+                                    setRefreshing(false);
+                                }}
+                            }}}} title={{lastUpdate ? 'Actualizado ' + lastUpdate.toLocaleTimeString('es-CL') : 'Actualizar datos'}} className={{`ml-auto p-1.5 rounded-lg text-gray-400 hover:text-violet-600 hover:bg-violet-50 transition-colors ${{refreshing ? 'animate-spin' : ''}}`}}>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+                            </button>
+                        )}}
+                        {{typeof APPS_SCRIPT_URL !== 'undefined' && (
+                            <button onClick={{async () => {{
+                                if (te1Loading) return;
+                                setTe1Loading(true);
+                                setTe1Error(null);
+                                setShowTE1(true);
+                                try {{
+                                    const TE1_SHEET_ID = '1QCoIpiQKV1LB6XgUwwoC_e4crRD5mIANLxon9ZVwsg8';
+                                    const url = APPS_SCRIPT_URL + '?sheetId=' + encodeURIComponent(TE1_SHEET_ID) + '&tables=' + encodeURIComponent('Hoja 1');
+                                    console.log('[TE1] Fetching:', url);
+                                    const resp = await fetch(url, {{ redirect: 'follow' }});
+                                    console.log('[TE1] Response status:', resp.status, 'type:', resp.type);
+                                    const text = await resp.text();
+                                    console.log('[TE1] Response length:', text.length, 'preview:', text.substring(0, 200));
+                                    let data;
+                                    try {{ data = JSON.parse(text); }} catch(pe) {{
+                                        throw new Error('Respuesta no es JSON. Puede ser problema de permisos del Apps Script. Abrir en nueva pestaña: ' + url);
+                                    }}
+                                    if (data.error) throw new Error(data.error);
+                                    const rows = data['Hoja 1']?.rows || data[Object.keys(data)[0]]?.rows || [];
+                                    console.log('[TE1] OK:', rows.length, 'registros');
+                                    setTe1Data(rows);
+                                }} catch(e) {{
+                                    console.error('[TE1] Error:', e);
+                                    setTe1Error(e.message);
+                                }} finally {{
+                                    setTe1Loading(false);
+                                }}
+                            }}}} title="Leer TE1" className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition-colors">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                            </button>
+                        )}}
+                        <button type="button" onClick={{(e) => {{ e.preventDefault(); e.stopPropagation(); setShowSugerencias(true); }}}} title="Sugerencias de mejora" className="relative p-1.5 rounded-lg text-gray-400 hover:text-violet-600 hover:bg-violet-50 transition-colors">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                            {{pendientesSug > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">{{pendientesSug}}</span>}}
+                        </button>
                     </div>
                 </div>
             </div>
@@ -3235,6 +3523,60 @@ const App = () => {{
                     <div className="bg-white rounded-xl p-3 border border-gray-200 shadow-sm"><p className="text-[10px] text-gray-500">Días Prom.</p><p className="text-xl font-bold font-mono">{{kpis.diasPromedio}}d</p><p className="text-[9px] text-gray-400">Fund → última</p></div>
                     <div className="bg-white rounded-xl p-3 border border-violet-200 shadow-sm"><p className="text-[10px] text-violet-600">Total Pagado</p><p className="text-lg font-bold font-mono text-violet-700">{{formatPeso(kpis.totalPagado)}}</p></div>
                 </div>
+
+                {{/* VALIDACION CRUZADA - Botón + Modal */}}
+                <button onClick={{() => setShowValidacion(true)}} className={{`mb-3 flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${{totalHallazgos > 0 ? 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100' : 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'}}`}}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        {{totalHallazgos > 0
+                            ? <><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></>
+                            : <><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></>
+                        }}
+                    </svg>
+                    {{totalHallazgos > 0 ? `${{totalHallazgos}} hallazgo${{totalHallazgos !== 1 ? 's' : ''}} en validación cruzada` : 'Validación cruzada OK'}}
+                </button>
+                {{showValidacion && (
+                    <div className="fixed inset-0 z-[60] bg-black/40 flex items-start justify-center pt-12 px-4" onClick={{(e) => e.target === e.currentTarget && setShowValidacion(false)}}>
+                        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+                            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+                                <div>
+                                    <h2 className="text-lg font-bold text-gray-800">Validación Cruzada</h2>
+                                    <p className="text-xs text-gray-500 mt-0.5">Compara datos entre tablas para detectar inconsistencias</p>
+                                </div>
+                                <button onClick={{() => setShowValidacion(false)}} className="text-gray-400 hover:text-gray-600 text-xl font-bold w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100">x</button>
+                            </div>
+                            <div className="overflow-y-auto p-6 space-y-4">
+                                {{validaciones.map(check => (
+                                    <div key={{check.id}} className={{`rounded-xl border ${{check.items.length === 0 ? 'border-green-200 bg-green-50/50' : check.tipo === 'rojo' ? 'border-red-200 bg-red-50/30' : check.tipo === 'naranja' ? 'border-orange-200 bg-orange-50/30' : 'border-yellow-200 bg-yellow-50/30'}}`}}>
+                                        <div className="px-4 py-3">
+                                            <div className="flex items-center gap-2">
+                                                {{check.items.length === 0
+                                                    ? <span className="w-5 h-5 rounded-full bg-green-500 text-white flex items-center justify-center text-xs font-bold">&#10003;</span>
+                                                    : <span className={{`w-5 h-5 rounded-full text-white flex items-center justify-center text-xs font-bold ${{check.tipo === 'rojo' ? 'bg-red-500' : check.tipo === 'naranja' ? 'bg-orange-500' : 'bg-yellow-500'}}`}}>{{check.items.length}}</span>
+                                                }}
+                                                <h3 className="font-semibold text-sm text-gray-800">{{check.titulo}}</h3>
+                                            </div>
+                                            <p className="text-[11px] text-gray-500 mt-1 leading-relaxed">{{check.desc}}</p>
+                                            <p className="text-[10px] text-gray-400 mt-0.5 font-mono">Compara: {{check.compara}}</p>
+                                        </div>
+                                        {{check.items.length > 0 && (
+                                            <div className="border-t border-gray-200/60 px-4 py-2 space-y-1 max-h-40 overflow-y-auto">
+                                                {{check.items.map((it, i) => (
+                                                    <p key={{i}} className="text-xs text-gray-700 py-0.5 flex items-start gap-1.5">
+                                                        <span className="text-gray-300 font-mono text-[10px] mt-px">{{i+1}}.</span>
+                                                        <span>{{check.render(it)}}</span>
+                                                    </p>
+                                                ))}}
+                                            </div>
+                                        )}}
+                                    </div>
+                                ))}}
+                            </div>
+                            <div className="px-6 py-3 border-t border-gray-100 bg-gray-50/50">
+                                <p className="text-[10px] text-gray-400 text-center">Los hallazgos no son necesariamente errores. Verificar caso a caso en AppSheet.</p>
+                            </div>
+                        </div>
+                    </div>
+                )}}
 
                 {{/* TABS */}}
                 <div className="flex items-center gap-1 mb-4 overflow-x-auto hide-scrollbar border-b border-gray-200 pb-px">
@@ -3266,6 +3608,182 @@ const App = () => {{
                 </div>
                 <p className="text-center text-[10px] text-gray-300 mt-4 mb-8">SCRaices v3 — Vista Unificada + Grupos — {{new Date().toLocaleString('es-CL')}}</p>
             </div>
+
+            {{/* MODAL SUGERENCIAS */}}
+            {{showSugerencias && (
+                <div className="fixed inset-0 z-[60] bg-black/40 flex items-start justify-center pt-8 px-4" onClick={{(e) => e.target === e.currentTarget && setShowSugerencias(false)}}>
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+                            <div>
+                                <h2 className="text-lg font-bold text-gray-800">Sugerencias de Mejora</h2>
+                                <p className="text-xs text-gray-500 mt-0.5">{{sugerencias.length}} total, {{pendientesSug}} pendientes</p>
+                            </div>
+                            <button onClick={{() => setShowSugerencias(false)}} className="text-gray-400 hover:text-gray-600 text-xl font-bold w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100">x</button>
+                        </div>
+
+                        {{/* Formulario nueva sugerencia */}}
+                        <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+                            <textarea
+                                ref={{textareaRef}}
+                                value={{textoSug}}
+                                onChange={{(e) => setTextoSug(e.target.value)}}
+                                onPaste={{(e) => {{
+                                    const items = e.clipboardData?.items;
+                                    if (!items) return;
+                                    for (let i = 0; i < items.length; i++) {{
+                                        if (items[i].type.startsWith('image/')) {{
+                                            e.preventDefault();
+                                            const file = items[i].getAsFile();
+                                            const reader = new FileReader();
+                                            reader.onload = (ev) => {{
+                                                const img = new Image();
+                                                img.onload = () => {{
+                                                    const canvas = document.createElement('canvas');
+                                                    const maxW = 800;
+                                                    const scale = img.width > maxW ? maxW / img.width : 1;
+                                                    canvas.width = img.width * scale;
+                                                    canvas.height = img.height * scale;
+                                                    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                                                    const compressed = canvas.toDataURL('image/jpeg', 0.7);
+                                                    setImgSug(compressed);
+                                                    setImgPreview(compressed);
+                                                }};
+                                                img.src = ev.target.result;
+                                            }};
+                                            reader.readAsDataURL(file);
+                                            break;
+                                        }}
+                                    }}
+                                }}}}
+                                onKeyDown={{(e) => {{ if (e.key === 'Enter' && !e.shiftKey) {{ e.preventDefault(); if (textoSug.trim()) {{ addSugerencia(textoSug.trim(), imgSug); setTextoSug(''); setImgSug(null); setImgPreview(null); }} }} }}}}
+                                placeholder="Describir mejora... (Ctrl+V para pegar imagen)"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-violet-400"
+                                rows={{3}}
+                            />
+                            {{imgPreview && (
+                                <div className="mt-2 relative inline-block">
+                                    <img src={{imgPreview}} className="max-h-32 rounded-lg border border-gray-200" />
+                                    <button onClick={{() => {{ setImgSug(null); setImgPreview(null); }}}} className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center hover:bg-red-600">x</button>
+                                </div>
+                            )}}
+                            <div className="flex items-center gap-2 mt-2">
+                                <button onClick={{() => {{ if (!textoSug.trim()) return; addSugerencia(textoSug.trim(), imgSug); setTextoSug(''); setImgSug(null); setImgPreview(null); }}}} disabled={{!textoSug.trim()}} className="px-4 py-1.5 bg-violet-600 text-white text-sm rounded-lg hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Enviar</button>
+                                <label className="px-3 py-1.5 text-xs text-gray-500 border border-gray-300 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors">
+                                    Adjuntar imagen
+                                    <input type="file" accept="image/*" onChange={{(e) => {{
+                                        const file = e.target.files?.[0];
+                                        if (!file || !file.type.startsWith('image/')) return;
+                                        const reader = new FileReader();
+                                        reader.onload = (ev) => {{
+                                            const img = new Image();
+                                            img.onload = () => {{
+                                                const canvas = document.createElement('canvas');
+                                                const maxW = 800;
+                                                const scale = img.width > maxW ? maxW / img.width : 1;
+                                                canvas.width = img.width * scale;
+                                                canvas.height = img.height * scale;
+                                                canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                                                const compressed = canvas.toDataURL('image/jpeg', 0.7);
+                                                setImgSug(compressed);
+                                                setImgPreview(compressed);
+                                            }};
+                                            img.src = ev.target.result;
+                                        }};
+                                        reader.readAsDataURL(file);
+                                    }}}} className="hidden" />
+                                </label>
+                            </div>
+                        </div>
+
+                        {{/* Lista de sugerencias */}}
+                        <div className="overflow-y-auto flex-1 p-6 space-y-3">
+                            {{sugerencias.length === 0 && <p className="text-gray-400 text-sm text-center py-8">No hay sugerencias aun</p>}}
+                            {{sugerencias.map(sug => (
+                                <div key={{sug.id}} className={{`rounded-xl border p-4 transition-colors ${{sug.resuelta ? 'bg-green-50/50 border-green-200' : 'bg-white border-gray-200'}}`}}>
+                                    <div className="flex items-start gap-3">
+                                        <button onClick={{() => toggleSugResuelta(sug.id)}} className={{`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${{sug.resuelta ? 'bg-green-500 border-green-500 text-white' : 'border-gray-300 hover:border-violet-400'}}`}}>
+                                            {{sug.resuelta && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>}}
+                                        </button>
+                                        <div className="flex-1 min-w-0">
+                                            <p className={{`text-sm leading-relaxed ${{sug.resuelta ? 'text-gray-400 line-through' : 'text-gray-700'}}`}}>{{sug.texto}}</p>
+                                            {{sug.imagen && (
+                                                <img src={{sug.imagen}} className="mt-2 max-h-48 rounded-lg border border-gray-200 cursor-pointer hover:opacity-90" onClick={{() => window.open(sug.imagen, '_blank')}} />
+                                            )}}
+                                            <div className="flex items-center gap-3 mt-2">
+                                                <span className="text-[10px] text-gray-400">{{sug.fecha}}</span>
+                                                {{sug.resuelta && sug.fechaResolucion && <span className="text-[10px] text-green-500">Resuelta {{sug.fechaResolucion}}</span>}}
+                                                <button onClick={{() => deleteSugerencia(sug.id)}} className="text-[10px] text-red-400 hover:text-red-600 ml-auto">Eliminar</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}}
+                        </div>
+                    </div>
+                </div>
+            )}}
+
+            {{/* MODAL TE1 */}}
+            {{showTE1 && (
+                <div className="fixed inset-0 z-[60] bg-black/40 flex items-start justify-center pt-8 px-4" onClick={{(e) => e.target === e.currentTarget && setShowTE1(false)}}>
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+                            <div>
+                                <h2 className="text-lg font-bold text-gray-800">TE1 — Certificados Eléctricos</h2>
+                                <p className="text-xs text-gray-500 mt-0.5">Datos desde Google Sheets (SEC)</p>
+                            </div>
+                            <button onClick={{() => setShowTE1(false)}} className="text-gray-400 hover:text-gray-600 text-xl font-bold w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100">x</button>
+                        </div>
+                        <div className="overflow-y-auto p-6">
+                            {{te1Loading && (
+                                <div className="flex items-center justify-center py-12 gap-3">
+                                    <div className="w-5 h-5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+                                    <span className="text-sm text-gray-500">Consultando Sheet TE1...</span>
+                                </div>
+                            )}}
+                            {{te1Error && (
+                                <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-center">
+                                    <p className="text-red-700 text-sm font-medium">Error al leer TE1</p>
+                                    <p className="text-red-500 text-xs mt-1">{{te1Error}}</p>
+                                    <p className="text-gray-400 text-[10px] mt-3">Verifica que el Apps Script tenga acceso al Sheet TE1 y que se haya re-desplegado con el parametro sheetId.</p>
+                                </div>
+                            )}}
+                            {{te1Data && !te1Loading && (() => {{
+                                const cols = te1Data.length > 0 ? Object.keys(te1Data[0]) : [];
+                                const filtered = filtroTE1
+                                    ? te1Data.filter(r => Object.values(r).some(v => String(v).toLowerCase().includes(filtroTE1.toLowerCase())))
+                                    : te1Data;
+                                return <div>
+                                    <div className="flex items-center gap-3 mb-4">
+                                        <p className="text-sm text-gray-600 font-medium">{{te1Data.length}} registros</p>
+                                        <input type="text" placeholder="Filtrar..." value={{filtroTE1}} onChange={{e => setFiltroTE1(e.target.value)}} className="flex-1 max-w-xs px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400" />
+                                        {{filtroTE1 && <p className="text-xs text-gray-400">{{filtered.length}} resultados</p>}}
+                                    </div>
+                                    {{cols.length > 0 ? (
+                                        <div className="overflow-x-auto border border-gray-200 rounded-xl">
+                                            <table className="w-full text-xs">
+                                                <thead>
+                                                    <tr className="bg-gray-50">
+                                                        {{cols.map(c => <th key={{c}} className="px-3 py-2 text-left font-semibold text-gray-600 border-b border-gray-200 whitespace-nowrap">{{c}}</th>)}}
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {{filtered.slice(0, 100).map((row, i) => (
+                                                        <tr key={{i}} className={{i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}}>
+                                                            {{cols.map(c => <td key={{c}} className="px-3 py-1.5 border-b border-gray-100 whitespace-nowrap max-w-[200px] truncate" title={{String(row[c] || '')}}>{{String(row[c] || '')}}</td>)}}
+                                                        </tr>
+                                                    ))}}
+                                                </tbody>
+                                            </table>
+                                            {{filtered.length > 100 && <p className="text-center text-xs text-gray-400 py-2">Mostrando 100 de {{filtered.length}}</p>}}
+                                        </div>
+                                    ) : <p className="text-gray-400 text-sm text-center py-8">Sin datos</p>}}
+                                </div>;
+                            }})()}}
+                        </div>
+                    </div>
+                </div>
+            )}}
         </div>
     );
 }};
