@@ -3217,11 +3217,19 @@ const App = () => {
             skipConsPush.current = true;
             setConsultas(val || {});
         });
+        // Listener Firebase para Sugerencias
+        sugRef.current = fbDB.ref('sugerencias');
+        sugRef.current.on('value', (snap) => {
+            const val = snap.val();
+            skipSugPush.current = true;
+            setSugerencias(val ? Object.values(val).sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '')) : []);
+        });
         return () => {
             if (gruposRef.current) gruposRef.current.off();
             if (obsRef.current) obsRef.current.off();
             if (actRef.current) actRef.current.off();
             if (consultasRef.current) consultasRef.current.off();
+            if (sugRef.current) sugRef.current.off();
         };
     }, []);
 
@@ -3239,6 +3247,12 @@ const App = () => {
     const [te1Data, setTe1Data] = React.useState(null);
     const [te1Loading, setTe1Loading] = React.useState(false);
     const [te1Error, setTe1Error] = React.useState(null);
+
+    // Sugerencias de mejora (Firebase)
+    const [showSugerencias, setShowSugerencias] = React.useState(false);
+    const [sugerencias, setSugerencias] = React.useState([]);
+    const sugRef = React.useRef(null);
+    const skipSugPush = React.useRef(true);
 
     // Push observaciones a Firebase cuando cambia localmente
     React.useEffect(() => {
@@ -3313,6 +3327,25 @@ const App = () => {
             return next;
         });
     };
+
+    const addSugerencia = (texto, imagen) => {
+        const id = Date.now();
+        const sug = { id, texto, imagen: imagen || null, fecha: fechaChile(), resuelta: false };
+        fbDB.ref('sugerencias/' + id).set(sug);
+    };
+
+    const toggleSugResuelta = (sugId) => {
+        const sug = sugerencias.find(s => s.id === sugId);
+        if (sug) {
+            fbDB.ref('sugerencias/' + sugId).update({ resuelta: !sug.resuelta, fechaResolucion: !sug.resuelta ? fechaChile() : null });
+        }
+    };
+
+    const deleteSugerencia = (sugId) => {
+        fbDB.ref('sugerencias/' + sugId).remove();
+    };
+
+    const pendientesSug = sugerencias.filter(s => !s.resuelta).length;
 
     const beneficiarios = React.useMemo(() => BENEFICIARIOS_DATA.filter(b => String(b.ID_Proy) === String(proyectoSel)), [proyectoSel]);
 
@@ -3677,6 +3710,10 @@ const App = () => {
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                             </button>
                         )}
+                        <button onClick={() => setShowSugerencias(true)} title="Sugerencias de mejora" className="relative p-1.5 rounded-lg text-gray-400 hover:text-violet-600 hover:bg-violet-50 transition-colors">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                            {pendientesSug > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">{pendientesSug}</span>}
+                        </button>
                     </div>
                 </div>
             </div>
@@ -3781,6 +3818,140 @@ const App = () => {
                 </div>
                 <p className="text-center text-[10px] text-gray-300 mt-4 mb-8">SCRaices v3 — Vista Unificada + Grupos — {new Date().toLocaleString('es-CL')}</p>
             </div>
+
+            {/* MODAL SUGERENCIAS */}
+            {showSugerencias && (
+                <div className="fixed inset-0 z-[60] bg-black/40 flex items-start justify-center pt-8 px-4" onClick={(e) => e.target === e.currentTarget && setShowSugerencias(false)}>
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+                            <div>
+                                <h2 className="text-lg font-bold text-gray-800">Sugerencias de Mejora</h2>
+                                <p className="text-xs text-gray-500 mt-0.5">{sugerencias.length} total, {pendientesSug} pendientes</p>
+                            </div>
+                            <button onClick={() => setShowSugerencias(false)} className="text-gray-400 hover:text-gray-600 text-xl font-bold w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100">x</button>
+                        </div>
+
+                        {/* Formulario nueva sugerencia */}
+                        {(() => {
+                            const [textoSug, setTextoSug] = React.useState('');
+                            const [imgSug, setImgSug] = React.useState(null);
+                            const [imgPreview, setImgPreview] = React.useState(null);
+                            const textareaRef = React.useRef(null);
+
+                            const handlePaste = (e) => {
+                                const items = e.clipboardData?.items;
+                                if (!items) return;
+                                for (let i = 0; i < items.length; i++) {
+                                    if (items[i].type.startsWith('image/')) {
+                                        e.preventDefault();
+                                        const file = items[i].getAsFile();
+                                        const reader = new FileReader();
+                                        reader.onload = (ev) => {
+                                            // Comprimir si es muy grande
+                                            const img = new Image();
+                                            img.onload = () => {
+                                                const canvas = document.createElement('canvas');
+                                                const maxW = 800;
+                                                const scale = img.width > maxW ? maxW / img.width : 1;
+                                                canvas.width = img.width * scale;
+                                                canvas.height = img.height * scale;
+                                                canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                                                const compressed = canvas.toDataURL('image/jpeg', 0.7);
+                                                setImgSug(compressed);
+                                                setImgPreview(compressed);
+                                            };
+                                            img.src = ev.target.result;
+                                        };
+                                        reader.readAsDataURL(file);
+                                        break;
+                                    }
+                                }
+                            };
+
+                            const handleFileSelect = (e) => {
+                                const file = e.target.files?.[0];
+                                if (!file || !file.type.startsWith('image/')) return;
+                                const reader = new FileReader();
+                                reader.onload = (ev) => {
+                                    const img = new Image();
+                                    img.onload = () => {
+                                        const canvas = document.createElement('canvas');
+                                        const maxW = 800;
+                                        const scale = img.width > maxW ? maxW / img.width : 1;
+                                        canvas.width = img.width * scale;
+                                        canvas.height = img.height * scale;
+                                        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                                        const compressed = canvas.toDataURL('image/jpeg', 0.7);
+                                        setImgSug(compressed);
+                                        setImgPreview(compressed);
+                                    };
+                                    img.src = ev.target.result;
+                                };
+                                reader.readAsDataURL(file);
+                            };
+
+                            const enviar = () => {
+                                if (!textoSug.trim()) return;
+                                addSugerencia(textoSug.trim(), imgSug);
+                                setTextoSug('');
+                                setImgSug(null);
+                                setImgPreview(null);
+                            };
+
+                            return <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+                                <textarea
+                                    ref={textareaRef}
+                                    value={textoSug}
+                                    onChange={(e) => setTextoSug(e.target.value)}
+                                    onPaste={handlePaste}
+                                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviar(); } }}
+                                    placeholder="Describir mejora... (Ctrl+V para pegar imagen)"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-violet-400"
+                                    rows={3}
+                                />
+                                {imgPreview && (
+                                    <div className="mt-2 relative inline-block">
+                                        <img src={imgPreview} className="max-h-32 rounded-lg border border-gray-200" />
+                                        <button onClick={() => { setImgSug(null); setImgPreview(null); }} className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center hover:bg-red-600">x</button>
+                                    </div>
+                                )}
+                                <div className="flex items-center gap-2 mt-2">
+                                    <button onClick={enviar} disabled={!textoSug.trim()} className="px-4 py-1.5 bg-violet-600 text-white text-sm rounded-lg hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Enviar</button>
+                                    <label className="px-3 py-1.5 text-xs text-gray-500 border border-gray-300 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors">
+                                        Adjuntar imagen
+                                        <input type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
+                                    </label>
+                                </div>
+                            </div>;
+                        })()}
+
+                        {/* Lista de sugerencias */}
+                        <div className="overflow-y-auto flex-1 p-6 space-y-3">
+                            {sugerencias.length === 0 && <p className="text-gray-400 text-sm text-center py-8">No hay sugerencias aun</p>}
+                            {sugerencias.map(sug => (
+                                <div key={sug.id} className={`rounded-xl border p-4 transition-colors ${sug.resuelta ? 'bg-green-50/50 border-green-200' : 'bg-white border-gray-200'}`}>
+                                    <div className="flex items-start gap-3">
+                                        <button onClick={() => toggleSugResuelta(sug.id)} className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${sug.resuelta ? 'bg-green-500 border-green-500 text-white' : 'border-gray-300 hover:border-violet-400'}`}>
+                                            {sug.resuelta && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>}
+                                        </button>
+                                        <div className="flex-1 min-w-0">
+                                            <p className={`text-sm leading-relaxed ${sug.resuelta ? 'text-gray-400 line-through' : 'text-gray-700'}`}>{sug.texto}</p>
+                                            {sug.imagen && (
+                                                <img src={sug.imagen} className="mt-2 max-h-48 rounded-lg border border-gray-200 cursor-pointer hover:opacity-90" onClick={() => window.open(sug.imagen, '_blank')} />
+                                            )}
+                                            <div className="flex items-center gap-3 mt-2">
+                                                <span className="text-[10px] text-gray-400">{sug.fecha}</span>
+                                                {sug.resuelta && sug.fechaResolucion && <span className="text-[10px] text-green-500">Resuelta {sug.fechaResolucion}</span>}
+                                                <button onClick={() => deleteSugerencia(sug.id)} className="text-[10px] text-red-400 hover:text-red-600 ml-auto">Eliminar</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* MODAL TE1 */}
             {showTE1 && (
