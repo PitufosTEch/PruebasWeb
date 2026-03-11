@@ -3548,31 +3548,44 @@ const App = () => {
             render: (it) => `${it.benef}`
         });
 
-        // CHECK 6: Pago duplicado sospechoso
-        // Compara: Solpago internamente
-        // Detecta: Mismo beneficiario + misma familia + mismo monto + misma fecha
+        // CHECK 6: Posible Pago en Exceso
+        // Compara: Solpago (total pagado por familia) vs Tabla_pago (presupuesto M.O. por tipología)
+        // Detecta: Lo pagado supera lo presupuestado para esa partida según la planilla base
         const c6 = [];
         viviendas.forEach(v => {
+            const tipId = v.tipologia_viv_id || v.tipologia_rc_id;
+            if (!tipId || !PRESUPUESTO_DATA[tipId]) return;
+            const presupTip = PRESUPUESTO_DATA[tipId];
             const pagos = getSolpago(v.ID_Benef);
-            const seen = {};
-            pagos.forEach(p => {
-                const key = `${p.Familia_pago}|${p.monto}|${p.fecha}`;
-                if (seen[key]) {
-                    if (!c6.find(x => x.id === v.ID_Benef && x.key === key)) {
-                        c6.push({ benef: v.NOMBRES + ' ' + v.APELLIDOS, id: v.ID_Benef, key, familia: p.Familia_pago, monto: p.monto, fecha: p.fecha });
-                    }
+
+            Object.entries(presupTip).forEach(([familia, montoBase]) => {
+                if (montoBase <= 0) return;
+                const pagosFam = pagos.filter(p => p.Familia_pago === familia);
+                const totalPagado = pagosFam.reduce((s, p) => s + p.monto, 0);
+                if (totalPagado > montoBase) {
+                    const exceso = totalPagado - montoBase;
+                    const pctExceso = Math.round((exceso / montoBase) * 100);
+                    c6.push({
+                        benef: v.NOMBRES + ' ' + v.APELLIDOS,
+                        id: v.ID_Benef,
+                        familia,
+                        pagado: totalPagado,
+                        presupuesto: montoBase,
+                        exceso,
+                        pctExceso
+                    });
                 }
-                seen[key] = true;
             });
         });
+        c6.sort((a, b) => b.exceso - a.exceso);
         checks.push({
-            id: 'pago_duplicado',
-            titulo: 'Pago Posiblemente Duplicado',
-            desc: 'Se encontró más de un pago con la misma familia, monto y fecha para el mismo beneficiario. Puede ser legítimo (ej: dos maestros) o un registro duplicado.',
-            compara: 'Solpago: misma familia + mismo monto + misma fecha por beneficiario',
-            tipo: 'amarillo',
+            id: 'pago_exceso',
+            titulo: 'Posible Pago en Exceso',
+            desc: 'El total pagado en Mano de Obra para esta partida supera el monto presupuestado en la Planilla Base (Tabla_pago) asociada a la tipología de la vivienda. Verificar si hay pagos adicionales justificados o si es un error.',
+            compara: 'Solpago (suma pagos aprobados por familia) vs Tabla_pago (presupuesto M.O. por tipología)',
+            tipo: 'rojo',
             items: c6,
-            render: (it) => `${it.benef} — ${it.familia} (${formatPeso(it.monto)} el ${it.fecha})`
+            render: (it) => `${it.benef} — ${it.familia}: Pagado ${formatPeso(it.pagado)} vs Presup. ${formatPeso(it.presupuesto)} (+${formatPeso(it.exceso)}, +${it.pctExceso}%)`
         });
 
         return checks;
