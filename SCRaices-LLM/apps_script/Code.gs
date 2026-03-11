@@ -13,13 +13,15 @@
  * ENDPOINT:
  *   GET {URL}?tables=Proyectos,Beneficiario,Despacho,soldepacho,Ejecucion,Solpago,Maestros,Tabla_pago,Tipologias,controlBGB,controlEEPP
  *   GET {URL}?tables=Proyectos  (una sola tabla)
+ *   GET {URL}?sheetId=XXXX&tables=Hoja1  (leer otro spreadsheet)
  */
 
 var SPREADSHEET_ID = "1JAxxP9W6LJzns5rmGIo7mfk227qMLwsq-gFMCvHU0Zk";
 
 function doGet(e) {
   try {
-    var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    var sheetId = e.parameter.sheetId || SPREADSHEET_ID;
+    var ss = SpreadsheetApp.openById(sheetId);
     var tablesParam = e.parameter.tables || '';
 
     if (!tablesParam) {
