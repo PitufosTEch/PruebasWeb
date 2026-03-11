@@ -734,24 +734,105 @@ const ETAPAS_CONFIG_FULL = {
         updateLoading('Listo!', 100, `${PROYECTOS_DATA.length} proyectos, ${BENEFICIARIOS_DATA.length} beneficiarios, ${DESPACHOS_DATA.length} despachos, ${SOLPAGO_DATA.length} pagos`);
     }
 
+    const CACHE_KEY = 'scraices_data_cache_v3';
+    const CACHE_MAX_AGE = 4 * 60 * 60 * 1000; // 4 horas
+
+    function saveCache(raw) {
+        try {
+            const payload = { ts: Date.now(), data: raw };
+            localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
+            console.log('[CACHE] Guardado', Math.round(JSON.stringify(payload).length / 1024), 'KB');
+        } catch (e) {
+            console.warn('[CACHE] No se pudo guardar:', e.message);
+            try { localStorage.removeItem(CACHE_KEY); } catch(_) {}
+        }
+    }
+
+    function loadCache() {
+        try {
+            const stored = localStorage.getItem(CACHE_KEY);
+            if (!stored) return null;
+            const payload = JSON.parse(stored);
+            const age = Date.now() - payload.ts;
+            if (age > CACHE_MAX_AGE) {
+                localStorage.removeItem(CACHE_KEY);
+                return null;
+            }
+            console.log('[CACHE] Cargado, edad:', Math.round(age / 60000), 'min');
+            return payload;
+        } catch (e) {
+            console.warn('[CACHE] Error al leer:', e.message);
+            return null;
+        }
+    }
+
+    function formatCacheAge(ts) {
+        const mins = Math.round((Date.now() - ts) / 60000);
+        if (mins < 1) return 'hace menos de 1 min';
+        if (mins < 60) return `hace ${mins} min`;
+        const hrs = Math.floor(mins / 60);
+        return `hace ${hrs}h ${mins % 60}m`;
+    }
+
+    function showCacheBanner(ts) {
+        const banner = document.createElement('div');
+        banner.id = 'cacheBanner';
+        banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#f59e0b;color:#78350f;text-align:center;padding:6px 16px;font-size:12px;font-family:IBM Plex Sans,sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;';
+        banner.innerHTML = `<span>&#9889; Mostrando datos en cache (${formatCacheAge(ts)}). Actualizando en segundo plano...</span>`;
+        document.body.prepend(banner);
+    }
+
+    function removeCacheBanner() {
+        const b = document.getElementById('cacheBanner');
+        if (b) b.remove();
+    }
+
     async function initLiveData() {
-        showLoadingScreen();
+        // 1. Intentar cache primero
+        const cached = loadCache();
+        let usedCache = false;
+
+        if (cached) {
+            try {
+                processRawData(cached.data);
+                renderApp();
+                showCacheBanner(cached.ts);
+                usedCache = true;
+            } catch (e) {
+                console.warn('[CACHE] Datos invalidos, descargando frescos');
+            }
+        }
+
+        if (!usedCache) showLoadingScreen();
+
+        // 2. Fetch datos frescos (en paralelo si hay cache, o como carga principal)
         try {
             const raw = await fetchAllData();
+            saveCache(raw);
             processRawData(raw);
-            await new Promise(r => setTimeout(r, 500));
+            removeCacheBanner();
             renderApp();
         } catch (err) {
-            document.getElementById('root').innerHTML = `
-                <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f3f4f6;font-family:'IBM Plex Sans',sans-serif;">
-                    <div style="text-align:center;max-width:450px;padding:40px;">
-                        <div style="color:#ef4444;font-size:48px;margin-bottom:16px;">&#9888;</div>
-                        <h2 style="color:#1f2937;font-size:18px;font-weight:600;margin-bottom:8px;">Error al cargar datos</h2>
-                        <p style="color:#6b7280;font-size:13px;margin-bottom:16px;">${err.message}</p>
-                        <button onclick="location.reload()" style="padding:10px 24px;background:#7c3aed;color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;">Reintentar</button>
-                        <p style="color:#9ca3af;font-size:11px;margin-top:20px;">Si el problema persiste, verifica que el Apps Script este desplegado correctamente.</p>
-                    </div>
-                </div>`;
+            if (usedCache) {
+                // Ya tenemos datos de cache, solo avisar que no se pudo actualizar
+                const b = document.getElementById('cacheBanner');
+                if (b) {
+                    b.style.background = '#fecaca';
+                    b.style.color = '#991b1b';
+                    b.innerHTML = `<span>&#9888; No se pudo actualizar (${err.message}). Usando datos en cache (${formatCacheAge(cached.ts)})</span><button onclick="location.reload()" style="margin-left:12px;padding:3px 12px;background:#991b1b;color:white;border:none;border-radius:4px;cursor:pointer;font-size:11px;">Reintentar</button>`;
+                }
+            } else {
+                document.getElementById('root').innerHTML = `
+                    <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f3f4f6;font-family:'IBM Plex Sans',sans-serif;">
+                        <div style="text-align:center;max-width:450px;padding:40px;">
+                            <div style="color:#ef4444;font-size:48px;margin-bottom:16px;">&#9888;</div>
+                            <h2 style="color:#1f2937;font-size:18px;font-weight:600;margin-bottom:8px;">Error al cargar datos</h2>
+                            <p style="color:#6b7280;font-size:13px;margin-bottom:16px;">${err.message}</p>
+                            <button onclick="location.reload()" style="padding:10px 24px;background:#7c3aed;color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;">Reintentar</button>
+                            <p style="color:#9ca3af;font-size:11px;margin-top:20px;">Si el problema persiste, verifica que el Apps Script este desplegado correctamente.</p>
+                        </div>
+                    </div>`;
+            }
         }
     }
 
