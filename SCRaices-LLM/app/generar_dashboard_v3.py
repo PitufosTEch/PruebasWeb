@@ -877,9 +877,9 @@ const calcCoherencia = (idBenef, estadoEtapas) => {{
         }}
     }});
 
-    // Alertas por solicitudes vencidas (solicitado hace mas de 14 dias sin despacho)
+    // Alertas por solicitudes vencidas (solicitado hace mas de 8 dias sin despacho)
     Object.entries(estadoEtapas).forEach(([key, info]) => {{
-        if (info.estado === "solicitado" && info.diasSolicitud > 14) {{
+        if (info.estado === "solicitado" && info.diasSolicitud > 8) {{
             alertas.push({{ tipo: "naranja", etapa: info.nombre, msg: `Solicitud hace ${{info.diasSolicitud}}d sin despacho` }});
         }}
     }});
@@ -3325,8 +3325,10 @@ const App = () => {{
                 if (etapasKeys.length === 0) return;
                 const pagosFam = pagos.filter(p => p.Familia_pago === fam);
                 const totalPagado = pagosFam.reduce((s, p) => s + p.monto, 0);
+                // Gasfiteria: los primeros $50.000 son alcantarillado que viene con Fundaciones
+                const umbral = fam === '04 - Gasfiteria' ? 50000 : 0;
                 const tieneDespacho = etapasKeys.some(k => v.estadoEtapas[k]?.estado === "despachado");
-                if (totalPagado > 0 && !tieneDespacho) {{
+                if (totalPagado > umbral && !tieneDespacho) {{
                     c1.push({{ benef: v.NOMBRES + ' ' + v.APELLIDOS, id: v.ID_Benef, familia: FAMILIA_LABELS[fam] || fam, monto: totalPagado }});
                 }}
             }});
@@ -3334,7 +3336,7 @@ const App = () => {{
         checks.push({{
             id: 'pago_sin_despacho',
             titulo: 'Pago sin Despacho',
-            desc: 'Se registró pago de Mano de Obra en una familia, pero no existe despacho de material para esa etapa. Puede indicar que falta registrar el despacho en AppSheet.',
+            desc: 'Se registró pago de Mano de Obra en una familia, pero no existe despacho de material para esa etapa. Gasfitería excluye los primeros $50.000 (alcantarillado con fundaciones).',
             compara: 'Solpago (pagos aprobados) vs Despacho (entregas de material)',
             tipo: 'rojo',
             items: c1,
@@ -3383,36 +3385,36 @@ const App = () => {{
                 const diasDesdeDesp = Math.floor((new Date() - new Date(fechaDesp)) / (1000*60*60*24));
                 const avanceFam = getAvancePorFamilia(v.ID_Benef);
                 const avance = avanceFam[fam];
-                if (diasDesdeDesp > 21 && (!avance || avance.pct < 10)) {{
+                if (diasDesdeDesp > 12 && (!avance || avance.pct < 10)) {{
                     c3.push({{ benef: v.NOMBRES + ' ' + v.APELLIDOS, id: v.ID_Benef, familia: FAMILIA_LABELS[fam] || fam, dias: diasDesdeDesp, pct: avance ? avance.pct : 0 }});
                 }}
             }});
         }});
         checks.push({{
             id: 'desp_sin_insp',
-            titulo: 'Despacho sin Inspección',
-            desc: 'Se despachó material hace más de 21 días pero la inspección registra menos de 10% de avance. Puede que falte una inspección o que el trabajo no haya comenzado.',
+            titulo: 'Despacho sin Inspección (+12 días)',
+            desc: 'Se despachó material hace más de 12 días pero la inspección registra menos de 10% de avance. Puede que falte una inspección o que el trabajo no haya comenzado.',
             compara: 'Despacho (fecha entrega) vs Ejecucion (% avance acumulado)',
             tipo: 'naranja',
             items: c3,
             render: (it) => `${{it.benef}} — ${{it.familia}} (${{it.dias}}d desde despacho, Insp: ${{it.pct}}%)`
         }});
 
-        // CHECK 4: Solicitud vencida (>14 días sin despacho)
+        // CHECK 4: Solicitud vencida (>8 días sin despacho)
         // Compara: soldepacho (solicitudes) vs Despacho
         // Detecta: Se pidió material hace más de 14 días y no se ha despachado
         const c4 = [];
         viviendas.forEach(v => {{
             Object.entries(v.estadoEtapas).forEach(([key, info]) => {{
-                if (info.estado === "solicitado" && info.diasSolicitud > 14) {{
+                if (info.estado === "solicitado" && info.diasSolicitud > 8) {{
                     c4.push({{ benef: v.NOMBRES + ' ' + v.APELLIDOS, id: v.ID_Benef, etapa: info.nombre, dias: info.diasSolicitud }});
                 }}
             }});
         }});
         checks.push({{
             id: 'sol_vencida',
-            titulo: 'Solicitud Vencida (+14 días)',
-            desc: 'Se solicitó despacho de material hace más de 14 días y aún no se registra la entrega. Verificar si hubo problemas de stock o si falta registrar el despacho.',
+            titulo: 'Solicitud Vencida (+8 días)',
+            desc: 'Se solicitó despacho de material hace más de 8 días y aún no se registra la entrega. Verificar si hubo problemas de stock o si falta registrar el despacho.',
             compara: 'soldepacho (fecha solicitud) vs Despacho (fecha entrega)',
             tipo: 'naranja',
             items: c4,
