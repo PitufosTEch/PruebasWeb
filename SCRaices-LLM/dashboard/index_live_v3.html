@@ -3309,48 +3309,44 @@ const App = () => {
         if (muestrasRef.current) muestrasRef.current.set(muestrasHormigon);
     }, [muestrasHormigon]);
 
-    // Muestras Hormigon: registrar toma de muestras para un grupo
-    // Estructura: muestrasHormigon[proyectoId][grupoId] = array de registros
-    const registrarMuestra = (grupoId, data) => {
+    // Muestras Hormigon: registrar toma de muestras por proyecto
+    // Estructura: muestrasHormigon[proyectoId] = array de registros
+    const registrarMuestra = (data) => {
         const key = proyectoSel;
         const muestrasId = Date.now().toString();
         const entry = { ...data, id: muestrasId, fecha: data.fecha || fechaChile(), resultadoPedido: false, fechaResultado: null };
         const next = { ...muestrasHormigon };
-        if (!next[key]) next[key] = {};
-        if (!next[key][grupoId]) next[key][grupoId] = [];
-        next[key][grupoId] = [...next[key][grupoId], entry];
+        if (!next[key]) next[key] = [];
+        next[key] = [...next[key], entry];
         fbDB.ref('muestras_hormigon').set(next);
         setMuestrasHormigon(next);
     };
 
-    const marcarResultadoPedido = (grupoId, muestraId) => {
+    const marcarResultadoPedido = (muestraId) => {
         const key = proyectoSel;
         const next = { ...muestrasHormigon };
-        const arr = next[key]?.[grupoId];
-        if (!arr) return;
+        const arr = next[key] || [];
         const idx = arr.findIndex(m => m.id === muestraId);
         if (idx === -1) return;
-        next[key][grupoId] = [...arr];
-        next[key][grupoId][idx] = { ...arr[idx], resultadoPedido: true, fechaResultado: fechaChile() };
+        next[key] = [...arr];
+        next[key][idx] = { ...arr[idx], resultadoPedido: true, fechaResultado: fechaChile() };
         fbDB.ref('muestras_hormigon').set(next);
         setMuestrasHormigon(next);
     };
 
-    const eliminarMuestra = (grupoId, muestraId) => {
+    const eliminarMuestra = (muestraId) => {
         const key = proyectoSel;
         const next = { ...muestrasHormigon };
-        const arr = next[key]?.[grupoId];
-        if (!arr) return;
-        next[key][grupoId] = arr.filter(m => m.id !== muestraId);
-        if (next[key][grupoId].length === 0) delete next[key][grupoId];
-        if (next[key] && Object.keys(next[key]).length === 0) delete next[key];
+        const arr = next[key] || [];
+        next[key] = arr.filter(m => m.id !== muestraId);
+        if (next[key].length === 0) delete next[key];
         fbDB.ref('muestras_hormigon').set(next);
         setMuestrasHormigon(next);
     };
 
-    // Obtener muestras del proyecto actual por grupo
-    const getMuestrasGrupo = (grupoId) => {
-        return (muestrasHormigon[proyectoSel] || {})[grupoId] || [];
+    const getMuestrasProy = () => {
+        const raw = muestrasHormigon[proyectoSel];
+        return Array.isArray(raw) ? raw : [];
     };
 
     const toggleConsulta = (idBenef, etapaKey) => {
@@ -3713,62 +3709,50 @@ const App = () => {
         });
 
         // CHECK 7: Muestras de Hormigon pendientes
-        // Detecta: Grupos con Fundaciones despachadas pero sin registro de toma de muestras
-        // Regla: 1 muestra cada 8 radieres/casas con fundaciones
+        // Detecta: Proyecto con Fundaciones despachadas pero sin suficientes muestras
+        // Regla: 1 muestra cada 8 casas con fundaciones despachadas
         const c7 = [];
-        const gruposActuales = agruparViviendas(viviendas, grupos);
-        const muestrasProy = muestrasHormigon[proyectoSel] || {};
-        gruposActuales.forEach(g => {
-            const conFund = g.viviendas.filter(v => v.estadoEtapas["01_FUNDACIONES"]?.estado === "despachado");
-            if (conFund.length === 0) return;
-            const muestrasGrupo = muestrasProy[g.id] || [];
-            const totalMuestras = muestrasGrupo.reduce((s, m) => s + (m.cantidad || 0), 0);
-            const muestrasRequeridas = Math.ceil(conFund.length / 8);
+        const conFundProy = viviendas.filter(v => v.estadoEtapas["01_FUNDACIONES"]?.estado === "despachado");
+        const muestrasArr = (() => { const raw = muestrasHormigon[proyectoSel]; return Array.isArray(raw) ? raw : []; })();
+        if (conFundProy.length > 0) {
+            const totalMuestras = muestrasArr.reduce((s, m) => s + (m.cantidad || 0), 0);
+            const muestrasRequeridas = Math.ceil(conFundProy.length / 8);
             if (totalMuestras < muestrasRequeridas) {
                 c7.push({
-                    grupoId: g.id,
-                    grupoNombre: g.nombre || 'Sin Asignar',
-                    casasConFund: conFund.length,
+                    casasConFund: conFundProy.length,
                     muestrasRequeridas,
                     muestrasTomadas: totalMuestras,
-                    faltantes: muestrasRequeridas - totalMuestras,
-                    casas: conFund.map(v => v.NOMBRES + ' ' + v.APELLIDOS)
+                    faltantes: muestrasRequeridas - totalMuestras
                 });
             }
-        });
+        }
         checks.push({
             id: 'muestras_hormigon',
             titulo: 'Muestras Hormigon Pendientes',
-            desc: 'Grupos con fundaciones despachadas que no tienen suficientes muestras de hormigon registradas. Se requiere 1 muestra cada 8 radieres.',
+            desc: 'El proyecto tiene casas con fundaciones despachadas pero no se han registrado suficientes muestras de hormigon. Se requiere 1 muestra cada 8 radieres.',
             compara: 'Despacho (Fundaciones) vs Registro Muestras (Firebase)',
             tipo: 'naranja',
             items: c7,
-            render: (it) => `${it.grupoNombre} — ${it.casasConFund} casas con fundacion, requiere ${it.muestrasRequeridas} muestra(s), tiene ${it.muestrasTomadas}`
+            render: (it) => `${it.casasConFund} casas con fundacion, requiere ${it.muestrasRequeridas} muestra(s), tiene ${it.muestrasTomadas} (faltan ${it.faltantes})`
         });
 
         // CHECK 8: Resultados de laboratorio pendientes (30 dias)
         // Detecta: Muestras tomadas hace mas de 30 dias sin que se haya marcado "resultado pedido"
         const c8 = [];
         const hoy = new Date();
-        Object.entries(muestrasProy).forEach(([grupoId, muestras]) => {
-            const grupoInfo = gruposActuales.find(g => g.id === grupoId);
-            const nombreGrupo = grupoInfo?.nombre || grupoId;
-            (muestras || []).forEach(m => {
-                if (m.resultadoPedido) return;
-                const fechaToma = new Date(m.fecha);
-                const diasDesde = Math.floor((hoy - fechaToma) / (1000 * 60 * 60 * 24));
-                if (diasDesde >= 30) {
-                    c8.push({
-                        grupoId,
-                        grupoNombre: nombreGrupo,
-                        muestraId: m.id,
-                        fecha: m.fecha,
-                        dias: diasDesde,
-                        cantidad: m.cantidad || 0,
-                        casas: m.casas || []
-                    });
-                }
-            });
+        muestrasArr.forEach(m => {
+            if (m.resultadoPedido) return;
+            const fechaToma = new Date(m.fecha);
+            const diasDesde = Math.floor((hoy - fechaToma) / (1000 * 60 * 60 * 24));
+            if (diasDesde >= 30) {
+                c8.push({
+                    muestraId: m.id,
+                    fecha: m.fecha,
+                    dias: diasDesde,
+                    cantidad: m.cantidad || 0,
+                    casasNombres: m.casasNombres || []
+                });
+            }
         });
         checks.push({
             id: 'resultado_lab_pendiente',
@@ -3777,11 +3761,11 @@ const App = () => {
             compara: 'Registro Muestras (fecha toma) vs Fecha actual',
             tipo: 'rojo',
             items: c8,
-            render: (it) => `${it.grupoNombre} — Muestra del ${it.fecha} (${it.dias} dias), ${it.cantidad} probeta(s)`
+            render: (it) => `Muestra del ${it.fecha} (${it.dias} dias), ${it.cantidad} probeta(s)${it.casasNombres.length > 0 ? ' — Casas: ' + it.casasNombres.join(', ') : ''}`
         });
 
         return checks;
-    }, [viviendas, muestrasHormigon, grupos]);
+    }, [viviendas, muestrasHormigon]);
 
     const totalHallazgos = validaciones.reduce((s, c) => s + c.items.length, 0);
 
@@ -3888,23 +3872,26 @@ const App = () => {
                 </button>
                 {/* MUESTRAS HORMIGON - Botón + Modal */}
                 {(() => {
-                    const gruposActuales = agruparViviendas(viviendas, grupos);
-                    const muestrasProy = muestrasHormigon[proyectoSel] || {};
-                    const gruposConFund = gruposActuales.filter(g => g.viviendas.some(v => v.estadoEtapas["01_FUNDACIONES"]?.estado === "despachado"));
-                    const totalMuestras = Object.values(muestrasProy).flat().reduce((s, m) => s + (m.cantidad || 0), 0);
-                    const alertaLab = Object.values(muestrasProy).flat().filter(m => !m.resultadoPedido && Math.floor((new Date() - new Date(m.fecha)) / (1000*60*60*24)) >= 30).length;
-                    if (gruposConFund.length === 0) return null;
-                    return <button onClick={() => setShowMuestras(true)} className={`mb-3 ml-2 flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${alertaLab > 0 ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100' : totalMuestras > 0 ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100' : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'}`}>
+                    const conFundProy = viviendas.filter(v => v.estadoEtapas["01_FUNDACIONES"]?.estado === "despachado");
+                    if (conFundProy.length === 0) return null;
+                    const muestrasArr = getMuestrasProy();
+                    const totalMuestras = muestrasArr.reduce((s, m) => s + (m.cantidad || 0), 0);
+                    const requeridas = Math.ceil(conFundProy.length / 8);
+                    const alertaLab = muestrasArr.filter(m => !m.resultadoPedido && Math.floor((new Date() - new Date(m.fecha)) / (1000*60*60*24)) >= 30).length;
+                    return <button onClick={() => setShowMuestras(true)} className={`mb-3 ml-2 flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${alertaLab > 0 ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100' : totalMuestras >= requeridas ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100' : totalMuestras > 0 ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100' : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'}`}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M9 3h6v2a3 3 0 0 1-6 0V3z"/><path d="M12 5v6"/><path d="M8 11h8l1 10H7L8 11z"/>
                         </svg>
-                        Muestras Hormigón{totalMuestras > 0 ? ` (${totalMuestras})` : ''}
+                        Muestras Hormigón {totalMuestras}/{requeridas}
                         {alertaLab > 0 && <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{alertaLab} lab</span>}
                     </button>;
                 })()}
                 {showMuestras && (() => {
-                    const gruposActuales = agruparViviendas(viviendas, grupos);
-                    const muestrasProy = muestrasHormigon[proyectoSel] || {};
+                    const conFundProy = viviendas.filter(v => v.estadoEtapas["01_FUNDACIONES"]?.estado === "despachado");
+                    const muestrasArr = getMuestrasProy();
+                    const totalMuestras = muestrasArr.reduce((s, m) => s + (m.cantidad || 0), 0);
+                    const requeridas = Math.ceil(conFundProy.length / 8);
+                    const hoy = new Date();
                     return <div className="fixed inset-0 z-[60] bg-black/40 flex items-start justify-center pt-8 px-4" onClick={(e) => e.target === e.currentTarget && setShowMuestras(false)}>
                         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
                             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
@@ -3914,92 +3901,104 @@ const App = () => {
                                 </div>
                                 <button onClick={() => setShowMuestras(false)} className="text-gray-400 hover:text-gray-600 text-xl font-bold w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100">x</button>
                             </div>
-                            <div className="overflow-y-auto p-6 space-y-6">
-                                {gruposActuales.map(g => {
-                                    const conFund = g.viviendas.filter(v => v.estadoEtapas["01_FUNDACIONES"]?.estado === "despachado");
-                                    if (conFund.length === 0) return null;
-                                    const muestrasGrupo = muestrasProy[g.id] || [];
-                                    const totalMuestrasG = muestrasGrupo.reduce((s, m) => s + (m.cantidad || 0), 0);
-                                    const requeridas = Math.ceil(conFund.length / 8);
-                                    const hoy = new Date();
-                                    const color = g.colorIdx >= 0 ? GRUPO_COLORS[g.colorIdx] : null;
-                                    return <div key={g.id} className="rounded-xl border border-gray-200 overflow-hidden">
-                                        <div className={`px-4 py-3 flex items-center justify-between ${color ? '' : 'bg-gray-50'}`} style={color ? {background: color.bg} : {}}>
-                                            <div>
-                                                <h3 className="font-semibold text-sm" style={color ? {color: color.text} : {}}>{g.nombre || 'Todas las viviendas'}</h3>
-                                                <p className="text-[11px] mt-0.5" style={color ? {color: color.text, opacity: 0.7} : {color: '#888'}}>
-                                                    {conFund.length} casa{conFund.length !== 1 ? 's' : ''} con fundación | Requiere {requeridas} muestra{requeridas !== 1 ? 's' : ''} | Tiene {totalMuestrasG}
-                                                </p>
-                                            </div>
-                                            {totalMuestrasG >= requeridas
-                                                ? <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">OK</span>
-                                                : <span className="text-[10px] bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-medium">Faltan {requeridas - totalMuestrasG}</span>
-                                            }
+                            <div className="overflow-y-auto p-6 space-y-5">
+                                {/* Resumen del proyecto */}
+                                <div className="rounded-xl border border-blue-200 bg-blue-50/50 px-4 py-3">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-sm font-semibold text-blue-800">{proy?.NOMBRE_PROYECTO || proyectoSel}</p>
+                                            <p className="text-[11px] text-blue-600 mt-0.5">
+                                                {conFundProy.length} casa{conFundProy.length !== 1 ? 's' : ''} con fundación despachada | Requiere {requeridas} muestra{requeridas !== 1 ? 's' : ''} | Registradas: {totalMuestras}
+                                            </p>
                                         </div>
-
-                                        {/* Lista de muestras existentes */}
-                                        {muestrasGrupo.length > 0 && (
-                                            <div className="border-t border-gray-100 divide-y divide-gray-50">
-                                                {muestrasGrupo.map(m => {
-                                                    const diasDesde = Math.floor((hoy - new Date(m.fecha)) / (1000*60*60*24));
-                                                    const alertaLab = !m.resultadoPedido && diasDesde >= 30;
-                                                    return <div key={m.id} className={`px-4 py-2.5 flex items-center gap-3 ${alertaLab ? 'bg-red-50/60' : ''}`}>
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="text-xs font-medium text-gray-700">{m.cantidad || 1} probeta{(m.cantidad || 1) > 1 ? 's' : ''}</span>
-                                                                <span className="text-[10px] text-gray-400">{m.fecha}</span>
-                                                                <span className="text-[10px] text-gray-400">({diasDesde}d)</span>
-                                                            </div>
-                                                            {m.casasNombres && m.casasNombres.length > 0 && (
-                                                                <p className="text-[10px] text-gray-400 mt-0.5 truncate">Casas: {m.casasNombres.join(', ')}</p>
-                                                            )}
-                                                            {m.notas && <p className="text-[10px] text-gray-500 mt-0.5 italic">{m.notas}</p>}
-                                                        </div>
-                                                        <div className="flex items-center gap-1.5">
-                                                            {m.resultadoPedido
-                                                                ? <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Resultado OK</span>
-                                                                : alertaLab
-                                                                    ? <button onClick={() => marcarResultadoPedido(g.id, m.id)} className="text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded-full hover:bg-red-200 transition-colors font-medium animate-pulse">Pedir resultado!</button>
-                                                                    : <button onClick={() => marcarResultadoPedido(g.id, m.id)} className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full hover:bg-gray-200 transition-colors">Marcar resultado</button>
-                                                            }
-                                                            <button onClick={() => eliminarMuestra(g.id, m.id)} className="text-gray-300 hover:text-red-500 transition-colors" title="Eliminar">
-                                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                                                            </button>
-                                                        </div>
-                                                    </div>;
-                                                })}
+                                        {totalMuestras >= requeridas
+                                            ? <span className="text-[10px] bg-green-100 text-green-700 px-2.5 py-1 rounded-full font-medium">Completo</span>
+                                            : <span className="text-[10px] bg-orange-100 text-orange-700 px-2.5 py-1 rounded-full font-medium">Faltan {requeridas - totalMuestras}</span>
+                                        }
+                                    </div>
+                                    {conFundProy.length > 0 && (
+                                        <details className="mt-2">
+                                            <summary className="text-[10px] text-blue-500 cursor-pointer hover:text-blue-700">Ver casas con fundación</summary>
+                                            <div className="mt-1 flex flex-wrap gap-1">
+                                                {conFundProy.map(v => (
+                                                    <span key={v.ID_Benef} className="text-[9px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">{v.APELLIDOS}, {v.NOMBRES}</span>
+                                                ))}
                                             </div>
-                                        )}
+                                        </details>
+                                    )}
+                                </div>
 
-                                        {/* Formulario para registrar nueva muestra */}
-                                        <div className="border-t border-gray-200 px-4 py-3 bg-gray-50/50">
-                                            <div className="flex items-end gap-2">
-                                                <div className="flex-1">
-                                                    <label className="text-[10px] text-gray-500 block mb-1">Cantidad probetas</label>
-                                                    <input type="number" min="1" defaultValue="1" id={`mh_cant_${g.id}`} className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
-                                                </div>
-                                                <div className="flex-[2]">
-                                                    <label className="text-[10px] text-gray-500 block mb-1">Casas incluidas (opcional)</label>
-                                                    <input type="text" placeholder="ej: Lopez, Perez, Soto" id={`mh_casas_${g.id}`} className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
-                                                </div>
-                                                <div className="flex-[2]">
-                                                    <label className="text-[10px] text-gray-500 block mb-1">Notas</label>
-                                                    <input type="text" placeholder="Laboratorio, obs..." id={`mh_notas_${g.id}`} className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
-                                                </div>
-                                                <button onClick={() => {
-                                                    const cant = parseInt(document.getElementById(`mh_cant_${g.id}`).value) || 1;
-                                                    const casasStr = document.getElementById(`mh_casas_${g.id}`).value;
-                                                    const notas = document.getElementById(`mh_notas_${g.id}`).value;
-                                                    const casasNombres = casasStr ? casasStr.split(',').map(c => c.trim()).filter(Boolean) : [];
-                                                    registrarMuestra(g.id, { cantidad: cant, casasNombres, notas });
-                                                    document.getElementById(`mh_cant_${g.id}`).value = '1';
-                                                    document.getElementById(`mh_casas_${g.id}`).value = '';
-                                                    document.getElementById(`mh_notas_${g.id}`).value = '';
-                                                }} className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors whitespace-nowrap">+ Registrar</button>
-                                            </div>
+                                {/* Lista de muestras registradas */}
+                                {muestrasArr.length > 0 && (
+                                    <div className="rounded-xl border border-gray-200 overflow-hidden">
+                                        <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-200">
+                                            <h3 className="text-xs font-semibold text-gray-700">Muestras registradas</h3>
                                         </div>
-                                    </div>;
-                                })}
+                                        <div className="divide-y divide-gray-100">
+                                            {muestrasArr.map(m => {
+                                                const diasDesde = Math.floor((hoy - new Date(m.fecha)) / (1000*60*60*24));
+                                                const alertaLab = !m.resultadoPedido && diasDesde >= 30;
+                                                return <div key={m.id} className={`px-4 py-2.5 flex items-center gap-3 ${alertaLab ? 'bg-red-50/60' : ''}`}>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-xs font-medium text-gray-700">{m.cantidad || 1} probeta{(m.cantidad || 1) > 1 ? 's' : ''}</span>
+                                                            <span className="text-[10px] text-gray-400">{m.fecha}</span>
+                                                            <span className="text-[10px] text-gray-400">({diasDesde}d)</span>
+                                                        </div>
+                                                        {m.casasNombres && m.casasNombres.length > 0 && (
+                                                            <p className="text-[10px] text-gray-400 mt-0.5 truncate">Casas: {m.casasNombres.join(', ')}</p>
+                                                        )}
+                                                        {m.notas && <p className="text-[10px] text-gray-500 mt-0.5 italic">{m.notas}</p>}
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5">
+                                                        {m.resultadoPedido
+                                                            ? <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Resultado OK</span>
+                                                            : alertaLab
+                                                                ? <button onClick={() => marcarResultadoPedido(m.id)} className="text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded-full hover:bg-red-200 transition-colors font-medium animate-pulse">Pedir resultado!</button>
+                                                                : <button onClick={() => marcarResultadoPedido(m.id)} className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full hover:bg-gray-200 transition-colors">Marcar resultado</button>
+                                                        }
+                                                        <button onClick={() => eliminarMuestra(m.id)} className="text-gray-300 hover:text-red-500 transition-colors" title="Eliminar">
+                                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                                        </button>
+                                                    </div>
+                                                </div>;
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Formulario para registrar nueva muestra */}
+                                <div className="rounded-xl border border-gray-200 overflow-hidden">
+                                    <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-200">
+                                        <h3 className="text-xs font-semibold text-gray-700">Registrar nueva muestra</h3>
+                                    </div>
+                                    <div className="px-4 py-3">
+                                        <div className="flex items-end gap-2">
+                                            <div className="flex-1">
+                                                <label className="text-[10px] text-gray-500 block mb-1">Cantidad probetas</label>
+                                                <input type="number" min="1" defaultValue="1" id="mh_cant" className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                                            </div>
+                                            <div className="flex-[2]">
+                                                <label className="text-[10px] text-gray-500 block mb-1">Casas incluidas (opcional)</label>
+                                                <input type="text" placeholder="ej: Lopez, Perez, Soto" id="mh_casas" className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                                            </div>
+                                            <div className="flex-[2]">
+                                                <label className="text-[10px] text-gray-500 block mb-1">Notas</label>
+                                                <input type="text" placeholder="Laboratorio, obs..." id="mh_notas" className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                                            </div>
+                                            <button onClick={() => {
+                                                const cant = parseInt(document.getElementById('mh_cant').value) || 1;
+                                                const casasStr = document.getElementById('mh_casas').value;
+                                                const notas = document.getElementById('mh_notas').value;
+                                                const casasNombres = casasStr ? casasStr.split(',').map(c => c.trim()).filter(Boolean) : [];
+                                                registrarMuestra({ cantidad: cant, casasNombres, notas });
+                                                document.getElementById('mh_cant').value = '1';
+                                                document.getElementById('mh_casas').value = '';
+                                                document.getElementById('mh_notas').value = '';
+                                            }} className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap">+ Registrar</button>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             <div className="px-6 py-3 border-t border-gray-100 bg-gray-50/50">
                                 <p className="text-[10px] text-gray-400 text-center">Regla: 1 probeta cada 8 radieres (casas con fundación). A los 30 días de la toma, pedir resultados al laboratorio.</p>
