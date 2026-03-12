@@ -203,6 +203,23 @@ def generar_dashboard_v3_html():
         alerta_log = obs_raw if obs_raw.lower() not in ['nan', '', 'none'] else ''
         obs_seguimiento = obs_seg if obs_seg.lower() not in ['nan', '', 'none'] else ''
 
+        # Fecha Recepción Definitiva
+        f_r_dom_raw = str(b.get('F_R_dom', '')).strip()
+        fecha_recepcion = ''
+        if f_r_dom_raw and f_r_dom_raw.lower() not in ['nan', '', 'nat', 'none']:
+            try:
+                if '-' in f_r_dom_raw and len(f_r_dom_raw) >= 10:
+                    parts = f_r_dom_raw.split('-')
+                    if len(parts[0]) == 4:
+                        fecha_recepcion = f_r_dom_raw[:10]
+                    else:
+                        fecha_recepcion = f"{parts[2][:4]}-{parts[1].zfill(2)}-{parts[0].zfill(2)}"
+                elif '/' in f_r_dom_raw:
+                    parts = f_r_dom_raw.split('/')
+                    fecha_recepcion = f"{parts[2][:4]}-{parts[1].zfill(2)}-{parts[0].zfill(2)}"
+            except:
+                fecha_recepcion = ''
+
         beneficiarios_data.append({
             'ID_Benef': int(b['ID_Benef']) if str(b['ID_Benef']).isdigit() else str(b['ID_Benef']),
             'ID_Proy': str(b.get('ID_Proy', '')),
@@ -213,6 +230,7 @@ def generar_dashboard_v3_html():
             'tipologia_rc_id': tip_rc_id,
             'habil': habil,
             'fecha_hpc': fecha_hpc,
+            'fecha_recepcion': fecha_recepcion,
             'alerta_logistica': alerta_log,
             'obs_seguimiento': obs_seguimiento
         })
@@ -1149,7 +1167,7 @@ const ViviendaCard = ({{ beneficiario, estadoEtapas, expanded, onToggle, grupoCo
                         {{gc && <div className={{`w-1.5 h-10 rounded-full ${{gc.accent}}`}} />}}
                         <span className={{b.tipologia === "Casa + RC" ? "text-blue-600" : "text-gray-400"}}><IconHome /></span>
                         <div>
-                            <h3 className="font-semibold text-gray-800">{{b.NOMBRES}} {{b.APELLIDOS}} {{obsCount > 0 && <span className="ml-1 inline-flex items-center gap-0.5 text-[9px] bg-amber-100 text-amber-700 border border-amber-300 rounded px-1 py-0.5 font-medium align-middle cursor-pointer" title={{`${{obsCount}} observacion(es)`}} onClick={{(e) => {{ e.stopPropagation(); if (!expanded) onToggle(); }}}}>&#9998; {{obsCount}}</span>}} {{b.habil ? <span className="ml-1 text-[9px] bg-green-100 text-green-700 border border-green-300 rounded px-1 py-0.5 font-medium align-middle">Habil para Construir</span> : <span className="ml-1 text-[9px] bg-red-100 text-red-600 border border-red-300 rounded px-1 py-0.5 font-medium align-middle">No Habilitada</span>}} {{b.alerta_logistica && <span className="ml-1 text-[9px] bg-amber-500 text-white border border-amber-600 rounded px-1.5 py-0.5 font-bold align-middle" title={{b.alerta_logistica}}>&#9888; Alerta</span>}}</h3>
+                            <h3 className="font-semibold text-gray-800">{{b.NOMBRES}} {{b.APELLIDOS}} {{obsCount > 0 && <span className="ml-1 inline-flex items-center gap-0.5 text-[9px] bg-amber-100 text-amber-700 border border-amber-300 rounded px-1 py-0.5 font-medium align-middle cursor-pointer" title={{`${{obsCount}} observacion(es)`}} onClick={{(e) => {{ e.stopPropagation(); if (!expanded) onToggle(); }}}}>&#9998; {{obsCount}}</span>}} {{b.habil ? <span className="ml-1 text-[9px] bg-green-100 text-green-700 border border-green-300 rounded px-1 py-0.5 font-medium align-middle">Habil{{b.fecha_hpc ? ` ${{(() => {{ const p = b.fecha_hpc.split('-'); return `${{p[2]}}/${{p[1]}}/${{p[0]}}`; }})()}}` : ''}}</span> : <span className="ml-1 text-[9px] bg-red-100 text-red-600 border border-red-300 rounded px-1 py-0.5 font-medium align-middle">No Habilitada</span>}} {{b.fecha_recepcion && (() => {{ const p = b.fecha_recepcion.split('-'); return <span className="ml-1 text-[9px] bg-blue-100 text-blue-700 border border-blue-300 rounded px-1 py-0.5 font-medium align-middle" title="Recepcion Definitiva">&#10003; Recepcion {{`${{p[2]}}/${{p[1]}}/${{p[0]}}`}}</span>; }})()}} {{b.alerta_logistica && <span className="ml-1 text-[9px] bg-amber-500 text-white border border-amber-600 rounded px-1.5 py-0.5 font-bold align-middle" title={{b.alerta_logistica}}>&#9888; Alerta</span>}}</h3>
                             <p className="text-xs text-gray-500">{{b.tipologia}}</p>
                             {{b.alerta_logistica && <p className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 mt-1 leading-snug" onClick={{(e) => e.stopPropagation()}}>{{b.alerta_logistica}}</p>}}
                             {{b.obs_seguimiento && <p className="text-[10px] text-gray-500 bg-gray-50 border border-gray-200 rounded px-2 py-0.5 mt-0.5 italic" onClick={{(e) => e.stopPropagation()}}>{{b.obs_seguimiento}}</p>}}
