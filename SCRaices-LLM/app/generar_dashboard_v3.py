@@ -2156,7 +2156,7 @@ const ManoDeObraTab = ({{ viviendas }}) => {{
                 </div>
                 <div className="bg-white border border-violet-200 rounded-xl p-3 shadow-sm">
                     <p className="text-gray-500 text-[10px]">Total Pagado M.O.</p>
-                    <p className="text-lg font-bold text-violet-700 font-mono">{{formatPeso(totalPagadoMO)}}</p>
+                    <p className={{`font-bold text-violet-700 font-mono ${{totalPagadoMO >= 100000000 ? "text-xs" : totalPagadoMO >= 10000000 ? "text-sm" : "text-lg"}}`}}>{{formatPeso(totalPagadoMO)}}</p>
                 </div>
             </div>
 
@@ -3634,7 +3634,7 @@ const App = () => {{
                     <div className="bg-white rounded-xl p-3 border border-red-200 shadow-sm"><p className="text-[10px] text-red-600">Críticas</p><p className="text-xl font-bold font-mono text-red-600">{{kpis.criticos}}</p>{{kpis.alertasCoherencia > 0 && <p className="text-[9px] text-red-400">{{kpis.alertasCoherencia}} alertas</p>}}</div>
                     <div className="bg-white rounded-xl p-3 border border-purple-200 shadow-sm"><p className="text-[10px] text-purple-600">Solicitadas</p><p className="text-xl font-bold font-mono text-purple-600">{{kpis.totalSolicitadas}}</p><p className="text-[9px] text-gray-400">esperando desp.</p></div>
                     <div className="bg-white rounded-xl p-3 border border-gray-200 shadow-sm"><p className="text-[10px] text-gray-500">Días Prom.</p><p className="text-xl font-bold font-mono">{{kpis.diasPromedio}}d</p><p className="text-[9px] text-gray-400">Fund → última</p></div>
-                    <div className="bg-white rounded-xl p-3 border border-violet-200 shadow-sm"><p className="text-[10px] text-violet-600">Total Pagado</p><p className="text-lg font-bold font-mono text-violet-700">{{formatPeso(kpis.totalPagado)}}</p></div>
+                    <div className="bg-white rounded-xl p-3 border border-violet-200 shadow-sm overflow-hidden"><p className="text-[10px] text-violet-600">Total Pagado</p><p className={{`font-bold font-mono text-violet-700 mt-1 ${{kpis.totalPagado >= 100000000 ? "text-xs" : kpis.totalPagado >= 10000000 ? "text-sm" : "text-lg"}}`}}>{{formatPeso(kpis.totalPagado)}}</p></div>
                 </div>
 
                 {{/* VALIDACION CRUZADA - Botón + Modal */}}
