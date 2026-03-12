@@ -3739,15 +3739,15 @@ const App = () => {
             render: (it) => `${it.totalCasas} casas en proyecto, requiere ${it.muestrasRequeridas} muestra(s), tiene ${it.muestrasTomadas} (faltan ${it.faltantes})`
         });
 
-        // CHECK 8: Resultados de laboratorio pendientes (30 dias)
-        // Detecta: Muestras tomadas hace mas de 30 dias sin que se haya marcado "resultado pedido"
+        // CHECK 8: Resultados de laboratorio pendientes (28 dias)
+        // Detecta: Muestras tomadas hace mas de 28 dias sin que se haya marcado "resultado pedido"
         const c8 = [];
         const hoy = new Date();
         muestrasArr.forEach(m => {
             if (m.resultadoPedido) return;
             const fechaToma = new Date(m.fecha);
             const diasDesde = Math.floor((hoy - fechaToma) / (1000 * 60 * 60 * 24));
-            if (diasDesde >= 30) {
+            if (diasDesde >= 28) {
                 c8.push({
                     muestraId: m.id,
                     fecha: m.fecha,
@@ -3760,7 +3760,7 @@ const App = () => {
         checks.push({
             id: 'resultado_lab_pendiente',
             titulo: 'Pedir Resultado Laboratorio',
-            desc: 'Han pasado mas de 30 dias desde la toma de muestras de hormigon. Se debe solicitar los resultados al laboratorio.',
+            desc: 'Han pasado mas de 28 dias desde la toma de muestras de hormigon. Se debe solicitar los resultados al laboratorio.',
             compara: 'Registro Muestras (fecha toma) vs Fecha actual',
             tipo: 'rojo',
             items: c8,
@@ -3879,7 +3879,7 @@ const App = () => {
                     const muestrasArr = getMuestrasProy();
                     const totalMuestras = muestrasArr.reduce((s, m) => s + (m.cantidad || 0), 0);
                     const requeridas = Math.ceil(viviendas.length / 6);
-                    const alertaLab = muestrasArr.filter(m => !m.resultadoPedido && Math.floor((new Date() - new Date(m.fecha)) / (1000*60*60*24)) >= 30).length;
+                    const alertaLab = muestrasArr.filter(m => !m.resultadoPedido && Math.floor((new Date() - new Date(m.fecha)) / (1000*60*60*24)) >= 28).length;
                     return <button onClick={() => setShowMuestras(true)} className={`mb-3 ml-2 flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${alertaLab > 0 ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100' : totalMuestras >= requeridas ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100' : totalMuestras > 0 ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100' : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'}`}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M9 3h6v2a3 3 0 0 1-6 0V3z"/><path d="M12 5v6"/><path d="M8 11h8l1 10H7L8 11z"/>
@@ -3916,6 +3916,7 @@ const App = () => {
                                             ? <span className="text-[10px] bg-green-100 text-green-700 px-2.5 py-1 rounded-full font-medium">Completo</span>
                                             : <span className="text-[10px] bg-orange-100 text-orange-700 px-2.5 py-1 rounded-full font-medium">Faltan {requeridas - totalMuestras}</span>
                                         }
+                                    </div>
                                 </div>
 
                                 {/* Lista de muestras registradas */}
@@ -3991,7 +3992,7 @@ const App = () => {
                                 </div>
                             </div>
                             <div className="px-6 py-3 border-t border-gray-100 bg-gray-50/50">
-                                <p className="text-[10px] text-gray-400 text-center">Regla: 1 probeta cada 6 casas (casas con fundación). A los 30 días de la toma, pedir resultados al laboratorio.</p>
+                                <p className="text-[10px] text-gray-400 text-center">Regla: 1 probeta cada 6 casas (casas con fundación). A los 28 días de la toma, pedir resultados al laboratorio.</p>
                             </div>
                         </div>
                     </div>;
