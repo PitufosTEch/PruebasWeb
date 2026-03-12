@@ -156,10 +156,10 @@ def get_data_loader_js(apps_script_url):
         // Lote 4 (comentarios) separado y no bloquea si falla
         try {{
             updateLoading('Descargando comentarios...', 25, 'Lote 4: Comentarios');
-            r4 = await fetchBatch('cominsp,Pendientes', 'Lote 4: Comentarios');
+            r4 = await fetchBatch('cominsp,Pendientes,combenef', 'Lote 4: Comentarios');
         }} catch (e) {{
             console.warn('[LIVE] Lote 4 (comentarios) fallo:', e.message);
-            r4 = {{ cominsp: {{ rows: [] }}, Pendientes: {{ rows: [] }} }};
+            r4 = {{ cominsp: {{ rows: [] }}, Pendientes: {{ rows: [] }}, combenef: {{ rows: [] }} }};
         }}
 
         updateLoading('Combinando datos...', 30, 'Todos los lotes recibidos');
@@ -506,6 +506,22 @@ def get_data_loader_js(apps_script_url):
             }});
         }});
 
+        // 12. COMENTARIOS BENEFICIARIO (combenef)
+        const combenefRaw = raw.combenef?.rows || [];
+        COMENTARIOS_BENEF_DATA = [];
+        combenefRaw.forEach(c => {{
+            const idB = String(c.ID_Benef || '');
+            if (!idsBenef.has(idB)) return;
+            const texto = String(c.comentario || '').trim();
+            if (!texto || texto === 'nan') return;
+            COMENTARIOS_BENEF_DATA.push({{
+                ID_Benef: idB,
+                fecha: parseDate(c.fecha) || '',
+                texto: texto,
+                usuario: String(c.usuario || '')
+            }});
+        }});
+
         updateLoading('Listo!', 100, `${{PROYECTOS_DATA.length}} proyectos, ${{BENEFICIARIOS_DATA.length}} beneficiarios, ${{DESPACHOS_DATA.length}} despachos, ${{SOLPAGO_DATA.length}} pagos`);
     }}
 
@@ -529,7 +545,8 @@ def get_data_loader_js(apps_script_url):
                 PRESUPUESTO_DATA,
                 GARANTIAS_DATA,
                 EEPP_DATA,
-                COMENTARIOS_DATA
+                COMENTARIOS_DATA,
+                COMENTARIOS_BENEF_DATA
             }};
             const json = JSON.stringify(payload);
             const sizeKB = Math.round(json.length / 1024);
@@ -574,6 +591,7 @@ def get_data_loader_js(apps_script_url):
         GARANTIAS_DATA = cache.GARANTIAS_DATA || [];
         EEPP_DATA = cache.EEPP_DATA || [];
         COMENTARIOS_DATA = cache.COMENTARIOS_DATA || [];
+        COMENTARIOS_BENEF_DATA = cache.COMENTARIOS_BENEF_DATA || [];
     }}
 
     function formatCacheAge(ts) {{
@@ -679,6 +697,7 @@ def make_live_dashboard(apps_script_url):
         ('GARANTIAS_DATA', '[]'),
         ('EEPP_DATA', '[]'),
         ('COMENTARIOS_DATA', '[]'),
+        ('COMENTARIOS_BENEF_DATA', '[]'),
     ]
 
     for var_name, empty_val in data_vars:

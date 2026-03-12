@@ -115,6 +115,7 @@ let PRESUPUESTO_DATA = {};
 let GARANTIAS_DATA = [];
 let EEPP_DATA = [];
 let COMENTARIOS_DATA = [];
+let COMENTARIOS_BENEF_DATA = [];
 const ETAPAS_CONFIG_FULL = {
   "_comentario": "Configuración de tiempos para etapas de construcción. Tiempos en DÍAS.",
   "_instrucciones": {
@@ -390,10 +391,10 @@ const ETAPAS_CONFIG_FULL = {
         // Lote 4 (comentarios) separado y no bloquea si falla
         try {
             updateLoading('Descargando comentarios...', 25, 'Lote 4: Comentarios');
-            r4 = await fetchBatch('cominsp,Pendientes', 'Lote 4: Comentarios');
+            r4 = await fetchBatch('cominsp,Pendientes,combenef', 'Lote 4: Comentarios');
         } catch (e) {
             console.warn('[LIVE] Lote 4 (comentarios) fallo:', e.message);
-            r4 = { cominsp: { rows: [] }, Pendientes: { rows: [] } };
+            r4 = { cominsp: { rows: [] }, Pendientes: { rows: [] }, combenef: { rows: [] } };
         }
 
         updateLoading('Combinando datos...', 30, 'Todos los lotes recibidos');
@@ -740,6 +741,22 @@ const ETAPAS_CONFIG_FULL = {
             });
         });
 
+        // 12. COMENTARIOS BENEFICIARIO (combenef)
+        const combenefRaw = raw.combenef?.rows || [];
+        COMENTARIOS_BENEF_DATA = [];
+        combenefRaw.forEach(c => {
+            const idB = String(c.ID_Benef || '');
+            if (!idsBenef.has(idB)) return;
+            const texto = String(c.comentario || '').trim();
+            if (!texto || texto === 'nan') return;
+            COMENTARIOS_BENEF_DATA.push({
+                ID_Benef: idB,
+                fecha: parseDate(c.fecha) || '',
+                texto: texto,
+                usuario: String(c.usuario || '')
+            });
+        });
+
         updateLoading('Listo!', 100, `${PROYECTOS_DATA.length} proyectos, ${BENEFICIARIOS_DATA.length} beneficiarios, ${DESPACHOS_DATA.length} despachos, ${SOLPAGO_DATA.length} pagos`);
     }
 
@@ -763,7 +780,8 @@ const ETAPAS_CONFIG_FULL = {
                 PRESUPUESTO_DATA,
                 GARANTIAS_DATA,
                 EEPP_DATA,
-                COMENTARIOS_DATA
+                COMENTARIOS_DATA,
+                COMENTARIOS_BENEF_DATA
             };
             const json = JSON.stringify(payload);
             const sizeKB = Math.round(json.length / 1024);
@@ -808,6 +826,7 @@ const ETAPAS_CONFIG_FULL = {
         GARANTIAS_DATA = cache.GARANTIAS_DATA || [];
         EEPP_DATA = cache.EEPP_DATA || [];
         COMENTARIOS_DATA = cache.COMENTARIOS_DATA || [];
+        COMENTARIOS_BENEF_DATA = cache.COMENTARIOS_BENEF_DATA || [];
     }
 
     function formatCacheAge(ts) {
@@ -1768,11 +1787,15 @@ const ViviendasTab = ({ viviendas, grupos, expandida, setExpandida, filtro, setF
                 const comProy = COMENTARIOS_DATA.filter(c => vivIds.has(String(c.ID_Benef)));
                 const comAbiertos = comProy.filter(c => !c.cerrado);
 
+                // Comentarios Beneficiario filtrados por proyecto
+                const comBenefProy = COMENTARIOS_BENEF_DATA.filter(c => vivIds.has(String(c.ID_Benef)));
+
                 const tabBtns = [
                     ["obs", `Observaciones (${obsProy.length})`],
                     ["cons", `Consultas (${consPendientes.length} pend.)`],
                     ["act5", `Actividades 5% (${actCompletas.length}/${viviendas.length})`],
-                    ["comapp", `AppSheet (${comProy.length})`]
+                    ["comapp", `AppSheet (${comProy.length})`],
+                    ["combenef", `Comentarios (${comBenefProy.length})`]
                 ];
 
                 return (
@@ -1952,6 +1975,52 @@ const ViviendasTab = ({ viviendas, grupos, expandida, setExpandida, filtro, setF
                                             </div>
                                         ) : (
                                             <p className="text-gray-400 text-center py-8">Sin comentarios en AppSheet para este proyecto</p>
+                                        )}
+                                    </div>
+                                )}
+                                {/* Tab Comentarios Beneficiario */}
+                                {actualTab === "combenef" && (
+                                    <div className="space-y-4">
+                                        <div className="flex items-center gap-4 text-sm mb-3">
+                                            <span className="text-gray-600">Total: <strong>{comBenefProy.length}</strong></span>
+                                        </div>
+                                        {comBenefProy.length > 0 ? (
+                                            <div className="space-y-3">
+                                                {(() => {
+                                                    const grouped = {};
+                                                    comBenefProy.forEach(c => {
+                                                        if (!grouped[c.ID_Benef]) grouped[c.ID_Benef] = [];
+                                                        grouped[c.ID_Benef].push(c);
+                                                    });
+                                                    return Object.entries(grouped).map(([idBenef, coms]) => {
+                                                        const v = viviendas.find(vv => String(vv.ID_Benef) === String(idBenef));
+                                                        const nombre = v ? `${v.NOMBRES} ${v.APELLIDOS}` : idBenef;
+                                                        const sorted = coms.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+                                                        return (
+                                                            <div key={idBenef} className="border border-violet-200 rounded-lg overflow-hidden">
+                                                                <div className="bg-violet-50 px-4 py-2 border-b border-violet-200 flex items-center justify-between">
+                                                                    <span className="font-semibold text-gray-800 text-sm">{nombre}</span>
+                                                                    <span className="text-[10px] text-gray-400">{coms.length} comentario{coms.length !== 1 ? 's' : ''}</span>
+                                                                </div>
+                                                                <div className="p-3 space-y-1.5 max-h-48 overflow-y-auto">
+                                                                    {sorted.map((c, i) => (
+                                                                        <div key={i} className="flex items-start gap-2 text-sm">
+                                                                            <span className="text-violet-400 mt-0.5">&#8226;</span>
+                                                                            <span className="text-gray-700 flex-1">{c.texto}</span>
+                                                                            <div className="text-right shrink-0">
+                                                                                {c.fecha && <div className="text-[10px] text-gray-400 whitespace-nowrap">{c.fecha}</div>}
+                                                                                {c.usuario && <div className="text-[9px] text-gray-300">{c.usuario}</div>}
+                                                                            </div>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    });
+                                                })()}
+                                            </div>
+                                        ) : (
+                                            <p className="text-gray-400 text-center py-8">Sin comentarios de beneficiario para este proyecto</p>
                                         )}
                                     </div>
                                 )}
