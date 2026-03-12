@@ -892,31 +892,34 @@ const ETAPAS_CONFIG = ETAPAS_CONFIG_FULL.etapas || {};
 const SECUENCIA_PRINCIPAL = ETAPAS_CONFIG_FULL.secuencia_principal || [];
 
 // ========== FAMILIA PAGO MAP ==========
+// Mapea cada Familia de pago a las etapas de despacho que le corresponden
+// Basado en tabla de partidas: Tipo → Familia
 const FAMILIA_PAGO_MAP = {
     "01 - Fundaciones": ["01_FUNDACIONES", "12_ALCANTARILLADO"],
     "02 - 1era Etapa": ["02_1ERA_ETAPA", "28_VENTANAS", "29_EIFS"],
-    "03 - 2da Etapa": ["03_2DA_ETAPA", "07_CERAMICO_PISO", "09_PINTURA_EXT", "10_PINTURA_INT"],
+    "03 - 2da Etapa": ["03_2DA_ETAPA"],
     "04 - Gasfiteria": ["13_GASFITERIA"],
-    "05 - Cerámica": ["08_CERAMICO_MURO"],
+    "05 - Cerámica": ["07_CERAMICO_PISO", "08_CERAMICO_MURO"],
     "06 - Pintura": ["09_PINTURA_EXT", "10_PINTURA_INT"],
     "07 - Eléctricidad": [],
-    "08 - Obras Exteriores": [],
-    "11 - Recepcion": []
+    "08 - Obras Exteriores": ["14_OBRAS_EXT"]
 };
 const FAMILIA_LABELS = {
     "01 - Fundaciones": "Fundaciones", "02 - 1era Etapa": "1era Etapa", "03 - 2da Etapa": "2da Etapa",
-    "04 - Gasfiteria": "Gasfiteria", "05 - Cerámica": "Ceramica", "06 - Pintura": "Pintura",
-    "07 - Eléctricidad": "Electricidad", "08 - Obras Exteriores": "OO.EE.", "11 - Recepcion": "Recepcion"
+    "04 - Gasfiteria": "Gasfiteria", "05 - Cerámica": "Cerámica", "06 - Pintura": "Pintura",
+    "07 - Eléctricidad": "Electricidad", "08 - Obras Exteriores": "OO.EE."
 };
 const FAMILIAS_CRITICAS = ["01 - Fundaciones", "02 - 1era Etapa", "03 - 2da Etapa", "04 - Gasfiteria", "05 - Cerámica"];
+// Partidas por familia (Viv = Vivienda, RC = Recinto Complementario)
 const FAMILIA_PARTIDAS = {
-    "01 - Fundaciones": ["Fundaciones", "Radier", "Alcantarillado"],
-    "02 - 1era Etapa": ["Tabiques", "Techumbre", "Rev. Exterior", "Ventanas", "Cubierta", "Cielo", "Alero", "Red Agua Pot.", "Red Electrica"],
-    "03 - 2da Etapa": ["Rev. Zona Seca", "Rev. Zona Humeda", "Aisl. Muro", "Aisl. Cielo", "Ceramico Piso", "Ceramico Muro", "Pintura Ext.", "Pintura Int.", "Puertas", "Molduras"],
-    "04 - Gasfiteria": ["Art. Bano", "Art. Cocina"],
-    "05 - Cerámica": ["Ceramico Piso", "Ceramico Muro"],
-    "07 - Eléctricidad": ["Art. Electricos"],
-    "08 - Obras Exteriores": ["Agua Pot. Ext.", "Alcant. Ext.", "Inst. Elec. Ext."]
+    "01 - Fundaciones": ["Viv. Fundaciones", "Viv. Radier", "RC Fundaciones", "RC Radier"],
+    "02 - 1era Etapa": ["Viv. Estruc. tabiques", "Viv. Estruc. Cubierta", "Viv. Rev. exterior", "Viv. Ventanas", "Viv. Cubierta", "Viv. Entr. Cielo", "Viv. Entr. Alero", "RC Estruc. tabiques", "RC Estruc. Cubierta", "RC Rev. exterior", "RC Ventanas", "RC Cubierta", "RC Entr. Cielo", "RC Entr. Alero", "Viv. Saldo viv. prefab."],
+    "03 - 2da Etapa": ["Viv. Rev. zona seca", "Viv. Rev. Zona húmeda", "Viv. Aisl. muros", "Viv. Aisl. cielo", "Viv. Puertas", "Viv. Molduras", "RC Rev. interior", "RC Aisl. muros", "RC Aisl. cielo", "RC Cerámicos Piso", "RC Puertas", "RC Molduras", "RC Art. eléctricos"],
+    "04 - Gasfiteria": ["Viv. Planta alcantarillado", "Viv. Red agua potable", "Viv. Art. baño", "Viv. Art. cocina", "Viv. Agua pot. exterior", "Viv. Alcantarillado exterior"],
+    "05 - Cerámica": ["Viv. Cerámicos Piso", "Viv. Cerámicos muro"],
+    "06 - Pintura": ["Viv. Pint. exterior", "Viv. Pint. interior", "RC Pint. exterior", "RC Pint. interior"],
+    "07 - Eléctricidad": ["Viv. Red eléctrica", "Viv. Art. eléctricos", "Viv. Ins. eléct. exterior", "RC Red eléctrica"],
+    "08 - Obras Exteriores": ["Viv. Habilitación"]
 };
 
 // ========== UTILITY FUNCTIONS ==========
