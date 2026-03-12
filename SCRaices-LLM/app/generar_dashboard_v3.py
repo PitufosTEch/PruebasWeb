@@ -1362,7 +1362,9 @@ const HeaderProyecto = ({{ proy, garantiasProy, eeppResumen }}) => {{
         vencimiento.setDate(vencimiento.getDate() + dur);
         const hoy = new Date();
         const diasRestantes = Math.floor((vencimiento - hoy) / (1000*60*60*24));
-        return {{ inicio: fi, duracion: dur, vencimiento: vencimiento.toISOString().substring(0,10), diasRestantes }};
+        const diasTranscurridos = Math.max(0, Math.floor((hoy - inicio) / (1000*60*60*24)));
+        const pctTranscurrido = Math.min(100, Math.max(0, Math.round(diasTranscurridos / dur * 100)));
+        return {{ inicio: fi, duracion: dur, vencimiento: vencimiento.toISOString().substring(0,10), diasRestantes, diasTranscurridos, pctTranscurrido }};
     }}, [proy]);
 
     const formatFecha = (iso) => {{ if (!iso) return "\u2014"; const [y,m,d] = iso.split("-"); return `${{d}}/${{m}}/${{y}}`; }};
@@ -1385,6 +1387,20 @@ const HeaderProyecto = ({{ proy, garantiasProy, eeppResumen }}) => {{
                              contratoInfo.diasRestantes < 30 ? <p className="font-bold text-yellow-600">{{contratoInfo.diasRestantes}}d restantes</p> :
                              <p className="font-semibold text-green-600">{{contratoInfo.diasRestantes}}d restantes</p>}}
                         </div>
+                    </div>
+                    <div className="mt-2.5">
+                        <div className="flex items-center justify-between text-[9px] text-gray-400 mb-1">
+                            <span>{{formatFecha(contratoInfo.inicio)}}</span>
+                            <span className="font-semibold">{{contratoInfo.diasTranscurridos}}d / {{contratoInfo.duracion}}d ({{contratoInfo.pctTranscurrido}}%)</span>
+                            <span>{{formatFecha(contratoInfo.vencimiento)}}</span>
+                        </div>
+                        <div className="relative h-3 bg-gray-200 rounded-full overflow-hidden">
+                            <div className={{`h-full rounded-full transition-all ${{contratoInfo.pctTranscurrido >= 100 ? "bg-red-500" : contratoInfo.pctTranscurrido >= 80 ? "bg-amber-500" : contratoInfo.pctTranscurrido >= 50 ? "bg-blue-500" : "bg-green-500"}}`}} style={{{{width: `${{Math.min(contratoInfo.pctTranscurrido, 100)}}%`}}}}></div>
+                            {{contratoInfo.pctTranscurrido > 8 && contratoInfo.pctTranscurrido <= 100 && <div className="absolute inset-0 flex items-center" style={{{{paddingLeft: `${{Math.min(contratoInfo.pctTranscurrido, 100) - 1}}%`}}}}>
+                                <div className="w-0.5 h-4 bg-gray-700 rounded-full" style={{{{marginTop: "-2px"}}}}></div>
+                            </div>}}
+                        </div>
+                        {{contratoInfo.pctTranscurrido >= 100 && <p className="text-[9px] text-red-500 font-semibold mt-1 text-center">Plazo excedido por {{contratoInfo.diasTranscurridos - contratoInfo.duracion}} dias</p>}}
                     </div>
                 </div>
             )}}
