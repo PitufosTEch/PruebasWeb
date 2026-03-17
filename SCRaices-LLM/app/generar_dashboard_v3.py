@@ -2776,6 +2776,12 @@ const ConfiguracionView = ({{ grupos, setGrupos, viviendas, proyectoSel }}) => {
         setEditingGrupos(prev => prev.filter(g => g.id !== grupoId));
     }};
 
+    const editarCapataz = (grupoId, nuevoCapataz) => {{
+        setEditingGrupos(prev => prev.map(g =>
+            g.id === grupoId ? {{...g, capataz: nuevoCapataz}} : g
+        ));
+    }};
+
     const aplicarCambios = () => {{
         setGrupos(editingGrupos);
     }};
@@ -2970,7 +2976,10 @@ const ConfiguracionView = ({{ grupos, setGrupos, viviendas, proyectoSel }}) => {
                                             </div>
                                             <div>
                                                 <h4 className={{`text-sm font-bold ${{c.text}}`}}>{{grupo.nombre}}</h4>
-                                                {{grupo.capataz && <p className="text-[10px] text-gray-500">Capataz: {{grupo.capataz}}</p>}}
+                                                <div className="flex items-center gap-1 mt-0.5">
+                                                    <span className="text-[10px] text-gray-400">Capataz:</span>
+                                                    <input type="text" value={{grupo.capataz || ""}} onChange={{e => editarCapataz(grupo.id, e.target.value)}} placeholder="Asignar capataz..." className="text-[11px] text-gray-700 font-medium bg-transparent border-b border-dashed border-gray-300 focus:border-violet-500 focus:outline-none px-1 py-0 w-40" />
+                                                </div>
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2">
