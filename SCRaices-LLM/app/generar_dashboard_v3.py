@@ -314,6 +314,13 @@ def generar_dashboard_v3_html():
     for col in all_cols:
         ejecucion[col] = ejecucion[col].apply(_to_float)
 
+    # Determinar que beneficiarios tienen RC
+    benef_con_rc = set()
+    for _, b in beneficiarios_activos.iterrows():
+        tip_rc = str(b.get('Tipologia RC', '')).strip().lower()
+        if tip_rc not in ['nan', '', 'none']:
+            benef_con_rc.add(str(b['ID_Benef']))
+
     inspecciones_data = []
     for id_benef in ids_beneficiarios:
         ejec_b = ejecucion[ejecucion['ID_benef'].astype(str) == str(id_benef)]
@@ -321,10 +328,18 @@ def generar_dashboard_v3_html():
             continue
         acum = ejec_b[all_cols].sum()
         pct_viv = sum(min(max(acum.get(col, 0), 0), 1) * peso for col, peso in pesos.items() if col in acum.index)
-        rc_vals = [min(max(acum.get(col, 0), 0), 1) for col in rc_cols if col in acum.index]
-        pct_rc = sum(rc_vals) / len(rc_vals) if rc_vals else 0
+        tiene_rc = str(id_benef) in benef_con_rc
+        if tiene_rc:
+            rc_vals = [min(max(acum.get(col, 0), 0), 1) for col in rc_cols if col in acum.index]
+            pct_rc = sum(rc_vals) / len(rc_vals) if rc_vals else 0
+        else:
+            pct_rc = 0
         hab_val = min(max(acum.get(hab_col, 0), 0), 1) if hab_col else 0
-        pct_total = pct_viv * 0.7 + pct_rc * 0.25 + hab_val * 0.05
+        if tiene_rc:
+            pct_total = pct_viv * 0.7 + pct_rc * 0.25 + hab_val * 0.05
+        else:
+            # Sin RC: Viv pesa 95%, Hab 5%
+            pct_total = pct_viv * 0.95 + hab_val * 0.05
         partidas = {}
         for col in viv_cols:
             short = shorts.get(col, col)
@@ -354,6 +369,7 @@ def generar_dashboard_v3_html():
             'pct_rc': round(pct_rc * 100, 1),
             'pct_hab': round(hab_val * 100, 1),
             'pct_total': round(pct_total * 100, 1),
+            'has_rc': tiene_rc,
             'ultima_insp': ultima_fecha,
             'n_insp': n_insp,
             'partidas': partidas,
@@ -442,6 +458,10 @@ def generar_dashboard_v3_html():
     for _, g in control_bgb.iterrows():
         id_proy = str(g.get('ID_Proy', ''))
         if id_proy not in ids_proyectos:
+            continue
+        # Excluir garantias de convenio marco (no son del proyecto)
+        tipo_gar = str(g.get('Tipo', '')).lower()
+        if 'convenio marco' in tipo_gar:
             continue
         fecha_vcmto = str(g.get('Fecha_vcmto', ''))
         fecha_inicio = str(g.get('Fecha_inic', ''))
@@ -1114,9 +1134,11 @@ const LineaTiempo = ({{ estadoEtapas, fechaHPC }}) => {{
 }};
 
 // ===== VIVIENDA CARD =====
-const ViviendaCard = ({{ beneficiario, estadoEtapas, expanded, onToggle, grupoColor, obsCount, observaciones, addObservacion, deleteObservacion, actividades, toggleActividad, consultas, toggleConsulta }}) => {{
+const ViviendaCard = ({{ beneficiario, estadoEtapas, expanded, onToggle, grupoColor, obsCount, observaciones, addObservacion, deleteObservacion, actividades, toggleActividad, consultas, toggleConsulta, ocultarBeneficiario }}) => {{
     const [obsTexto, setObsTexto] = React.useState("");
     const [showObsInput, setShowObsInput] = React.useState(false);
+    const [showOcultarInput, setShowOcultarInput] = React.useState(false);
+    const [motivoOcultar, setMotivoOcultar] = React.useState("");
     const b = beneficiario;
     const avance = b.avance || calcularAvance(estadoEtapas);
     const insp = getInspeccion(b.ID_Benef);
@@ -1148,6 +1170,9 @@ const ViviendaCard = ({{ beneficiario, estadoEtapas, expanded, onToggle, grupoCo
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
+                        <button onClick={{(e) => {{ e.stopPropagation(); setShowOcultarInput(!showOcultarInput); }}}} className="p-1.5 rounded-lg text-gray-300 hover:text-gray-500 hover:bg-gray-100 transition-colors" title="Ocultar vivienda">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M3 3l18 18" /></svg>
+                        </button>
                         <div className="text-right">
                             <div className="flex items-center gap-2 mb-0.5">
                                 <span className="text-[10px] text-gray-400 w-8 font-mono">Desp</span>
@@ -1185,6 +1210,20 @@ const ViviendaCard = ({{ beneficiario, estadoEtapas, expanded, onToggle, grupoCo
                         </div>
                     </div>
                 </div>
+                {{showOcultarInput && (
+                    <div className="mx-4 mb-2 p-3 bg-gray-50 border border-gray-200 rounded-lg" onClick={{(e) => e.stopPropagation()}}>
+                        <div className="flex items-center gap-2 mb-2">
+                            <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M3 3l18 18" /></svg>
+                            <span className="text-xs font-semibold text-gray-600">Ocultar vivienda</span>
+                        </div>
+                        <input type="text" placeholder="Motivo (opcional)..." value={{motivoOcultar}} onChange={{(e) => setMotivoOcultar(e.target.value)}}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500 focus:outline-none mb-2" />
+                        <div className="flex gap-2 justify-end">
+                            <button onClick={{() => {{ setShowOcultarInput(false); setMotivoOcultar(""); }}}} className="px-3 py-1 text-xs text-gray-500 hover:text-gray-700">Cancelar</button>
+                            <button onClick={{() => {{ ocultarBeneficiario(b.ID_Benef, motivoOcultar); setShowOcultarInput(false); setMotivoOcultar(""); }}}} className="px-3 py-1.5 bg-gray-700 text-white text-xs rounded-lg hover:bg-gray-800 font-medium">Ocultar</button>
+                        </div>
+                    </div>
+                )}}
                 <LineaTiempo estadoEtapas={{estadoEtapas}} fechaHPC={{b.fecha_hpc}} />
                 <div className="mt-3 flex items-center justify-between text-sm">
                     <div className="text-gray-500">
@@ -1277,8 +1316,8 @@ const ViviendaCard = ({{ beneficiario, estadoEtapas, expanded, onToggle, grupoCo
                         <div className="mt-4 pt-4 border-t border-gray-200">
                             <h4 className="text-sm font-medium text-gray-700 mb-2">Avance por Inspecciones</h4>
                             <div className="flex items-center gap-4 text-xs text-gray-500 mb-2">
-                                <span>Viv (70%): <strong className="text-gray-700">{{insp.pct_viv}}%</strong></span>
-                                <span>RC (25%): <strong className="text-gray-700">{{insp.pct_rc}}%</strong></span>
+                                <span>Viv ({{insp.has_rc ? "70" : "95"}}%): <strong className="text-gray-700">{{insp.pct_viv}}%</strong></span>
+                                {{insp.has_rc ? <span>RC (25%): <strong className="text-gray-700">{{insp.pct_rc}}%</strong></span> : <span className="text-gray-300">Sin RC</span>}}
                                 <span>Hab (5%): <strong className="text-gray-700">{{insp.pct_hab}}%</strong></span>
                                 <span>Total: <strong className={{insp.pct_total >= 90 ? "text-green-600" : "text-blue-600"}}>{{insp.pct_total}}%</strong></span>
                             </div>
@@ -1509,18 +1548,22 @@ const GrupoHeader = ({{ grupo, colorIdx, open, onToggle }}) => {{
 }};
 
 // ===== VIVIENDAS TAB =====
-const ViviendasTab = ({{ viviendas, grupos, expandida, setExpandida, filtro, setFiltro, busqueda, setBusqueda, observaciones, addObservacion, deleteObservacion, showResumenObs, setShowResumenObs, actividades, toggleActividad, consultas, toggleConsulta }}) => {{
-    const criticas = viviendas.filter(v => v.estadoGeneral === "critico").length;
-    const atencion_ = viviendas.filter(v => v.estadoGeneral === "atencion").length;
-    const enTiempo = viviendas.filter(v => v.estadoGeneral === "en_tiempo").length;
+const ViviendasTab = ({{ viviendas, grupos, expandida, setExpandida, filtro, setFiltro, busqueda, setBusqueda, observaciones, addObservacion, deleteObservacion, showResumenObs, setShowResumenObs, actividades, toggleActividad, consultas, toggleConsulta, ocultados, ocultarBeneficiario, mostrarBeneficiario }}) => {{
+    const [showOcultas, setShowOcultas] = React.useState(false);
+    const ocultadasProy = viviendas.filter(v => ocultados[v.ID_Benef]);
+    const vivVisibles = viviendas.filter(v => !ocultados[v.ID_Benef]);
+
+    const criticas = vivVisibles.filter(v => v.estadoGeneral === "critico").length;
+    const atencion_ = vivVisibles.filter(v => v.estadoGeneral === "atencion").length;
+    const enTiempo = vivVisibles.filter(v => v.estadoGeneral === "en_tiempo").length;
 
     const vivFiltradas = React.useMemo(() => {{
-        return viviendas.filter(v => {{
+        return vivVisibles.filter(v => {{
             if (busqueda && !`${{v.NOMBRES}} ${{v.APELLIDOS}}`.toLowerCase().includes(busqueda.toLowerCase())) return false;
             if (filtro !== "todos" && v.estadoGeneral !== filtro) return false;
             return true;
         }});
-    }}, [viviendas, busqueda, filtro]);
+    }}, [vivVisibles, busqueda, filtro]);
 
     const gruposData = agruparViviendas(vivFiltradas, grupos);
     const [gruposAbiertos, setGruposAbiertos] = React.useState({{}});
@@ -1529,16 +1572,59 @@ const ViviendasTab = ({{ viviendas, grupos, expandida, setExpandida, filtro, set
     return (
         <div>
             <div className="flex items-center gap-2 mb-4 flex-wrap">
-                {{[["todos","Todas",viviendas.length],["critico","Criticas",criticas],["atencion","Atencion",atencion_],["en_tiempo","En Tiempo",enTiempo]].map(([k,l,c]) =>
+                {{[["todos","Todas",vivVisibles.length],["critico","Criticas",criticas],["atencion","Atencion",atencion_],["en_tiempo","En Tiempo",enTiempo]].map(([k,l,c]) =>
                     <button key={{k}} onClick={{() => setFiltro(k)}} className={{`px-3 py-1.5 rounded-lg text-xs font-medium ${{filtro===k ? "bg-violet-600 text-white shadow-sm" : "bg-white text-gray-500 border border-gray-200 hover:border-gray-300"}}`}}>{{l}} <span className="ml-1 opacity-60">{{c}}</span></button>
                 )}}
                 <button onClick={{() => setShowResumenObs("obs")}} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-700 border border-amber-300 hover:bg-amber-100 flex items-center gap-1" title="Ver resumen general">&#9998; Resumen</button>
+                {{ocultadasProy.length > 0 && (
+                    <button onClick={{() => setShowOcultas(true)}} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200 flex items-center gap-1.5" title="Ver viviendas ocultas">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M3 3l18 18" /></svg>
+                        Ocultas <span className="bg-gray-300 text-gray-700 text-[10px] px-1.5 py-0.5 rounded-full font-bold">{{ocultadasProy.length}}</span>
+                    </button>
+                )}}
                 <div className="relative ml-auto">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"><IconSearch /></span>
                     <input type="text" placeholder="Buscar beneficiario..." value={{busqueda}} onChange={{(e) => setBusqueda(e.target.value)}}
                         className="w-56 bg-white border border-gray-200 rounded-lg pl-10 pr-4 py-1.5 text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500 focus:outline-none" />
                 </div>
             </div>
+            {{/* Modal Viviendas Ocultas */}}
+            {{showOcultas && (
+                <div className="fixed inset-0 bg-black/40 z-[100] flex items-center justify-center p-4" onClick={{() => setShowOcultas(false)}}>
+                    <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[80vh] flex flex-col" onClick={{(e) => e.stopPropagation()}}>
+                        <div className="sticky top-0 bg-white border-b border-gray-200 px-5 py-3 flex items-center justify-between rounded-t-xl z-10">
+                            <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M3 3l18 18" /></svg>
+                                Viviendas Ocultas ({{ocultadasProy.length}})
+                            </h3>
+                            <button onClick={{() => setShowOcultas(false)}} className="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                            {{ocultadasProy.map(v => {{
+                                const info = ocultados[v.ID_Benef] || {{}};
+                                return (
+                                    <div key={{v.ID_Benef}} className="flex items-center justify-between px-4 py-3 bg-gray-50 rounded-lg border border-gray-200">
+                                        <div className="flex-1 min-w-0">
+                                            <div className="font-semibold text-sm text-gray-800 truncate">{{v.NOMBRES}} {{v.APELLIDOS}}</div>
+                                            <div className="text-[11px] text-gray-500">{{v.tipologia}}</div>
+                                            {{info.motivo && <div className="text-[11px] text-gray-500 mt-1 italic bg-white px-2 py-1 rounded border border-gray-100">{{info.motivo}}</div>}}
+                                            {{info.fecha && <div className="text-[10px] text-gray-400 mt-0.5">Oculta desde: {{info.fecha.replace('T', ' ')}}</div>}}
+                                        </div>
+                                        <button onClick={{() => mostrarBeneficiario(v.ID_Benef)}} className="ml-3 px-3 py-1.5 bg-violet-600 text-white text-[11px] font-semibold rounded-lg hover:bg-violet-700 shrink-0 flex items-center gap-1">
+                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                            Mostrar
+                                        </button>
+                                    </div>
+                                );
+                            }})}}
+                        </div>
+                        <div className="px-5 py-3 border-t border-gray-100 flex justify-between items-center">
+                            <button onClick={{() => {{ ocultadasProy.forEach(v => mostrarBeneficiario(v.ID_Benef)); setShowOcultas(false); }}}} className="text-xs text-violet-600 hover:text-violet-800 font-semibold">Mostrar todas</button>
+                            <button onClick={{() => setShowOcultas(false)}} className="px-4 py-1.5 bg-gray-800 text-white text-xs rounded-lg hover:bg-gray-700">Cerrar</button>
+                        </div>
+                    </div>
+                </div>
+            )}}
             {{/* Modal Resumen con 3 tabs */}}
             {{showResumenObs && (() => {{
                 const [resTab, setResTab] = [showResumenObs, setShowResumenObs];
@@ -1768,7 +1854,7 @@ const ViviendasTab = ({{ viviendas, grupos, expandida, setExpandida, filtro, set
                         {{(gruposAbiertos[grupo.id] !== false) && (
                             <div className={{`space-y-2 ${{grupo.nombre ? "ml-2 pl-3 border-l-2 " + (grupo.colorIdx >= 0 ? GRUPO_COLORS[grupo.colorIdx].border : "border-gray-200") : ""}} mt-2`}}>
                                 {{grupo.viviendas.map(v =>
-                                    <ViviendaCard key={{v.ID_Benef}} beneficiario={{v}} estadoEtapas={{v.estadoEtapas}} expanded={{expandida === v.ID_Benef}} onToggle={{() => setExpandida(expandida === v.ID_Benef ? null : v.ID_Benef)}} grupoColor={{grupo.colorIdx}} obsCount={{(observaciones[v.ID_Benef] || []).length}} observaciones={{observaciones[v.ID_Benef] || []}} addObservacion={{addObservacion}} deleteObservacion={{deleteObservacion}} actividades={{actividades[v.ID_Benef] || {{}}}} toggleActividad={{toggleActividad}} consultas={{consultas[v.ID_Benef] || {{}}}} toggleConsulta={{toggleConsulta}} />
+                                    <ViviendaCard key={{v.ID_Benef}} beneficiario={{v}} estadoEtapas={{v.estadoEtapas}} expanded={{expandida === v.ID_Benef}} onToggle={{() => setExpandida(expandida === v.ID_Benef ? null : v.ID_Benef)}} grupoColor={{grupo.colorIdx}} obsCount={{(observaciones[v.ID_Benef] || []).length}} observaciones={{observaciones[v.ID_Benef] || []}} addObservacion={{addObservacion}} deleteObservacion={{deleteObservacion}} actividades={{actividades[v.ID_Benef] || {{}}}} toggleActividad={{toggleActividad}} consultas={{consultas[v.ID_Benef] || {{}}}} toggleConsulta={{toggleConsulta}} ocultarBeneficiario={{ocultarBeneficiario}} />
                                 )}}
                             </div>
                         )}}
@@ -2994,6 +3080,8 @@ const App = () => {{
     const skipConsPush = React.useRef(true);
     const sugRef = React.useRef(null);
     const skipSugPush = React.useRef(true);
+    const ocultadosRef = React.useRef(null);
+    const skipOcultadosPush = React.useRef(true);
 
     React.useEffect(() => {{
         // Listener Firebase para Grupos
@@ -3039,6 +3127,13 @@ const App = () => {{
             skipSugPush.current = true;
             setSugerencias(val ? Object.values(val).sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '')) : []);
         }});
+        // Listener Firebase para Beneficiarios Ocultos
+        ocultadosRef.current = fbDB.ref('ocultados');
+        ocultadosRef.current.on('value', (snap) => {{
+            const val = snap.val();
+            skipOcultadosPush.current = true;
+            setOcultados(val || {{}});
+        }});
         return () => {{
             if (gruposRef.current) gruposRef.current.off();
             if (obsRef.current) obsRef.current.off();
@@ -3046,6 +3141,7 @@ const App = () => {{
             if (consultasRef.current) consultasRef.current.off();
             if (sugRef.current) sugRef.current.off();
             if (muestrasRef.current) muestrasRef.current.off();
+            if (ocultadosRef.current) ocultadosRef.current.off();
         }};
     }}, []);
 
@@ -3153,6 +3249,28 @@ const App = () => {{
     const getMuestrasProy = () => {{
         const raw = muestrasHormigon[proyectoSel];
         return Array.isArray(raw) ? raw : [];
+    }};
+
+    // Beneficiarios ocultos (Firebase)
+    const [ocultados, setOcultados] = React.useState({{}});
+
+    React.useEffect(() => {{
+        if (skipOcultadosPush.current) {{ skipOcultadosPush.current = false; return; }}
+        if (ocultadosRef.current) ocultadosRef.current.set(ocultados);
+    }}, [ocultados]);
+
+    const ocultarBeneficiario = (idBenef, motivo) => {{
+        const entry = {{ motivo: motivo || "", fecha: fechaChile() }};
+        const next = {{ ...ocultados, [idBenef]: entry }};
+        fbDB.ref('ocultados').set(next);
+        setOcultados(next);
+    }};
+
+    const mostrarBeneficiario = (idBenef) => {{
+        const next = {{ ...ocultados }};
+        delete next[idBenef];
+        fbDB.ref('ocultados').set(next);
+        setOcultados(next);
     }};
 
     const toggleConsulta = (idBenef, etapaKey) => {{
@@ -3858,7 +3976,7 @@ const App = () => {{
 
                 {{/* CONTENIDO */}}
                 <div className="min-h-[500px]">
-                    {{tab === "viviendas" && <ViviendasTab viviendas={{viviendas}} grupos={{grupos}} expandida={{expandida}} setExpandida={{setExpandida}} filtro={{filtro}} setFiltro={{setFiltro}} busqueda={{busqueda}} setBusqueda={{setBusqueda}} observaciones={{observaciones}} addObservacion={{addObservacion}} deleteObservacion={{deleteObservacion}} showResumenObs={{showResumenObs}} setShowResumenObs={{setShowResumenObs}} actividades={{actividades}} toggleActividad={{toggleActividad}} consultas={{consultas}} toggleConsulta={{toggleConsulta}} />}}
+                    {{tab === "viviendas" && <ViviendasTab viviendas={{viviendas}} grupos={{grupos}} expandida={{expandida}} setExpandida={{setExpandida}} filtro={{filtro}} setFiltro={{setFiltro}} busqueda={{busqueda}} setBusqueda={{setBusqueda}} observaciones={{observaciones}} addObservacion={{addObservacion}} deleteObservacion={{deleteObservacion}} showResumenObs={{showResumenObs}} setShowResumenObs={{setShowResumenObs}} actividades={{actividades}} toggleActividad={{toggleActividad}} consultas={{consultas}} toggleConsulta={{toggleConsulta}} ocultados={{ocultados}} ocultarBeneficiario={{ocultarBeneficiario}} mostrarBeneficiario={{mostrarBeneficiario}} />}}
                     {{tab === "matriz" && <MatrizAvance viviendas={{viviendas}} grupos={{grupos}} />}}
                     {{tab === "distribucion" && <DistribucionTab viviendas={{viviendas}} />}}
                     {{tab === "financiero" && <FinancieroTab viviendas={{viviendas}} />}}

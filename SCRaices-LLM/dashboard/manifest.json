@@ -1,0 +1,24 @@
+{
+  "name": "SCRaices Dashboard",
+  "short_name": "SCRaices",
+  "description": "Panel de control de obras SCRaices",
+  "start_url": "./index_live_v3.html",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

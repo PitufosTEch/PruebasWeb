@@ -748,6 +748,28 @@ def make_live_dashboard(apps_script_url):
         '<title>Panel de Control v3 - SG Raices (Live)</title>'
     )
 
+    # 4a. Inyectar tags PWA
+    pwa_tags = '''
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="SCRaices">
+    <link rel="apple-touch-icon" href="./icon-192.png">
+'''
+    html = html.replace('</head>', pwa_tags + '</head>', 1)
+
+    # Inyectar registro del Service Worker antes de </body>
+    sw_script = '''
+<script>
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
+</script>
+'''
+    html = html.replace('</body>', sw_script + '</body>', 1)
+    print("  Tags PWA inyectadas")
+
     # 4b. Inyectar protección por contraseña
     # SHA-256 de "SCRAICES.2026"
     PASSWORD_HASH = "a0f3b1c45e6d8f9a2b4c7e0d1f3a5b8c9e2d4f6a8b0c3e5d7f9a1b4c6e8d0f2"
