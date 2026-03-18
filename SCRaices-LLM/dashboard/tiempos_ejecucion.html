@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Tiempos de Ejecucion — SCRaices</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+body{font-family:'IBM Plex Sans',sans-serif}
+.mono,.font-mono{font-family:'IBM Plex Mono',monospace}
+table{border-collapse:collapse}
+th,td{white-space:nowrap}
+tr:hover td{background:#f8fafc !important}
+.bar-c{position:relative;height:18px;min-width:220px}
+.bar{position:absolute;height:100%;border-radius:3px;top:0}
+.fbtn{padding:6px 14px;border-radius:8px;font-size:12px;font-weight:500;background:white;color:#6b7280;border:1px solid #e5e7eb;cursor:pointer;transition:all .15s}
+.fbtn:hover{border-color:#9ca3af}
+.fbtn.active{background:#7c3aed;color:white;border-color:#7c3aed;box-shadow:0 1px 3px rgba(124,58,237,.3)}
+.sort-btn{cursor:pointer;user-select:none}
+.sort-btn:hover{color:#7c3aed}
+</style>
+</head><body class="bg-gray-50 text-gray-800">
+
+<div class="bg-slate-900 text-white px-6 py-3 flex items-center justify-between">
+<div class="font-bold text-lg tracking-tight"><span class="text-indigo-400">SC</span> Tiempos de Ejecucion</div>
+<div class="text-xs text-gray-400">Proyectos desde 2021 &middot; Generado: 17/03/2026 22:04</div>
+</div>
+
+<div class="max-w-[1600px] mx-auto px-4 py-5">
+
+<div class="flex items-center gap-3 mb-4 flex-wrap">
+<button onclick="setFilter('todos')" class="fbtn active" data-f="todos">Todos</button>
+<button onclick="setFilter('finalizado')" class="fbtn" data-f="finalizado">Finalizados</button>
+<button onclick="setFilter('ejecucion')" class="fbtn" data-f="ejecucion">En Ejecucion</button>
+<button onclick="setFilter('excedido')" class="fbtn" data-f="excedido">Excedidos</button>
+<button onclick="setFilter('pendiente')" class="fbtn" data-f="pendiente">Sin Recepcion</button>
+<button id="btnOcultos" onclick="toggleModalOcultos()" class="fbtn" style="border-color:#f59e0b;color:#92400e;background:#fffbeb;display:none">
+<svg class="inline w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M3 3l18 18"/></svg>
+<span id="txtOcultos">0 ocultos</span>
+</button>
+<div class="ml-auto flex items-center gap-4 text-xs text-gray-500">
+<span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-slate-200 inline-block border border-slate-300"></span>Plazo contrato</span>
+<span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-blue-400 inline-block"></span>Pre-despacho</span>
+<span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-emerald-500 inline-block"></span>Ejecucion obra</span>
+<span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-red-400 inline-block"></span>Exceso plazo</span>
+</div>
+</div>
+
+<div id="kpis" class="grid grid-cols-2 md:grid-cols-6 gap-3 mb-5"></div>
+
+<div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-x-auto">
+<table class="w-full text-xs">
+<thead>
+<tr class="bg-gray-50 border-b border-gray-200 text-[10px] uppercase tracking-wide text-gray-500">
+<th class="px-3 py-2.5 text-left sticky left-0 bg-gray-50 z-10 sort-btn" onclick="sortBy('nombre')">Proyecto &#x25B4;&#x25BE;</th>
+<th class="px-2 py-2.5 text-left">Comuna</th>
+<th class="px-2 py-2.5 text-center sort-btn" onclick="sortBy('n_viv')">Viv &#x25B4;&#x25BE;</th>
+<th class="px-2 py-2.5 text-center sort-btn" onclick="sortBy('fi')">Inicio &#x25B4;&#x25BE;</th>
+<th class="px-2 py-2.5 text-center">1er Desp</th>
+<th class="px-2 py-2.5 text-center sort-btn" onclick="sortBy('dur')">Plazo &#x25B4;&#x25BE;</th>
+<th class="px-2 py-2.5 text-center">Venc.</th>
+<th class="px-2 py-2.5 text-center">1ra Recep</th>
+<th class="px-2 py-2.5 text-center">Ult Recep</th>
+<th class="px-2 py-2.5 text-center">Recep</th>
+<th class="px-2 py-2.5 text-center sort-btn" onclick="sortBy('dc')">Dias Ini→Rec &#x25B4;&#x25BE;</th>
+<th class="px-2 py-2.5 text-center sort-btn" onclick="sortBy('do')">Dias Obra &#x25B4;&#x25BE;</th>
+<th class="px-2 py-2.5 text-center sort-btn" onclick="sortBy('ex')">Dif &#x25B4;&#x25BE;</th>
+<th class="px-3 py-2.5 text-left" style="min-width:250px">Timeline</th>
+</tr>
+</thead>
+<tbody id="tbody"></tbody>
+</table>
+</div>
+</div>
+
+<!-- Modal ocultos -->
+<div id="modalOcultos" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;align-items:center;justify-content:center" onclick="if(event.target===this)toggleModalOcultos()">
+<div style="background:white;border-radius:16px;width:480px;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)">
+<div style="padding:16px 20px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between">
+<h3 style="font-weight:700;font-size:14px">Proyectos Ocultos</h3>
+<button onclick="toggleModalOcultos()" style="color:#9ca3af;font-size:20px;cursor:pointer;border:none;background:none">&times;</button>
+</div>
+<div id="modalBody" style="padding:16px"></div>
+<div style="padding:12px 20px;border-top:1px solid #f3f4f6;display:flex;justify-content:space-between;align-items:center">
+<button onclick="mostrarTodos()" style="font-size:12px;color:#7c3aed;font-weight:600;cursor:pointer;border:none;background:none">Mostrar todos</button>
+<button onclick="toggleModalOcultos()" style="padding:6px 16px;background:#1e293b;color:white;font-size:12px;border-radius:8px;cursor:pointer;border:none">Cerrar</button>
+</div>
+</div>
+</div>
+
+<script>
+const DATA = [{"nombre": "Casa Rápida", "comuna": "Lonquimay", "estado": "Finalizado", "n_viv": 30, "fi": "2021-06-10", "dur": 599, "fv": "2023-01-30", "pd": "2021-11-10", "pr": "2022-11-21", "ur": "2023-10-05", "nr": 24, "dc": 847, "ex": 248, "do": 694}, {"nombre": "Aguas Claras", "comuna": "Cunco", "estado": "Finalizado", "n_viv": 10, "fi": "2022-01-07", "dur": 450, "fv": "2023-04-02", "pd": "2022-07-27", "pr": "2023-05-10", "ur": "2023-11-10", "nr": 10, "dc": 672, "ex": 222, "do": 471}, {"nombre": "Los Avellanos", "comuna": "Gorbea", "estado": "Finalizado", "n_viv": 19, "fi": "2022-01-07", "dur": 450, "fv": "2023-04-02", "pd": "2022-07-25", "pr": "2023-04-05", "ur": "2023-10-06", "nr": 19, "dc": 637, "ex": 187, "do": 438}, {"nombre": "Proyecto prueba 1", "comuna": "Temuco", "estado": "En ejecución", "n_viv": 13, "fi": "2022-03-28", "dur": 400, "fv": "2023-05-02", "pd": "2024-11-28", "pr": "2023-06-28", "ur": "2023-07-28", "nr": 3, "dc": 487, "ex": 87, "do": -489}, {"nombre": "Individuales Curacautín", "comuna": "Curacautín", "estado": "Finalizado", "n_viv": 4, "fi": "2022-06-13", "dur": 400, "fv": "2023-07-18", "pd": "2022-08-09", "pr": "2023-06-22", "ur": "2023-06-22", "nr": 4, "dc": 374, "ex": -26, "do": 317}, {"nombre": "El Ocaso", "comuna": "Loncoche", "estado": "Finalizado", "n_viv": 14, "fi": "2022-06-16", "dur": 450, "fv": "2023-09-09", "pd": "2022-06-28", "pr": "2023-01-06", "ur": "2023-10-19", "nr": 14, "dc": 490, "ex": 40, "do": 478}, {"nombre": "Las Rosas", "comuna": "Melipeuco", "estado": "Finalizado", "n_viv": 61, "fi": "2022-07-29", "dur": 380, "fv": "2023-08-13", "pd": "2022-08-04", "pr": "2023-02-16", "ur": "2024-10-01", "nr": 39, "dc": 795, "ex": 415, "do": 789}, {"nombre": "Com. Victorio Millan", "comuna": "Victoria", "estado": "Finalizado", "n_viv": 6, "fi": "2022-09-20", "dur": 450, "fv": "2023-12-14", "pd": "2022-09-27", "pr": "2023-09-13", "ur": "2023-09-13", "nr": 6, "dc": 358, "ex": -92, "do": 351}, {"nombre": "Huilio", "comuna": "Teodoro Schmidt", "estado": "Finalizado", "n_viv": 14, "fi": "2022-10-20", "dur": 450, "fv": "2024-01-13", "pd": "2017-08-09", "pr": "2023-10-10", "ur": "2024-12-01", "nr": 14, "dc": 773, "ex": 323, "do": 2671}, {"nombre": "Truful Truful", "comuna": "Melipeuco", "estado": "Finalizado", "n_viv": 12, "fi": "2022-10-20", "dur": 450, "fv": "2024-01-13", "pd": "2022-12-27", "pr": "2023-06-12", "ur": "2023-09-11", "nr": 12, "dc": 326, "ex": -124, "do": 258}, {"nombre": "Peumayen 2021", "comuna": "Freire", "estado": "Finalizado", "n_viv": 21, "fi": "2022-12-30", "dur": 450, "fv": "2024-03-24", "pd": "2023-02-21", "pr": "2024-05-20", "ur": "2024-05-22", "nr": 21, "dc": 509, "ex": 59, "do": 456}, {"nombre": "Peumayen 2020-1", "comuna": "Freire", "estado": "Finalizado", "n_viv": 13, "fi": "2023-03-08", "dur": 450, "fv": "2024-05-31", "pd": "2023-08-30", "pr": "2024-09-16", "ur": "2024-09-16", "nr": 13, "dc": 558, "ex": 108, "do": 383}, {"nombre": "Com. Francisco Pichun", "comuna": "Teodoro Schmidt", "estado": "Finalizado", "n_viv": 6, "fi": "2023-03-30", "dur": 450, "fv": "2024-06-22", "pd": "2023-05-16", "pr": "2024-04-18", "ur": "2024-08-05", "nr": 6, "dc": 494, "ex": 44, "do": 447}, {"nombre": "Com. Juan Huilcan Rucacura", "comuna": "Teodoro Schmidt", "estado": "Finalizado", "n_viv": 5, "fi": "2023-03-30", "dur": 680, "fv": "2025-02-07", "pd": "2024-04-04", "pr": "2025-03-27", "ur": "2025-03-27", "nr": 5, "dc": 728, "ex": 48, "do": 357}, {"nombre": "Unidos de Cunco", "comuna": "Cunco", "estado": "Finalizado", "n_viv": 4, "fi": "2023-04-25", "dur": 450, "fv": "2024-07-18", "pd": "2023-06-27", "pr": "2024-04-16", "ur": "2024-08-04", "nr": 4, "dc": 467, "ex": 17, "do": 404}, {"nombre": "Individual Carmen Silva", "comuna": "Cunco", "estado": "Finalizado", "n_viv": 1, "fi": "2023-05-05", "dur": 450, "fv": "2024-07-28", "pd": "2023-07-10", "pr": "", "ur": "", "nr": 0, "dc": null, "ex": null, "do": null}, {"nombre": "We Ruca Rural", "comuna": "Teodoro Schmidt", "estado": "Finalizado", "n_viv": 19, "fi": "2023-07-25", "dur": 450, "fv": "2024-10-17", "pd": "2023-08-08", "pr": "2024-01-10", "ur": "2024-08-21", "nr": 19, "dc": 393, "ex": -57, "do": 379}, {"nombre": "Allipen", "comuna": "Melipeuco", "estado": "Finalizado", "n_viv": 13, "fi": "2023-10-25", "dur": 450, "fv": "2025-01-17", "pd": "2023-12-06", "pr": "2024-08-08", "ur": "2025-01-24", "nr": 13, "dc": 457, "ex": 7, "do": 415}, {"nombre": "Com. Juan Andres Huenchuleo", "comuna": "Teodoro Schmidt", "estado": "Finalizado", "n_viv": 3, "fi": "2023-11-04", "dur": 450, "fv": "2025-01-27", "pd": "2023-05-03", "pr": "2024-12-01", "ur": "2024-12-01", "nr": 3, "dc": 393, "ex": -57, "do": 578}, {"nombre": "Com. Juan Huenchuman", "comuna": "Teodoro Schmidt", "estado": "Finalizado", "n_viv": 11, "fi": "2023-11-07", "dur": 600, "fv": "2025-06-29", "pd": "2023-07-25", "pr": "2024-07-23", "ur": "2025-03-27", "nr": 10, "dc": 506, "ex": -94, "do": 611}, {"nombre": "Los Valles de Gorbea", "comuna": "Gorbea", "estado": "Finalizado", "n_viv": 25, "fi": "2023-12-10", "dur": 450, "fv": "2025-03-04", "pd": "2024-01-04", "pr": "2024-12-17", "ur": "2025-11-03", "nr": 25, "dc": 694, "ex": 244, "do": 669}, {"nombre": "Amuley Ruka", "comuna": "Melipeuco", "estado": "Finalizado", "n_viv": 24, "fi": "2024-01-03", "dur": 450, "fv": "2025-03-28", "pd": "2024-05-23", "pr": "2025-01-24", "ur": "2025-10-02", "nr": 23, "dc": 638, "ex": 188, "do": 497}, {"nombre": "Grupo Panguipulli DS 10", "comuna": "Panguipulli", "estado": "En ejecución", "n_viv": 22, "fi": "2024-01-26", "dur": 764, "fv": "2026-02-28", "pd": "2024-03-18", "pr": "2025-09-09", "ur": "2026-02-13", "nr": 22, "dc": 749, "ex": -15, "do": 697}, {"nombre": "Grupo Panguipulli DS 10 N°2", "comuna": "Panguipulli", "estado": "En ejecución", "n_viv": 9, "fi": "2024-01-26", "dur": 683, "fv": "2025-12-09", "pd": "2024-03-18", "pr": "2025-09-09", "ur": "2025-12-11", "nr": 9, "dc": 685, "ex": 2, "do": 633}, {"nombre": "Grupo Panguipulli DS 10 N°3", "comuna": "Panguipulli", "estado": "En ejecución", "n_viv": 5, "fi": "2024-01-26", "dur": 705, "fv": "2025-12-31", "pd": "2024-03-18", "pr": "2025-10-24", "ur": "2025-12-08", "nr": 5, "dc": 682, "ex": -23, "do": 630}, {"nombre": "Raíces de Lanco", "comuna": "Lanco", "estado": "En ejecución", "n_viv": 12, "fi": "2024-02-02", "dur": 698, "fv": "2025-12-31", "pd": "2024-03-04", "pr": "2025-02-09", "ur": "2025-08-18", "nr": 10, "dc": 563, "ex": -135, "do": 532}, {"nombre": "Lago Ranco", "comuna": "Lago Ranco", "estado": "En ejecución", "n_viv": 15, "fi": "2024-02-15", "dur": 685, "fv": "2025-12-31", "pd": "2024-03-25", "pr": "2025-03-11", "ur": "2025-12-10", "nr": 15, "dc": 664, "ex": -21, "do": 625}, {"nombre": "Puyehue", "comuna": "Teodoro Schmidt", "estado": "En ejecución", "n_viv": 29, "fi": "2024-03-23", "dur": 540, "fv": "2025-09-14", "pd": "2024-07-01", "pr": "2025-08-26", "ur": "2025-10-24", "nr": 29, "dc": 580, "ex": 40, "do": 480}, {"nombre": "Los campesinos esforzados", "comuna": "Loncoche", "estado": "En ejecución", "n_viv": 15, "fi": "2024-04-24", "dur": 660, "fv": "2026-02-13", "pd": "2003-03-04", "pr": "2025-10-24", "ur": "2026-02-26", "nr": 11, "dc": 673, "ex": 13, "do": 8395}, {"nombre": "La casa de mis sueños", "comuna": "Loncoche", "estado": "En ejecución", "n_viv": 14, "fi": "2024-04-24", "dur": 660, "fv": "2026-02-13", "pd": "2024-07-23", "pr": "2025-06-11", "ur": "2026-02-26", "nr": 13, "dc": 673, "ex": 13, "do": 583}, {"nombre": "La Union de Freire", "comuna": "Freire", "estado": "Finalizado", "n_viv": 7, "fi": "2024-05-21", "dur": 540, "fv": "2025-11-12", "pd": "2024-08-21", "pr": "2025-07-23", "ur": "2025-11-08", "nr": 7, "dc": 536, "ex": -4, "do": 444}, {"nombre": "La Esperanza (F)", "comuna": "Freire", "estado": "Finalizado", "n_viv": 8, "fi": "2024-05-22", "dur": 540, "fv": "2025-11-13", "pd": "2005-02-24", "pr": "2025-07-23", "ur": "2025-11-08", "nr": 8, "dc": 535, "ex": -5, "do": 7562}, {"nombre": "Demanda Mafil 2022", "comuna": "Máfil", "estado": "En ejecución", "n_viv": 8, "fi": "2024-06-14", "dur": 420, "fv": "2025-08-08", "pd": "2024-10-01", "pr": "2025-12-23", "ur": "2026-02-20", "nr": 8, "dc": 616, "ex": 196, "do": 507}, {"nombre": "Mi Nuevo Hogar", "comuna": "Teodoro Schmidt", "estado": "En ejecución", "n_viv": 10, "fi": "2024-08-26", "dur": 570, "fv": "2026-03-19", "pd": "2024-12-17", "pr": "2026-01-26", "ur": "2026-02-03", "nr": 10, "dc": 526, "ex": -44, "do": 413}, {"nombre": "Nuevo Poculon", "comuna": "Teodoro Schmidt", "estado": "En ejecución", "n_viv": 20, "fi": "2024-08-26", "dur": 630, "fv": "2026-05-18", "pd": "2024-11-27", "pr": "2026-01-26", "ur": "2026-02-03", "nr": 20, "dc": 526, "ex": -104, "do": 433}, {"nombre": "La Esperanza (TS)", "comuna": "Teodoro Schmidt", "estado": "En ejecución", "n_viv": 2, "fi": "2024-08-26", "dur": 540, "fv": "2026-02-17", "pd": "2025-05-05", "pr": "2026-01-20", "ur": "2026-01-20", "nr": 2, "dc": 512, "ex": -28, "do": 260}, {"nombre": "Individual Carlos Melin", "comuna": "Teodoro Schmidt", "estado": "Finalizado", "n_viv": 1, "fi": "2024-08-26", "dur": 450, "fv": "2025-11-19", "pd": "2024-10-25", "pr": "2025-04-29", "ur": "2025-04-29", "nr": 1, "dc": 246, "ex": -204, "do": 186}, {"nombre": "Com. Jose Quiñilef", "comuna": "Teodoro Schmidt", "estado": "En ejecución", "n_viv": 4, "fi": "2024-11-11", "dur": 450, "fv": "2026-02-04", "pd": "2025-02-03", "pr": "2026-01-20", "ur": "2026-01-20", "nr": 4, "dc": 435, "ex": -15, "do": 351}, {"nombre": "Likankura", "comuna": "Cunco", "estado": "Finalizado", "n_viv": 16, "fi": "2024-12-09", "dur": 480, "fv": "2026-04-03", "pd": "2024-11-12", "pr": "2025-07-07", "ur": "2025-11-08", "nr": 16, "dc": 334, "ex": -146, "do": 361}, {"nombre": "Mapu Rayen 2022", "comuna": "Villarrica", "estado": "En ejecución", "n_viv": 19, "fi": "2025-02-24", "dur": 450, "fv": "2026-05-20", "pd": "2025-04-28", "pr": "", "ur": "", "nr": 0, "dc": null, "ex": null, "do": null}, {"nombre": "Newen Ruka", "comuna": "Puerto Saavedra", "estado": "En ejecución", "n_viv": 8, "fi": "2025-02-24", "dur": 450, "fv": "2026-05-20", "pd": "2025-05-30", "pr": "", "ur": "", "nr": 0, "dc": null, "ex": null, "do": null}, {"nombre": "Pukem Ruka", "comuna": "Gorbea", "estado": "En ejecución", "n_viv": 5, "fi": "2025-02-24", "dur": 450, "fv": "2026-05-20", "pd": "2025-05-20", "pr": "2026-01-23", "ur": "2026-01-23", "nr": 5, "dc": 333, "ex": -117, "do": 248}, {"nombre": "Boyeco 2022", "comuna": "Temuco", "estado": "En ejecución", "n_viv": 4, "fi": "2025-03-20", "dur": 450, "fv": "2026-06-13", "pd": "2025-06-09", "pr": "", "ur": "", "nr": 0, "dc": null, "ex": null, "do": null}, {"nombre": "Com. Pedro Antivil", "comuna": "Teodoro Schmidt", "estado": "En ejecución", "n_viv": 9, "fi": "2025-10-15", "dur": 500, "fv": "2027-02-27", "pd": "2025-10-20", "pr": "", "ur": "", "nr": 0, "dc": null, "ex": null, "do": null}, {"nombre": "Condinhue", "comuna": "Vilcún", "estado": "En ejecución", "n_viv": 3, "fi": "2025-10-22", "dur": 500, "fv": "2027-03-06", "pd": "2025-11-14", "pr": "", "ur": "", "nr": 0, "dc": null, "ex": null, "do": null}, {"nombre": "Trovolhue", "comuna": "Carahue", "estado": "En ejecución", "n_viv": 3, "fi": "2025-11-18", "dur": 500, "fv": "2027-04-02", "pd": "2026-01-07", "pr": "", "ur": "", "nr": 0, "dc": null, "ex": null, "do": null}, {"nombre": "Ñuke Mapu", "comuna": "Teodoro Schmidt", "estado": "En ejecución", "n_viv": 35, "fi": "2026-01-09", "dur": 600, "fv": "2027-09-01", "pd": "2026-01-15", "pr": "", "ur": "", "nr": 0, "dc": null, "ex": null, "do": null}, {"nombre": "Aliwen", "comuna": "Toltén", "estado": "Sin ejecución - con subsidio", "n_viv": 6, "fi": "2026-02-25", "dur": 540, "fv": "2027-08-19", "pd": "2026-03-05", "pr": "", "ur": "", "nr": 0, "dc": null, "ex": null, "do": null}, {"nombre": "Com. Juan Huilcan Tolten", "comuna": "Toltén", "estado": "Sin ejecución - con subsidio", "n_viv": 10, "fi": "2026-03-04", "dur": 450, "fv": "2027-05-28", "pd": "2026-03-10", "pr": "", "ur": "", "nr": 0, "dc": null, "ex": null, "do": null}, {"nombre": "Com. Madihue", "comuna": "Nueva Imperial", "estado": "Sin ejecución - con subsidio", "n_viv": 2, "fi": "2026-03-10", "dur": 450, "fv": "2027-06-03", "pd": "", "pr": "", "ur": "", "nr": 0, "dc": null, "ex": null, "do": null}, {"nombre": "Individual Sonia Quilaleo", "comuna": "Nueva Imperial", "estado": "Sin ejecución - con subsidio", "n_viv": 1, "fi": "2026-03-10", "dur": 450, "fv": "2027-06-03", "pd": "2026-03-16", "pr": "", "ur": "", "nr": 0, "dc": null, "ex": null, "do": null}];
+const LS_KEY = 'scraices_tiempos_ocultos';
+let currentFilter = 'todos';
+let sortField = 'fi';
+let sortAsc = true;
+
+function getOcultos() { try { return JSON.parse(localStorage.getItem(LS_KEY)) || []; } catch { return []; } }
+function setOcultos(arr) { localStorage.setItem(LS_KEY, JSON.stringify(arr)); render(); renderModal(); }
+
+function ocultarProy(nombre) {
+    const oc = getOcultos();
+    if (!oc.includes(nombre)) oc.push(nombre);
+    setOcultos(oc);
+}
+function mostrarProy(nombre) {
+    setOcultos(getOcultos().filter(n => n !== nombre));
+}
+function mostrarTodos() {
+    setOcultos([]);
+}
+
+function toggleModalOcultos() {
+    const m = document.getElementById('modalOcultos');
+    const show = m.style.display === 'none';
+    m.style.display = show ? 'flex' : 'none';
+    if (show) renderModal();
+}
+
+function renderModal() {
+    const oc = getOcultos();
+    const body = document.getElementById('modalBody');
+    const btn = document.getElementById('btnOcultos');
+    const txt = document.getElementById('txtOcultos');
+    btn.style.display = oc.length > 0 ? 'inline-flex' : 'none';
+    txt.textContent = oc.length + ' oculto' + (oc.length !== 1 ? 's' : '');
+    if (oc.length === 0) {
+        body.innerHTML = '<p style="color:#9ca3af;text-align:center;padding:24px;font-size:13px">No hay proyectos ocultos</p>';
+        return;
+    }
+    let html = '';
+    oc.forEach(nombre => {
+        html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#f9fafb;border-radius:10px;border:1px solid #e5e7eb;margin-bottom:8px">
+            <span style="font-weight:600;font-size:13px;color:#1f2937">${nombre}</span>
+            <button onclick="mostrarProy('${nombre.replace(/'/g,"\\'")}')" style="padding:4px 12px;background:#7c3aed;color:white;font-size:11px;font-weight:600;border-radius:8px;cursor:pointer;border:none">Mostrar</button>
+        </div>`;
+    });
+    body.innerHTML = html;
+}
+
+function ff(iso) {
+    if (!iso) return '—';
+    const p = iso.split('-');
+    return p[2]+'/'+p[1]+'/'+p[0].slice(2);
+}
+
+function setFilter(f) {
+    currentFilter = f;
+    document.querySelectorAll('.fbtn').forEach(b => {
+        b.classList.toggle('active', b.dataset.f === f);
+    });
+    render();
+}
+
+function sortBy(field) {
+    if (sortField === field) sortAsc = !sortAsc;
+    else { sortField = field; sortAsc = true; }
+    render();
+}
+
+function render() {
+    const ocultos = getOcultos();
+    let filtered = DATA.filter(r => !ocultos.includes(r.nombre));
+    if (currentFilter === 'finalizado') filtered = filtered.filter(r => r.estado.toLowerCase().includes('finaliz'));
+    else if (currentFilter === 'ejecucion') filtered = filtered.filter(r => r.estado.toLowerCase().includes('ejecuci'));
+    else if (currentFilter === 'excedido') filtered = filtered.filter(r => r.ex !== null && r.ex > 0);
+    else if (currentFilter === 'pendiente') filtered = filtered.filter(r => r.nr === 0);
+
+    // Sort
+    filtered.sort((a, b) => {
+        let va = a[sortField], vb = b[sortField];
+        if (va === null || va === '') va = sortAsc ? 99999 : -99999;
+        if (vb === null || vb === '') vb = sortAsc ? 99999 : -99999;
+        if (typeof va === 'string') return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+        return sortAsc ? va - vb : vb - va;
+    });
+
+    // KPIs
+    const total = filtered.length;
+    const completos = filtered.filter(r => r.nr === r.n_viv && r.nr > 0);
+    const excedidos = filtered.filter(r => r.ex !== null && r.ex > 0);
+    const totalViv = filtered.reduce((s,r) => s + r.n_viv, 0);
+    const totalRecep = filtered.reduce((s,r) => s + r.nr, 0);
+    const avgDias = completos.length ? Math.round(completos.reduce((s,r) => s + r.dc, 0) / completos.length) : 0;
+    const avgObra = completos.filter(r=>r.do).length ? Math.round(completos.filter(r=>r.do).reduce((s,r) => s + r.do, 0) / completos.filter(r=>r.do).length) : 0;
+
+    document.getElementById('kpis').innerHTML = `
+        <div class="bg-white rounded-xl p-3 border border-gray-200"><div class="text-[10px] uppercase text-gray-500">Proyectos</div><div class="text-2xl font-bold font-mono mt-1">${total}</div></div>
+        <div class="bg-white rounded-xl p-3 border border-blue-200"><div class="text-[10px] uppercase text-blue-600">Viviendas</div><div class="text-2xl font-bold font-mono text-blue-600 mt-1">${totalViv}</div><div class="text-[10px] text-gray-400">${totalRecep} recep. (${totalViv?Math.round(totalRecep/totalViv*100):0}%)</div></div>
+        <div class="bg-white rounded-xl p-3 border border-green-200"><div class="text-[10px] uppercase text-green-600">100% Completos</div><div class="text-2xl font-bold font-mono text-green-600 mt-1">${completos.length}</div></div>
+        <div class="bg-white rounded-xl p-3 border border-red-200"><div class="text-[10px] uppercase text-red-600">Excedidos</div><div class="text-2xl font-bold font-mono text-red-600 mt-1">${excedidos.length}</div></div>
+        <div class="bg-white rounded-xl p-3 border border-violet-200"><div class="text-[10px] uppercase text-violet-600">Prom Inicio→Recep</div><div class="text-2xl font-bold font-mono text-violet-600 mt-1">${avgDias}d</div></div>
+        <div class="bg-white rounded-xl p-3 border border-indigo-200"><div class="text-[10px] uppercase text-indigo-600">Prom Dias Obra</div><div class="text-2xl font-bold font-mono text-indigo-600 mt-1">${avgObra}d</div></div>
+    `;
+
+    const maxDays = Math.max(...filtered.map(r => Math.max(r.dur || 0, r.dc || 0, (r.dur||0)+(r.ex>0?r.ex:0))), 100);
+    const scale = 220 / maxDays;
+
+    let rows = '';
+    filtered.forEach(r => {
+        const esExcedido = r.ex !== null && r.ex > 0;
+        const completo = r.nr === r.n_viv && r.nr > 0;
+        const rowBg = esExcedido ? 'background:#fef2f2' : '';
+
+        let difHtml = '—';
+        if (r.ex !== null) {
+            const color = r.ex > 0 ? '#ef4444' : '#22c55e';
+            const sign = r.ex > 0 ? '+' : '';
+            difHtml = `<span class="font-mono font-bold" style="color:${color}">${sign}${r.ex}d</span>`;
+        }
+
+        const pctRecep = r.n_viv > 0 ? Math.round(r.nr / r.n_viv * 100) : 0;
+        const recepColor = pctRecep === 100 ? 'text-green-600' : pctRecep > 0 ? 'text-blue-600' : 'text-gray-400';
+
+        let badge = '';
+        const el = r.estado.toLowerCase();
+        if (el.includes('finaliz')) badge = '<span class="text-[8px] bg-green-100 text-green-700 px-1 rounded ml-1">FIN</span>';
+        else if (el.includes('ejecuci')) badge = '<span class="text-[8px] bg-blue-100 text-blue-700 px-1 rounded ml-1">EJ</span>';
+        else if (el.includes('sin ej')) badge = '<span class="text-[8px] bg-gray-100 text-gray-500 px-1 rounded ml-1">SIN</span>';
+
+        const plazoW = Math.max(r.dur * scale, 2);
+        let preW = 0;
+        if (r.pd && r.fi) {
+            const d1 = new Date(r.fi), d2 = new Date(r.pd);
+            preW = Math.max(((d2-d1)/(86400000)) * scale, 0);
+        }
+        const obraW = r.do ? Math.max(r.do * scale, 2) : 0;
+        const exW = (r.ex && r.ex > 0) ? Math.max(r.ex * scale, 2) : 0;
+
+        const timeline = `<div class="bar-c">
+            <div class="bar bg-slate-200 border border-slate-300" style="left:0;width:${plazoW}px"></div>
+            ${preW > 0 ? `<div class="bar bg-blue-400 opacity-60" style="left:0;width:${preW}px"></div>` : ''}
+            ${obraW > 0 ? `<div class="bar bg-emerald-500" style="left:${preW}px;width:${obraW}px"></div>` : ''}
+            ${exW > 0 ? `<div class="bar bg-red-400" style="left:${plazoW}px;width:${exW}px"></div>` : ''}
+        </div>`;
+
+        rows += `<tr style="${rowBg}">
+            <td class="px-3 py-2 font-semibold text-gray-800 sticky left-0 bg-white z-10" style="${rowBg}"><span class="inline-flex items-center gap-1.5">${r.nombre}${badge}<button onclick="ocultarProy('${r.nombre.replace(/'/g,"\\'")}')" title="Ocultar proyecto" style="opacity:.25;cursor:pointer;border:none;background:none;padding:2px;line-height:1" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.25"><svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M3 3l18 18"/></svg></button></span></td>
+            <td class="px-2 py-2 text-gray-500">${r.comuna}</td>
+            <td class="px-2 py-2 text-center font-mono font-semibold">${r.n_viv}</td>
+            <td class="px-2 py-2 text-center font-mono text-gray-500">${ff(r.fi)}</td>
+            <td class="px-2 py-2 text-center font-mono text-gray-500">${ff(r.pd)}</td>
+            <td class="px-2 py-2 text-center font-mono font-semibold">${r.dur}d</td>
+            <td class="px-2 py-2 text-center font-mono text-gray-500">${ff(r.fv)}</td>
+            <td class="px-2 py-2 text-center font-mono text-gray-500">${ff(r.pr)}</td>
+            <td class="px-2 py-2 text-center font-mono font-semibold">${ff(r.ur)}</td>
+            <td class="px-2 py-2 text-center font-mono ${recepColor} font-bold">${r.nr}/${r.n_viv}</td>
+            <td class="px-2 py-2 text-center font-mono">${r.dc !== null ? r.dc+'d' : '—'}</td>
+            <td class="px-2 py-2 text-center font-mono">${r.do !== null ? r.do+'d' : '—'}</td>
+            <td class="px-2 py-2 text-center">${difHtml}</td>
+            <td class="px-3 py-2">${timeline}</td>
+        </tr>`;
+    });
+    document.getElementById('tbody').innerHTML = rows;
+}
+
+render();
+renderModal();
+</script>
+</body></html>
