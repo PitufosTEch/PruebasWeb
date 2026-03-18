@@ -126,15 +126,24 @@ def get_data_loader_js(apps_script_url):
         return null;
     }}
 
-    async function fetchBatch(tables, label) {{
+    async function fetchBatch(tables, label, retry = 0) {{
         const url = APPS_SCRIPT_URL + '?tables=' + encodeURIComponent(tables);
         console.log('[LIVE] Fetching:', label, tables);
-        const response = await fetch(url);
-        if (!response.ok) throw new Error(`Error ${{response.status}} al cargar ${{label}}`);
-        const data = await response.json();
-        if (data.error) throw new Error('Error Apps Script (' + label + '): ' + data.error);
-        console.log('[LIVE] OK:', label);
-        return data;
+        try {{
+            const response = await fetch(url, {{ redirect: 'follow' }});
+            if (!response.ok) throw new Error(`Error ${{response.status}} al cargar ${{label}}`);
+            const data = await response.json();
+            if (data.error) throw new Error('Error Apps Script (' + label + '): ' + data.error);
+            console.log('[LIVE] OK:', label);
+            return data;
+        }} catch (err) {{
+            if (retry < 2) {{
+                console.warn(`[LIVE] Retry ${{retry+1}} para ${{label}}:`, err.message);
+                await new Promise(r => setTimeout(r, 2000));
+                return fetchBatch(tables, label, retry + 1);
+            }}
+            throw err;
+        }}
     }}
 
     async function fetchAllData() {{
