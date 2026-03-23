@@ -1403,7 +1403,7 @@ const ViviendaCard = ({{ beneficiario, estadoEtapas, expanded, onToggle, grupoCo
 }};
 
 // ===== HEADER PROYECTO =====
-const HeaderProyecto = ({{ proy, garantiasProy, eeppResumen }}) => {{
+const HeaderProyecto = ({{ proy, garantiasProy, eeppResumen, kpis }}) => {{
     if (!proy) return null;
     const contratoInfo = React.useMemo(() => {{
         const fi = proy.fecha_inicio;
@@ -1412,16 +1412,17 @@ const HeaderProyecto = ({{ proy, garantiasProy, eeppResumen }}) => {{
         const inicio = new Date(fi);
         const vencimiento = new Date(inicio);
         vencimiento.setDate(vencimiento.getDate() + dur);
-        const hoy = new Date();
-        const diasRestantes = Math.floor((vencimiento - hoy) / (1000*60*60*24));
-        const diasTranscurridos = Math.max(0, Math.floor((hoy - inicio) / (1000*60*60*24)));
+        // Si finalizado, usar fecha de ultima recepcion en vez de hoy
+        const fechaRef = (kpis && kpis.esFinalizado && kpis.fechaFin) ? new Date(kpis.fechaFin) : new Date();
+        const diasRestantes = Math.floor((vencimiento - fechaRef) / (1000*60*60*24));
+        const diasTranscurridos = Math.max(0, Math.floor((fechaRef - inicio) / (1000*60*60*24)));
         const pctTranscurrido = Math.min(100, Math.max(0, Math.round(diasTranscurridos / dur * 100)));
         const diaMarca90 = dur - 90;
         const pctMarca90 = dur > 90 ? Math.round(diaMarca90 / dur * 100) : null;
         const fechaMarca90 = dur > 90 ? (() => {{ const d = new Date(inicio); d.setDate(d.getDate() + diaMarca90); return d.toISOString().substring(0,10); }})() : null;
-        const enFaseCierre = diasTranscurridos >= diaMarca90 && dur > 90;
+        const enFaseCierre = !kpis?.esFinalizado && diasTranscurridos >= diaMarca90 && dur > 90;
         return {{ inicio: fi, duracion: dur, vencimiento: vencimiento.toISOString().substring(0,10), diasRestantes, diasTranscurridos, pctTranscurrido, pctMarca90, fechaMarca90, enFaseCierre }};
-    }}, [proy]);
+    }}, [proy, kpis]);
 
     const formatFecha = (iso) => {{ if (!iso) return "\u2014"; const [y,m,d] = iso.split("-"); return `${{d}}/${{m}}/${{y}}`; }};
     const formatUF = (val) => {{ if (!val && val !== 0) return "\u2014"; return val.toLocaleString("es-CL", {{ minimumFractionDigits: 2, maximumFractionDigits: 2 }}) + " UF"; }};
@@ -3814,7 +3815,7 @@ const App = () => {{
 
             <div className="max-w-[1400px] mx-auto px-4 py-4">
                 {{/* HEADER: Contrato + Garantías + EP */}}
-                <HeaderProyecto proy={{proy}} garantiasProy={{garantiasProy}} eeppResumen={{eeppResumen}} />
+                <HeaderProyecto proy={{proy}} garantiasProy={{garantiasProy}} eeppResumen={{eeppResumen}} kpis={{kpis}} />
 
                 {{/* Banner Finalizado */}}
                 {{kpis.esFinalizado && (
