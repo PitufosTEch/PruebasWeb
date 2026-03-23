@@ -76,6 +76,7 @@ def generar_dashboard_v3_html():
     tipologias = dm.get_table_data('Tipologias')
     control_bgb = dm.get_table_data('controlBGB')
     com_benef = dm.get_table_data('combenef')
+    documentacion = dm.get_table_data('documentacion')
     control_eepp_raw = dm.conn.spreadsheet.worksheet('controlEEPP').get_all_values()
     control_eepp_headers = control_eepp_raw[0] if control_eepp_raw else []
     control_eepp_rows = []
@@ -162,6 +163,17 @@ def generar_dashboard_v3_html():
         tip_dict[tid] = label
     print(f"Tipologias cargadas: {len(tip_dict)}")
 
+    # Documentacion: detectar quién tiene TE1 y Recepción subida
+    benef_con_te1 = set()
+    benef_con_recep_doc = set()
+    for _, dd in documentacion.iterrows():
+        idb = str(dd.get('ID_benef', ''))
+        if 'documentacion_' in str(dd.get('T1', '')):
+            benef_con_te1.add(idb)
+        if 'documentacion_' in str(dd.get('C_recepcion', '')):
+            benef_con_recep_doc.add(idb)
+    print(f"Documentacion: {len(benef_con_te1)} con TE1, {len(benef_con_recep_doc)} con Recepcion")
+
     beneficiarios_data = []
     for _, b in beneficiarios_activos.iterrows():
         tipologia = str(b.get('Tipologia Vivienda', ''))
@@ -230,6 +242,7 @@ def generar_dashboard_v3_html():
             'habil': habil,
             'fecha_hpc': fecha_hpc,
             'fecha_recepcion': fecha_recepcion,
+            'has_te1': str(b['ID_Benef']) in benef_con_te1,
             'alerta_logistica': alerta_log,
             'obs_seguimiento': obs_seguimiento
         })
@@ -3405,13 +3418,29 @@ const App = () => {{
         }});
         const diasPromedio = diasCount > 0 ? Math.round(diasTotal / diasCount) : 0;
 
+        const conRecepcion = viviendas.filter(v => v.fecha_recepcion).length;
+        const conTE1 = viviendas.filter(v => v.has_te1).length;
+
+        // Finalizado: por tabla O por recepciones completas
+        const finalizadoTabla = proy && proy.estado === 'finalizado';
+        const finalizadoRecep = viviendas.length > 0 && conRecepcion === viviendas.length;
+        const esFinalizado = finalizadoTabla || finalizadoRecep;
+
+        // Fecha de finalizacion: ultima recepcion definitiva
+        let fechaFin = null;
+        if (esFinalizado) {{
+            const fechasRecep = viviendas.map(v => v.fecha_recepcion).filter(Boolean).sort();
+            fechaFin = fechasRecep.length > 0 ? fechasRecep[fechasRecep.length - 1] : null;
+        }}
+
         return {{
             total: viviendas.length, terminadas,
             enTiempo: viviendas.filter(v => v.estadoGeneral === "en_tiempo").length,
             atencion: viviendas.filter(v => v.estadoGeneral === "atencion").length,
             criticos: viviendas.filter(v => v.estadoGeneral === "critico").length,
             avance: avanceDesp, avanceInsp, totalPagado: totalPagadoProy,
-            alertasCoherencia: conAlertasRojas, totalSolicitadas, diasPromedio
+            alertasCoherencia: conAlertasRojas, totalSolicitadas, diasPromedio,
+            conRecepcion, conTE1, esFinalizado, fechaFin, finalizadoTabla, finalizadoRecep
         }};
     }}, [viviendas]);
 
@@ -3716,7 +3745,12 @@ const App = () => {{
                             <span className="text-sm font-bold text-gray-600 hidden sm:inline">SCRaices v3</span>
                         </div>
                         <select className="bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 flex-1 max-w-md focus:outline-none focus:ring-2 focus:ring-violet-500" value={{proyectoSel}} onChange={{e => {{ setProyectoSel(e.target.value); setExpandida(null); setTab("viviendas"); }}}}>
-                            {{PROYECTOS_DATA.map(p => <option key={{p.ID_proy}} value={{p.ID_proy}}>{{p.estado === 'finalizado' ? '[F] ' : ''}}{{p.NOMBRE_PROYECTO}} — {{p.COMUNA}} ({{BENEFICIARIOS_DATA.filter(b => String(b.ID_Proy) === String(p.ID_proy)).length}} viv.)</option>)}}
+                            {{PROYECTOS_DATA.map(p => {{
+                                const bens = BENEFICIARIOS_DATA.filter(b => String(b.ID_Proy) === String(p.ID_proy));
+                                const nRecep = bens.filter(b => b.fecha_recepcion).length;
+                                const fin = p.estado === 'finalizado' || (bens.length > 0 && nRecep === bens.length);
+                                return <option key={{p.ID_proy}} value={{p.ID_proy}}>{{fin ? '\u2713 ' : ''}}{{p.NOMBRE_PROYECTO}} — {{p.COMUNA}} ({{bens.length}} viv.)</option>;
+                            }})}}
                         </select>
                         {{grupos.length > 0 && <div className="flex items-center gap-1.5 text-xs text-gray-500"><IconGroup /><span>{{grupos.length}} grupos</span></div>}}
                         {{typeof APPS_SCRIPT_URL !== 'undefined' && (
@@ -3782,6 +3816,32 @@ const App = () => {{
                 {{/* HEADER: Contrato + Garantías + EP */}}
                 <HeaderProyecto proy={{proy}} garantiasProy={{garantiasProy}} eeppResumen={{eeppResumen}} />
 
+                {{/* Banner Finalizado */}}
+                {{kpis.esFinalizado && (
+                    <div className="mb-4 bg-green-50 border border-green-300 rounded-xl px-5 py-3 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
+                                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7"/></svg>
+                            </div>
+                            <div>
+                                <h3 className="text-green-800 font-bold text-sm">Proyecto Finalizado</h3>
+                                <p className="text-green-600 text-xs">
+                                    {{kpis.finalizadoRecep && !kpis.finalizadoTabla && "Todas las recepciones definitivas completadas"}}
+                                    {{kpis.finalizadoTabla && kpis.finalizadoRecep && "Marcado como finalizado — recepciones completas"}}
+                                    {{kpis.finalizadoTabla && !kpis.finalizadoRecep && "Marcado como finalizado en AppSheet"}}
+                                </p>
+                            </div>
+                        </div>
+                        {{kpis.fechaFin && (() => {{
+                            const p = kpis.fechaFin.split('-');
+                            return <div className="text-right">
+                                <p className="text-[10px] text-green-600 uppercase font-medium">Fecha finalizacion</p>
+                                <p className="text-lg font-bold font-mono text-green-700">{{p[2]}}/{{p[1]}}/{{p[0]}}</p>
+                            </div>;
+                        }})()}}
+                    </div>
+                )}}
+
                 {{/* KPIs */}}
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3 mb-4">
                     <div className="bg-white rounded-xl p-3 border border-gray-200 shadow-sm"><p className="text-[10px] text-gray-500 uppercase">Viviendas</p><p className="text-xl font-bold font-mono">{{kpis.total}}</p></div>
@@ -3792,6 +3852,8 @@ const App = () => {{
                     <div className="bg-white rounded-xl p-3 border border-purple-200 shadow-sm"><p className="text-[10px] text-purple-600">Solicitadas</p><p className="text-xl font-bold font-mono text-purple-600">{{kpis.totalSolicitadas}}</p><p className="text-[9px] text-gray-400">esperando desp.</p></div>
                     <div className="bg-white rounded-xl p-3 border border-gray-200 shadow-sm"><p className="text-[10px] text-gray-500">Días Prom.</p><p className="text-xl font-bold font-mono">{{kpis.diasPromedio}}d</p><p className="text-[9px] text-gray-400">Fund → última</p></div>
                     <div className="bg-white rounded-xl p-3 border border-violet-200 shadow-sm overflow-hidden"><p className="text-[10px] text-violet-600">Total Pagado</p><p className={{`font-bold font-mono text-violet-700 mt-1 ${{kpis.totalPagado >= 100000000 ? "text-xs" : kpis.totalPagado >= 10000000 ? "text-sm" : "text-lg"}}`}}>{{formatPeso(kpis.totalPagado)}}</p></div>
+                    <div className="bg-white rounded-xl p-3 border border-blue-200 shadow-sm"><p className="text-[10px] text-blue-600">Recepcion Def.</p><p className="text-xl font-bold font-mono text-blue-700">{{kpis.conRecepcion}}<span className="text-sm text-gray-400 font-normal"> de {{kpis.total}}</span></p></div>
+                    <div className="bg-white rounded-xl p-3 border border-amber-200 shadow-sm"><p className="text-[10px] text-amber-600">TE1</p><p className="text-xl font-bold font-mono text-amber-700">{{kpis.conTE1}}<span className="text-sm text-gray-400 font-normal"> de {{kpis.total}}</span></p></div>
                 </div>
 
                 {{/* VALIDACION CRUZADA - Botón + Modal */}}
