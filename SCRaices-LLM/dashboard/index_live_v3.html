@@ -4016,7 +4016,13 @@ const App = () => {
                                     }
                                     if (data.error) throw new Error(data.error);
                                     const rows = data['Hoja 1']?.rows || data[Object.keys(data)[0]]?.rows || [];
-                                    console.log('[TE1] OK:', rows.length, 'registros');
+                                    // Ordenar por Fecha Inscripcion descendente (mas recientes primero)
+                                    rows.sort((a, b) => {
+                                        const fa = (a['Fecha Inscripcion'] || '').split('/').reverse().join('');
+                                        const fb = (b['Fecha Inscripcion'] || '').split('/').reverse().join('');
+                                        return fb.localeCompare(fa);
+                                    });
+                                    console.log('[TE1] OK:', rows.length, 'registros (ordenados desc)');
                                     setTe1Data(rows);
                                 } catch(e) {
                                     console.error('[TE1] Error:', e);
