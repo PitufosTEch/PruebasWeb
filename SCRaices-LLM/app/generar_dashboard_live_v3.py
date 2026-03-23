@@ -162,17 +162,21 @@ def get_data_loader_js(apps_script_url):
             throw new Error('Error al descargar datos: ' + e.message);
         }}
 
-        // Lote 4 (comentarios) separado y no bloquea si falla
+        // Lotes 4-5 separados y no bloquean si fallan
+        let r4, r5;
         try {{
-            updateLoading('Descargando comentarios...', 25, 'Lote 4: Comentarios');
-            r4 = await fetchBatch('combenef', 'Lote 4: Comentarios Benef');
+            updateLoading('Descargando complementarios...', 25, 'Lotes 4-5: Comentarios + Documentacion');
+            [r4, r5] = await Promise.all([
+                fetchBatch('combenef', 'Lote 4: Comentarios Benef').catch(e => {{ console.warn('[LIVE] Lote 4 fallo:', e.message); return {{ combenef: {{ rows: [] }} }}; }}),
+                fetchBatch('documentacion', 'Lote 5: Documentacion').catch(e => {{ console.warn('[LIVE] Lote 5 fallo:', e.message); return {{ documentacion: {{ rows: [] }} }}; }})
+            ]);
         }} catch (e) {{
-            console.warn('[LIVE] Lote 4 (comentarios) fallo:', e.message);
             r4 = {{ combenef: {{ rows: [] }} }};
+            r5 = {{ documentacion: {{ rows: [] }} }};
         }}
 
         updateLoading('Combinando datos...', 30, 'Todos los lotes recibidos');
-        return {{ ...r1, ...r2, ...r3, ...r4 }};
+        return {{ ...r1, ...r2, ...r3, ...r4, ...r5 }};
     }}
 
     function processRawData(raw) {{
@@ -241,6 +245,26 @@ def get_data_loader_js(apps_script_url):
                 const habilRaw = String(b['Habil para construir'] || '').toLowerCase();
                 const habil = habilRaw === 'si' || habilRaw === 'sí' || habilRaw === 'true' || habilRaw === '1';
 
+                // Fecha HPC
+                let fecha_hpc = '';
+                const fhpcRaw = String(b.fecha_habil_para_const || '').trim();
+                if (fhpcRaw && !['nan','','NaT','None'].includes(fhpcRaw.toLowerCase())) {{
+                    fecha_hpc = parseDate(fhpcRaw) || '';
+                }}
+
+                // Fecha Recepcion Definitiva (F_R_dom)
+                let fecha_recepcion = '';
+                const frdRaw = String(b.F_R_dom || '').trim();
+                if (frdRaw && !['nan','','NaT','None'].includes(frdRaw.toLowerCase())) {{
+                    fecha_recepcion = parseDate(frdRaw) || '';
+                }}
+
+                // Alerta logistica y obs seguimiento
+                const alertaLog = String(b.alerta_logistica || '').trim();
+                const alerta_logistica = (alertaLog && alertaLog.toLowerCase() !== 'nan') ? alertaLog : '';
+                const obsSeg = String(b['Observacion '] || b.Observacion || '').trim();
+                const obs_seguimiento = (obsSeg && obsSeg.toLowerCase() !== 'nan') ? obsSeg : '';
+
                 // Tipologia descriptiva - siempre usar vivienda como principal
                 let tipLabel = tipRCId ? 'Casa + RC' : 'Casa';
                 if (tipVivId && tipDict[tipVivId]) {{
@@ -261,11 +285,29 @@ def get_data_loader_js(apps_script_url):
                     tipologia: tipLabel,
                     tipologia_viv_id: tipVivId,
                     tipologia_rc_id: tipRCId,
-                    habil: habil
+                    habil: habil,
+                    fecha_hpc: fecha_hpc,
+                    fecha_recepcion: fecha_recepcion,
+                    has_te1: false,
+                    alerta_logistica: alerta_logistica,
+                    obs_seguimiento: obs_seguimiento
                 }};
             }});
 
         const idsBenef = new Set(BENEFICIARIOS_DATA.map(b => String(b.ID_Benef)));
+
+        // Marcar has_te1 desde documentacion
+        const docRows = raw.documentacion?.rows || [];
+        const benefConTE1 = new Set();
+        docRows.forEach(d => {{
+            const idb = String(d.ID_benef || '');
+            const t1 = String(d.T1 || '');
+            if (t1.includes('documentacion_')) benefConTE1.add(idb);
+        }});
+        BENEFICIARIOS_DATA.forEach(b => {{
+            if (benefConTE1.has(String(b.ID_Benef))) b.has_te1 = true;
+        }});
+        console.log('[LIVE] TE1:', benefConTE1.size, 'beneficiarios con TE1');
 
         updateLoading('Procesando despachos...', 50);
 
