@@ -163,7 +163,6 @@ def get_data_loader_js(apps_script_url):
         }}
 
         // Lote 4 (comentarios) separado y no bloquea si falla
-        let r4;
         try {{
             updateLoading('Descargando comentarios...', 25, 'Lote 4: Comentarios');
             r4 = await fetchBatch('combenef', 'Lote 4: Comentarios Benef');
