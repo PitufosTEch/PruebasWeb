@@ -162,21 +162,18 @@ def get_data_loader_js(apps_script_url):
             throw new Error('Error al descargar datos: ' + e.message);
         }}
 
-        // Lotes 4-5 separados y no bloquean si fallan
-        let r4, r5;
+        // Lote 4 (comentarios) separado y no bloquea si falla
+        let r4;
         try {{
-            updateLoading('Descargando complementarios...', 25, 'Lotes 4-5: Comentarios + Documentacion');
-            [r4, r5] = await Promise.all([
-                fetchBatch('combenef', 'Lote 4: Comentarios Benef').catch(e => {{ console.warn('[LIVE] Lote 4 fallo:', e.message); return {{ combenef: {{ rows: [] }} }}; }}),
-                fetchBatch('documentacion', 'Lote 5: Documentacion').catch(e => {{ console.warn('[LIVE] Lote 5 fallo:', e.message); return {{ documentacion: {{ rows: [] }} }}; }})
-            ]);
+            updateLoading('Descargando comentarios...', 25, 'Lote 4: Comentarios');
+            r4 = await fetchBatch('combenef', 'Lote 4: Comentarios Benef');
         }} catch (e) {{
+            console.warn('[LIVE] Lote 4 (comentarios) fallo:', e.message);
             r4 = {{ combenef: {{ rows: [] }} }};
-            r5 = {{ documentacion: {{ rows: [] }} }};
         }}
 
         updateLoading('Combinando datos...', 30, 'Todos los lotes recibidos');
-        return {{ ...r1, ...r2, ...r3, ...r4, ...r5 }};
+        return {{ ...r1, ...r2, ...r3, ...r4 }};
     }}
 
     function processRawData(raw) {{
@@ -296,18 +293,13 @@ def get_data_loader_js(apps_script_url):
 
         const idsBenef = new Set(BENEFICIARIOS_DATA.map(b => String(b.ID_Benef)));
 
-        // Marcar has_te1 desde documentacion
-        const docRows = raw.documentacion?.rows || [];
-        const benefConTE1 = new Set();
-        docRows.forEach(d => {{
-            const idb = String(d.ID_benef || '');
-            const t1 = String(d.T1 || '');
-            if (t1.includes('documentacion_')) benefConTE1.add(idb);
-        }});
-        BENEFICIARIOS_DATA.forEach(b => {{
-            if (benefConTE1.has(String(b.ID_Benef))) b.has_te1 = true;
-        }});
-        console.log('[LIVE] TE1:', benefConTE1.size, 'beneficiarios con TE1');
+        // Marcar has_te1 desde set pre-calculado (embebido al generar)
+        if (typeof BENEF_CON_TE1 !== 'undefined') {{
+            BENEFICIARIOS_DATA.forEach(b => {{
+                if (BENEF_CON_TE1.has(String(b.ID_Benef))) b.has_te1 = true;
+            }});
+            console.log('[LIVE] TE1: marcados desde set embebido (' + BENEF_CON_TE1.size + ')');
+        }}
 
         updateLoading('Procesando despachos...', 50);
 
@@ -798,6 +790,22 @@ def make_live_dashboard(apps_script_url):
         '<title>Panel de Control v3 - SG Raices</title>',
         '<title>Panel de Control v3 - SG Raices (Live)</title>'
     )
+
+    # 4pre. Embeber set de beneficiarios con TE1 (pre-calculado, evita cargar documentacion en runtime)
+    try:
+        sys.path.insert(0, str(Path(__file__).parent))
+        from data_manager import DataManager
+        dm = DataManager()
+        documentacion = dm.get_table_data('documentacion')
+        te1_ids = set()
+        for _, dd in documentacion.iterrows():
+            if 'documentacion_' in str(dd.get('T1', '')):
+                te1_ids.add(str(dd.get('ID_benef', '')))
+        te1_js = 'const BENEF_CON_TE1 = new Set([' + ','.join(f'"{x}"' for x in te1_ids) + ']);'
+        html = html.replace('<script type="text/babel">', f'<script>/* TE1 pre-calculado */\n{te1_js}\n</script>\n<script type="text/babel">', 1)
+        print(f"  TE1 embebido: {len(te1_ids)} beneficiarios")
+    except Exception as e:
+        print(f"  WARN: No se pudo embeber TE1: {e}")
 
     # 4a. Inyectar tags PWA
     pwa_tags = '''
