@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="es"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SCRaices — Portal Central</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="./lib/data-sync.js"></script>
+<script src="./lib/stage-mapping.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDuM11JE-7klfBBrWsSSi1DF71HiXXYpW0",
+  authDomain: "scraices-dashboard.firebaseapp.com",
+  databaseURL: "https://scraices-dashboard-default-rtdb.firebaseio.com",
+  projectId: "scraices-dashboard"
+};
+firebase.initializeApp(firebaseConfig);
+const fbDB = firebase.database();
+</script>
+<style>
+body { font-family: 'IBM Plex Sans', sans-serif; }
+.mono, .font-mono { font-family: 'IBM Plex Mono', monospace; }
+.card { background: #1e293b; border-radius: 14px; border: 1px solid #334155; overflow: hidden; transition: all .2s; cursor: pointer; }
+.card:hover { border-color: #6366f1; box-shadow: 0 4px 20px rgba(99,102,241,.15); transform: translateY(-2px); }
+.sem { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.prog-bar { height: 6px; border-radius: 3px; overflow: hidden; background: #334155; }
+.prog-fill { height: 100%; border-radius: 3px; transition: width .5s; }
+.nav-link { padding: 10px 20px; border-radius: 10px; font-size: 13px; font-weight: 600; transition: all .2s; border: 1px solid #334155; color: #94a3b8; cursor: pointer; display: flex; align-items: center; gap: 8px; text-decoration: none; }
+.nav-link:hover { border-color: #6366f1; color: #e2e8f0; background: #1e293b; }
+.skeleton { background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 10px; }
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+.indic { font-size: 10px; padding: 2px 8px; border-radius: 6px; font-weight: 700; white-space: nowrap; }
+</style>
+</head>
+<body class="bg-slate-900 text-gray-200 min-h-screen">
+
+<!-- HEADER -->
+<div class="bg-slate-950 border-b border-slate-800 px-6 py-4 sticky top-0 z-50">
+  <div class="max-w-[1400px] mx-auto flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center">
+        <span class="text-white font-bold font-mono text-sm">SC</span>
+      </div>
+      <div>
+        <h1 class="font-bold text-lg text-white tracking-tight">Portal Central</h1>
+        <p class="text-[11px] text-slate-500">SCRaices — Control de Obras</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-3">
+      <div id="syncStatus" class="text-[11px] text-slate-500"></div>
+      <button id="btnSync" onclick="doSync()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs text-slate-400 rounded-lg border border-slate-700 transition flex items-center gap-1.5 cursor-pointer">
+        <svg id="syncIcon" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        Sincronizar
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- NAV LINKS -->
+<div class="max-w-[1400px] mx-auto px-6 py-4">
+  <div class="flex flex-wrap gap-3 mb-6">
+    <a href="../dashboard/index_live_v3.html" class="nav-link">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+      Dashboard Operativo v3
+    </a>
+    <a href="../dashboard/panel_coordinador.html" class="nav-link">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+      Panel Coordinador
+    </a>
+    <a href="../dashboard/tiempos_ejecucion.html" class="nav-link">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      Tiempos de Ejecucion
+    </a>
+  </div>
+
+  <!-- KPIs -->
+  <div id="kpis" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-6"></div>
+
+  <!-- SEARCH -->
+  <div class="flex items-center gap-3 mb-4">
+    <div class="relative flex-1 max-w-md">
+      <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path stroke-linecap="round" stroke-width="2" d="m21 21-4.35-4.35"/></svg>
+      <input id="searchInput" type="text" placeholder="Buscar proyecto..." oninput="renderCards()" class="w-full bg-slate-800 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" />
+    </div>
+    <select id="filterEstado" onchange="renderCards()" class="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer">
+      <option value="todos">Todos</option>
+      <option value="ejecucion" selected>En Ejecucion</option>
+      <option value="finalizado">Finalizados</option>
+      <option value="rojo">Semaforo Rojo</option>
+    </select>
+    <span id="countLabel" class="text-xs text-slate-500"></span>
+  </div>
+
+  <!-- PROJECT CARDS -->
+  <div id="cardsGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-8">
+    <!-- Skeleton loading -->
+    <div class="skeleton h-48"></div>
+    <div class="skeleton h-48"></div>
+    <div class="skeleton h-48"></div>
+    <div class="skeleton h-48"></div>
+    <div class="skeleton h-48"></div>
+    <div class="skeleton h-48"></div>
+  </div>
+</div>
+
+<script>
+const API_BASE = "https://script.google.com/macros/s/AKfycbx_mSt3xEeXZYn7R2fkt5drp3Pfllxdj71tJo0-2iSqW28OAgwgpzoH_2NI_erM5yB-/exec";
+const SM = StageMapping;
+
+let projectsData = []; // Processed project summaries
+
+// ---- Init ----
+async function init() {
+  const initResult = await DataSync.init({ apiBase: API_BASE });
+
+  if (initResult.fromCache) {
+    // Render immediately from cache
+    processAndRender();
+    updateSyncStatus('Datos del cache');
+    // Background sync
+    doSync(true);
+  } else {
+    updateSyncStatus('Cargando datos por primera vez...');
+    await doSync(false);
+  }
+}
+
+async function doSync(background) {
+  const btn = document.getElementById('btnSync');
+  const icon = document.getElementById('syncIcon');
+  btn.disabled = true;
+  icon.style.animation = 'spin 1s linear infinite';
+
+  try {
+    const result = await DataSync.sync({
+      onProgress: (msg, pct) => {
+        if (!background) updateSyncStatus(msg + ' ' + pct + '%');
+      }
+    });
+    processAndRender();
+    const ago = result.duration < 1000 ? result.duration + 'ms' : Math.round(result.duration/1000) + 's';
+    updateSyncStatus(`Sincronizado (${result.updated.length} tablas actualizadas, ${ago})`);
+  } catch (err) {
+    updateSyncStatus('Error: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    icon.style.animation = '';
+  }
+}
+
+function updateSyncStatus(msg) {
+  const el = document.getElementById('syncStatus');
+  const last = DataSync.getLastSyncTime();
+  if (last) {
+    const mins = Math.round((Date.now() - last.getTime()) / 60000);
+    el.textContent = mins < 1 ? msg : msg + ' — hace ' + mins + ' min';
+  } else {
+    el.textContent = msg;
+  }
+}
+
+// ---- Process data ----
+function processAndRender() {
+  const proyectos = DataSync.getData('Proyectos');
+  const beneficiarios = DataSync.getData('Beneficiario');
+  const despachos = DataSync.getData('Despacho');
+  const ejecucion = DataSync.getData('Ejecucion');
+  const solpago = DataSync.getData('Solpago');
+
+  projectsData = [];
+
+  // Filter active projects
+  const proyFiltrados = proyectos.filter(p => {
+    const est = String(p.estado_general || '').toLowerCase();
+    return est.includes('ejecuci') || est.includes('finalizado');
+  });
+
+  for (const p of proyFiltrados) {
+    const pid = String(p.ID_proy || '');
+    const bens = beneficiarios.filter(b => String(b.ID_Proy) === pid);
+    const nViv = bens.length;
+    if (nViv === 0) continue;
+
+    const estado = String(p.estado_general || '').toLowerCase();
+    const esFinalTabla = estado.includes('finalizado');
+
+    // HPC, Recep, TE1
+    let nHpc = 0, nRecep = 0, nTe1 = 0;
+    bens.forEach(b => {
+      if (String(b['Habil para construir'] || '').toUpperCase() === 'TRUE') nHpc++;
+      const frd = String(b.F_R_dom || '').trim();
+      if (frd && !['nan','','NaT','None'].includes(frd.toLowerCase())) nRecep++;
+    });
+    // TE1 from BENEF_CON_TE1 if available, otherwise skip
+    if (typeof BENEF_CON_TE1 !== 'undefined') {
+      bens.forEach(b => { if (BENEF_CON_TE1.has(String(b.ID_Benef))) nTe1++; });
+    }
+
+    const esFinalRecep = nRecep === nViv;
+    const esFinalizado = esFinalTabla || esFinalRecep;
+
+    // Despachos per beneficiary
+    let nLineaCritica = 0;
+    const idsB = new Set(bens.map(b => String(b.ID_Benef)));
+    const despProy = despachos.filter(d => idsB.has(String(d.ID_Benef)));
+    const avanceDesps = [];
+
+    bens.forEach(b => {
+      const ib = String(b.ID_Benef);
+      const despB = despProy.filter(d => String(d.ID_Benef) === ib);
+      const etapas = SM.getEtapasDespachadas(despB);
+      avanceDesps.push(SM.calcAvanceDespacho(etapas));
+      if (SM.lineaCriticaCompleta(etapas)) nLineaCritica++;
+    });
+
+    const avdProm = avanceDesps.length ? Math.round(avanceDesps.reduce((s,v) => s+v, 0) / avanceDesps.length) : 0;
+
+    // Plazo
+    const fi = SM.parseDate(p.fecha_inicio);
+    const dur = parseInt(p.duracion) || 0;
+    let diasR = null, pctPlazo = 0;
+    if (fi && dur > 0) {
+      const inicio = new Date(fi);
+      const venc = new Date(inicio);
+      venc.setDate(venc.getDate() + dur);
+      const ref = esFinalizado ? (() => {
+        const fechasR = bens.map(b => SM.parseDate(b.F_R_dom)).filter(Boolean).sort();
+        return fechasR.length ? new Date(fechasR[fechasR.length - 1]) : new Date();
+      })() : new Date();
+      diasR = Math.floor((venc - ref) / 86400000);
+      pctPlazo = Math.min(100, Math.max(0, Math.round((ref - inicio) / 86400000 / dur * 100)));
+    }
+
+    const delta = avdProm - pctPlazo;
+    const semaforo = SM.calcSemaforo(diasR, 0, delta); // criticas simplified
+
+    projectsData.push({
+      id: pid, nombre: String(p.NOMBRE_PROYECTO || ''), comuna: String(p.COMUNA || ''),
+      nViv, estado: esFinalizado ? 'finalizado' : 'ejecucion',
+      fi, dur, diasR, pctPlazo, avdProm, delta, semaforo,
+      nHpc, nTe1, nRecep, nLineaCritica, esFinalizado
+    });
+  }
+
+  // Sort: ejecucion first, then by fecha inicio desc
+  projectsData.sort((a, b) => {
+    if (a.estado !== b.estado) return a.estado === 'ejecucion' ? -1 : 1;
+    return (b.fi || '').localeCompare(a.fi || '');
+  });
+
+  renderKPIs();
+  renderCards();
+}
+
+// ---- Render ----
+function renderKPIs() {
+  const ej = projectsData.filter(p => p.estado === 'ejecucion');
+  const fin = projectsData.filter(p => p.estado === 'finalizado');
+  const totalViv = ej.reduce((s, p) => s + p.nViv, 0);
+  const totalRecep = ej.reduce((s, p) => s + p.nRecep, 0);
+  const rojos = ej.filter(p => p.semaforo === 'rojo').length;
+  const avgAvd = ej.length ? Math.round(ej.reduce((s, p) => s + p.avdProm, 0) / ej.length) : 0;
+
+  document.getElementById('kpis').innerHTML = `
+    <div class="bg-slate-800 rounded-xl p-4 border border-slate-700"><div class="text-[10px] uppercase text-slate-500">En Ejecucion</div><div class="text-2xl font-bold font-mono text-white mt-1">${ej.length}</div></div>
+    <div class="bg-slate-800 rounded-xl p-4 border border-indigo-900"><div class="text-[10px] uppercase text-indigo-400">Viviendas Activas</div><div class="text-2xl font-bold font-mono text-indigo-400 mt-1">${totalViv}</div></div>
+    <div class="bg-slate-800 rounded-xl p-4 border border-emerald-900"><div class="text-[10px] uppercase text-emerald-400">Recepciones</div><div class="text-2xl font-bold font-mono text-emerald-400 mt-1">${totalRecep}<span class="text-sm text-slate-500">/${totalViv}</span></div></div>
+    <div class="bg-slate-800 rounded-xl p-4 border border-violet-900"><div class="text-[10px] uppercase text-violet-400">Avance Prom.</div><div class="text-2xl font-bold font-mono text-violet-400 mt-1">${avgAvd}%</div></div>
+    <div class="bg-slate-800 rounded-xl p-4 border border-red-900"><div class="text-[10px] uppercase text-red-400">Semaforo Rojo</div><div class="text-2xl font-bold font-mono text-red-400 mt-1">${rojos}</div></div>
+    <div class="bg-slate-800 rounded-xl p-4 border border-green-900"><div class="text-[10px] uppercase text-green-400">Finalizados</div><div class="text-2xl font-bold font-mono text-green-400 mt-1">${fin.length}</div></div>
+  `;
+}
+
+function renderCards() {
+  const search = (document.getElementById('searchInput').value || '').toLowerCase();
+  const filter = document.getElementById('filterEstado').value;
+
+  let filtered = projectsData;
+  if (filter === 'ejecucion') filtered = filtered.filter(p => p.estado === 'ejecucion');
+  else if (filter === 'finalizado') filtered = filtered.filter(p => p.estado === 'finalizado');
+  else if (filter === 'rojo') filtered = filtered.filter(p => p.semaforo === 'rojo');
+  if (search) filtered = filtered.filter(p => p.nombre.toLowerCase().includes(search) || p.comuna.toLowerCase().includes(search));
+
+  document.getElementById('countLabel').textContent = filtered.length + ' proyecto' + (filtered.length !== 1 ? 's' : '');
+
+  const semColors = { verde: '#22c55e', amarillo: '#f59e0b', rojo: '#ef4444' };
+  const ff = SM.formatFecha;
+
+  let html = '';
+  filtered.forEach((p, i) => {
+    const sc = semColors[p.semaforo] || '#94a3b8';
+    const deltaSign = p.delta > 0 ? '+' : '';
+    const deltaCol = p.delta > 5 ? '#22c55e' : p.delta < -5 ? '#ef4444' : '#f59e0b';
+    const finBadge = p.esFinalizado ? '<span class="indic" style="background:#065f46;color:#6ee7b7">FINALIZADO</span>' : '';
+    const drBadge = p.diasR !== null
+      ? (p.diasR < 0 ? `<span class="indic" style="background:#7f1d1d;color:#fca5a5">VENCIDO ${Math.abs(p.diasR)}d</span>`
+        : p.diasR <= 90 ? `<span class="indic" style="background:#78350f;color:#fcd34d">${p.diasR}d</span>`
+        : `<span class="indic" style="background:#14532d;color:#86efac">${p.diasR}d</span>`)
+      : '';
+
+    html += `<div class="card" onclick="window.location.href='proyecto.html?id=${p.id}'" style="animation:fadeIn .3s ease ${i*50}ms both">
+      <div class="p-4">
+        <div class="flex items-start justify-between mb-3">
+          <div class="flex items-center gap-2.5">
+            <div class="sem" style="background:${sc}"></div>
+            <div>
+              <div class="font-bold text-sm text-white">${p.nombre}</div>
+              <div class="text-[11px] text-slate-500">${p.comuna} &middot; ${p.nViv} viv</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-1.5">${finBadge}${drBadge}</div>
+        </div>
+        <div class="flex items-center gap-3 mb-3">
+          <div class="flex-1">
+            <div class="prog-bar"><div class="prog-fill" style="width:${p.avdProm}%;background:linear-gradient(90deg,#6366f1,#8b5cf6)"></div></div>
+            <div class="flex justify-between mt-1 text-[9px] text-slate-500"><span>${ff(p.fi)}</span><span class="font-mono">${p.avdProm}% desp</span></div>
+          </div>
+          <div class="text-center px-2 py-1 rounded-lg" style="border:1px solid ${deltaCol}30;background:${deltaCol}10">
+            <div class="text-[8px] text-slate-400 uppercase">Delta</div>
+            <div class="text-sm font-bold font-mono" style="color:${deltaCol}">${deltaSign}${p.delta}%</div>
+          </div>
+        </div>
+        <div class="grid grid-cols-4 gap-1.5">
+          ${indic('HPC', p.nHpc, p.nViv)}
+          ${indic('TE1', p.nTe1, p.nViv)}
+          ${indic('L.Crit', p.nLineaCritica, p.nViv)}
+          ${indic('Recep', p.nRecep, p.nViv)}
+        </div>
+      </div>
+    </div>`;
+  });
+
+  document.getElementById('cardsGrid').innerHTML = html || '<div class="col-span-3 text-center py-12 text-slate-500">No se encontraron proyectos</div>';
+}
+
+function indic(label, n, total) {
+  const pct = total > 0 ? Math.round(n / total * 100) : 0;
+  const bg = pct === 100 ? 'background:#065f46;color:#6ee7b7' : pct > 0 ? 'background:#1e293b;color:#94a3b8;border:1px solid #334155' : 'background:#0f172a;color:#475569;border:1px solid #1e293b';
+  return `<div class="indic text-center" style="${bg}">${label} ${n}/${total}</div>`;
+}
+
+// CSS animation
+const style = document.createElement('style');
+style.textContent = '@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}} @keyframes spin{to{transform:rotate(360deg)}}';
+document.head.appendChild(style);
+
+// Start
+init();
+</script>
+</body></html>

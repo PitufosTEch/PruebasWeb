@@ -40,6 +40,38 @@ FAMILIA_ETAPAS = {
     "Obras Ext.": ["14_OBRAS_EXT"]
 }
 
+def mapear_segmento(seg):
+    """Mapea un segmento de Tipo_despacho al codigo de etapa (misma logica que dashboard v3)"""
+    t = seg.lower().strip()
+    if 'fundacion' in t and 'eifs' not in t and 'aislacion' not in t: return '01_FUNDACIONES'
+    if 'alcantarillado' in t: return '12_ALCANTARILLADO'
+    if '1era' in t: return '02_1ERA_ETAPA'
+    if 'ventana' in t: return '28_VENTANAS'
+    if 'eifs' in t or 'aislacion fund' in t: return '29_EIFS'
+    if '2da' in t: return '03_2DA_ETAPA'
+    if 'piso' in t and 'ceram' in t: return '07_CERAMICO_PISO'
+    if '07-' in t and 'piso' in t: return '07_CERAMICO_PISO'
+    if 'muro' in t and 'ceram' in t: return '08_CERAMICO_MURO'
+    if '08-' in t and 'muro' in t: return '08_CERAMICO_MURO'
+    if 'pintura ext' in t or '09-' in t: return '09_PINTURA_EXT'
+    if 'pintura int' in t or '10-' in t: return '10_PINTURA_INT'
+    if 'pintura' in t and 'r.c' in t: return '09_PINTURA_EXT'
+    if 'gasfiter' in t or 'sol. ac' in t or 'artefact' in t or 'cocina' in t or 'calefont' in t: return '13_GASFITERIA'
+    if 'obra' in t and 'ext' in t: return '14_OBRAS_EXT'
+    if 'ap ext' in t or '05-' in t: return '14_OBRAS_EXT'
+    return None
+
+def mapear_tipo_despacho(tipo):
+    """Mapea un Tipo_despacho completo (puede contener multiples etapas separadas por coma)"""
+    if not tipo or str(tipo) in ['nan', '', 'None']:
+        return set()
+    etapas = set()
+    for seg in str(tipo).split(','):
+        key = mapear_segmento(seg)
+        if key:
+            etapas.add(key)
+    return etapas
+
 def _to_float(val):
     if pd.isna(val) or val == '' or val is None:
         return 0.0
@@ -81,12 +113,34 @@ def generar_panel():
     ejecucion = dm.get_table_data('Ejecucion')
     solpago = dm.get_table_data('Solpago')
     control_bgb = dm.get_table_data('controlBGB')
+    documentacion = dm.get_table_data('documentacion')
     control_eepp_raw = dm.conn.spreadsheet.worksheet('controlEEPP').get_all_values()
     eepp_headers = control_eepp_raw[0] if control_eepp_raw else []
     eepp_rows = [dict(zip(eepp_headers, r + ['']*(len(eepp_headers)-len(r)))) for r in control_eepp_raw[1:]]
 
-    proyectos_ej = proyectos[proyectos['estado_general'].str.lower().str.contains('ejecuci', na=False)].copy()
-    print(f"Proyectos en ejecucion: {len(proyectos_ej)}")
+    # Filtrar proyectos en ejecucion (misma regla que dashboard v3)
+    proyectos_ej_raw = proyectos[proyectos['estado_general'].str.lower().str.contains('ejecuci', na=False)].copy()
+    print(f"Proyectos en ejecucion (tabla): {len(proyectos_ej_raw)}")
+
+    # Excluir finalizados por recepciones completas (F_R_dom)
+    def pf_check(f):
+        if not f or str(f) in ['nan','NaT','','None']: return False
+        return True
+
+    finalizados_recep = set()
+    for _, pr in proyectos_ej_raw.iterrows():
+        pid = str(pr['ID_proy'])
+        bens_p = beneficiarios[beneficiarios['ID_Proy'].astype(str) == pid]
+        if len(bens_p) == 0:
+            continue
+        con_recep = sum(1 for _, b in bens_p.iterrows() if pf_check(b.get('F_R_dom', '')))
+        if con_recep == len(bens_p):
+            finalizados_recep.add(pid)
+
+    proyectos_ej = proyectos_ej_raw[~proyectos_ej_raw['ID_proy'].astype(str).isin(finalizados_recep)].copy()
+    if finalizados_recep:
+        print(f"  Excluidos por recepciones completas: {len(finalizados_recep)}")
+    print(f"Proyectos activos (sin finalizados): {len(proyectos_ej)}")
     hoy = datetime.now()
 
     pesos = dict(PESOS_VIV)
@@ -105,6 +159,22 @@ def generar_panel():
         tip_rc = str(b.get('Tipologia RC', '')).strip().lower()
         if tip_rc not in ['nan', '', 'none']:
             benef_con_rc.add(str(b['ID_Benef']))
+
+    # Beneficiarios con TE1 subido
+    benef_con_te1 = set()
+    for _, dd in documentacion.iterrows():
+        if 'documentacion_' in str(dd.get('T1', '')):
+            benef_con_te1.add(str(dd.get('ID_benef', '')))
+
+    # Linea critica: Fundaciones + 1era Etapa + 2da Etapa + Gasfiteria + Ceramica
+    # Cuando todas estan despachadas, la vivienda tiene lo medular y falta solo cierre
+    LINEA_CRITICA = [
+        "01_FUNDACIONES", "12_ALCANTARILLADO",     # Fundaciones
+        "02_1ERA_ETAPA", "28_VENTANAS", "29_EIFS",  # 1era Etapa
+        "03_2DA_ETAPA",                              # 2da Etapa
+        "13_GASFITERIA",                             # Gasfiteria
+        "07_CERAMICO_PISO", "08_CERAMICO_MURO"       # Ceramica
+    ]
 
     def get_insp(id_b):
         eb = ejecucion[ejecucion['ID_benef'].astype(str) == str(id_b)]
@@ -156,21 +226,38 @@ def generar_panel():
         dp = despachos[despachos['ID_Benef'].astype(str).isin(ids_b)]
         sp = solicitudes[solicitudes['ID_Benef'].astype(str).isin(ids_b)]
         term,ent,atc,crit,sind,tpag,solp = 0,0,0,0,0,0,0
+        n_hpc, n_te1, n_recep, n_ecrit = 0, 0, 0, 0
+        nombres_crit = []
         dias_list, desp_pcts, insp_vals = [],[],[]
         et_proy = {f:{'d':0,'t':0} for f in FAMILIA_ETAPAS}
 
         for _, b in benefs.iterrows():
             ib = str(b.get('ID_Benef',''))
+            # HPC
+            hpc_raw = str(b.get('Habil para construir', '')).strip().upper()
+            if hpc_raw == 'TRUE': n_hpc += 1
+            # TE1
+            if ib in benef_con_te1: n_te1 += 1
+            # Recepcion definitiva
+            frd = str(b.get('F_R_dom', '')).strip()
+            if frd and frd.lower() not in ['nan', '', 'nat', 'none']: n_recep += 1
+
             db = dp[dp['ID_Benef'].astype(str)==ib]
-            tds = set(db['Tipo_despacho'].astype(str).values) if len(db)>0 else set()
-            ed = set(t for t in tds if t in SECUENCIA_PRINCIPAL)
-            nd = len(ed)
+            # Mapear despachos a etapas (misma logica que dashboard v3)
+            ed = set()
+            for _, dd in db.iterrows():
+                ed.update(mapear_tipo_despacho(dd.get('Tipo_despacho', '')))
+            # Linea critica completa (todo lo medular despachado, falta solo cierre)
+            if all(ec in ed for ec in LINEA_CRITICA): n_ecrit += 1
+            ed_seq = ed & set(SECUENCIA_PRINCIPAL)
+            nd = len(ed_seq)
             nt = len(SECUENCIA_PRINCIPAL)
             desp_pcts.append(round(nd/nt*100) if nt>0 else 0)
             sb = sp[sp['ID_Benef'].astype(str)==ib]
             for _, s in sb.iterrows():
-                ts = str(s.get('Tipo_despacho',''))
-                if ts in SECUENCIA_PRINCIPAL and ts not in ed: solp += 1
+                sol_etapas = mapear_tipo_despacho(s.get('Tipo_despacho',''))
+                for se in sol_etapas:
+                    if se in SECUENCIA_PRINCIPAL and se not in ed_seq: solp += 1
             ip = get_insp(ib)
             if ip is not None: insp_vals.append(ip)
             pb = solpago_ok[solpago_ok['ID_Benef'].astype(str)==ib]
@@ -183,7 +270,10 @@ def generar_panel():
             else:
                 if fds:
                     dd = (hoy-max(fds)).days
-                    if dd>21: crit+=1
+                    if dd>21:
+                        crit+=1
+                        nom_b = f"{b.get('NOMBRES','')} {b.get('APELLIDOS','')}".strip()
+                        nombres_crit.append(nom_b)
                     elif dd>7: atc+=1
                     else: ent+=1
                 else: ent+=1
@@ -222,16 +312,27 @@ def generar_panel():
         if crit>=3: alertas_g.append({'proy':nombre,'tipo':'warn','msg':f'{crit} viviendas criticas','u':2})
         if gpv>0: alertas_g.append({'proy':nombre,'tipo':'info','msg':f'{gpv} garantias vencen en <60d','u':3})
 
+        # Semaforo: rojo si vencido o >3 criticas, amarillo si <90d o criticas>0 o delta<-10, verde el resto
+        if (dias_r is not None and dias_r < 0) or crit >= 3:
+            semaforo = 'rojo'
+        elif (dias_r is not None and dias_r <= 90) or crit > 0 or delta < -10:
+            semaforo = 'amarillo'
+        else:
+            semaforo = 'verde'
+
         panel_data.append({'id':pid,'nombre':nombre,'comuna':comuna,'n_viv':nv,
             'fi':fi_iso,'dur':dur,'venc':venc_iso,'dr':dias_r,'dt':dias_t,'pp':pct_p,
             'term':term,'ent':ent,'atc':atc,'crit':crit,'sind':sind,
             'avd':avd,'avi':avi,'tpag':tpag,'dpr':dpr,'sol':solp,'delta':delta,'als':als,
-            'epp':round(epp,2),'ept':round(ept,2)})
+            'epp':round(epp,2),'ept':round(ept,2),
+            'n_hpc':n_hpc,'n_te1':n_te1,'n_recep':n_recep,'n_ecrit':n_ecrit,'semaforo':semaforo,
+            'nombres_crit':nombres_crit})
         gs['total_viv']+=nv; gs['terminadas']+=term; gs['en_tiempo']+=ent
         gs['atencion']+=atc; gs['criticas']+=crit; gs['sin_despacho']+=sind
         gs['total_pagado']+=tpag; gs['total_solicitudes']+=solp
 
-    panel_data.sort(key=lambda p:(0 if p['dr'] is not None and p['dr']<0 else 1, p['dr'] if p['dr'] is not None else 9999))
+    # Orden: por fecha inicio descendente (mas recientes primero), mismo que dashboard v3
+    panel_data.sort(key=lambda p: p['fi'] if p['fi'] else '', reverse=True)
     alertas_g.sort(key=lambda a:a['u'])
     print(f"Proyectos: {len(panel_data)}, Viviendas: {gs['total_viv']}")
     html = gen_html(panel_data, gs, alertas_g)
@@ -374,7 +475,7 @@ function render() {{
     <div class="bg-white rounded-xl p-3.5 border border-gray-200 shadow-sm"><div class="text-[10px] uppercase tracking-wide text-gray-500">Proyectos Activos</div><div class="text-2xl font-bold font-mono mt-1">${{visibles.length}}</div></div>
     <div class="bg-white rounded-xl p-3.5 border border-blue-200 shadow-sm"><div class="text-[10px] uppercase tracking-wide text-blue-600">Viviendas</div><div class="text-2xl font-bold font-mono text-blue-600 mt-1">${{gs.total_viv}}</div><div class="text-[10px] text-gray-400 mt-0.5">${{gs.terminadas}} terminadas (${{pctTerm}}%)</div></div>
     <div class="bg-white rounded-xl p-3.5 border border-violet-200 shadow-sm"><div class="text-[10px] uppercase tracking-wide text-violet-600">Avance Despacho</div><div class="text-2xl font-bold font-mono text-violet-600 mt-1">${{avg}}%</div></div>
-    <div class="bg-white rounded-xl p-3.5 border border-red-200 shadow-sm"><div class="text-[10px] uppercase tracking-wide text-red-600">Criticas</div><div class="text-2xl font-bold font-mono text-red-600 mt-1">${{gs.criticas}}</div><div class="text-[10px] text-gray-400 mt-0.5">${{pctCrit}}%</div></div>
+    <div class="bg-white rounded-xl p-3.5 border border-red-200 shadow-sm" title="${{visibles.filter(p=>p.crit>0).map(p=>p.nombre+': '+p.crit+' ('+p.nombres_crit.join(', ')+')').join('\\n')}}" style="cursor:help"><div class="text-[10px] uppercase tracking-wide text-red-600">Criticas</div><div class="text-2xl font-bold font-mono text-red-600 mt-1">${{gs.criticas}}</div><div class="text-[10px] text-gray-400 mt-0.5">${{pctCrit}}%</div></div>
     <div class="bg-white rounded-xl p-3.5 border border-purple-200 shadow-sm"><div class="text-[10px] uppercase tracking-wide text-purple-600">Total Pagado M.O.</div><div class="text-lg font-bold font-mono text-purple-700 mt-1">${{fpf(gs.total_pagado)}}</div></div>
     <div class="bg-white rounded-xl p-3.5 border border-amber-200 shadow-sm"><div class="text-[10px] uppercase tracking-wide text-amber-600">Contratos &lt;90d</div><div class="text-2xl font-bold font-mono text-amber-600 mt-1">${{gs.contratos_90d}}</div><div class="text-[10px] text-gray-400 mt-0.5">${{gs.contratos_vencidos}} vencido${{gs.contratos_vencidos!==1?'s':''}}</div></div>`;
 
@@ -415,8 +516,10 @@ function render() {{
       if (n > 0) {{
         const pc_ = Math.max(Math.round(n/tot*100), 5);
         const tc_ = k === 'sind' ? 'text-gray-600' : 'text-white';
-        segs += `<div class="${{cl}} ${{tc_}} flex items-center justify-center text-[9px] font-bold" style="width:${{pc_}}%">${{n}}</div>`;
-        leg += `<span class="flex items-center gap-1"><div class="w-2 h-2 rounded-sm shrink-0" style="background:${{hx}}"></div>${{n}} ${{lb}}</span>`;
+        const tooltip = (k === 'crit' && p.nombres_crit && p.nombres_crit.length > 0) ? ` title="${{p.nombres_crit.join('\\n')}}" style="width:${{pc_}}%;cursor:help"` : ` style="width:${{pc_}}%"`;
+        segs += `<div class="${{cl}} ${{tc_}} flex items-center justify-center text-[9px] font-bold"${{tooltip}}>${{n}}</div>`;
+        const legTooltip = (k === 'crit' && p.nombres_crit && p.nombres_crit.length > 0) ? ` title="${{p.nombres_crit.join('\\n')}}" style="cursor:help"` : '';
+        leg += `<span class="flex items-center gap-1"${{legTooltip}}><div class="w-2 h-2 rounded-sm shrink-0" style="background:${{hx}}"></div>${{n}} ${{lb}}</span>`;
       }}
     }});
 
@@ -437,19 +540,43 @@ function render() {{
     const hideTitle = hidden ? 'Mostrar proyecto' : 'Ocultar proyecto';
     const hideBtn = `<button onclick="toggleOculto('${{p.id}}')" title="${{hideTitle}}" class="btn-hide p-1.5 rounded-lg text-gray-400 hover:text-gray-700">${{hideIcon}}</button>`;
 
-    return `<div class="${{cc}}" data-pid="${{p.id}}">
+    // Semaforo
+    const semCol = p.semaforo === 'rojo' ? '#ef4444' : p.semaforo === 'amarillo' ? '#f59e0b' : '#22c55e';
+    const semBorder = p.semaforo === 'rojo' ? 'border-l-4 border-l-red-500' : p.semaforo === 'amarillo' ? 'border-l-4 border-l-yellow-400' : 'border-l-4 border-l-green-500';
+
+    // Delta prominente
+    const deltaSign = p.delta > 0 ? '+' : '';
+    const deltaCol = p.delta > 5 ? '#22c55e' : p.delta < -5 ? '#ef4444' : '#f59e0b';
+
+    // Indicadores de documentacion
+    function indic(label, n, total, color) {{
+      const pct = total > 0 ? Math.round(n/total*100) : 0;
+      const bg = pct === 100 ? 'bg-green-100 text-green-700 border-green-200' : pct > 0 ? `bg-${{color}}-50 text-${{color}}-700 border-${{color}}-200` : 'bg-gray-50 text-gray-400 border-gray-200';
+      return `<div class="flex items-center justify-between px-2.5 py-1 rounded border ${{bg}}"><span class="text-[9px] font-medium">${{label}}</span><span class="text-[10px] font-bold font-mono">${{n}}/${{total}}</span></div>`;
+    }}
+
+    return `<div class="${{cc}} ${{semBorder}}" data-pid="${{p.id}}">
 <div class="px-4 pt-3 pb-2 flex items-start justify-between">
-  <div><div class="font-bold text-sm text-gray-800">${{p.nombre}}</div><div class="text-[11px] text-gray-500 mt-0.5">${{p.comuna}} &middot; ${{p.n_viv}} viv &middot; ${{p.id}}</div></div>
+  <div class="flex items-center gap-2.5">
+    <div class="w-3 h-3 rounded-full shrink-0" style="background:${{semCol}}"></div>
+    <div><div class="font-bold text-sm text-gray-800">${{p.nombre}}</div><div class="text-[11px] text-gray-500 mt-0.5">${{p.comuna}} &middot; ${{p.n_viv}} viv</div></div>
+  </div>
   <div class="flex items-center gap-1.5">${{hideBtn}}${{bdg}}</div>
 </div>
-<div class="px-4 pb-2"><div class="relative h-1.5 bg-gray-200 rounded-full overflow-visible"><div class="h-full rounded-full" style="width:${{pf}}%;background:${{fc}}"></div>${{m90}}</div><div class="flex justify-between text-[9px] text-gray-400 mt-1"><span>${{ff(p.fi)}}</span>${{tll}}<span>${{ff(p.venc)}}</span></div></div>
-<div class="px-4 pb-3"><div class="flex h-5 rounded-md overflow-hidden gap-px">${{segs}}</div><div class="flex gap-3 mt-1.5 text-[9px] text-gray-500 flex-wrap">${{leg}}</div></div>
+<div class="px-4 pb-1"><div class="flex items-center gap-3 mb-1"><div class="flex-1"><div class="relative h-1.5 bg-gray-200 rounded-full overflow-visible"><div class="h-full rounded-full" style="width:${{pf}}%;background:${{fc}}"></div>${{m90}}</div><div class="flex justify-between text-[9px] text-gray-400 mt-0.5"><span>${{ff(p.fi)}}</span>${{tll}}<span>${{ff(p.venc)}}</span></div></div><div class="text-center shrink-0 ml-2 px-2 py-1 rounded-lg border" style="border-color:${{deltaCol}}20;background:${{deltaCol}}10"><div class="text-[8px] text-gray-400 uppercase">Delta</div><div class="text-sm font-bold font-mono" style="color:${{deltaCol}}">${{deltaSign}}${{p.delta}}%</div></div></div></div>
+<div class="px-4 pb-2"><div class="flex h-5 rounded-md overflow-hidden gap-px">${{segs}}</div><div class="flex gap-3 mt-1 text-[9px] text-gray-500 flex-wrap">${{leg}}</div></div>
+<div class="px-4 pb-2 grid grid-cols-4 gap-1.5">
+  ${{indic('HPC', p.n_hpc, p.n_viv, 'green')}}
+  ${{indic('TE1', p.n_te1, p.n_viv, 'amber')}}
+  ${{indic('L.Critica', p.n_ecrit, p.n_viv, 'purple')}}
+  ${{indic('Recep.Def', p.n_recep, p.n_viv, 'blue')}}
+</div>
 <div class="grid grid-cols-5 gap-px bg-gray-100 border-t border-gray-200">
-<div class="bg-white p-2.5 text-center"><div class="text-[9px] text-gray-400 uppercase">Av.Desp</div><div class="text-base font-bold font-mono text-violet-600 mt-0.5">${{p.avd}}%</div></div>
-<div class="bg-white p-2.5 text-center"><div class="text-[9px] text-gray-400 uppercase">Av.Insp</div><div class="text-base font-bold font-mono text-indigo-600 mt-0.5">${{p.avi}}%</div></div>
-<div class="bg-white p-2.5 text-center"><div class="text-[9px] text-gray-400 uppercase">Pagado</div><div class="text-xs font-bold font-mono text-purple-700 mt-0.5">${{fp(p.tpag)}}</div></div>
-<div class="bg-white p-2.5 text-center"><div class="text-[9px] text-gray-400 uppercase">Dias Prom</div><div class="text-base font-bold font-mono mt-0.5">${{p.dpr}}d</div></div>
-<div class="bg-white p-2.5 text-center"><div class="text-[9px] text-gray-400 uppercase">Solicitudes</div><div class="text-base font-bold font-mono text-purple-500 mt-0.5">${{p.sol}}</div></div>
+<div class="bg-white p-2 text-center"><div class="text-[9px] text-gray-400 uppercase">Av.Desp</div><div class="text-base font-bold font-mono text-violet-600 mt-0.5">${{p.avd}}%</div></div>
+<div class="bg-white p-2 text-center"><div class="text-[9px] text-gray-400 uppercase">Av.Insp</div><div class="text-base font-bold font-mono text-indigo-600 mt-0.5">${{p.avi}}%</div></div>
+<div class="bg-white p-2 text-center"><div class="text-[9px] text-gray-400 uppercase">Pagado</div><div class="text-xs font-bold font-mono text-purple-700 mt-0.5">${{fp(p.tpag)}}</div></div>
+<div class="bg-white p-2 text-center"><div class="text-[9px] text-gray-400 uppercase">Dias Prom</div><div class="text-base font-bold font-mono mt-0.5">${{p.dpr}}d</div></div>
+<div class="bg-white p-2 text-center"><div class="text-[9px] text-gray-400 uppercase">Solicitudes</div><div class="text-base font-bold font-mono text-purple-500 mt-0.5">${{p.sol}}</div></div>
 </div>${{alh}}</div>`;
   }});
   document.getElementById('cardsGrid').innerHTML = allCards.join('');

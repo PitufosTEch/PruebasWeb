@@ -20,8 +20,22 @@ var SPREADSHEET_ID = "1JAxxP9W6LJzns5rmGIo7mfk227qMLwsq-gFMCvHU0Zk";
 
 function doGet(e) {
   try {
+    var action = e.parameter.action || '';
     var sheetId = e.parameter.sheetId || SPREADSHEET_ID;
     var ss = SpreadsheetApp.openById(sheetId);
+
+    // Manifest: returns row counts per table (lightweight, for smart sync)
+    if (action === 'manifest') {
+      var allSheets = ss.getSheets();
+      var tables = {};
+      for (var s = 0; s < allSheets.length; s++) {
+        var sheet = allSheets[s];
+        var name = sheet.getName();
+        tables[name] = sheet.getLastRow() - 1; // minus header
+      }
+      return jsonResponse({ tables: tables, timestamp: new Date().toISOString() });
+    }
+
     var tablesParam = e.parameter.tables || '';
 
     if (!tablesParam) {

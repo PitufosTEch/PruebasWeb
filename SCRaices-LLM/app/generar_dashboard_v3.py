@@ -1388,6 +1388,24 @@ const ViviendaCard = ({{ beneficiario, estadoEtapas, expanded, onToggle, grupoCo
                                             <p className="text-sm text-gray-700">{{obs.texto}}</p>
                                             <p className="text-[10px] text-gray-400 mt-1">{{obs.fecha.replace('T', ' ')}}</p>
                                         </div>
+                                        <button onClick={{() => {{
+                                            const pId = String(b.ID_Proy || proyectoSel);
+                                            const ref = fbDB.ref('resumen_comentarios/' + pId + '/' + obs.id);
+                                            ref.once('value').then(snap => {{
+                                                if (snap.exists()) {{
+                                                    ref.remove();
+                                                }} else {{
+                                                    ref.set({{
+                                                        texto: obs.texto,
+                                                        fecha: obs.fecha,
+                                                        tipo: 'observacion',
+                                                        beneficiarioId: String(b.ID_Benef),
+                                                        beneficiarioNombre: `${{b.NOMBRES}} ${{b.APELLIDOS}}`,
+                                                        tickedAt: Date.now()
+                                                    }});
+                                                }}
+                                            }});
+                                        }}}} className={{`text-xs px-1.5 py-0.5 rounded transition-colors ${{resumenComentarios[String(b.ID_Proy || proyectoSel)] && resumenComentarios[String(b.ID_Proy || proyectoSel)][obs.id] ? "text-amber-500 bg-amber-100" : "text-gray-300 hover:text-amber-500"}}`}} title="Incorporar al resumen ejecutivo">&#9733;</button>
                                         <button onClick={{() => deleteObservacion(b.ID_Benef, obs.id)}} className="text-red-400 hover:text-red-600 text-xs px-1" title="Eliminar">&times;</button>
                                     </div>
                                 ))}}
@@ -3157,6 +3175,11 @@ const App = () => {{
             skipOcultadosPush.current = true;
             setOcultados(val || {{}});
         }});
+        // Listener Firebase para Resumen Comentarios
+        resumenRef.current = fbDB.ref('resumen_comentarios');
+        resumenRef.current.on('value', (snap) => {{
+            setResumenComentarios(snap.val() || {{}});
+        }});
         return () => {{
             if (gruposRef.current) gruposRef.current.off();
             if (obsRef.current) obsRef.current.off();
@@ -3165,6 +3188,7 @@ const App = () => {{
             if (sugRef.current) sugRef.current.off();
             if (muestrasRef.current) muestrasRef.current.off();
             if (ocultadosRef.current) ocultadosRef.current.off();
+            if (resumenRef.current) resumenRef.current.off();
         }};
     }}, []);
 
@@ -3273,6 +3297,10 @@ const App = () => {{
         const raw = muestrasHormigon[proyectoSel];
         return Array.isArray(raw) ? raw : [];
     }};
+
+    // Resumen comentarios (Firebase) - para tick de incorporar al resumen
+    const [resumenComentarios, setResumenComentarios] = React.useState({{}});
+    const resumenRef = React.useRef(null);
 
     // Beneficiarios ocultos (Firebase)
     const [ocultados, setOcultados] = React.useState({{}});

@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="es"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Resumen Ejecutivo — SCRaices</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="./lib/data-sync.js"></script>
+<script src="./lib/stage-mapping.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+firebase.initializeApp({
+  apiKey: "AIzaSyDuM11JE-7klfBBrWsSSi1DF71HiXXYpW0",
+  databaseURL: "https://scraices-dashboard-default-rtdb.firebaseio.com",
+  projectId: "scraices-dashboard"
+});
+const fbDB = firebase.database();
+</script>
+<style>
+body { font-family: 'IBM Plex Sans', sans-serif; }
+.mono, .font-mono { font-family: 'IBM Plex Mono', monospace; }
+.stat-card { background: #1e293b; border-radius: 14px; border: 1px solid #334155; padding: 20px; }
+.house { width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; cursor: pointer; transition: all .15s; position: relative; }
+.house:hover { transform: scale(1.2); z-index: 10; box-shadow: 0 4px 12px rgba(0,0,0,.4); }
+.stage-bar { height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: white; min-width: 30px; transition: width .5s; }
+.comment-card { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 12px 16px; }
+.comment-card .pin { color: #f59e0b; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; } }
+</style>
+</head>
+<body class="bg-slate-900 text-gray-200 min-h-screen">
+
+<!-- HEADER -->
+<div class="bg-slate-950 border-b border-slate-800 px-6 py-3 sticky top-0 z-50">
+  <div class="max-w-[1200px] mx-auto flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <a href="./index.html" class="text-slate-500 hover:text-slate-300 transition">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+      </a>
+      <div>
+        <h1 id="projName" class="font-bold text-lg text-white">Cargando...</h1>
+        <p id="projSub" class="text-[11px] text-slate-500"></p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <a id="linkDashboard" href="#" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium rounded-lg transition">Abrir en Dashboard v3</a>
+      <a id="linkViviendas" href="#" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium rounded-lg border border-slate-700 transition">Ver Viviendas</a>
+    </div>
+  </div>
+</div>
+
+<div class="max-w-[1200px] mx-auto px-6 py-6">
+  <div id="loading" class="text-center py-20 text-slate-500">Cargando datos...</div>
+  <div id="content" style="display:none">
+
+    <!-- STAT CARDS -->
+    <div id="statCards" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6"></div>
+
+    <!-- PROGRESS + TIMELINE -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+      <div class="stat-card">
+        <h3 class="text-xs font-semibold text-slate-500 uppercase mb-3">Distribucion por Etapa</h3>
+        <div id="stageDistribution" class="flex gap-1 rounded-lg overflow-hidden"></div>
+        <div id="stageLegend" class="flex flex-wrap gap-3 mt-3 text-[10px] text-slate-400"></div>
+      </div>
+      <div class="stat-card">
+        <h3 class="text-xs font-semibold text-slate-500 uppercase mb-3">Indicadores de Proceso</h3>
+        <div id="processIndicators" class="space-y-3"></div>
+      </div>
+    </div>
+
+    <!-- HOUSES GRID -->
+    <div class="stat-card mb-6">
+      <h3 class="text-xs font-semibold text-slate-500 uppercase mb-3">Viviendas</h3>
+      <div id="housesGrid" class="flex flex-wrap gap-2"></div>
+      <div class="flex flex-wrap gap-4 mt-3 text-[10px] text-slate-500">
+        <span><span class="inline-block w-3 h-3 rounded" style="background:#64748b"></span> Sin despacho</span>
+        <span><span class="inline-block w-3 h-3 rounded" style="background:#ef4444"></span> Inicio</span>
+        <span><span class="inline-block w-3 h-3 rounded" style="background:#f59e0b"></span> Medio</span>
+        <span><span class="inline-block w-3 h-3 rounded" style="background:#22c55e"></span> Avanzado</span>
+        <span><span class="inline-block w-3 h-3 rounded" style="background:#3b82f6"></span> Recepcionada</span>
+      </div>
+    </div>
+
+    <!-- HIGHLIGHTED COMMENTS -->
+    <div class="stat-card mb-6">
+      <h3 class="text-xs font-semibold text-slate-500 uppercase mb-3">
+        <svg class="inline w-4 h-4 text-amber-500 mr-1" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        Comentarios Destacados
+      </h3>
+      <div id="comments" class="space-y-2"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const API_BASE = "https://script.google.com/macros/s/AKfycbx_mSt3xEeXZYn7R2fkt5drp3Pfllxdj71tJo0-2iSqW28OAgwgpzoH_2NI_erM5yB-/exec";
+const SM = StageMapping;
+const params = new URLSearchParams(window.location.search);
+const PROJECT_ID = params.get('id') || '';
+
+let resumenComentarios = {};
+
+async function init() {
+  if (!PROJECT_ID) {
+    document.getElementById('loading').textContent = 'No se especifico un proyecto. Usa ?id=PROJECT_ID';
+    return;
+  }
+
+  await DataSync.init({ apiBase: API_BASE });
+
+  if (DataSync.getCachedTables().length > 0) {
+    render();
+    DataSync.sync().then(() => render());
+  } else {
+    await DataSync.sync({ onProgress: (msg) => { document.getElementById('loading').textContent = msg; }});
+    render();
+  }
+
+  // Listen for ticked comments from Firebase
+  fbDB.ref('resumen_comentarios/' + PROJECT_ID).on('value', (snap) => {
+    resumenComentarios = snap.val() || {};
+    renderComments();
+  });
+}
+
+function render() {
+  const proyectos = DataSync.getData('Proyectos');
+  const beneficiarios = DataSync.getData('Beneficiario');
+  const despachos = DataSync.getData('Despacho');
+
+  const proy = proyectos.find(p => String(p.ID_proy) === PROJECT_ID);
+  if (!proy) {
+    document.getElementById('loading').textContent = 'Proyecto no encontrado: ' + PROJECT_ID;
+    return;
+  }
+
+  const bens = beneficiarios.filter(b => String(b.ID_Proy) === PROJECT_ID);
+  const nViv = bens.length;
+  const idsB = new Set(bens.map(b => String(b.ID_Benef)));
+  const despProy = despachos.filter(d => idsB.has(String(d.ID_Benef)));
+
+  // Header
+  document.getElementById('projName').textContent = proy.NOMBRE_PROYECTO;
+  document.getElementById('projSub').textContent = `${proy.COMUNA} — ${nViv} viviendas — ${proy.estado_general || ''}`;
+  document.getElementById('linkDashboard').href = `../dashboard/index_live_v3.html`;
+  document.getElementById('linkViviendas').href = `vivienda.html?id=${PROJECT_ID}`;
+
+  // Counts
+  let nHpc = 0, nRecep = 0, nLC = 0;
+  const stages = { sinDespacho: 0, inicio: 0, medio: 0, avanzado: 0, recepcionada: 0 };
+  const houseData = [];
+
+  bens.forEach(b => {
+    const ib = String(b.ID_Benef);
+    if (String(b['Habil para construir'] || '').toUpperCase() === 'TRUE') nHpc++;
+    const frd = String(b.F_R_dom || '').trim();
+    const tieneRecep = frd && !['nan','','NaT','None'].includes(frd.toLowerCase());
+    if (tieneRecep) nRecep++;
+
+    const despB = despProy.filter(d => String(d.ID_Benef) === ib);
+    const etapas = SM.getEtapasDespachadas(despB);
+    const avd = SM.calcAvanceDespacho(etapas);
+    if (SM.lineaCriticaCompleta(etapas)) nLC++;
+
+    let stage, color;
+    if (tieneRecep) { stage = 'recepcionada'; color = '#3b82f6'; }
+    else if (avd === 0) { stage = 'sinDespacho'; color = '#64748b'; }
+    else if (avd <= 33) { stage = 'inicio'; color = '#ef4444'; }
+    else if (avd <= 75) { stage = 'medio'; color = '#f59e0b'; }
+    else { stage = 'avanzado'; color = '#22c55e'; }
+    stages[stage]++;
+
+    const nombre = `${b.NOMBRES || ''} ${b.APELLIDOS || ''}`.trim();
+    houseData.push({ id: ib, nombre, avd, tieneRecep, color, stage });
+  });
+
+  // Plazo
+  const fi = SM.parseDate(proy.fecha_inicio);
+  const dur = parseInt(proy.duracion) || 0;
+  let diasR = null, pctPlazo = 0;
+  if (fi && dur > 0) {
+    const inicio = new Date(fi);
+    const venc = new Date(inicio); venc.setDate(venc.getDate() + dur);
+    diasR = Math.floor((venc - new Date()) / 86400000);
+    pctPlazo = Math.min(100, Math.round((new Date() - inicio) / 86400000 / dur * 100));
+  }
+
+  const avgAvd = houseData.length ? Math.round(houseData.reduce((s, h) => s + h.avd, 0) / houseData.length) : 0;
+
+  // Show content
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('content').style.display = '';
+
+  // Stat cards
+  document.getElementById('statCards').innerHTML = `
+    <div class="stat-card text-center"><div class="text-3xl font-bold font-mono text-white">${nViv}</div><div class="text-[10px] text-slate-500 uppercase mt-1">Viviendas</div></div>
+    <div class="stat-card text-center"><div class="text-3xl font-bold font-mono text-indigo-400">${avgAvd}%</div><div class="text-[10px] text-slate-500 uppercase mt-1">Avance Despacho</div></div>
+    <div class="stat-card text-center"><div class="text-3xl font-bold font-mono text-emerald-400">${nRecep}/${nViv}</div><div class="text-[10px] text-slate-500 uppercase mt-1">Recepciones</div></div>
+    <div class="stat-card text-center"><div class="text-3xl font-bold font-mono ${diasR !== null && diasR < 0 ? 'text-red-400' : diasR !== null && diasR <= 90 ? 'text-amber-400' : 'text-green-400'}">${diasR !== null ? (diasR < 0 ? 'Vencido' : diasR + 'd') : '—'}</div><div class="text-[10px] text-slate-500 uppercase mt-1">Plazo Restante</div></div>
+  `;
+
+  // Stage distribution
+  const stageConfig = [
+    ['sinDespacho', 'Sin Despacho', '#64748b'],
+    ['inicio', 'Inicio (0-33%)', '#ef4444'],
+    ['medio', 'Medio (34-75%)', '#f59e0b'],
+    ['avanzado', 'Avanzado (76%+)', '#22c55e'],
+    ['recepcionada', 'Recepcionada', '#3b82f6']
+  ];
+  let distHtml = '', legHtml = '';
+  stageConfig.forEach(([key, label, color]) => {
+    const n = stages[key];
+    if (n > 0) {
+      const pct = Math.max(Math.round(n / nViv * 100), 8);
+      distHtml += `<div class="stage-bar" style="width:${pct}%;background:${color}">${n}</div>`;
+      legHtml += `<span><span class="inline-block w-2 h-2 rounded" style="background:${color}"></span> ${n} ${label}</span>`;
+    }
+  });
+  document.getElementById('stageDistribution').innerHTML = distHtml;
+  document.getElementById('stageLegend').innerHTML = legHtml;
+
+  // Process indicators
+  function procBar(label, n, total, color) {
+    const pct = total > 0 ? Math.round(n / total * 100) : 0;
+    return `<div>
+      <div class="flex justify-between text-[11px] mb-1"><span class="text-slate-400">${label}</span><span class="font-mono font-bold" style="color:${color}">${n}/${total}</span></div>
+      <div class="h-2 bg-slate-700 rounded-full overflow-hidden"><div class="h-full rounded-full" style="width:${pct}%;background:${color}"></div></div>
+    </div>`;
+  }
+  document.getElementById('processIndicators').innerHTML =
+    procBar('Habilitadas (HPC)', nHpc, nViv, '#22c55e') +
+    procBar('TE1 Inscrito', 0, nViv, '#f59e0b') + // TE1 not available here yet
+    procBar('Linea Critica Completa', nLC, nViv, '#8b5cf6') +
+    procBar('Recepcion Definitiva', nRecep, nViv, '#3b82f6');
+
+  // Houses grid
+  let housesHtml = '';
+  houseData.sort((a, b) => b.avd - a.avd);
+  houseData.forEach(h => {
+    const initials = h.nombre.split(' ').map(w => w[0]).join('').substring(0, 2);
+    housesHtml += `<div class="house" style="background:${h.color}" title="${h.nombre}\nAvance: ${h.avd}%${h.tieneRecep ? '\nRecepcionada' : ''}">${h.avd}%</div>`;
+  });
+  document.getElementById('housesGrid').innerHTML = housesHtml;
+
+  renderComments();
+}
+
+function renderComments() {
+  const el = document.getElementById('comments');
+  const entries = Object.entries(resumenComentarios);
+  if (entries.length === 0) {
+    el.innerHTML = '<p class="text-slate-500 text-sm text-center py-4">Sin comentarios destacados. Marca comentarios desde el Dashboard v3.</p>';
+    return;
+  }
+  // Sort by date desc
+  entries.sort((a, b) => (b[1].fecha || '').localeCompare(a[1].fecha || ''));
+  let html = '';
+  entries.forEach(([id, c]) => {
+    html += `<div class="comment-card" style="animation:fadeIn .3s ease">
+      <div class="flex items-start gap-2">
+        <svg class="w-4 h-4 pin mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        <div class="flex-1">
+          <p class="text-sm text-slate-200">${c.texto || ''}</p>
+          <div class="flex items-center gap-3 mt-1.5 text-[10px] text-slate-500">
+            ${c.beneficiarioNombre ? `<span>${c.beneficiarioNombre}</span>` : ''}
+            ${c.fecha ? `<span>${SM.formatFecha(c.fecha)}</span>` : ''}
+            ${c.tipo ? `<span class="px-1.5 py-0.5 bg-slate-800 rounded text-[9px]">${c.tipo}</span>` : ''}
+          </div>
+        </div>
+      </div>
+    </div>`;
+  });
+  el.innerHTML = html;
+}
+
+init();
+</script>
+</body></html>
