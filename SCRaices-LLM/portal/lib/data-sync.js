@@ -24,8 +24,12 @@
     'controlBGB', 'controlEEPP', 'combenef'
   ];
 
-  // Tables that are append-only (can use incremental offset)
-  const INCREMENTAL = ['Ejecucion', 'Solpago', 'Despacho', 'soldepacho'];
+  // Tables we actually use (whitelist - ignore everything else from manifest)
+  const KNOWN_TABLES = new Set([
+    'Proyectos', 'Beneficiario', 'Despacho', 'soldepacho', 'Ejecucion',
+    'Solpago', 'Maestros', 'Tipologias', 'controlBGB', 'controlEEPP',
+    'combenef', 'Tabla_pago'
+  ]);
 
   let db = null;
   let config = {};
@@ -245,18 +249,20 @@
 
         if (manifest && manifest.tables) {
           const serverCounts = manifest.tables;
-          const allTables = Object.keys(serverCounts);
+          // Only process tables we know about
+          const tablesToCheck = Object.keys(serverCounts).filter(t => KNOWN_TABLES.has(t));
           let i = 0;
 
-          for (const tableName of allTables) {
+          for (const tableName of tablesToCheck) {
             i++;
-            const pct = 10 + Math.round((i / allTables.length) * 80);
+            const pct = 10 + Math.round((i / tablesToCheck.length) * 80);
             const serverCount = serverCounts[tableName];
             const cached = cache[tableName];
 
-            if (FORCE_RELOAD.includes(tableName) || !cached) {
-              // Full reload
-              onProgress(`Descargando ${tableName}...`, pct);
+            if (!cached || cached.rowCount !== serverCount || FORCE_RELOAD.includes(tableName)) {
+              // Download table (full reload — simple and correct)
+              const label = !cached ? 'nueva' : cached.rowCount !== serverCount ? 'actualizada' : 'forzada';
+              onProgress(`Descargando ${tableName} (${label})...`, pct);
               try {
                 const rows = await fetchTable(tableName);
                 await saveToIDB(tableName, rows, serverCount);
@@ -264,29 +270,8 @@
               } catch (err) {
                 errors.push({ table: tableName, error: err.message });
               }
-            } else if (INCREMENTAL.includes(tableName) && cached.rowCount < serverCount) {
-              // Incremental: fetch only new rows
-              onProgress(`Actualizando ${tableName} (+${serverCount - cached.rowCount})...`, pct);
-              try {
-                // Try offset-based fetch; if API doesn't support it, fall back to full
-                const newRows = await fetchTable(tableName);
-                await saveToIDB(tableName, newRows, serverCount);
-                updated.push(tableName);
-              } catch (err) {
-                errors.push({ table: tableName, error: err.message });
-              }
-            } else if (cached.rowCount === serverCount) {
-              unchanged.push(tableName);
             } else {
-              // Row count decreased or mismatch — full reload
-              onProgress(`Recargando ${tableName}...`, pct);
-              try {
-                const rows = await fetchTable(tableName);
-                await saveToIDB(tableName, rows, serverCount);
-                updated.push(tableName);
-              } catch (err) {
-                errors.push({ table: tableName, error: err.message });
-              }
+              unchanged.push(tableName);
             }
           }
         } else {

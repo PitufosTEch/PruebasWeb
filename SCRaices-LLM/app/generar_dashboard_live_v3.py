@@ -801,8 +801,13 @@ def make_live_dashboard(apps_script_url):
             if 'documentacion_' in str(dd.get('T1', '')):
                 te1_ids.add(str(dd.get('ID_benef', '')))
         te1_js = 'const BENEF_CON_TE1 = new Set([' + ','.join(f'"{x}"' for x in te1_ids) + ']);'
+        # Embeber en el dashboard live
         html = html.replace('<script type="text/babel">', f'<script>/* TE1 pre-calculado */\n{te1_js}\n</script>\n<script type="text/babel">', 1)
-        print(f"  TE1 embebido: {len(te1_ids)} beneficiarios")
+        # Tambien guardar como archivo independiente para el portal
+        te1_file = Path(__file__).parent.parent / 'dashboard' / 'te1-set.js'
+        with open(te1_file, 'w', encoding='utf-8') as f:
+            f.write('/* TE1 pre-calculado - generado automaticamente */\n' + te1_js + '\n')
+        print(f"  TE1 embebido: {len(te1_ids)} beneficiarios (+ te1-set.js)")
     except Exception as e:
         print(f"  WARN: No se pudo embeber TE1: {e}")
 

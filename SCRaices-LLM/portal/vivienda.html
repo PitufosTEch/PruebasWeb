@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="es"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Viviendas — SCRaices</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="./lib/data-sync.js"></script>
+<script src="./lib/stage-mapping.js"></script>
+<script src="../dashboard/te1-set.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+firebase.initializeApp({
+  apiKey: "AIzaSyDuM11JE-7klfBBrWsSSi1DF71HiXXYpW0",
+  databaseURL: "https://scraices-dashboard-default-rtdb.firebaseio.com",
+  projectId: "scraices-dashboard"
+});
+const fbDB = firebase.database();
+</script>
+<style>
+body { font-family: 'IBM Plex Sans', sans-serif; }
+.mono, .font-mono { font-family: 'IBM Plex Mono', monospace; }
+.vcard { background: #1e293b; border-radius: 12px; border: 1px solid #334155; padding: 16px; transition: all .2s; }
+.vcard:hover { border-color: #6366f1; }
+.prog { height: 4px; border-radius: 2px; overflow: hidden; background: #334155; }
+.prog-f { height: 100%; border-radius: 2px; }
+.tag { font-size: 9px; font-weight: 700; padding: 2px 8px; border-radius: 5px; white-space: nowrap; }
+.detail-panel { position: fixed; right: 0; top: 0; bottom: 0; width: 420px; max-width: 100vw; background: #0f172a; border-left: 1px solid #334155; z-index: 60; transform: translateX(100%); transition: transform .3s; overflow-y: auto; }
+.detail-panel.open { transform: translateX(0); }
+.backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 55; display: none; }
+.backdrop.show { display: block; }
+.etapa-dot { width: 24px; height: 24px; border-radius: 6px; font-size: 8px; font-weight: 700; display: flex; align-items: center; justify-content: center; color: white; }
+</style>
+</head>
+<body class="bg-slate-900 text-gray-200 min-h-screen">
+
+<div class="bg-slate-950 border-b border-slate-800 px-6 py-3 sticky top-0 z-50">
+  <div class="max-w-[1400px] mx-auto flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <a href="./index.html" class="text-slate-500 hover:text-slate-300"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg></a>
+      <div>
+        <h1 id="projName" class="font-bold text-lg text-white">Cargando...</h1>
+        <p id="projSub" class="text-[11px] text-slate-500"></p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <select id="viewMode" onchange="renderHouses()" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-300 cursor-pointer">
+        <option value="grid">Vista Grid</option>
+        <option value="list">Vista Lista</option>
+      </select>
+      <a id="linkResumen" href="#" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg border border-slate-700">Resumen</a>
+    </div>
+  </div>
+</div>
+
+<div class="max-w-[1400px] mx-auto px-6 py-6">
+  <div id="loading" class="text-center py-20 text-slate-500">Cargando datos...</div>
+  <div id="content" style="display:none">
+    <div id="houses"></div>
+  </div>
+</div>
+
+<!-- Detail panel -->
+<div id="backdrop" class="backdrop" onclick="closeDetail()"></div>
+<div id="detailPanel" class="detail-panel">
+  <div class="p-6" id="detailContent"></div>
+</div>
+
+<script>
+const API_BASE = "https://script.google.com/macros/s/AKfycbx_mSt3xEeXZYn7R2fkt5drp3Pfllxdj71tJo0-2iSqW28OAgwgpzoH_2NI_erM5yB-/exec";
+const SM = StageMapping;
+const PROJECT_ID = new URLSearchParams(window.location.search).get('id') || '';
+
+let housesData = [];
+let comentariosResumen = {};
+
+async function init() {
+  if (!PROJECT_ID) { document.getElementById('loading').textContent = 'Usa ?id=PROJECT_ID'; return; }
+  await DataSync.init({ apiBase: API_BASE });
+  if (DataSync.getCachedTables().length > 0) {
+    processData(); renderHouses();
+    DataSync.sync().then(() => { processData(); renderHouses(); });
+  } else {
+    await DataSync.sync({ onProgress: (msg) => document.getElementById('loading').textContent = msg });
+    processData(); renderHouses();
+  }
+  // Comentarios destacados
+  fbDB.ref('resumen_comentarios/' + PROJECT_ID).on('value', s => { comentariosResumen = s.val() || {}; });
+  // Observaciones
+  fbDB.ref('observaciones').on('value', s => { window._obs = s.val() || {}; });
+}
+
+function processData() {
+  const proyectos = DataSync.getData('Proyectos');
+  const beneficiarios = DataSync.getData('Beneficiario');
+  const despachos = DataSync.getData('Despacho');
+
+  const proy = proyectos.find(p => String(p.ID_proy) === PROJECT_ID);
+  if (!proy) { document.getElementById('loading').textContent = 'Proyecto no encontrado'; return; }
+
+  const bens = beneficiarios.filter(b => String(b.ID_Proy) === PROJECT_ID);
+  const idsB = new Set(bens.map(b => String(b.ID_Benef)));
+  const despProy = despachos.filter(d => idsB.has(String(d.ID_Benef)));
+
+  document.getElementById('projName').textContent = proy.NOMBRE_PROYECTO;
+  document.getElementById('projSub').textContent = `${proy.COMUNA} — ${bens.length} viviendas`;
+  document.getElementById('linkResumen').href = `proyecto.html?id=${PROJECT_ID}`;
+
+  housesData = bens.map(b => {
+    const ib = String(b.ID_Benef);
+    const nombre = `${b.NOMBRES || ''} ${b.APELLIDOS || ''}`.trim();
+    const hpc = String(b['Habil para construir'] || '').toUpperCase() === 'TRUE';
+    const frd = String(b.F_R_dom || '').trim();
+    const tieneRecep = frd && !['nan','','NaT','None'].includes(frd.toLowerCase());
+    const te1 = typeof BENEF_CON_TE1 !== 'undefined' && BENEF_CON_TE1.has(ib);
+
+    const despB = despProy.filter(d => String(d.ID_Benef) === ib);
+    const etapas = SM.getEtapasDespachadas(despB);
+    const avd = SM.calcAvanceDespacho(etapas);
+    const lc = SM.lineaCriticaCompleta(etapas);
+
+    // Color
+    let color, stage;
+    if (tieneRecep) { color = '#3b82f6'; stage = 'Recepcionada'; }
+    else if (avd === 0) { color = '#64748b'; stage = 'Sin despacho'; }
+    else if (avd <= 33) { color = '#ef4444'; stage = 'Inicio'; }
+    else if (avd <= 75) { color = '#f59e0b'; stage = 'En progreso'; }
+    else { color = '#22c55e'; stage = 'Avanzado'; }
+
+    // Ultima fecha despacho
+    const fechas = despB.map(d => d.Fecha).filter(Boolean).sort();
+    const ultDesp = fechas.length > 0 ? fechas[fechas.length - 1] : null;
+
+    // Etapas detalladas
+    const etapasDetalle = SM.SECUENCIA_PRINCIPAL.map(key => ({
+      key, despachada: etapas.has(key),
+      nombre: key.replace(/^\d+_/, '').replace(/_/g, ' ')
+    }));
+
+    return { id: ib, nombre, hpc, tieneRecep, te1, avd, lc, color, stage, etapas: etapasDetalle, ultDesp, fechaRecep: tieneRecep ? frd : null };
+  }).sort((a, b) => b.avd - a.avd);
+
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('content').style.display = '';
+}
+
+function renderHouses() {
+  const mode = document.getElementById('viewMode').value;
+  const el = document.getElementById('houses');
+
+  if (mode === 'grid') {
+    let html = '<div class="flex flex-wrap gap-3">';
+    housesData.forEach((h, i) => {
+      html += `<div class="vcard flex flex-col items-center justify-center cursor-pointer" style="width:90px;min-height:90px;border-left:3px solid ${h.color};animation:fadeIn .3s ease ${i*30}ms both" onclick="showDetail('${h.id}')">
+        <div class="text-lg font-bold font-mono" style="color:${h.color}">${h.avd}%</div>
+        <div class="text-[9px] text-slate-400 text-center mt-1 leading-tight">${h.nombre.split(' ').slice(0,2).join(' ')}</div>
+        <div class="flex gap-0.5 mt-1.5">
+          ${h.hpc ? '<div class="w-2 h-2 rounded-full bg-green-500" title="HPC"></div>' : '<div class="w-2 h-2 rounded-full bg-slate-600" title="Sin HPC"></div>'}
+          ${h.te1 ? '<div class="w-2 h-2 rounded-full bg-amber-500" title="TE1"></div>' : '<div class="w-2 h-2 rounded-full bg-slate-600" title="Sin TE1"></div>'}
+          ${h.lc ? '<div class="w-2 h-2 rounded-full bg-purple-500" title="L.Critica"></div>' : '<div class="w-2 h-2 rounded-full bg-slate-600" title="Sin L.Critica"></div>'}
+          ${h.tieneRecep ? '<div class="w-2 h-2 rounded-full bg-blue-500" title="Recepcionada"></div>' : '<div class="w-2 h-2 rounded-full bg-slate-600"></div>'}
+        </div>
+      </div>`;
+    });
+    html += '</div>';
+    el.innerHTML = html;
+  } else {
+    let html = '<div class="space-y-2">';
+    housesData.forEach((h, i) => {
+      html += `<div class="vcard flex items-center gap-4 cursor-pointer" style="border-left:3px solid ${h.color};animation:fadeIn .2s ease ${i*20}ms both" onclick="showDetail('${h.id}')">
+        <div class="w-14 text-center"><span class="text-lg font-bold font-mono" style="color:${h.color}">${h.avd}%</span></div>
+        <div class="flex-1">
+          <div class="font-semibold text-sm text-white">${h.nombre}</div>
+          <div class="text-[10px] text-slate-500">${h.stage}${h.ultDesp ? ' — Ult.desp: ' + SM.formatFecha(h.ultDesp) : ''}</div>
+        </div>
+        <div class="flex gap-1">
+          ${h.hpc ? '<span class="tag" style="background:#065f46;color:#6ee7b7">HPC</span>' : ''}
+          ${h.te1 ? '<span class="tag" style="background:#78350f;color:#fcd34d">TE1</span>' : ''}
+          ${h.lc ? '<span class="tag" style="background:#581c87;color:#d8b4fe">L.Crit</span>' : ''}
+          ${h.tieneRecep ? '<span class="tag" style="background:#1e3a5f;color:#93c5fd">Recep</span>' : ''}
+        </div>
+      </div>`;
+    });
+    html += '</div>';
+    el.innerHTML = html;
+  }
+}
+
+function showDetail(id) {
+  const h = housesData.find(x => x.id === id);
+  if (!h) return;
+
+  const obs = (window._obs && window._obs[id]) ? Object.values(window._obs[id]) : [];
+
+  let etapasHtml = '<div class="flex flex-wrap gap-1.5 mt-3">';
+  h.etapas.forEach(e => {
+    const bg = e.despachada ? '#22c55e' : '#334155';
+    etapasHtml += `<div class="etapa-dot" style="background:${bg}" title="${e.nombre}">${e.nombre.substring(0,3)}</div>`;
+  });
+  etapasHtml += '</div>';
+
+  let obsHtml = '';
+  if (obs.length > 0) {
+    obsHtml = '<h4 class="text-xs font-semibold text-slate-500 uppercase mt-5 mb-2">Observaciones</h4>';
+    obs.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+    obs.forEach(o => {
+      const ticked = comentariosResumen[o.id];
+      obsHtml += `<div class="p-2.5 bg-slate-800 rounded-lg border border-slate-700 mb-2">
+        <p class="text-sm text-slate-200">${o.texto}</p>
+        <div class="flex items-center gap-2 mt-1 text-[10px] text-slate-500">
+          <span>${o.fecha || ''}</span>
+          ${ticked ? '<span class="text-amber-400">★ En resumen</span>' : ''}
+        </div>
+      </div>`;
+    });
+  }
+
+  document.getElementById('detailContent').innerHTML = `
+    <button onclick="closeDetail()" class="text-slate-500 hover:text-slate-300 text-xl float-right">&times;</button>
+    <h2 class="text-lg font-bold text-white mb-1">${h.nombre}</h2>
+    <p class="text-xs text-slate-500 mb-4">${h.stage}${h.fechaRecep ? ' — Recepcion: ' + SM.formatFecha(h.fechaRecep) : ''}</p>
+
+    <div class="grid grid-cols-2 gap-3 mb-4">
+      <div class="bg-slate-800 rounded-lg p-3 text-center"><div class="text-2xl font-bold font-mono" style="color:${h.color}">${h.avd}%</div><div class="text-[10px] text-slate-500">Av. Despacho</div></div>
+      <div class="bg-slate-800 rounded-lg p-3 text-center"><div class="text-2xl font-bold font-mono text-slate-300">${h.etapas.filter(e=>e.despachada).length}/${h.etapas.length}</div><div class="text-[10px] text-slate-500">Etapas</div></div>
+    </div>
+
+    <div class="flex flex-wrap gap-2 mb-4">
+      <span class="tag" style="background:${h.hpc?'#065f46':'#1e293b'};color:${h.hpc?'#6ee7b7':'#475569'}">HPC: ${h.hpc?'SI':'NO'}</span>
+      <span class="tag" style="background:${h.te1?'#78350f':'#1e293b'};color:${h.te1?'#fcd34d':'#475569'}">TE1: ${h.te1?'SI':'NO'}</span>
+      <span class="tag" style="background:${h.lc?'#581c87':'#1e293b'};color:${h.lc?'#d8b4fe':'#475569'}">L.Critica: ${h.lc?'SI':'NO'}</span>
+      <span class="tag" style="background:${h.tieneRecep?'#1e3a5f':'#1e293b'};color:${h.tieneRecep?'#93c5fd':'#475569'}">Recep: ${h.tieneRecep?'SI':'NO'}</span>
+    </div>
+
+    <h4 class="text-xs font-semibold text-slate-500 uppercase mb-2">Etapas Despachadas</h4>
+    ${etapasHtml}
+
+    ${obsHtml}
+  `;
+
+  document.getElementById('detailPanel').classList.add('open');
+  document.getElementById('backdrop').classList.add('show');
+}
+
+function closeDetail() {
+  document.getElementById('detailPanel').classList.remove('open');
+  document.getElementById('backdrop').classList.remove('show');
+}
+
+const style = document.createElement('style');
+style.textContent = '@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}';
+document.head.appendChild(style);
+
+init();
+</script>
+</body></html>

@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="./lib/data-sync.js"></script>
 <script src="./lib/stage-mapping.js"></script>
+<script src="../dashboard/te1-set.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script>
@@ -220,6 +221,7 @@ function processAndRender() {
     // Plazo
     const fi = SM.parseDate(p.fecha_inicio);
     const dur = parseInt(p.duracion) || 0;
+    if (!fi && !esFinalTabla) continue; // Skip projects without start date unless finalized
     let diasR = null, pctPlazo = 0;
     if (fi && dur > 0) {
       const inicio = new Date(fi);
@@ -234,7 +236,21 @@ function processAndRender() {
     }
 
     const delta = avdProm - pctPlazo;
-    const semaforo = SM.calcSemaforo(diasR, 0, delta); // criticas simplified
+    // Contar criticas (viviendas con >21 dias sin despacho)
+    let nCriticas = 0;
+    const hoy = new Date();
+    bens.forEach(b => {
+      const ib = String(b.ID_Benef);
+      const despB = despProy.filter(d => String(d.ID_Benef) === ib);
+      if (despB.length > 0) {
+        const fechas = despB.map(d => new Date(d.Fecha)).filter(f => !isNaN(f));
+        if (fechas.length > 0) {
+          const ultima = Math.max(...fechas);
+          if ((hoy - ultima) / 86400000 > 21) nCriticas++;
+        }
+      }
+    });
+    const semaforo = SM.calcSemaforo(diasR, nCriticas, delta);
 
     projectsData.push({
       id: pid, nombre: String(p.NOMBRE_PROYECTO || ''), comuna: String(p.COMUNA || ''),

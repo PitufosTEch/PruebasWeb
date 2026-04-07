@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="./lib/data-sync.js"></script>
 <script src="./lib/stage-mapping.js"></script>
+<script src="../dashboard/te1-set.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script>
@@ -232,7 +233,7 @@ function render() {
   }
   document.getElementById('processIndicators').innerHTML =
     procBar('Habilitadas (HPC)', nHpc, nViv, '#22c55e') +
-    procBar('TE1 Inscrito', 0, nViv, '#f59e0b') + // TE1 not available here yet
+    procBar('TE1 Inscrito', typeof BENEF_CON_TE1 !== 'undefined' ? bens.filter(b => BENEF_CON_TE1.has(String(b.ID_Benef))).length : '?', nViv, '#f59e0b') +
     procBar('Linea Critica Completa', nLC, nViv, '#8b5cf6') +
     procBar('Recepcion Definitiva', nRecep, nViv, '#3b82f6');
 
@@ -270,6 +271,7 @@ function renderComments() {
             ${c.tipo ? `<span class="px-1.5 py-0.5 bg-slate-800 rounded text-[9px]">${c.tipo}</span>` : ''}
           </div>
         </div>
+        <button onclick="fbDB.ref('resumen_comentarios/${PROJECT_ID}/${id}').remove()" class="text-slate-500 hover:text-red-400 text-xs shrink-0 px-1" title="Quitar del resumen">&times;</button>
       </div>
     </div>`;
   });
