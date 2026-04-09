@@ -833,63 +833,8 @@ if ('serviceWorker' in navigator) {
     html = html.replace('</body>', sw_script + '</body>', 1)
     print("  Tags PWA inyectadas")
 
-    # 4b. Inyectar protección por contraseña
-    # SHA-256 de "SCRAICES.2026"
-    PASSWORD_HASH = "a0f3b1c45e6d8f9a2b4c7e0d1f3a5b8c9e2d4f6a8b0c3e5d7f9a1b4c6e8d0f2"
-    login_screen = '''
-<div id="loginOverlay" style="position:fixed;inset:0;z-index:9999;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans',sans-serif;">
-    <div style="text-align:center;max-width:380px;width:90%;">
-        <div style="width:56px;height:56px;background:#7c3aed;border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;">
-            <span style="color:white;font-size:18px;font-weight:700;font-family:'IBM Plex Mono',monospace;">SC</span>
-        </div>
-        <h2 style="color:#1f2937;font-size:20px;font-weight:600;margin-bottom:4px;">Panel de Control v3</h2>
-        <p style="color:#9ca3af;font-size:13px;margin-bottom:24px;">SG Raices - Acceso protegido</p>
-        <div style="display:flex;gap:8px;">
-            <input type="password" id="pwdInput" placeholder="Contrasena" autocomplete="off" autofocus
-                style="flex:1;padding:10px 16px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;outline:none;font-family:'IBM Plex Sans',sans-serif;"
-                onkeydown="if(event.key==='Enter')checkPwd()" />
-            <button onclick="checkPwd()"
-                style="padding:10px 20px;background:#7c3aed;color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:500;">Entrar</button>
-        </div>
-        <p id="pwdError" style="color:#ef4444;font-size:12px;margin-top:10px;display:none;">Contrasena incorrecta</p>
-    </div>
-</div>
-<script>
-async function hashPwd(pwd) {
-    const enc = new TextEncoder().encode(pwd);
-    const buf = await crypto.subtle.digest('SHA-256', enc);
-    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
-}
-async function checkPwd() {
-    const input = document.getElementById('pwdInput').value;
-    const hash = await hashPwd(input);
-    if (hash === sessionStorage.getItem('_sc_hash') || input === '') { return; }
-    // Hash correcto de SCRAICES.2026
-    if (hash === '__PWD_HASH__') {
-        sessionStorage.setItem('_sc_auth', '1');
-        document.getElementById('loginOverlay').style.display = 'none';
-    } else {
-        document.getElementById('pwdError').style.display = 'block';
-        document.getElementById('pwdInput').value = '';
-        document.getElementById('pwdInput').focus();
-    }
-}
-// Auto-check si ya autenticado en esta sesion
-if (sessionStorage.getItem('_sc_auth') === '1') {
-    document.getElementById('loginOverlay').style.display = 'none';
-}
-</script>
-'''
-    # Calcular hash real
-    import hashlib
-    real_hash = hashlib.sha256("SCRAICES.2026".encode()).hexdigest()
-    login_screen = login_screen.replace('__PWD_HASH__', real_hash)
-
-    # Inyectar después de <body...>
-    body_tag = '<body class="bg-gray-50 text-gray-800 min-h-screen">'
-    if body_tag in html:
-        html = html.replace(body_tag, body_tag + '\n' + login_screen)
-        print("  Pantalla de login inyectada")
+    # 4b. Login removido — acceso directo sin contraseña
+    print("  Sin pantalla de login (acceso directo)")
 
     # 5. Agregar indicador LIVE en top bar
     html = html.replace(
