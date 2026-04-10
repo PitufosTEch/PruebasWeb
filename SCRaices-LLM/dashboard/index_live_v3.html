@@ -63,9 +63,53 @@
     <link rel="apple-touch-icon" href="./icon-192.png">
 </head>
 <body class="bg-gray-50 text-gray-800 min-h-screen">
+
+<div id="loginOverlay" style="position:fixed;inset:0;z-index:9999;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans',sans-serif;">
+    <div style="text-align:center;max-width:380px;width:90%;">
+        <div style="width:56px;height:56px;background:#7c3aed;border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;">
+            <span style="color:white;font-size:18px;font-weight:700;font-family:'IBM Plex Mono',monospace;">SC</span>
+        </div>
+        <h2 style="color:#1f2937;font-size:20px;font-weight:600;margin-bottom:4px;">Panel de Control v3</h2>
+        <p style="color:#9ca3af;font-size:13px;margin-bottom:24px;">SG Raices - Acceso protegido</p>
+        <div style="display:flex;gap:8px;">
+            <input type="password" id="pwdInput" placeholder="Contrasena" autocomplete="off" autofocus
+                style="flex:1;padding:10px 16px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;outline:none;font-family:'IBM Plex Sans',sans-serif;"
+                onkeydown="if(event.key==='Enter')checkPwd()" />
+            <button onclick="checkPwd()"
+                style="padding:10px 20px;background:#7c3aed;color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:500;">Entrar</button>
+        </div>
+        <p id="pwdError" style="color:#ef4444;font-size:12px;margin-top:10px;display:none;">Contrasena incorrecta</p>
+    </div>
+</div>
+<script>
+async function hashPwd(pwd) {
+    const enc = new TextEncoder().encode(pwd);
+    const buf = await crypto.subtle.digest('SHA-256', enc);
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+async function checkPwd() {
+    const input = document.getElementById('pwdInput').value;
+    const hash = await hashPwd(input);
+    if (hash === sessionStorage.getItem('_sc_hash') || input === '') { return; }
+    // Hash correcto de SCRAICES.2026
+    if (hash === 'b5346b30a063c762b881008377ddb2746ce6075a0eb8518eca696937ef2cd6c0') {
+        sessionStorage.setItem('_sc_auth', '1');
+        document.getElementById('loginOverlay').style.display = 'none';
+    } else {
+        document.getElementById('pwdError').style.display = 'block';
+        document.getElementById('pwdInput').value = '';
+        document.getElementById('pwdInput').focus();
+    }
+}
+// Auto-check si ya autenticado en esta sesion
+if (sessionStorage.getItem('_sc_auth') === '1') {
+    document.getElementById('loginOverlay').style.display = 'none';
+}
+</script>
+
 <div id="root"></div>
 <script>/* TE1 pre-calculado */
-const BENEF_CON_TE1 = new Set(["12c25a45","166","ac1ab314","34","40","c8d8c1a7","f5bcf55a","85","179","5YmO5g4R","4e58d270","259","03e9b88e","258","61","dc046a32","16","eba7c726","127","b9f15de2","5ff35e45","55","274","20","278f9423","cf79f388","e01c6721","238","270","192","273","175","211","89","152","299","ee324b3e","300d64d0","a822691f","102","86","145","8d1e3485","39cb7460","0YnV4j1M","884d1089","6ba2bc19","163","237","9a92e6a5","165","130","87","284","5ec97c61","0b6a1dec","9d710ac4","5be80191","63","6MmA9y4V","33058c14","7f8c689e","8b2aee80","161","2BzZ0m6A","10","e50e1f4d","29","118","cece8553","be281e89","eb8f60ce","290","9de422b6","c600ee1f","b110f6a0","149","234","147","187","66d64e7c","624c1c97","140","171b3d1c","aa02a175","218","fd4aea68","3177f6bf","3MpE1d9N","efa3b5bc","6cd0c7de","a92a0012","c2acdd91","a4bddd1c","11","15","ad4b2df5","0c863128","2a7c6229","fe671f04","3b2640ec","035ee40b","84","f1301620","131","79b4cd06","04534bc2","164","fb6b5ff3","c52c5a7e","2f63c593","f250ca25","e34d0b4a","2c8535ef","d5413844","6TzD5y3C","44","04c74b12","7c513d05","6fd5ceab","52","0c89e0d9","176","60","c7a1748f","96","204","189","1475c828","98dac2f8","fdcac62b","4d16529b","2e698e86","6655e02c","9775976c","a7be7f1e","e4fffaed","9132d211","222","56","8c4f57c6","e7bef459","570c01f1","262","1ea78361","8dcd85a1","293","1c0fc70e","04fce0a8","e28184b8","6b5257aa","04f93b7e","84d765be","0747ee11","e7918209","281","bfc0a38e","a88a8ddd","299b47ab","1ba081c1","26","260","d9ee9ac0","9KwV6v9B","4fab5c1a","217","307","137","90dd6eb7","f7204dee","125","30","141","bdbaf11b","423a638b","4812fe24","185","253","9e43d846","0786b2bb","51","194","300","b549601d","499d9712","7ec22c9f","eabc0b53","4118efc3","a06ea83d","39a6fc94","0b407d4f","196","ba5dfd6e","7a466407","143","6c6ec77f","3602ce85","192b021a","81","96025d52","139","f930511c","50","265","0GyX6w7X","153","113","1eaf0c03","43","151","80e4efb8","93","bc406ef1","e30eb1b9","245","3b565b7f","e777cc66","2d4de184","252","112","559fa9fa","239","51af0605","7627c55e","142","277","1","43ea5aa3","3bf067cc","8JmK7j7H","32090842","a7e8d877","178","279","104f9b13","303","5EhS9o5H","8f0b9ff3","58","5a7236df","22628dc9","14","7d102b6f","8d82cf2c","b182853f","9a9977d0","59","ad0ab40d","23d76bb4","eabe3a84","fe02d24e","d0361dd3","49","105","138d896a","39","f943a1e7","172","82485a60","d0994b0d","54","0CeB0n4Y","9b44a4f5","c6115326","9a74568f","82","d2fd7725","e73b48ef","91","16eb4c90","e379e5da","123","a275b583","171","227","04c70869","20f5d547","1c7ca796","216","6QsV1o3K","0be183e0","92","a6c28e2b","c64507cc","17","186","99","216a4068","9b3f1489","120","226","76fcb444","297","b8ea1bf4","1VpX5w9C","5dc4b296","103","285","34f3fd52","3AoI2p0F","3JfY5f2O","62ec5e83","23","295","198","188","0ecb6510","110","c241852e","e9ea20e5","e26036eb","d74b36eb","276","98deedd7","81816980","57c367bf","75","ada36206","221","100","c4c5ffa2","0a092e84","a3a06af7","6UoQ2g6T","97","119","9142342d","db69ba69","302","2YoX7y7X","35121288","d5c4d1aa","304","27cd49d0","da9a8e86","116","106","197","45223ebf","8b143222","68","173","154","9YuU5e9L","158f3213","157","195","12","28","158","8","1IpY6j3O","e4909f27","6fdec46a","190","25","b6c8c480","67112c8c","9937634d","a0f8fafb","27701795","40c23899","36315d01","8fbc54c0","b798c98b","296","e991428a","250","230","a4a340d8","170","159","16be7442","146","156","66","c99d0690","223","ef0fad1d","dff78b53","599ba314","38","65","8d7443b9","e84c74db","46","205","155","0a44325e","95e473e4","69f6772e","7be4d040","8b189ef8","73","107","271","3b3f2df8","d30eab52","126","255","faa4e189","27","c7e5630c","d1bd913f","f54a1357","122","368fff93","9BfD2a7N","86804af6","5366cac3","e9dcbe42","367b245e","967cbc85","6e85ee72","94","135","4b9841b0","182","aeb78cc6","707ccf02","857336a3","2ecc8d09","65fded69","254","10c20768","69a25997","41","93f0a67d","a842239e","a8fe9540","a4cb19e6","58f7daf1","124","88","16f84f38","150","7ace36ee","ea49da17","203fe3ee","e6adfcbb","0a9833cc","b228e13e","206","306","bb53962c","79","f123cf9b","da6bea3d","6928a1dc","ba86949b","104","47","6StD5g7B","bd2fe770","6a24bede","298","a0cb34f6","da26ea4d","90","6OtX3i4C","4f51ad4d","8835b1ff","4EsD0l1B","9ba3209f","181","69","b269b82f","c023fe3f","badfc843","70389731","134","174","292","9","8cba66e3","129","ba44da17","2929ec92","e67ba878","36","278","0273ee90","c94bfc0b","114","a741b6e1","7FsZ6p1R","219","168","9d8cfe48","9dfc8be0","19","c8892a41","48","136","cf5e7a2d","e48cd722","e27117e5","ce7f31c4","54c35236","22","4YhQ4u5N","32","a0aef150","23726d89","85e290fd","1BpA4x1K","1279c798","6487d6ba","251","1a7b1678","184","ea66aaf0","45","108","762f405e","f518b836","128","275","280","2ee0e760","fb2f4ffa","a5a685cd","111","74","5c218dce","62","f8cb95f0","df507538","121","b92a67e8","ad2908b2","248","c67277fe","3VnH3q6A","d8f1a015","98372951","643d0257","117","220","74ecbdf7","301","268","6JrA5z9N","21","a786d46c","98","cbb509e4","be800f5b","3359d44b","dacfb58e","90064428","3d729ee4","1f73f7a1","0d60dbad","7BtM8g3U","64","115","4f2b37b1","3a770823","11800759","c63219df","294","0b0161bb","3JkH8v3B","81fbd43d","6c11c8d8","263","23885317","0e83dc4e","32104289","4a448359","80c7347f","042aba14","32c882d7","144","a881771d","57","8e63106a","94aaf1da","193","80","bbb1f24b","e025c654","67","70","b5ccb0c3","35","6494dce8","305","291","229","269","8a37237e","167","105ada69","201","3a29579b","4TsP6m8J","77f772f4","138","42","257","a094613d"]);
+const BENEF_CON_TE1 = new Set(["be800f5b","9775976c","1VpX5w9C","4812fe24","c99d0690","21","142","3602ce85","8JmK7j7H","1a7b1678","85","9d710ac4","80","cbb509e4","3177f6bf","32104289","12c25a45","27","270","79b4cd06","e6adfcbb","131","306","0a44325e","f518b836","6e85ee72","285","136","188","e73b48ef","b5ccb0c3","140","9142342d","15","8b2aee80","67","179","b549601d","230","04f93b7e","b110f6a0","7be4d040","259","a094613d","185","3359d44b","61","6494dce8","a5a685cd","86","6b5257aa","eabc0b53","203fe3ee","0YnV4j1M","1c0fc70e","a0aef150","ee324b3e","143","a0f8fafb","11800759","110","33058c14","367b245e","194","4e58d270","8f0b9ff3","237","171b3d1c","170","204","94aaf1da","3JfY5f2O","499d9712","279","884d1089","fb6b5ff3","1ba081c1","599ba314","96025d52","b798c98b","120","df507538","221","f250ca25","105","278f9423","23d76bb4","f123cf9b","151","152","0c89e0d9","158f3213","193","65","9KwV6v9B","04c74b12","223","274","166","108","ba86949b","128","54c35236","16be7442","aa02a175","62","29","112","35121288","251","d8f1a015","c241852e","6487d6ba","220","8e63106a","90dd6eb7","30","41","10c20768","0d60dbad","0273ee90","624c1c97","b182853f","189","1f73f7a1","192b021a","38","34f3fd52","184","eabe3a84","fe671f04","cf79f388","ad0ab40d","196","138d896a","0e83dc4e","165","6OtX3i4C","98deedd7","138","3b2640ec","99","103","43","6fd5ceab","ad2908b2","a881771d","198","84d765be","ef0fad1d","dc046a32","257","a0cb34f6","125","8","8fbc54c0","304","114","146","88","1","157","81","144","e777cc66","1ea78361","44","16","dff78b53","301","90","9a9977d0","b6c8c480","5EhS9o5H","c6115326","305","98372951","a275b583","ba44da17","34","190","51","174","9BfD2a7N","cf5e7a2d","f943a1e7","303","c7e5630c","b269b82f","e4909f27","9a92e6a5","139","75","55","b8ea1bf4","42","efa3b5bc","be281e89","254","ac1ab314","6928a1dc","181","141","6StD5g7B","0786b2bb","182","0be183e0","126","11","3a29579b","e28184b8","158","277","e67ba878","6UoQ2g6T","172","8cba66e3","6a24bede","a7be7f1e","707ccf02","fd4aea68","58","14","69","f1301620","c4c5ffa2","3b565b7f","9de422b6","c64507cc","219","0c863128","1eaf0c03","f8cb95f0","1279c798","159","206","1475c828","7d102b6f","9","296","7ec22c9f","e50e1f4d","156","250","23726d89","68","192","56","6JrA5z9N","7BtM8g3U","7a466407","c67277fe","186","db69ba69","bdbaf11b","d1bd913f","145","300d64d0","b92a67e8","299","7c513d05","9e43d846","92","17","12","a6c28e2b","d5c4d1aa","187","45","f7204dee","129","195","118","216","54","8d7443b9","ea66aaf0","255","9dfc8be0","284","35","4f2b37b1","51af0605","70","106","0a9833cc","173","77f772f4","161","175","90064428","164","d0361dd3","faa4e189","a8fe9540","fdcac62b","2d4de184","8d1e3485","bb53962c","5dc4b296","36","1IpY6j3O","57c367bf","238","a7e8d877","c7a1748f","85e290fd","2a7c6229","20","16eb4c90","57","a88a8ddd","2929ec92","5a7236df","84","e991428a","7627c55e","a92a0012","e01c6721","168","50","300","79","269","3VnH3q6A","273","c52c5a7e","eb8f60ce","40c23899","280","8d82cf2c","16f84f38","6fdec46a","10","65fded69","0b6a1dec","137","04534bc2","a842239e","a4cb19e6","123","c023fe3f","19","271","ea49da17","e025c654","100","76fcb444","163","e26036eb","23","ba5dfd6e","da9a8e86","a06ea83d","134","96","ce7f31c4","260","1c7ca796","e7bef459","155","6TzD5y3C","c94bfc0b","3b3f2df8","f54a1357","47","104f9b13","91","9d8cfe48","d74b36eb","643d0257","297","9937634d","da6bea3d","93f0a67d","6655e02c","0b407d4f","8b189ef8","216a4068","e30eb1b9","4TsP6m8J","0CeB0n4Y","7f8c689e","113","294","153","a4a340d8","291","b9f15de2","43ea5aa3","121","9b3f1489","66d64e7c","63","23885317","f930511c","d9ee9ac0","263","298","81fbd43d","25","234","135","290","218","81816980","276","9ba3209f","82","bd2fe770","171","5366cac3","4d16529b","73","59","40","147","d2fd7725","127","3bf067cc","d0994b0d","97","82485a60","6MmA9y4V","130","0GyX6w7X","8835b1ff","117","211","b228e13e","03e9b88e","94","4118efc3","58f7daf1","2ecc8d09","89","222","95e473e4","39cb7460","252","262","967cbc85","80e4efb8","9YuU5e9L","0ecb6510","5ff35e45","0b0161bb","45223ebf","0a092e84","8b143222","87","857336a3","245","c8892a41","a4bddd1c","275","39","035ee40b","265","26","167","6cd0c7de","e9ea20e5","4fab5c1a","197","20f5d547","eba7c726","178","8dcd85a1","0747ee11","da26ea4d","d5413844","293","badfc843","a822691f","3AoI2p0F","6QsV1o3K","8c4f57c6","86804af6","48","27701795","150","368fff93","f5bcf55a","226","60","253","3MpE1d9N","80c7347f","116","105ada69","93","d30eab52","a3a06af7","67112c8c","39a6fc94","2ee0e760","9b44a4f5","a741b6e1","9132d211","32","1BpA4x1K","570c01f1","fe02d24e","107","292","c63219df","4b9841b0","7FsZ6p1R","559fa9fa","22","258","124","102","e379e5da","98","36315d01","239","3JkH8v3B","154","104","e34d0b4a","62ec5e83","4EsD0l1B","49","229","ada36206","e48cd722","32c882d7","04c70869","4YhQ4u5N","69a25997","4f51ad4d","52","c2acdd91","299b47ab","5ec97c61","cece8553","66","a786d46c","115","2BzZ0m6A","278","307","248","22628dc9","6c6ec77f","74","7ace36ee","bfc0a38e","e84c74db","227","e4fffaed","3a770823","2f63c593","64","5YmO5g4R","ad4b2df5","aeb78cc6","201","119","28","111","281","98dac2f8","205","e27117e5","302","6ba2bc19","c600ee1f","69f6772e","2YoX7y7X","149","217","bbb1f24b","295","c8d8c1a7","5be80191","423a638b","2e698e86","6c11c8d8","3d729ee4","122","e9dcbe42","46","5c218dce","04fce0a8","176","268","2c8535ef","4a448359","fb2f4ffa","8a37237e"]);
 </script>
 <script type="text/babel">
 
@@ -1561,24 +1605,6 @@ const ViviendaCard = ({ beneficiario, estadoEtapas, expanded, onToggle, grupoCol
                                             <p className="text-sm text-gray-700">{obs.texto}</p>
                                             <p className="text-[10px] text-gray-400 mt-1">{obs.fecha.replace('T', ' ')}</p>
                                         </div>
-                                        <button onClick={() => {
-                                            const pId = String(b.ID_Proy || proyectoSel);
-                                            const ref = fbDB.ref('resumen_comentarios/' + pId + '/' + obs.id);
-                                            ref.once('value').then(snap => {
-                                                if (snap.exists()) {
-                                                    ref.remove();
-                                                } else {
-                                                    ref.set({
-                                                        texto: obs.texto,
-                                                        fecha: obs.fecha,
-                                                        tipo: 'observacion',
-                                                        beneficiarioId: String(b.ID_Benef),
-                                                        beneficiarioNombre: `${b.NOMBRES} ${b.APELLIDOS}`,
-                                                        tickedAt: Date.now()
-                                                    });
-                                                }
-                                            });
-                                        }} className={`text-xs px-1.5 py-0.5 rounded transition-colors ${resumenComentarios[String(b.ID_Proy || proyectoSel)] && resumenComentarios[String(b.ID_Proy || proyectoSel)][obs.id] ? "text-amber-500 bg-amber-100" : "text-gray-300 hover:text-amber-500"}`} title="Incorporar al resumen ejecutivo">&#9733;</button>
                                         <button onClick={() => deleteObservacion(b.ID_Benef, obs.id)} className="text-red-400 hover:text-red-600 text-xs px-1" title="Eliminar">&times;</button>
                                     </div>
                                 ))}
@@ -3348,11 +3374,6 @@ const App = () => {
             skipOcultadosPush.current = true;
             setOcultados(val || {});
         });
-        // Listener Firebase para Resumen Comentarios
-        resumenRef.current = fbDB.ref('resumen_comentarios');
-        resumenRef.current.on('value', (snap) => {
-            setResumenComentarios(snap.val() || {});
-        });
         return () => {
             if (gruposRef.current) gruposRef.current.off();
             if (obsRef.current) obsRef.current.off();
@@ -3361,7 +3382,6 @@ const App = () => {
             if (sugRef.current) sugRef.current.off();
             if (muestrasRef.current) muestrasRef.current.off();
             if (ocultadosRef.current) ocultadosRef.current.off();
-            if (resumenRef.current) resumenRef.current.off();
         };
     }, []);
 
@@ -3470,10 +3490,6 @@ const App = () => {
         const raw = muestrasHormigon[proyectoSel];
         return Array.isArray(raw) ? raw : [];
     };
-
-    // Resumen comentarios (Firebase) - para tick de incorporar al resumen
-    const [resumenComentarios, setResumenComentarios] = React.useState({});
-    const resumenRef = React.useRef(null);
 
     // Beneficiarios ocultos (Firebase)
     const [ocultados, setOcultados] = React.useState({});
