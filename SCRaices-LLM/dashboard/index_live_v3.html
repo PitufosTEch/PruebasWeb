@@ -63,53 +63,9 @@
     <link rel="apple-touch-icon" href="./icon-192.png">
 </head>
 <body class="bg-gray-50 text-gray-800 min-h-screen">
-
-<div id="loginOverlay" style="position:fixed;inset:0;z-index:9999;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans',sans-serif;">
-    <div style="text-align:center;max-width:380px;width:90%;">
-        <div style="width:56px;height:56px;background:#7c3aed;border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;">
-            <span style="color:white;font-size:18px;font-weight:700;font-family:'IBM Plex Mono',monospace;">SC</span>
-        </div>
-        <h2 style="color:#1f2937;font-size:20px;font-weight:600;margin-bottom:4px;">Panel de Control v3</h2>
-        <p style="color:#9ca3af;font-size:13px;margin-bottom:24px;">SG Raices - Acceso protegido</p>
-        <div style="display:flex;gap:8px;">
-            <input type="password" id="pwdInput" placeholder="Contrasena" autocomplete="off" autofocus
-                style="flex:1;padding:10px 16px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;outline:none;font-family:'IBM Plex Sans',sans-serif;"
-                onkeydown="if(event.key==='Enter')checkPwd()" />
-            <button onclick="checkPwd()"
-                style="padding:10px 20px;background:#7c3aed;color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:500;">Entrar</button>
-        </div>
-        <p id="pwdError" style="color:#ef4444;font-size:12px;margin-top:10px;display:none;">Contrasena incorrecta</p>
-    </div>
-</div>
-<script>
-async function hashPwd(pwd) {
-    const enc = new TextEncoder().encode(pwd);
-    const buf = await crypto.subtle.digest('SHA-256', enc);
-    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
-}
-async function checkPwd() {
-    const input = document.getElementById('pwdInput').value;
-    const hash = await hashPwd(input);
-    if (hash === sessionStorage.getItem('_sc_hash') || input === '') { return; }
-    // Hash correcto de SCRAICES.2026
-    if (hash === 'b5346b30a063c762b881008377ddb2746ce6075a0eb8518eca696937ef2cd6c0') {
-        sessionStorage.setItem('_sc_auth', '1');
-        document.getElementById('loginOverlay').style.display = 'none';
-    } else {
-        document.getElementById('pwdError').style.display = 'block';
-        document.getElementById('pwdInput').value = '';
-        document.getElementById('pwdInput').focus();
-    }
-}
-// Auto-check si ya autenticado en esta sesion
-if (sessionStorage.getItem('_sc_auth') === '1') {
-    document.getElementById('loginOverlay').style.display = 'none';
-}
-</script>
-
 <div id="root"></div>
 <script>/* TE1 pre-calculado */
-const BENEF_CON_TE1 = new Set(["be800f5b","9775976c","1VpX5w9C","4812fe24","c99d0690","21","142","3602ce85","8JmK7j7H","1a7b1678","85","9d710ac4","80","cbb509e4","3177f6bf","32104289","12c25a45","27","270","79b4cd06","e6adfcbb","131","306","0a44325e","f518b836","6e85ee72","285","136","188","e73b48ef","b5ccb0c3","140","9142342d","15","8b2aee80","67","179","b549601d","230","04f93b7e","b110f6a0","7be4d040","259","a094613d","185","3359d44b","61","6494dce8","a5a685cd","86","6b5257aa","eabc0b53","203fe3ee","0YnV4j1M","1c0fc70e","a0aef150","ee324b3e","143","a0f8fafb","11800759","110","33058c14","367b245e","194","4e58d270","8f0b9ff3","237","171b3d1c","170","204","94aaf1da","3JfY5f2O","499d9712","279","884d1089","fb6b5ff3","1ba081c1","599ba314","96025d52","b798c98b","120","df507538","221","f250ca25","105","278f9423","23d76bb4","f123cf9b","151","152","0c89e0d9","158f3213","193","65","9KwV6v9B","04c74b12","223","274","166","108","ba86949b","128","54c35236","16be7442","aa02a175","62","29","112","35121288","251","d8f1a015","c241852e","6487d6ba","220","8e63106a","90dd6eb7","30","41","10c20768","0d60dbad","0273ee90","624c1c97","b182853f","189","1f73f7a1","192b021a","38","34f3fd52","184","eabe3a84","fe671f04","cf79f388","ad0ab40d","196","138d896a","0e83dc4e","165","6OtX3i4C","98deedd7","138","3b2640ec","99","103","43","6fd5ceab","ad2908b2","a881771d","198","84d765be","ef0fad1d","dc046a32","257","a0cb34f6","125","8","8fbc54c0","304","114","146","88","1","157","81","144","e777cc66","1ea78361","44","16","dff78b53","301","90","9a9977d0","b6c8c480","5EhS9o5H","c6115326","305","98372951","a275b583","ba44da17","34","190","51","174","9BfD2a7N","cf5e7a2d","f943a1e7","303","c7e5630c","b269b82f","e4909f27","9a92e6a5","139","75","55","b8ea1bf4","42","efa3b5bc","be281e89","254","ac1ab314","6928a1dc","181","141","6StD5g7B","0786b2bb","182","0be183e0","126","11","3a29579b","e28184b8","158","277","e67ba878","6UoQ2g6T","172","8cba66e3","6a24bede","a7be7f1e","707ccf02","fd4aea68","58","14","69","f1301620","c4c5ffa2","3b565b7f","9de422b6","c64507cc","219","0c863128","1eaf0c03","f8cb95f0","1279c798","159","206","1475c828","7d102b6f","9","296","7ec22c9f","e50e1f4d","156","250","23726d89","68","192","56","6JrA5z9N","7BtM8g3U","7a466407","c67277fe","186","db69ba69","bdbaf11b","d1bd913f","145","300d64d0","b92a67e8","299","7c513d05","9e43d846","92","17","12","a6c28e2b","d5c4d1aa","187","45","f7204dee","129","195","118","216","54","8d7443b9","ea66aaf0","255","9dfc8be0","284","35","4f2b37b1","51af0605","70","106","0a9833cc","173","77f772f4","161","175","90064428","164","d0361dd3","faa4e189","a8fe9540","fdcac62b","2d4de184","8d1e3485","bb53962c","5dc4b296","36","1IpY6j3O","57c367bf","238","a7e8d877","c7a1748f","85e290fd","2a7c6229","20","16eb4c90","57","a88a8ddd","2929ec92","5a7236df","84","e991428a","7627c55e","a92a0012","e01c6721","168","50","300","79","269","3VnH3q6A","273","c52c5a7e","eb8f60ce","40c23899","280","8d82cf2c","16f84f38","6fdec46a","10","65fded69","0b6a1dec","137","04534bc2","a842239e","a4cb19e6","123","c023fe3f","19","271","ea49da17","e025c654","100","76fcb444","163","e26036eb","23","ba5dfd6e","da9a8e86","a06ea83d","134","96","ce7f31c4","260","1c7ca796","e7bef459","155","6TzD5y3C","c94bfc0b","3b3f2df8","f54a1357","47","104f9b13","91","9d8cfe48","d74b36eb","643d0257","297","9937634d","da6bea3d","93f0a67d","6655e02c","0b407d4f","8b189ef8","216a4068","e30eb1b9","4TsP6m8J","0CeB0n4Y","7f8c689e","113","294","153","a4a340d8","291","b9f15de2","43ea5aa3","121","9b3f1489","66d64e7c","63","23885317","f930511c","d9ee9ac0","263","298","81fbd43d","25","234","135","290","218","81816980","276","9ba3209f","82","bd2fe770","171","5366cac3","4d16529b","73","59","40","147","d2fd7725","127","3bf067cc","d0994b0d","97","82485a60","6MmA9y4V","130","0GyX6w7X","8835b1ff","117","211","b228e13e","03e9b88e","94","4118efc3","58f7daf1","2ecc8d09","89","222","95e473e4","39cb7460","252","262","967cbc85","80e4efb8","9YuU5e9L","0ecb6510","5ff35e45","0b0161bb","45223ebf","0a092e84","8b143222","87","857336a3","245","c8892a41","a4bddd1c","275","39","035ee40b","265","26","167","6cd0c7de","e9ea20e5","4fab5c1a","197","20f5d547","eba7c726","178","8dcd85a1","0747ee11","da26ea4d","d5413844","293","badfc843","a822691f","3AoI2p0F","6QsV1o3K","8c4f57c6","86804af6","48","27701795","150","368fff93","f5bcf55a","226","60","253","3MpE1d9N","80c7347f","116","105ada69","93","d30eab52","a3a06af7","67112c8c","39a6fc94","2ee0e760","9b44a4f5","a741b6e1","9132d211","32","1BpA4x1K","570c01f1","fe02d24e","107","292","c63219df","4b9841b0","7FsZ6p1R","559fa9fa","22","258","124","102","e379e5da","98","36315d01","239","3JkH8v3B","154","104","e34d0b4a","62ec5e83","4EsD0l1B","49","229","ada36206","e48cd722","32c882d7","04c70869","4YhQ4u5N","69a25997","4f51ad4d","52","c2acdd91","299b47ab","5ec97c61","cece8553","66","a786d46c","115","2BzZ0m6A","278","307","248","22628dc9","6c6ec77f","74","7ace36ee","bfc0a38e","e84c74db","227","e4fffaed","3a770823","2f63c593","64","5YmO5g4R","ad4b2df5","aeb78cc6","201","119","28","111","281","98dac2f8","205","e27117e5","302","6ba2bc19","c600ee1f","69f6772e","2YoX7y7X","149","217","bbb1f24b","295","c8d8c1a7","5be80191","423a638b","2e698e86","6c11c8d8","3d729ee4","122","e9dcbe42","46","5c218dce","04fce0a8","176","268","2c8535ef","4a448359","fb2f4ffa","8a37237e"]);
+const BENEF_CON_TE1 = new Set(["0b0161bb","112","59","fb6b5ff3","30","a6c28e2b","6fdec46a","260","189","96025d52","69","70","80c7347f","9937634d","fb2f4ffa","36","216","110","290","259","135","b182853f","239","33058c14","e48cd722","ad2908b2","e4909f27","bc406ef1","3JkH8v3B","23d76bb4","217","32104289","570c01f1","a5a685cd","21","0a092e84","40c23899","0786b2bb","303","170","104f9b13","8f0b9ff3","fdcac62b","8b2aee80","96","8d82cf2c","2929ec92","4f51ad4d","206","e01c6721","f943a1e7","98deedd7","2BzZ0m6A","ce7f31c4","7d102b6f","2f63c593","65","176","166","156","a842239e","ef0fad1d","8JmK7j7H","6487d6ba","250","6fd5ceab","f1301620","45","218","19","17","134","4118efc3","884d1089","300","9KwV6v9B","12c25a45","95e473e4","a06ea83d","3VnH3q6A","ac1ab314","49","7627c55e","6ba2bc19","7f8c689e","35","6c11c8d8","9ba3209f","297","128","91","20","f123cf9b","2d4de184","116","58","237","163","5ff35e45","98","90064428","04c74b12","a92a0012","3b565b7f","296","279","8d1e3485","0a9833cc","b110f6a0","c023fe3f","ee324b3e","275","c64507cc","6655e02c","219","3JfY5f2O","a3a06af7","3a770823","e84c74db","94","3bf067cc","b92a67e8","a4a340d8","5EhS9o5H","11800759","146","192","9b44a4f5","118","0c89e0d9","a786d46c","a4cb19e6","34f3fd52","a741b6e1","bfc0a38e","b6c8c480","137","270","d1bd913f","8c4f57c6","e73b48ef","22628dc9","193","ea66aaf0","25","201","125","302","03e9b88e","1f73f7a1","40","8e63106a","0c863128","9e43d846","74ecbdf7","6928a1dc","108","f8cb95f0","c7a1748f","ba44da17","eabe3a84","762f405e","8fbc54c0","98dac2f8","121","192b021a","67","d2fd7725","105ada69","42","81fbd43d","77f772f4","263","35121288","b269b82f","139","0a44325e","136","b798c98b","204","92","d9ee9ac0","10","51","87","2c8535ef","86","172","73","bb53962c","157","cf79f388","39cb7460","86804af6","ada36206","100","304","a7e8d877","23726d89","e6adfcbb","299","114","113","76fcb444","d0994b0d","e4fffaed","5ec97c61","e50e1f4d","0GyX6w7X","6494dce8","bbb1f24b","faa4e189","4a448359","168","89","a094613d","94aaf1da","7BtM8g3U","142","e777cc66","74","6c6ec77f","220","c2acdd91","54c35236","b5ccb0c3","599ba314","44","857336a3","9","158f3213","a881771d","8835b1ff","58f7daf1","e27117e5","da26ea4d","0273ee90","52","04c70869","e9dcbe42","248","252","042aba14","98372951","1IpY6j3O","143","23885317","db69ba69","265","268","181","271","67112c8c","69a25997","64","227","45223ebf","230","80","ba5dfd6e","154","c8892a41","255","195","278f9423","9a92e6a5","6a24bede","d0361dd3","7ec22c9f","69f6772e","c67277fe","62ec5e83","27cd49d0","da9a8e86","12","1BpA4x1K","e7918209","7a466407","22","105","254","5be80191","27","84","41","7ace36ee","216a4068","3MpE1d9N","47","75","fd4aea68","be800f5b","d74b36eb","e025c654","eba7c726","3177f6bf","63","9a9977d0","e28184b8","5366cac3","16eb4c90","32c882d7","158","245","306","d5413844","93","188","8d7443b9","88","147","164","185","624c1c97","293","7FsZ6p1R","4d16529b","5a7236df","b549601d","187","d8f1a015","a0cb34f6","aa02a175","b8ea1bf4","32","79b4cd06","e34d0b4a","ad0ab40d","234","124","117","6JrA5z9N","ba86949b","294","20f5d547","1VpX5w9C","367b245e","f518b836","90dd6eb7","dacfb58e","ea49da17","171b3d1c","e67ba878","4812fe24","39","66","6e85ee72","36315d01","4f2b37b1","43","8b189ef8","da6bea3d","c4c5ffa2","66d64e7c","61","967cbc85","152","307","6UoQ2g6T","643d0257","179","c6115326","df507538","184","4EsD0l1B","29","119","38","123","5dc4b296","3b2640ec","dff78b53","04534bc2","82","274","186","102","305","d30eab52","51af0605","0YnV4j1M","c600ee1f","90","56","178","222","81","cece8553","1","3359d44b","57","43ea5aa3","80e4efb8","291","127","197","120","1c0fc70e","a822691f","10c20768","ad4b2df5","196","6QsV1o3K","6b5257aa","c94bfc0b","27701795","97","9d710ac4","8cba66e3","39a6fc94","6TzD5y3C","65fded69","251","278","e30eb1b9","99","285","4b9841b0","6StD5g7B","0d60dbad","c7e5630c","0ecb6510","122","0747ee11","1a7b1678","68","9BfD2a7N","bdbaf11b","182","174","0be183e0","190","9de422b6","2ecc8d09","e7bef459","130","131","81816980","c63219df","159","a275b583","0CeB0n4Y","280","284","f930511c","107","8a37237e","115","a7be7f1e","04f93b7e","f7204dee","0b407d4f","257","eb8f60ce","f250ca25","aeb78cc6","171","1c7ca796","28","8b143222","368fff93","9775976c","16be7442","60","035ee40b","8dcd85a1","50","149","5c218dce","70389731","9a74568f","57c367bf","298","276","258","211","04fce0a8","a4bddd1c","203fe3ee","cf5e7a2d","fe02d24e","3a29579b","1ba081c1","54","3AoI2p0F","7be4d040","167","cbb509e4","efa3b5bc","fe671f04","d5c4d1aa","6OtX3i4C","bd2fe770","9b3f1489","23","16f84f38","6MmA9y4V","a0f8fafb","301","a88a8ddd","1279c798","0e83dc4e","229","e26036eb","4e58d270","262","106","badfc843","c8d8c1a7","140","be281e89","126","f54a1357","e9ea20e5","707ccf02","2a7c6229","2YoX7y7X","4YhQ4u5N","300d64d0","b9f15de2","3602ce85","299b47ab","85e290fd","eabc0b53","1ea78361","104","138","151","e379e5da","2e698e86","82485a60","55","144","84d765be","9YuU5e9L","499d9712","205","11","226","85","292","2ee0e760","b228e13e","3b3f2df8","32090842","c241852e","138d896a","62","c99d0690","295","175","dc046a32","103","281","a8fe9540","559fa9fa","423a638b","f5bcf55a","a0aef150","93f0a67d","9142342d","1475c828","223","153","155","7c513d05","150","15","16","9dfc8be0","145","46","221","1eaf0c03","111","129","6cd0c7de","165","194","8","269","238","141","e991428a","9132d211","0b6a1dec","c52c5a7e","273","161","5YmO5g4R","34","26","4fab5c1a","253","3d729ee4","48","4TsP6m8J","9d8cfe48","14","198","173","79","277"]);
 </script>
 <script type="text/babel">
 
@@ -1605,6 +1561,24 @@ const ViviendaCard = ({ beneficiario, estadoEtapas, expanded, onToggle, grupoCol
                                             <p className="text-sm text-gray-700">{obs.texto}</p>
                                             <p className="text-[10px] text-gray-400 mt-1">{obs.fecha.replace('T', ' ')}</p>
                                         </div>
+                                        <button onClick={() => {
+                                            const pId = String(b.ID_Proy || proyectoSel);
+                                            const ref = fbDB.ref('resumen_comentarios/' + pId + '/' + obs.id);
+                                            ref.once('value').then(snap => {
+                                                if (snap.exists()) {
+                                                    ref.remove();
+                                                } else {
+                                                    ref.set({
+                                                        texto: obs.texto,
+                                                        fecha: obs.fecha,
+                                                        tipo: 'observacion',
+                                                        beneficiarioId: String(b.ID_Benef),
+                                                        beneficiarioNombre: `${b.NOMBRES} ${b.APELLIDOS}`,
+                                                        tickedAt: Date.now()
+                                                    });
+                                                }
+                                            });
+                                        }} className={`text-xs px-1.5 py-0.5 rounded transition-colors ${resumenComentarios[String(b.ID_Proy || proyectoSel)] && resumenComentarios[String(b.ID_Proy || proyectoSel)][obs.id] ? "text-amber-500 bg-amber-100" : "text-gray-300 hover:text-amber-500"}`} title="Incorporar al resumen ejecutivo">&#9733;</button>
                                         <button onClick={() => deleteObservacion(b.ID_Benef, obs.id)} className="text-red-400 hover:text-red-600 text-xs px-1" title="Eliminar">&times;</button>
                                     </div>
                                 ))}
@@ -3367,12 +3341,22 @@ const App = () => {
             skipSugPush.current = true;
             setSugerencias(val ? Object.values(val).sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '')) : []);
         });
+        // Listener Firebase para Proyectos Terminados (manual)
+        proyTermRef.current = fbDB.ref('proyectos_terminados');
+        proyTermRef.current.on('value', (snap) => {
+            setProyTerminados(snap.val() || {});
+        });
         // Listener Firebase para Beneficiarios Ocultos
         ocultadosRef.current = fbDB.ref('ocultados');
         ocultadosRef.current.on('value', (snap) => {
             const val = snap.val();
             skipOcultadosPush.current = true;
             setOcultados(val || {});
+        });
+        // Listener Firebase para Resumen Comentarios
+        resumenRef.current = fbDB.ref('resumen_comentarios');
+        resumenRef.current.on('value', (snap) => {
+            setResumenComentarios(snap.val() || {});
         });
         return () => {
             if (gruposRef.current) gruposRef.current.off();
@@ -3382,6 +3366,8 @@ const App = () => {
             if (sugRef.current) sugRef.current.off();
             if (muestrasRef.current) muestrasRef.current.off();
             if (ocultadosRef.current) ocultadosRef.current.off();
+            if (resumenRef.current) resumenRef.current.off();
+            if (proyTermRef.current) proyTermRef.current.off();
         };
     }, []);
 
@@ -3489,6 +3475,23 @@ const App = () => {
     const getMuestrasProy = () => {
         const raw = muestrasHormigon[proyectoSel];
         return Array.isArray(raw) ? raw : [];
+    };
+
+    // Resumen comentarios (Firebase) - para tick de incorporar al resumen
+    const [resumenComentarios, setResumenComentarios] = React.useState({});
+    const resumenRef = React.useRef(null);
+
+    // Proyectos marcados como terminados manualmente (Firebase)
+    const [proyTerminados, setProyTerminados] = React.useState({});
+    const proyTermRef = React.useRef(null);
+
+    const marcarTerminado = (proyId, motivo) => {
+        const entry = { fecha: fechaChile(), motivo: motivo || '' };
+        fbDB.ref('proyectos_terminados/' + proyId).set(entry);
+    };
+
+    const desmarcarTerminado = (proyId) => {
+        fbDB.ref('proyectos_terminados/' + proyId).remove();
     };
 
     // Beneficiarios ocultos (Firebase)
@@ -3642,13 +3645,17 @@ const App = () => {
         // Finalizado: por tabla O por recepciones completas
         const finalizadoTabla = proy && proy.estado === 'finalizado';
         const finalizadoRecep = viviendas.length > 0 && conRecepcion === viviendas.length;
-        const esFinalizado = finalizadoTabla || finalizadoRecep;
+        const finalizadoManual = proyTerminados[proyectoSel] ? true : false;
+        const esFinalizado = finalizadoTabla || finalizadoRecep || finalizadoManual;
 
-        // Fecha de finalizacion: ultima recepcion definitiva
+        // Fecha de finalizacion: ultima recepcion o fecha de marcado manual
         let fechaFin = null;
         if (esFinalizado) {
             const fechasRecep = viviendas.map(v => v.fecha_recepcion).filter(Boolean).sort();
             fechaFin = fechasRecep.length > 0 ? fechasRecep[fechasRecep.length - 1] : null;
+            if (!fechaFin && finalizadoManual && proyTerminados[proyectoSel]?.fecha) {
+                fechaFin = proyTerminados[proyectoSel].fecha.substring(0, 10);
+            }
         }
 
         return {
@@ -3658,7 +3665,7 @@ const App = () => {
             criticos: viviendas.filter(v => v.estadoGeneral === "critico").length,
             avance: avanceDesp, avanceInsp, totalPagado: totalPagadoProy,
             alertasCoherencia: conAlertasRojas, totalSolicitadas, diasPromedio,
-            conRecepcion, conTE1, esFinalizado, fechaFin, finalizadoTabla, finalizadoRecep
+            conRecepcion, conTE1, esFinalizado, fechaFin, finalizadoTabla, finalizadoRecep, finalizadoManual
         };
     }, [viviendas]);
 
@@ -4050,19 +4057,34 @@ const App = () => {
                             <div>
                                 <h3 className="text-green-800 font-bold text-sm">Proyecto Finalizado</h3>
                                 <p className="text-green-600 text-xs">
-                                    {kpis.finalizadoRecep && !kpis.finalizadoTabla && "Todas las recepciones definitivas completadas"}
+                                    {kpis.finalizadoManual && !kpis.finalizadoRecep && `Marcado manualmente${proyTerminados[proyectoSel]?.motivo ? ': ' + proyTerminados[proyectoSel].motivo : ''}`}
+                                    {kpis.finalizadoRecep && !kpis.finalizadoTabla && !kpis.finalizadoManual && "Todas las recepciones definitivas completadas"}
                                     {kpis.finalizadoTabla && kpis.finalizadoRecep && "Marcado como finalizado — recepciones completas"}
-                                    {kpis.finalizadoTabla && !kpis.finalizadoRecep && "Marcado como finalizado en AppSheet"}
+                                    {kpis.finalizadoTabla && !kpis.finalizadoRecep && !kpis.finalizadoManual && "Marcado como finalizado en AppSheet"}
                                 </p>
                             </div>
                         </div>
-                        {kpis.fechaFin && (() => {
-                            const p = kpis.fechaFin.split('-');
-                            return <div className="text-right">
-                                <p className="text-[10px] text-green-600 uppercase font-medium">Fecha finalizacion</p>
-                                <p className="text-lg font-bold font-mono text-green-700">{p[2]}/{p[1]}/{p[0]}</p>
-                            </div>;
-                        })()}
+                        <div className="flex items-center gap-3">
+                            {kpis.fechaFin && (() => {
+                                const p = kpis.fechaFin.split('-');
+                                return <div className="text-right">
+                                    <p className="text-[10px] text-green-600 uppercase font-medium">Fecha finalizacion</p>
+                                    <p className="text-lg font-bold font-mono text-green-700">{p[2]}/{p[1]}/{p[0]}</p>
+                                </div>;
+                            })()}
+                            {kpis.finalizadoManual && <button onClick={() => desmarcarTerminado(proyectoSel)} className="text-[10px] text-green-600 hover:text-red-500 underline ml-2">Desmarcar</button>}
+                        </div>
+                    </div>
+                )}
+                {/* Boton Marcar Terminado (cuando NO esta finalizado) */}
+                {!kpis.esFinalizado && (
+                    <div className="mb-4 flex justify-end">
+                        <button onClick={() => {
+                            const motivo = prompt('Motivo (ej: 1 casa no se construira):');
+                            if (motivo !== null) marcarTerminado(proyectoSel, motivo);
+                        }} className="px-3 py-1.5 text-xs font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-green-50 hover:text-green-700 hover:border-green-300 transition">
+                            Marcar como Terminado
+                        </button>
                     </div>
                 )}
 

@@ -3168,6 +3168,11 @@ const App = () => {{
             skipSugPush.current = true;
             setSugerencias(val ? Object.values(val).sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '')) : []);
         }});
+        // Listener Firebase para Proyectos Terminados (manual)
+        proyTermRef.current = fbDB.ref('proyectos_terminados');
+        proyTermRef.current.on('value', (snap) => {{
+            setProyTerminados(snap.val() || {{}});
+        }});
         // Listener Firebase para Beneficiarios Ocultos
         ocultadosRef.current = fbDB.ref('ocultados');
         ocultadosRef.current.on('value', (snap) => {{
@@ -3189,6 +3194,7 @@ const App = () => {{
             if (muestrasRef.current) muestrasRef.current.off();
             if (ocultadosRef.current) ocultadosRef.current.off();
             if (resumenRef.current) resumenRef.current.off();
+            if (proyTermRef.current) proyTermRef.current.off();
         }};
     }}, []);
 
@@ -3301,6 +3307,19 @@ const App = () => {{
     // Resumen comentarios (Firebase) - para tick de incorporar al resumen
     const [resumenComentarios, setResumenComentarios] = React.useState({{}});
     const resumenRef = React.useRef(null);
+
+    // Proyectos marcados como terminados manualmente (Firebase)
+    const [proyTerminados, setProyTerminados] = React.useState({{}});
+    const proyTermRef = React.useRef(null);
+
+    const marcarTerminado = (proyId, motivo) => {{
+        const entry = {{ fecha: fechaChile(), motivo: motivo || '' }};
+        fbDB.ref('proyectos_terminados/' + proyId).set(entry);
+    }};
+
+    const desmarcarTerminado = (proyId) => {{
+        fbDB.ref('proyectos_terminados/' + proyId).remove();
+    }};
 
     // Beneficiarios ocultos (Firebase)
     const [ocultados, setOcultados] = React.useState({{}});
@@ -3453,13 +3472,17 @@ const App = () => {{
         // Finalizado: por tabla O por recepciones completas
         const finalizadoTabla = proy && proy.estado === 'finalizado';
         const finalizadoRecep = viviendas.length > 0 && conRecepcion === viviendas.length;
-        const esFinalizado = finalizadoTabla || finalizadoRecep;
+        const finalizadoManual = proyTerminados[proyectoSel] ? true : false;
+        const esFinalizado = finalizadoTabla || finalizadoRecep || finalizadoManual;
 
-        // Fecha de finalizacion: ultima recepcion definitiva
+        // Fecha de finalizacion: ultima recepcion o fecha de marcado manual
         let fechaFin = null;
         if (esFinalizado) {{
             const fechasRecep = viviendas.map(v => v.fecha_recepcion).filter(Boolean).sort();
             fechaFin = fechasRecep.length > 0 ? fechasRecep[fechasRecep.length - 1] : null;
+            if (!fechaFin && finalizadoManual && proyTerminados[proyectoSel]?.fecha) {{
+                fechaFin = proyTerminados[proyectoSel].fecha.substring(0, 10);
+            }}
         }}
 
         return {{
@@ -3469,7 +3492,7 @@ const App = () => {{
             criticos: viviendas.filter(v => v.estadoGeneral === "critico").length,
             avance: avanceDesp, avanceInsp, totalPagado: totalPagadoProy,
             alertasCoherencia: conAlertasRojas, totalSolicitadas, diasPromedio,
-            conRecepcion, conTE1, esFinalizado, fechaFin, finalizadoTabla, finalizadoRecep
+            conRecepcion, conTE1, esFinalizado, fechaFin, finalizadoTabla, finalizadoRecep, finalizadoManual
         }};
     }}, [viviendas]);
 
@@ -3861,19 +3884,34 @@ const App = () => {{
                             <div>
                                 <h3 className="text-green-800 font-bold text-sm">Proyecto Finalizado</h3>
                                 <p className="text-green-600 text-xs">
-                                    {{kpis.finalizadoRecep && !kpis.finalizadoTabla && "Todas las recepciones definitivas completadas"}}
+                                    {{kpis.finalizadoManual && !kpis.finalizadoRecep && `Marcado manualmente${{proyTerminados[proyectoSel]?.motivo ? ': ' + proyTerminados[proyectoSel].motivo : ''}}`}}
+                                    {{kpis.finalizadoRecep && !kpis.finalizadoTabla && !kpis.finalizadoManual && "Todas las recepciones definitivas completadas"}}
                                     {{kpis.finalizadoTabla && kpis.finalizadoRecep && "Marcado como finalizado — recepciones completas"}}
-                                    {{kpis.finalizadoTabla && !kpis.finalizadoRecep && "Marcado como finalizado en AppSheet"}}
+                                    {{kpis.finalizadoTabla && !kpis.finalizadoRecep && !kpis.finalizadoManual && "Marcado como finalizado en AppSheet"}}
                                 </p>
                             </div>
                         </div>
-                        {{kpis.fechaFin && (() => {{
-                            const p = kpis.fechaFin.split('-');
-                            return <div className="text-right">
-                                <p className="text-[10px] text-green-600 uppercase font-medium">Fecha finalizacion</p>
-                                <p className="text-lg font-bold font-mono text-green-700">{{p[2]}}/{{p[1]}}/{{p[0]}}</p>
-                            </div>;
-                        }})()}}
+                        <div className="flex items-center gap-3">
+                            {{kpis.fechaFin && (() => {{
+                                const p = kpis.fechaFin.split('-');
+                                return <div className="text-right">
+                                    <p className="text-[10px] text-green-600 uppercase font-medium">Fecha finalizacion</p>
+                                    <p className="text-lg font-bold font-mono text-green-700">{{p[2]}}/{{p[1]}}/{{p[0]}}</p>
+                                </div>;
+                            }})()}}
+                            {{kpis.finalizadoManual && <button onClick={{() => desmarcarTerminado(proyectoSel)}} className="text-[10px] text-green-600 hover:text-red-500 underline ml-2">Desmarcar</button>}}
+                        </div>
+                    </div>
+                )}}
+                {{/* Boton Marcar Terminado (cuando NO esta finalizado) */}}
+                {{!kpis.esFinalizado && (
+                    <div className="mb-4 flex justify-end">
+                        <button onClick={{() => {{
+                            const motivo = prompt('Motivo (ej: 1 casa no se construira):');
+                            if (motivo !== null) marcarTerminado(proyectoSel, motivo);
+                        }}}} className="px-3 py-1.5 text-xs font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-green-50 hover:text-green-700 hover:border-green-300 transition">
+                            Marcar como Terminado
+                        </button>
                     </div>
                 )}}
 
