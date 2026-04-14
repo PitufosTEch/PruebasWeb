@@ -1389,7 +1389,7 @@ const ViviendaCard = ({{ beneficiario, estadoEtapas, expanded, onToggle, grupoCo
                                             <p className="text-[10px] text-gray-400 mt-1">{{obs.fecha.replace('T', ' ')}}</p>
                                         </div>
                                         <button onClick={{() => {{
-                                            const pId = String(b.ID_Proy || proyectoSel);
+                                            const pId = String(b.ID_Proy || '');
                                             const ref = fbDB.ref('resumen_comentarios/' + pId + '/' + obs.id);
                                             ref.once('value').then(snap => {{
                                                 if (snap.exists()) {{
@@ -1405,7 +1405,7 @@ const ViviendaCard = ({{ beneficiario, estadoEtapas, expanded, onToggle, grupoCo
                                                     }});
                                                 }}
                                             }});
-                                        }}}} className={{`text-xs px-1.5 py-0.5 rounded transition-colors ${{resumenComentarios[String(b.ID_Proy || proyectoSel)] && resumenComentarios[String(b.ID_Proy || proyectoSel)][obs.id] ? "text-amber-500 bg-amber-100" : "text-gray-300 hover:text-amber-500"}}`}} title="Incorporar al resumen ejecutivo">&#9733;</button>
+                                        }}}} className={{`text-xs px-1.5 py-0.5 rounded transition-colors ${{typeof resumenComentarios !== 'undefined' && resumenComentarios[String(b.ID_Proy)] && resumenComentarios[String(b.ID_Proy)][obs.id] ? "text-amber-500 bg-amber-100" : "text-gray-300 hover:text-amber-500"}}`}} title="Incorporar al resumen ejecutivo">&#9733;</button>
                                         <button onClick={{() => deleteObservacion(b.ID_Benef, obs.id)}} className="text-red-400 hover:text-red-600 text-xs px-1" title="Eliminar">&times;</button>
                                     </div>
                                 ))}}
