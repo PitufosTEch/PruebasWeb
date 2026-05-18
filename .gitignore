@@ -1,0 +1,61 @@
+# ============================================================
+# Subproyectos hermanos: cada uno vive en su propio repo
+# ============================================================
+/Filtro-Cientifico/
+/ONNE/
+/PermisoBOT/
+/Control de Proyectos/
+/PRUEBAS WEB/
+
+# ============================================================
+# Secretos - NUNCA commitear
+# ============================================================
+SCRaices-LLM/credentials/
+SCRaices-LLM/app/config.py
+*.pem
+*.key
+.env
+.env.*
+!.env.example
+
+# ============================================================
+# Basura del sistema / generados / cache
+# ============================================================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.gdoc
+nul
+.DS_Store
+Thumbs.db
+
+# ============================================================
+# Archivos de exportacion y temporales del proyecto
+# ============================================================
+SCRaices-LLM/output/
+SCRaices-LLM/Arreglos/
+SCRaices-LLM/Application Documentation.html
+SCRaices-LLM/Application Documentation_files/
+SCRaices-LLM/temp_*.py
+SCRaices-LLM/ejemplo de estructura/
+
+# Capturas y notas locales
+SCRaices-LLM/Estetitca.png
+SCRaices-LLM/Prueba.png
+SCRaices-LLM/CLAUDE.md.gdoc
+
+# Datos cacheados por scripts (se regeneran)
+SCRaices-LLM/app/comparador_data.json
+
+# Backups de archivos (se regeneran via FirebaseBackup.gs)
+SCRaices-LLM/dashboard/index_live_v3.backup.html
+
+# ============================================================
+# Editor / IDE
+# ============================================================
+.vscode/
+.idea/
+*.swp
+*.swo
