@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mockup — Panel Coordinador de Obras</title>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'IBM Plex Sans', sans-serif; background: #f1f5f9; color: #1e293b; }
+        .mono { font-family: 'IBM Plex Mono', monospace; }
+
+        /* Top Bar */
+        .topbar { background: #0f172a; color: white; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 50; }
+        .topbar-logo { font-weight: 700; font-size: 18px; letter-spacing: -0.5px; }
+        .topbar-logo span { color: #818cf8; }
+        .topbar-right { display: flex; align-items: center; gap: 16px; font-size: 12px; color: #94a3b8; }
+
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px 24px; }
+
+        /* KPI Strip */
+        .kpi-strip { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 20px; }
+        .kpi-card { background: white; border-radius: 12px; padding: 14px 16px; border: 1px solid #e2e8f0; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+        .kpi-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; margin-bottom: 4px; }
+        .kpi-value { font-size: 22px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; }
+        .kpi-sub { font-size: 10px; color: #94a3b8; margin-top: 2px; }
+
+        /* Section */
+        .section-title { font-size: 13px; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+        .section-title::before { content: ''; display: block; width: 3px; height: 16px; background: #818cf8; border-radius: 2px; }
+
+        /* Project Cards Grid */
+        .projects-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 16px; margin-bottom: 24px; }
+
+        .proj-card { background: white; border-radius: 14px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.06); transition: box-shadow 0.2s; }
+        .proj-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .proj-card.alert { border-color: #fca5a5; }
+        .proj-card.warning { border-color: #fcd34d; }
+
+        .proj-header { padding: 14px 16px 10px; display: flex; align-items: flex-start; justify-content: space-between; }
+        .proj-name { font-size: 14px; font-weight: 700; color: #1e293b; }
+        .proj-comuna { font-size: 11px; color: #64748b; margin-top: 2px; }
+        .proj-badge { font-size: 9px; font-weight: 700; padding: 3px 8px; border-radius: 6px; white-space: nowrap; }
+        .badge-green { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+        .badge-yellow { background: #fef9c3; color: #854d0e; border: 1px solid #fde68a; }
+        .badge-red { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+        .badge-blue { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
+
+        /* Timeline bar inside card */
+        .proj-timeline { padding: 0 16px 10px; }
+        .timeline-bar { height: 6px; background: #e2e8f0; border-radius: 3px; position: relative; overflow: visible; }
+        .timeline-fill { height: 100%; border-radius: 3px; }
+        .timeline-mark90 { position: absolute; top: -3px; width: 2px; height: 12px; background: #ef4444; border-radius: 1px; }
+        .timeline-labels { display: flex; justify-content: space-between; font-size: 9px; color: #94a3b8; margin-top: 3px; }
+
+        /* Viviendas summary strip */
+        .proj-viv-strip { padding: 0 16px 12px; }
+        .viv-bar { display: flex; height: 20px; border-radius: 6px; overflow: hidden; gap: 1px; }
+        .viv-bar div { display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: white; min-width: 20px; }
+        .viv-terminadas { background: #22c55e; }
+        .viv-entiempo { background: #3b82f6; }
+        .viv-atencion { background: #f59e0b; }
+        .viv-criticas { background: #ef4444; }
+        .viv-sindespacho { background: #cbd5e1; color: #64748b !important; }
+
+        .viv-legend { display: flex; gap: 12px; margin-top: 6px; font-size: 9px; color: #64748b; }
+        .viv-legend span { display: flex; align-items: center; gap: 4px; }
+        .viv-legend .dot { width: 8px; height: 8px; border-radius: 2px; }
+
+        /* Metrics row */
+        .proj-metrics { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px; background: #f1f5f9; border-top: 1px solid #e2e8f0; }
+        .metric { background: white; padding: 10px 12px; text-align: center; }
+        .metric-label { font-size: 9px; color: #94a3b8; text-transform: uppercase; }
+        .metric-value { font-size: 16px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; margin-top: 2px; }
+        .metric-sub { font-size: 9px; color: #94a3b8; }
+
+        /* Alerts strip */
+        .proj-alerts { padding: 8px 16px; background: #fefce8; border-top: 1px solid #fde68a; display: flex; gap: 8px; flex-wrap: wrap; }
+        .proj-alerts.red { background: #fef2f2; border-top-color: #fecaca; }
+        .alert-chip { font-size: 9px; font-weight: 600; padding: 2px 8px; border-radius: 4px; display: flex; align-items: center; gap: 4px; }
+        .alert-chip.warn { background: #fef3c7; color: #92400e; }
+        .alert-chip.danger { background: #fee2e2; color: #991b1b; }
+        .alert-chip.info { background: #e0e7ff; color: #3730a3; }
+
+        /* Ranking table */
+        .ranking-section { margin-top: 24px; }
+        .ranking-table { width: 100%; background: white; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+        .ranking-table th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; padding: 10px 14px; text-align: left; background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
+        .ranking-table td { padding: 10px 14px; font-size: 12px; border-bottom: 1px solid #f1f5f9; }
+        .ranking-table tr:hover td { background: #f8fafc; }
+        .ranking-table .num { font-family: 'IBM Plex Mono', monospace; font-weight: 600; }
+
+        /* Mini progress bar in table */
+        .mini-bar { width: 80px; height: 6px; background: #e2e8f0; border-radius: 3px; display: inline-block; vertical-align: middle; margin-left: 6px; }
+        .mini-bar-fill { height: 100%; border-radius: 3px; }
+
+        /* Bottom summary */
+        .bottom-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 24px; }
+        .summary-card { background: white; border-radius: 12px; border: 1px solid #e2e8f0; padding: 16px; }
+        .summary-card h3 { font-size: 12px; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
+
+        .alert-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-size: 12px; }
+        .alert-row:last-child { border-bottom: none; }
+        .alert-icon { width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; flex-shrink: 0; }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .kpi-strip { grid-template-columns: repeat(3, 1fr); }
+            .projects-grid { grid-template-columns: 1fr; }
+            .proj-metrics { grid-template-columns: repeat(3, 1fr); }
+            .bottom-grid { grid-template-columns: 1fr; }
+        }
+
+        .mockup-badge { position: fixed; bottom: 16px; right: 16px; background: #818cf8; color: white; padding: 8px 16px; border-radius: 8px; font-size: 11px; font-weight: 600; z-index: 100; box-shadow: 0 4px 12px rgba(129,140,248,0.4); }
+    </style>
+</head>
+<body>
+
+<div class="topbar">
+    <div>
+        <div class="topbar-logo"><span>SC</span> Panel Coordinador</div>
+    </div>
+    <div class="topbar-right">
+        <span>12 proyectos en ejecución</span>
+        <span>•</span>
+        <span>Actualizado: 15/03/2026 09:30</span>
+    </div>
+</div>
+
+<div class="container">
+
+    <!-- KPI STRIP GLOBAL -->
+    <div class="kpi-strip">
+        <div class="kpi-card">
+            <div class="kpi-label">Proyectos Activos</div>
+            <div class="kpi-value" style="color:#1e293b;">12</div>
+            <div class="kpi-sub">de 66 totales</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Viviendas en Ejecución</div>
+            <div class="kpi-value" style="color:#3b82f6;">287</div>
+            <div class="kpi-sub">38 terminadas (13%)</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Avance Despacho Prom.</div>
+            <div class="kpi-value" style="color:#8b5cf6;">47%</div>
+            <div class="kpi-sub">avance inspección: 32%</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Viviendas Críticas</div>
+            <div class="kpi-value" style="color:#ef4444;">23</div>
+            <div class="kpi-sub">8% del total</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Total Pagado M.O.</div>
+            <div class="kpi-value mono" style="color:#7c3aed; font-size:16px;">$482.350.000</div>
+            <div class="kpi-sub">$1.681.000 / casa prom.</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Contratos &lt; 90 días</div>
+            <div class="kpi-value" style="color:#f59e0b;">3</div>
+            <div class="kpi-sub">1 vencido</div>
+        </div>
+    </div>
+
+    <!-- PROJECT CARDS -->
+    <div class="section-title">Proyectos en Ejecución</div>
+    <div class="projects-grid">
+
+        <!-- Card 1: Proyecto normal -->
+        <div class="proj-card">
+            <div class="proj-header">
+                <div>
+                    <div class="proj-name">Newen Ruka 2022</div>
+                    <div class="proj-comuna">Villarrica · 38 viviendas · P62</div>
+                </div>
+                <span class="proj-badge badge-green">342d restantes</span>
+            </div>
+            <div class="proj-timeline">
+                <div class="timeline-bar">
+                    <div class="timeline-fill" style="width:24%; background: #22c55e; border-radius:3px;"></div>
+                    <div class="timeline-mark90" style="left:80%;"></div>
+                </div>
+                <div class="timeline-labels">
+                    <span>24/02/2025</span>
+                    <span class="mono" style="font-weight:600;">108d / 450d (24%)</span>
+                    <span>20/05/2026</span>
+                </div>
+            </div>
+            <div class="proj-viv-strip">
+                <div class="viv-bar">
+                    <div class="viv-terminadas" style="width:8%">3</div>
+                    <div class="viv-entiempo" style="width:52%">20</div>
+                    <div class="viv-atencion" style="width:24%">9</div>
+                    <div class="viv-criticas" style="width:8%">3</div>
+                    <div class="viv-sindespacho" style="width:8%">3</div>
+                </div>
+                <div class="viv-legend">
+                    <span><div class="dot" style="background:#22c55e"></div> 3 terminadas</span>
+                    <span><div class="dot" style="background:#3b82f6"></div> 20 en tiempo</span>
+                    <span><div class="dot" style="background:#f59e0b"></div> 9 atención</span>
+                    <span><div class="dot" style="background:#ef4444"></div> 3 críticas</span>
+                    <span><div class="dot" style="background:#cbd5e1"></div> 3 sin despacho</span>
+                </div>
+            </div>
+            <div class="proj-metrics">
+                <div class="metric">
+                    <div class="metric-label">Avance Desp.</div>
+                    <div class="metric-value" style="color:#8b5cf6;">42%</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Avance Insp.</div>
+                    <div class="metric-value" style="color:#6366f1;">28%</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Pagado M.O.</div>
+                    <div class="metric-value mono" style="color:#7c3aed; font-size:12px;">$62.4M</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Días Prom.</div>
+                    <div class="metric-value">86d</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Solicitudes</div>
+                    <div class="metric-value" style="color:#a855f7;">12</div>
+                    <div class="metric-sub">esperando desp.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 2: Proyecto con alerta 90d -->
+        <div class="proj-card warning">
+            <div class="proj-header">
+                <div>
+                    <div class="proj-name">Raíces de Anco</div>
+                    <div class="proj-comuna">Panguipulli · 22 viviendas · P58</div>
+                </div>
+                <span class="proj-badge badge-yellow">67d restantes</span>
+            </div>
+            <div class="proj-timeline">
+                <div class="timeline-bar">
+                    <div class="timeline-fill" style="width:89%; background: #f59e0b; border-radius:3px;"></div>
+                    <div class="timeline-mark90" style="left:85%;"></div>
+                </div>
+                <div class="timeline-labels">
+                    <span>15/04/2024</span>
+                    <span class="mono" style="font-weight:600; color:#f59e0b;">533d / 600d (89%)</span>
+                    <span>05/12/2025</span>
+                </div>
+            </div>
+            <div class="proj-viv-strip">
+                <div class="viv-bar">
+                    <div class="viv-terminadas" style="width:45%">10</div>
+                    <div class="viv-entiempo" style="width:27%">6</div>
+                    <div class="viv-atencion" style="width:14%">3</div>
+                    <div class="viv-criticas" style="width:14%">3</div>
+                </div>
+                <div class="viv-legend">
+                    <span><div class="dot" style="background:#22c55e"></div> 10 terminadas</span>
+                    <span><div class="dot" style="background:#3b82f6"></div> 6 en tiempo</span>
+                    <span><div class="dot" style="background:#f59e0b"></div> 3 atención</span>
+                    <span><div class="dot" style="background:#ef4444"></div> 3 críticas</span>
+                </div>
+            </div>
+            <div class="proj-metrics">
+                <div class="metric">
+                    <div class="metric-label">Avance Desp.</div>
+                    <div class="metric-value" style="color:#8b5cf6;">78%</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Avance Insp.</div>
+                    <div class="metric-value" style="color:#6366f1;">61%</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Pagado M.O.</div>
+                    <div class="metric-value mono" style="color:#7c3aed; font-size:12px;">$48.1M</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Días Prom.</div>
+                    <div class="metric-value">142d</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Solicitudes</div>
+                    <div class="metric-value" style="color:#a855f7;">4</div>
+                    <div class="metric-sub">esperando desp.</div>
+                </div>
+            </div>
+            <div class="proj-alerts">
+                <div class="alert-chip danger">⚠ Fase cierre EGR — 67d para vencimiento</div>
+                <div class="alert-chip warn">🔶 3 viviendas críticas sin avance</div>
+                <div class="alert-chip info">📋 Muestras hormigón: 2/4 tomadas</div>
+            </div>
+        </div>
+
+        <!-- Card 3: Proyecto vencido -->
+        <div class="proj-card alert">
+            <div class="proj-header">
+                <div>
+                    <div class="proj-name">Pewma Mapu 2021</div>
+                    <div class="proj-comuna">Temuco · 15 viviendas · P45</div>
+                </div>
+                <span class="proj-badge badge-red">VENCIDO 34d</span>
+            </div>
+            <div class="proj-timeline">
+                <div class="timeline-bar">
+                    <div class="timeline-fill" style="width:100%; background: #ef4444; border-radius:3px;"></div>
+                    <div class="timeline-mark90" style="left:78%;"></div>
+                </div>
+                <div class="timeline-labels">
+                    <span>10/01/2024</span>
+                    <span class="mono" style="font-weight:600; color:#ef4444;">PLAZO EXCEDIDO +34d</span>
+                    <span>10/02/2026</span>
+                </div>
+            </div>
+            <div class="proj-viv-strip">
+                <div class="viv-bar">
+                    <div class="viv-terminadas" style="width:60%">9</div>
+                    <div class="viv-entiempo" style="width:13%">2</div>
+                    <div class="viv-atencion" style="width:7%">1</div>
+                    <div class="viv-criticas" style="width:20%">3</div>
+                </div>
+                <div class="viv-legend">
+                    <span><div class="dot" style="background:#22c55e"></div> 9 terminadas</span>
+                    <span><div class="dot" style="background:#3b82f6"></div> 2 en tiempo</span>
+                    <span><div class="dot" style="background:#f59e0b"></div> 1 atención</span>
+                    <span><div class="dot" style="background:#ef4444"></div> 3 críticas</span>
+                </div>
+            </div>
+            <div class="proj-metrics">
+                <div class="metric">
+                    <div class="metric-label">Avance Desp.</div>
+                    <div class="metric-value" style="color:#8b5cf6;">85%</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Avance Insp.</div>
+                    <div class="metric-value" style="color:#6366f1;">72%</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Pagado M.O.</div>
+                    <div class="metric-value mono" style="color:#7c3aed; font-size:12px;">$31.2M</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Días Prom.</div>
+                    <div class="metric-value">195d</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Solicitudes</div>
+                    <div class="metric-value" style="color:#a855f7;">1</div>
+                    <div class="metric-sub">esperando desp.</div>
+                </div>
+            </div>
+            <div class="proj-alerts red">
+                <div class="alert-chip danger">🔴 CONTRATO VENCIDO — Requiere prórroga o cierre inmediato</div>
+                <div class="alert-chip danger">⚠ 3 viviendas sin recepción definitiva</div>
+            </div>
+        </div>
+
+        <!-- Card 4: Proyecto nuevo, poco avance -->
+        <div class="proj-card">
+            <div class="proj-header">
+                <div>
+                    <div class="proj-name">Mapu Rayen 2022</div>
+                    <div class="proj-comuna">Villarrica · 19 viviendas · P30</div>
+                </div>
+                <span class="proj-badge badge-blue">405d restantes</span>
+            </div>
+            <div class="proj-timeline">
+                <div class="timeline-bar">
+                    <div class="timeline-fill" style="width:10%; background: #22c55e; border-radius:3px;"></div>
+                    <div class="timeline-mark90" style="left:80%;"></div>
+                </div>
+                <div class="timeline-labels">
+                    <span>24/02/2025</span>
+                    <span class="mono" style="font-weight:600;">45d / 450d (10%)</span>
+                    <span>20/05/2026</span>
+                </div>
+            </div>
+            <div class="proj-viv-strip">
+                <div class="viv-bar">
+                    <div class="viv-entiempo" style="width:32%">6</div>
+                    <div class="viv-sindespacho" style="width:68%">13</div>
+                </div>
+                <div class="viv-legend">
+                    <span><div class="dot" style="background:#3b82f6"></div> 6 en tiempo</span>
+                    <span><div class="dot" style="background:#cbd5e1"></div> 13 sin despacho</span>
+                </div>
+            </div>
+            <div class="proj-metrics">
+                <div class="metric">
+                    <div class="metric-label">Avance Desp.</div>
+                    <div class="metric-value" style="color:#8b5cf6;">8%</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Avance Insp.</div>
+                    <div class="metric-value" style="color:#6366f1;">0%</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Pagado M.O.</div>
+                    <div class="metric-value mono" style="color:#7c3aed; font-size:12px;">$2.8M</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Días Prom.</div>
+                    <div class="metric-value">—</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Solicitudes</div>
+                    <div class="metric-value" style="color:#a855f7;">8</div>
+                    <div class="metric-sub">esperando desp.</div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- RANKING TABLE -->
+    <div class="ranking-section">
+        <div class="section-title">Ranking de Avance vs Plazo Consumido</div>
+        <table class="ranking-table">
+            <thead>
+                <tr>
+                    <th>Proyecto</th>
+                    <th>Comuna</th>
+                    <th>Viv.</th>
+                    <th>Plazo Consumido</th>
+                    <th>Avance Despacho</th>
+                    <th>Avance Inspección</th>
+                    <th>Δ Relación</th>
+                    <th>Críticas</th>
+                    <th>Pagado</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="font-weight:600;">Pewma Mapu 2021</td>
+                    <td>Temuco</td>
+                    <td class="num">15</td>
+                    <td>
+                        <span class="num" style="color:#ef4444;">100%</span>
+                        <div class="mini-bar"><div class="mini-bar-fill" style="width:100%; background:#ef4444;"></div></div>
+                    </td>
+                    <td>
+                        <span class="num">85%</span>
+                        <div class="mini-bar"><div class="mini-bar-fill" style="width:85%; background:#8b5cf6;"></div></div>
+                    </td>
+                    <td>
+                        <span class="num">72%</span>
+                        <div class="mini-bar"><div class="mini-bar-fill" style="width:72%; background:#6366f1;"></div></div>
+                    </td>
+                    <td class="num" style="color:#ef4444; font-weight:700;">-15%</td>
+                    <td class="num" style="color:#ef4444;">3</td>
+                    <td class="num" style="font-size:11px;">$31.2M</td>
+                </tr>
+                <tr>
+                    <td style="font-weight:600;">Raíces de Anco</td>
+                    <td>Panguipulli</td>
+                    <td class="num">22</td>
+                    <td>
+                        <span class="num" style="color:#f59e0b;">89%</span>
+                        <div class="mini-bar"><div class="mini-bar-fill" style="width:89%; background:#f59e0b;"></div></div>
+                    </td>
+                    <td>
+                        <span class="num">78%</span>
+                        <div class="mini-bar"><div class="mini-bar-fill" style="width:78%; background:#8b5cf6;"></div></div>
+                    </td>
+                    <td>
+                        <span class="num">61%</span>
+                        <div class="mini-bar"><div class="mini-bar-fill" style="width:61%; background:#6366f1;"></div></div>
+                    </td>
+                    <td class="num" style="color:#f59e0b; font-weight:700;">-11%</td>
+                    <td class="num" style="color:#ef4444;">3</td>
+                    <td class="num" style="font-size:11px;">$48.1M</td>
+                </tr>
+                <tr>
+                    <td style="font-weight:600;">Newen Ruka 2022</td>
+                    <td>Villarrica</td>
+                    <td class="num">38</td>
+                    <td>
+                        <span class="num">24%</span>
+                        <div class="mini-bar"><div class="mini-bar-fill" style="width:24%; background:#22c55e;"></div></div>
+                    </td>
+                    <td>
+                        <span class="num">42%</span>
+                        <div class="mini-bar"><div class="mini-bar-fill" style="width:42%; background:#8b5cf6;"></div></div>
+                    </td>
+                    <td>
+                        <span class="num">28%</span>
+                        <div class="mini-bar"><div class="mini-bar-fill" style="width:28%; background:#6366f1;"></div></div>
+                    </td>
+                    <td class="num" style="color:#22c55e; font-weight:700;">+18%</td>
+                    <td class="num" style="color:#ef4444;">3</td>
+                    <td class="num" style="font-size:11px;">$62.4M</td>
+                </tr>
+                <tr>
+                    <td style="font-weight:600;">Mapu Rayen 2022</td>
+                    <td>Villarrica</td>
+                    <td class="num">19</td>
+                    <td>
+                        <span class="num">10%</span>
+                        <div class="mini-bar"><div class="mini-bar-fill" style="width:10%; background:#22c55e;"></div></div>
+                    </td>
+                    <td>
+                        <span class="num">8%</span>
+                        <div class="mini-bar"><div class="mini-bar-fill" style="width:8%; background:#8b5cf6;"></div></div>
+                    </td>
+                    <td>
+                        <span class="num">0%</span>
+                        <div class="mini-bar"><div class="mini-bar-fill" style="width:0%; background:#6366f1;"></div></div>
+                    </td>
+                    <td class="num" style="color:#f59e0b; font-weight:700;">-2%</td>
+                    <td class="num">0</td>
+                    <td class="num" style="font-size:11px;">$2.8M</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- BOTTOM SUMMARY -->
+    <div class="bottom-grid">
+        <div class="summary-card">
+            <h3>⚡ Alertas Activas (ordenadas por urgencia)</h3>
+            <div class="alert-row">
+                <div style="display:flex; align-items:center;">
+                    <div class="alert-icon" style="background:#ef4444;"></div>
+                    <span><strong>Pewma Mapu 2021</strong> — Contrato vencido hace 34 días</span>
+                </div>
+            </div>
+            <div class="alert-row">
+                <div style="display:flex; align-items:center;">
+                    <div class="alert-icon" style="background:#ef4444;"></div>
+                    <span><strong>Raíces de Anco</strong> — Fase cierre EGR activa (67d)</span>
+                </div>
+            </div>
+            <div class="alert-row">
+                <div style="display:flex; align-items:center;">
+                    <div class="alert-icon" style="background:#f59e0b;"></div>
+                    <span><strong>3 proyectos</strong> — Muestras hormigón incompletas</span>
+                </div>
+            </div>
+            <div class="alert-row">
+                <div style="display:flex; align-items:center;">
+                    <div class="alert-icon" style="background:#f59e0b;"></div>
+                    <span><strong>23 viviendas</strong> — En estado crítico (>14d sin avance)</span>
+                </div>
+            </div>
+            <div class="alert-row">
+                <div style="display:flex; align-items:center;">
+                    <div class="alert-icon" style="background:#3b82f6;"></div>
+                    <span><strong>2 garantías</strong> — Vencen en menos de 60 días</span>
+                </div>
+            </div>
+        </div>
+        <div class="summary-card">
+            <h3>📊 Distribución General de Etapas</h3>
+            <div style="font-size:12px; color:#64748b; margin-bottom:10px;">Estado agregado de las 287 viviendas activas</div>
+
+            <div style="display:flex; flex-direction:column; gap:6px;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-size:10px; width:90px; text-align:right; color:#64748b;">Fundaciones</span>
+                    <div style="flex:1; height:14px; background:#e2e8f0; border-radius:4px; overflow:hidden; display:flex;">
+                        <div style="width:82%; background:#22c55e; display:flex; align-items:center; justify-content:center; font-size:8px; color:white; font-weight:700;">82%</div>
+                    </div>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-size:10px; width:90px; text-align:right; color:#64748b;">1era Etapa</span>
+                    <div style="flex:1; height:14px; background:#e2e8f0; border-radius:4px; overflow:hidden; display:flex;">
+                        <div style="width:65%; background:#3b82f6; display:flex; align-items:center; justify-content:center; font-size:8px; color:white; font-weight:700;">65%</div>
+                    </div>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-size:10px; width:90px; text-align:right; color:#64748b;">2da Etapa</span>
+                    <div style="flex:1; height:14px; background:#e2e8f0; border-radius:4px; overflow:hidden; display:flex;">
+                        <div style="width:48%; background:#3b82f6; display:flex; align-items:center; justify-content:center; font-size:8px; color:white; font-weight:700;">48%</div>
+                    </div>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-size:10px; width:90px; text-align:right; color:#64748b;">Gasfitería</span>
+                    <div style="flex:1; height:14px; background:#e2e8f0; border-radius:4px; overflow:hidden; display:flex;">
+                        <div style="width:38%; background:#8b5cf6; display:flex; align-items:center; justify-content:center; font-size:8px; color:white; font-weight:700;">38%</div>
+                    </div>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-size:10px; width:90px; text-align:right; color:#64748b;">Cerámica</span>
+                    <div style="flex:1; height:14px; background:#e2e8f0; border-radius:4px; overflow:hidden; display:flex;">
+                        <div style="width:29%; background:#8b5cf6; display:flex; align-items:center; justify-content:center; font-size:8px; color:white; font-weight:700;">29%</div>
+                    </div>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-size:10px; width:90px; text-align:right; color:#64748b;">Pintura</span>
+                    <div style="flex:1; height:14px; background:#e2e8f0; border-radius:4px; overflow:hidden; display:flex;">
+                        <div style="width:18%; background:#a855f7; display:flex; align-items:center; justify-content:center; font-size:8px; color:white; font-weight:700;">18%</div>
+                    </div>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-size:10px; width:90px; text-align:right; color:#64748b;">Electricidad</span>
+                    <div style="flex:1; height:14px; background:#e2e8f0; border-radius:4px; overflow:hidden; display:flex;">
+                        <div style="width:15%; background:#a855f7; display:flex; align-items:center; justify-content:center; font-size:8px; color:white; font-weight:700;">15%</div>
+                    </div>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-size:10px; width:90px; text-align:right; color:#64748b;">Obras Ext.</span>
+                    <div style="flex:1; height:14px; background:#e2e8f0; border-radius:4px; overflow:hidden; display:flex;">
+                        <div style="width:8%; background:#cbd5e1; display:flex; align-items:center; justify-content:center; font-size:8px; color:#64748b; font-weight:700;">8%</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<div class="mockup-badge">MOCKUP — Panel Coordinador v1</div>
+
+</body>
+</html>
