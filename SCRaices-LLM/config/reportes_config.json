@@ -1,0 +1,504 @@
+{
+  "_descripcion": "Configuración de Reportes Tipo - Estructura y fuentes de datos",
+  "_instrucciones": "Cada reporte define las tablas fuente, campos clave, y secciones a mostrar",
+  "_version": "2.0",
+  "_ultima_modificacion": "2026-02-03",
+  "_changelog": [
+    "v1.0: Creación inicial con RESUMEN_BENEFICIARIO",
+    "v1.1: Mejoras - quitar ID interno, mostrar descripción de tipología (m2)",
+    "v1.2: Agregar Solicitudes de Despacho con campos Adicional (material, estado aprobación)",
+    "v1.3: Mejorar Solicitudes de Pago (Familia, Observación, Resumen por Maestro) + Generación PDF",
+    "v1.4: Agregar RESUMEN_PAGO_MO_GRUPO - Excel con pagos de mano de obra por grupo/proyecto",
+    "v1.5: Documentar conceptos de Tablas M.O Base vs Pagos Reales",
+    "v1.6: Agregar ANALISIS_COMPARATIVO_MO - PDF comparando Base vs Real por proyecto",
+    "v1.7: Agregar FICHA_PROYECTO - Ficha completa de proyecto con beneficiarios y tipologías",
+    "v1.8: Agregar DASHBOARD_CONTRATOS - Tabla resumen de contratos y plazos de todos los proyectos",
+    "v1.9: Agregar GASTOS_PROYECTO - PDF con Gastos Generales (facturas) y Rendiciones (reembolsos) por proyecto",
+    "v2.0: Agregar CIERRE_VIVIENDAS_GRUPO - PDF con días de ejecución por casa (1er despacho a recepción)"
+  ],
+
+  "_conceptos": {
+    "TABLA_PAGO_MO_BASE": {
+      "descripcion": "Montos AUTORIZADOS/PRESUPUESTADOS de mano de obra por partida para cada tipología de un proyecto",
+      "tabla_fuente": "Tabla_pago",
+      "campos_clave": ["ID_proy", "IDU_Tipol", "tipologia", "familia_pago", "tipo_pago", "monto"],
+      "uso": "Base de referencia para contrastar cuánto se DEBERÍA gastar en sueldos para un proyecto",
+      "nota": "Cada proyecto tiene una tabla por cada tipología (Vivienda 2D, 3D, R.Comp, etc.)",
+      "ejemplo_invocacion": "Tablas de Pago M.O Base de Ñuke Mapu"
+    },
+    "PAGOS_MO_REALES": {
+      "descripcion": "Registros históricos de pagos REALES efectuados a maestros",
+      "tabla_fuente": "Solpago",
+      "campos_clave": ["ID_proy", "ID_Benef", "Familia_pago", "Tipo_pago", "monto", "Estado", "maestro"],
+      "uso": "Lo que realmente se terminó pagando - para comparar contra la Base",
+      "nota": "Incluye pagos aprobados, pendientes y rechazados"
+    },
+    "COMPARACION_BASE_VS_REAL": {
+      "descripcion": "Análisis de desviación entre presupuesto base y gasto real en M.O",
+      "proposito": "Identificar partidas donde se gastó más o menos de lo presupuestado",
+      "calculo": "Por cada partida: Monto Real - Monto Base = Desviación"
+    }
+  },
+
+  "reportes": {
+    "RESUMEN_BENEFICIARIO": {
+      "nombre": "Resumen de Beneficiario",
+      "descripcion": "Reporte completo de un beneficiario: identificación, proyecto, despachos, pagos y ejecución",
+      "parametros_requeridos": ["nombre_beneficiario", "nombre_proyecto"],
+      "parametros_opcionales": ["id_benef"],
+
+      "fuentes_datos": {
+        "beneficiario": {
+          "tabla": "Beneficiario",
+          "busqueda": "Por APELLIDOS (contiene) + ID_Proy, o por ID_Benef directo",
+          "campos_clave": ["ID_Benef", "ID_Proy", "NOMBRES", "APELLIDOS", "RUT", "DV", "TELEFONO", "EMAIL", "WHATSAPP", "ESTADO_CIVIL", "DIRECCION_RSH", "DIRECCION_POST", "COMUNA", "Estado", "Habil para construir", "fecha_habil_para_const", "Tipologia Vivienda", "Tipologia RC", "Aprob_legal", "Aprob_social", "Aprob_tecnico", "N_ROL", "CBR", "DECRETO", "Permiso_edif", "Num_permiso"]
+        },
+        "proyecto": {
+          "tabla": "Proyectos",
+          "busqueda": "Por NOMBRE_PROYECTO (contiene) para obtener ID_proy",
+          "campos_clave": ["ID_proy", "NOMBRE_PROYECTO", "COMUNA", "PERIODO", "Encargado", "estado_general", "fecha_inicio", "duracion"]
+        },
+        "tipologias": {
+          "tabla": "Tipologias",
+          "busqueda": "Por IDU_tipol para traducir ID a descripción",
+          "campos_clave": ["IDU_tipol", "Familia", "dormitorios", "plantas", "caracterizacion", "tipologia"],
+          "transformacion": {
+            "Vivienda": "Familia + dormitoriosD + plantasP + caracterizacion (ej: Vivienda 2D 1P 59.18 m2)",
+            "R.Complementario": "tipologia + caracterizacion (ej: Bodega 14.4 m2)"
+          }
+        },
+        "solicitudes_despacho": {
+          "tabla": "soldepacho",
+          "busqueda": "Filtrar por ID_Benef del beneficiario",
+          "campos_clave": ["fecha_creacion", "Fecha", "Tipo_despacho", "observacion", "desc_adicional", "aprueba_adicional"],
+          "logica": "Comparar Fecha programada con fecha actual: si es futuro = PENDIENTE, si pasó = EJECUTADA",
+          "campos_adicional": {
+            "desc_adicional": "Detalle del material adicional (código, descripción, cantidad)",
+            "aprueba_adicional": "Estado de aprobación: 'true'=Aprobado, 'false'=Rechazado, vacío=Pendiente",
+            "observacion": "Razón o justificación de la solicitud"
+          }
+        },
+        "despachos": {
+          "tabla": "Despacho",
+          "busqueda": "Filtrar por ID_Benef del beneficiario",
+          "campos_clave": ["Fecha", "Guia", "Tipo_despacho", "Camion", "Chofer"],
+          "ordenamiento": "Por Fecha ascendente"
+        },
+        "pagos": {
+          "tabla": "Solpago",
+          "busqueda": "Filtrar por ID_Benef del beneficiario",
+          "campos_clave": ["fecha", "Tipo_pago", "monto", "Estado", "maestro"],
+          "ordenamiento": "Por fecha ascendente"
+        },
+        "maestros": {
+          "tabla": "Maestros",
+          "busqueda": "Por IDU_maestros para obtener nombres de maestros en pagos",
+          "campos_clave": ["IDU_maestros", "Nombres", "Apellidos", "Especialidad"],
+          "nota": "Tabla tiene columnas duplicadas (Telefono, Estado), requiere manejo especial"
+        },
+        "ejecucion": {
+          "tabla": "Ejecucion",
+          "busqueda": "Filtrar por ID_benef (minúscula) del beneficiario",
+          "campos_clave": ["IDU_E", "Fecha_creacion", "Fecha_ingresada"],
+          "nota": "Tabla tiene columnas duplicadas, requiere manejo especial"
+        }
+      },
+
+      "secciones": [
+        {
+          "nombre": "IDENTIFICACIÓN",
+          "campos": ["Nombre completo", "RUT", "Estado civil", "Teléfono", "Email", "WhatsApp"],
+          "nota": "Sin ID interno - no relevante para usuario"
+        },
+        {
+          "nombre": "PROYECTO",
+          "campos": ["ID_Proy", "Estado", "Hábil para construir", "Fecha hábil"]
+        },
+        {
+          "nombre": "TIPOLOGÍAS",
+          "campos": ["Vivienda (descripción con m2)", "Recinto Complementario (descripción con m2)"],
+          "nota": "Muestra descripción legible, no ID. Ej: 'Vivienda 2D 1P 59.18 m2'"
+        },
+        {
+          "nombre": "UBICACIÓN",
+          "campos": ["Dirección RSH", "Dirección Postal", "Comuna"]
+        },
+        {
+          "nombre": "APROBACIONES",
+          "campos": ["Legal", "Social", "Técnico"]
+        },
+        {
+          "nombre": "TERRENO/LEGAL",
+          "campos": ["N° Rol", "CBR", "Decreto", "Permiso edificación", "Num permiso"]
+        },
+        {
+          "nombre": "DESPACHOS",
+          "tipo": "tabla",
+          "columnas": ["Fecha", "Guía", "Etapas", "Camión", "Chofer"],
+          "resumen": ["Total despachos"]
+        },
+        {
+          "nombre": "SOLICITUDES DE PAGO",
+          "tipo": "tabla",
+          "columnas": ["Fecha", "Tipo", "Monto", "Estado", "Maestro"],
+          "resumen": ["Total solicitudes", "Total aprobado", "Total pendiente"]
+        },
+        {
+          "nombre": "REGISTROS DE EJECUCIÓN",
+          "resumen": ["Cantidad de registros", "Rango de fechas"]
+        }
+      ],
+
+      "ejemplo_invocacion": "Reporte de Resumen de Beneficiario para Maria Matus Acuña, de Los Campesinos Esforzados"
+    },
+
+    "RESUMEN_PAGO_MO_GRUPO": {
+      "nombre": "Resumen de Pago M.O de Grupos",
+      "descripcion": "Excel con resumen de pagos de mano de obra de todos los beneficiarios de un proyecto/grupo",
+      "formato_salida": "Excel (.xlsx)",
+      "parametros_requeridos": ["nombre_proyecto"],
+
+      "fuentes_datos": {
+        "proyecto": {
+          "tabla": "Proyectos",
+          "busqueda": "Por NOMBRE_PROYECTO (contiene) para obtener ID_proy",
+          "campos_clave": ["ID_proy", "NOMBRE_PROYECTO", "COMUNA", "PERIODO"]
+        },
+        "beneficiarios": {
+          "tabla": "Beneficiario",
+          "busqueda": "Filtrar por ID_Proy del proyecto",
+          "campos_clave": ["ID_Benef", "NOMBRES", "APELLIDOS", "RUT", "DV", "Tipologia Vivienda", "COMUNA"]
+        },
+        "pagos": {
+          "tabla": "Solpago",
+          "busqueda": "Filtrar por ID_proy del proyecto",
+          "campos_clave": ["fecha", "ID_Benef", "Familia_pago", "Tipo_pago", "monto", "Estado", "maestro", "Observacion"]
+        },
+        "maestros": {
+          "tabla": "Maestros",
+          "busqueda": "Por IDU_maestros para obtener nombres",
+          "campos_clave": ["IDU_maestros", "Nombres", "Apellidos"]
+        },
+        "tipologias": {
+          "tabla": "Tipologias",
+          "busqueda": "Por IDU_tipol para descripción",
+          "campos_clave": ["IDU_tipol", "Familia", "dormitorios", "plantas", "caracterizacion"]
+        }
+      },
+
+      "hojas_excel": [
+        {
+          "nombre": "Resumen Proyecto",
+          "tipo": "info_general",
+          "campos": ["Proyecto", "ID", "Comuna", "Periodo", "Beneficiarios", "Total Pagos", "Fecha Reporte"]
+        },
+        {
+          "nombre": "Por Beneficiario",
+          "tipo": "tabla_resumen",
+          "columnas": ["Beneficiario", "RUT", "Tipologia", "Comuna", "Cant_Pagos", "Total", "Aprobado", "Pendiente"],
+          "incluye_total": true
+        },
+        {
+          "nombre": "Detalle Pagos",
+          "tipo": "tabla_detalle",
+          "columnas": ["Fecha", "Beneficiario", "Familia", "Tipo_Pago", "Monto", "Estado", "Maestro", "Observacion"]
+        },
+        {
+          "nombre": "Por Maestro",
+          "tipo": "tabla_resumen",
+          "columnas": ["Maestro", "Cant_Pagos", "Total", "Aprobado", "Pendiente"],
+          "ordenamiento": "Total DESC",
+          "incluye_total": true
+        }
+      ],
+
+      "ejemplo_invocacion": "Resumen de Pago M.O de Grupos para Mi Nuevo Hogar"
+    },
+
+    "ANALISIS_COMPARATIVO_MO": {
+      "nombre": "Análisis Comparativo de M.O",
+      "descripcion": "PDF comparando M.O Base Autorizada vs Pagos Reales por proyecto, con desviación por familia y beneficiario",
+      "formato_salida": "PDF (Landscape A4)",
+      "parametros_requeridos": ["nombre_proyecto"],
+
+      "fuentes_datos": {
+        "proyecto": {
+          "tabla": "Proyectos",
+          "busqueda": "Por NOMBRE_PROYECTO (contiene) para obtener ID_proy",
+          "campos_clave": ["ID_proy", "NOMBRE_PROYECTO", "COMUNA", "PERIODO"]
+        },
+        "tipologias": {
+          "tabla": "Tipologias",
+          "busqueda": "Por ID_proy para obtener tipologías del proyecto",
+          "campos_clave": ["IDU_tipol", "ID_proy", "Familia", "dormitorios", "plantas", "caracterizacion"],
+          "logica": "Identificar IDs de tipologías que son R.Comp para prefijo 'RC '"
+        },
+        "beneficiarios": {
+          "tabla": "Beneficiario",
+          "busqueda": "Filtrar por ID_Proy",
+          "campos_clave": ["ID_Benef", "NOMBRES", "APELLIDOS", "Tipologia Vivienda", "Tipologia RC"],
+          "nota": "Cada beneficiario tiene Tipologia Vivienda y opcionalmente Tipologia RC (bodega)"
+        },
+        "tabla_pago_base": {
+          "tabla": "Tabla_pago",
+          "busqueda": "Filtrar por ID_proy del proyecto",
+          "campos_clave": ["IDU_Tipol", "familia_pago", "tipo_pago", "monto"],
+          "uso": "Montos AUTORIZADOS por partida para cada tipología"
+        },
+        "pagos_reales": {
+          "tabla": "Solpago",
+          "busqueda": "Filtrar por ID_proy, solo Estado='Aprobado'",
+          "campos_clave": ["ID_Benef", "tipologia", "Familia_pago", "monto"],
+          "logica": "Detectar pagos RC comparando campo 'tipologia' con IDs de tipologías RC"
+        }
+      },
+
+      "secciones_pdf": [
+        {
+          "nombre": "RESUMEN EJECUTIVO",
+          "contenido": [
+            "Tabla de tipologías: descripción, cantidad, base unitaria",
+            "Total Viviendas + Recintos Complementarios",
+            "M.O Base Esperado vs Total Pagado vs Desviación (%)"
+          ]
+        },
+        {
+          "nombre": "PAGOS REALES POR FAMILIA Y BENEFICIARIO",
+          "tipo": "matriz",
+          "filas": "Familias de pago (vivienda primero, RC después con prefijo 'RC ')",
+          "columnas": "Beneficiarios (hasta 10 por página)",
+          "formato_celda": "$XXXk(±XX%) - monto en miles y desviación vs base unitaria",
+          "notas": [
+            "Filas amarillas = Recinto Complementario",
+            "Si no hay pago pero sí base = muestra '(-100%)'",
+            "Fila TOTAL con desviación total del beneficiario"
+          ]
+        },
+        {
+          "nombre": "ANALISIS DE DESVIACION POR FAMILIA",
+          "tipo": "tabla",
+          "columnas": ["Familia de Pago", "Base Esperada", "Real Pagado", "Desviación", "%"],
+          "ordenamiento": "Vivienda primero (por desviación), luego RC (por desviación)",
+          "colores": {
+            "sobrecosto": "Texto rojo",
+            "ahorro": "Texto verde",
+            "filas_rc": "Fondo amarillo"
+          },
+          "interpretacion": "Lista top 3 familias con sobrecosto y top 3 con ahorro"
+        }
+      ],
+
+      "ejemplo_invocacion": "Análisis Comparativo de M.O para Com. Pedro Antivil"
+    },
+
+    "FICHA_PROYECTO": {
+      "nombre": "Ficha de Proyecto",
+      "descripcion": "Ficha completa de un proyecto con información general, plazos, montos y listado de beneficiarios con sus tipologías",
+      "formato_salida": "Tabla en pantalla",
+      "parametros_requeridos": ["nombre_proyecto"],
+
+      "fuentes_datos": {
+        "proyecto": {
+          "tabla": "Proyectos",
+          "busqueda": "Por NOMBRE_PROYECTO (contiene) para obtener ID_proy",
+          "campos_clave": ["ID_proy", "NOMBRE_PROYECTO", "COMUNA", "PERIODO", "estado_general", "Encargado", "cod_rukan", "fecha_inicio", "duracion"]
+        },
+        "beneficiarios": {
+          "tabla": "Beneficiario",
+          "busqueda": "Filtrar por ID_Proy del proyecto",
+          "campos_clave": ["ID_Benef", "NOMBRES", "APELLIDOS", "Estado", "Habil para construir", "Tipologia Vivienda", "Tipologia RC"]
+        },
+        "tipologias": {
+          "tabla": "Tipologias",
+          "busqueda": "Por IDU_tipol para descripción de tipologías",
+          "campos_clave": ["IDU_tipol", "Familia", "dormitorios", "plantas", "caracterizacion", "tipologia"]
+        },
+        "montos": {
+          "tabla": "Montos",
+          "busqueda": "Filtrar por ID_proy del proyecto",
+          "campos_clave": ["Base", "RAL", "Ampliacion1", "Ampliacion2", "Terreno", "Conexiones", "Discapacidad", "entorno", "mejvivienda", "incremento", "homologacion", "ajuste_ppto"]
+        }
+      },
+
+      "secciones": [
+        {
+          "nombre": "INFORMACIÓN GENERAL",
+          "campos": ["ID", "Código Rukan", "Comuna", "Periodo", "Estado", "Encargado", "Total Beneficiarios", "Monto Base Original (UF)", "Monto Incrementado (UF)", "Monto Total Proyecto (UF)"]
+        },
+        {
+          "nombre": "PLAZOS DEL CONTRATO",
+          "campos": ["Fecha Inicio", "Duración Original", "Duración Total", "Fecha Término", "Días Transcurridos", "Días Restantes", "Avance Tiempo %", "Estado Plazo"]
+        },
+        {
+          "nombre": "LISTADO DE BENEFICIARIOS",
+          "tipo": "tabla",
+          "columnas": ["N°", "Beneficiario", "Estado", "Hábil para construir", "Tipología Vivienda", "Tipología RC"],
+          "nota": "Muestra TODOS los beneficiarios sin límite"
+        }
+      ],
+
+      "ejemplo_invocacion": "Ficha del proyecto Ñuke Mapu"
+    },
+
+    "DASHBOARD_CONTRATOS": {
+      "nombre": "Dashboard de Contratos y Plazos",
+      "descripcion": "Tabla resumen de todos los proyectos activos con sus plazos, fechas y estado de contrato",
+      "formato_salida": "Tabla en pantalla",
+      "parametros_requeridos": [],
+
+      "fuentes_datos": {
+        "proyectos": {
+          "tabla": "Proyectos",
+          "busqueda": "Todos los proyectos con fecha de inicio",
+          "campos_clave": ["ID_proy", "NOMBRE_PROYECTO", "COMUNA", "PERIODO", "estado_general", "Encargado", "fecha_inicio", "duracion", "Prorroga1", "Prorroga2"]
+        },
+        "beneficiarios": {
+          "tabla": "Beneficiario",
+          "busqueda": "Para contar beneficiarios por proyecto",
+          "campos_clave": ["ID_Benef", "ID_Proy"]
+        }
+      },
+
+      "columnas_salida": [
+        "ID_proy", "Nombre", "Comuna", "Periodo", "Fecha_Inicio", "Duracion",
+        "Prorroga", "Duracion_Total", "Fecha_Termino", "Dias_Transcurridos",
+        "Dias_Restantes", "Avance_Tiempo_%", "Estado_Plazo", "Estado_General",
+        "Beneficiarios", "Encargado"
+      ],
+
+      "ordenamiento": "Por Dias_Restantes ascendente (más urgentes primero)",
+
+      "estados_plazo": {
+        "vencido": "Contrato ya venció",
+        "proximo_vencer": "Menos de 30 días restantes",
+        "en_tiempo": "Más de 30 días restantes"
+      },
+
+      "ejemplo_invocacion": "Dashboard de contratos"
+    },
+
+    "GASTOS_PROYECTO": {
+      "nombre": "Gastos por Proyecto",
+      "descripcion": "PDF con Gastos Generales (facturas pago directo) y Rendiciones (reembolsos) de un proyecto",
+      "formato_salida": "PDF (Landscape A4)",
+      "parametros_requeridos": ["nombre_proyecto"],
+
+      "fuentes_datos": {
+        "proyecto": {
+          "tabla": "Proyectos",
+          "busqueda": "Por NOMBRE_PROYECTO (contiene) para obtener ID_proy",
+          "campos_clave": ["ID_proy", "NOMBRE_PROYECTO"]
+        },
+        "gastos_generales_cabecera": {
+          "tabla": "Reg_pago_ex",
+          "busqueda": "Filtrar por ID_proy del proyecto",
+          "campos_clave": ["IDU_regpx", "ID_proy", "fecha", "estado", "descripcion"]
+        },
+        "gastos_generales_detalle": {
+          "tabla": "Reg_pago_ex_det",
+          "busqueda": "Filtrar por IDU_regpx de las cabeceras del proyecto",
+          "campos_clave": ["IDU_detpago", "IDU_regpx", "Tipo_pago", "monto", "proveedor", "detalle_pago", "observaciones"]
+        },
+        "proveedores": {
+          "tabla": "Reg_pago_proveed",
+          "busqueda": "Por IDU_proveed para obtener nombre del proveedor",
+          "campos_clave": ["IDU_proveed", "Nombre"]
+        },
+        "rendiciones_cabecera": {
+          "tabla": "rend_caja",
+          "busqueda": "Filtrar por Ccosto = ID_proy",
+          "campos_clave": ["IDU_Rendcaja", "usuario", "fecha", "Estado", "Ccosto"]
+        },
+        "rendiciones_detalle": {
+          "tabla": "rend_caja_det",
+          "busqueda": "Filtrar por IDU_Rendcaja de las cabeceras del proyecto",
+          "campos_clave": ["IDU_rendet", "IDU_Rendcaja", "fecha", "clase", "tipo_doc", "Detalle", "Monto"]
+        }
+      },
+
+      "secciones_pdf": [
+        {
+          "nombre": "GASTOS GENERALES (Facturas - Pago Directo)",
+          "contenido": [
+            "Resumen por Categoría (Tipo_pago): cantidad, total, % del total",
+            "Detalle de Gastos: Fecha, Categoría, Proveedor (nombre), Descripción, Detalle Pago, Monto"
+          ]
+        },
+        {
+          "nombre": "RENDICIONES (Reembolsos Solicitados)",
+          "contenido": [
+            "Resumen por Clase: cantidad, total, % del total",
+            "Resumen por Usuario (rendidor): cantidad, total rendido",
+            "Detalle de Rendiciones: Fecha, Clase, Tipo Doc, Detalle, Monto, Usuario"
+          ]
+        },
+        {
+          "nombre": "RESUMEN EJECUTIVO",
+          "contenido": [
+            "Total Gastos Generales vs Total Rendiciones",
+            "Top 5 Categorías de Gastos Generales",
+            "Top 5 Clases de Rendiciones"
+          ]
+        }
+      ],
+
+      "ejemplo_invocacion": "Gastos del proyecto Raíces de Lanco"
+    },
+
+    "CIERRE_VIVIENDAS_GRUPO": {
+      "nombre": "Cierre de Viviendas por Grupo",
+      "descripcion": "PDF con análisis de días de ejecución por vivienda: desde 1er despacho hasta recepción municipal",
+      "formato_salida": "PDF (Portrait A4)",
+      "parametros_requeridos": ["nombre_proyecto"],
+
+      "fuentes_datos": {
+        "proyecto": {
+          "tabla": "Proyectos",
+          "busqueda": "Por NOMBRE_PROYECTO (contiene) para obtener ID_proy",
+          "campos_clave": ["ID_proy", "NOMBRE_PROYECTO"]
+        },
+        "beneficiarios": {
+          "tabla": "Beneficiario",
+          "busqueda": "Filtrar por ID_Proy del proyecto",
+          "campos_clave": ["ID_Benef", "NOMBRES", "APELLIDOS", "F_R_dom"],
+          "nota": "F_R_dom = Fecha de Recepción Municipal de la vivienda"
+        },
+        "despachos": {
+          "tabla": "Despacho",
+          "busqueda": "Filtrar por ID_proy del proyecto",
+          "campos_clave": ["ID_Benef", "Fecha"],
+          "logica": "Se toma la fecha mínima como '1er Despacho' por beneficiario"
+        }
+      },
+
+      "secciones_pdf": [
+        {
+          "nombre": "RESUMEN EJECUTIVO",
+          "contenido": [
+            "Nombre del Proyecto",
+            "Cantidad de casas con datos completos",
+            "Promedio de días de ejecución",
+            "Mínimo y máximo de días"
+          ]
+        },
+        {
+          "nombre": "DETALLE POR BENEFICIARIO",
+          "tipo": "tabla",
+          "columnas": ["Beneficiario", "1er Despacho", "Recepción", "Días Ejecución", "vs Promedio"],
+          "ordenamiento": "Por días de ejecución descendente (más lentos primero)",
+          "colores": {
+            "mas_lento_15pct": "Texto rojo - tardó más que promedio +15%",
+            "mas_rapido_15pct": "Texto verde - tardó menos que promedio -15%"
+          }
+        }
+      ],
+
+      "calculo": {
+        "dias_ejecucion": "Fecha_Recepcion - Fecha_1er_Despacho",
+        "desviacion": "(dias_casa - promedio_grupo) / promedio_grupo * 100"
+      },
+
+      "ejemplo_invocacion": "Cierre de Viviendas de Los Valles de Gorbea"
+    }
+  }
+}
