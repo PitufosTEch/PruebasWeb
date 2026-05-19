@@ -11,7 +11,7 @@ Mantener sincronizado con el código de `SCRaices-LLM/dashboard/index_live_v3.ht
 | Checkpoint en el informe | Fuente | Tabla / Nodo | Columna / Campo | Notas |
 |---|---|---|---|---|
 | **HPC** | AppSheet Sheet | `Beneficiario` | `Habil para construir` (sí/no) → flag `b.habil` | Si "Si"/"sí"/true/1 → prendido. Procesado en `index_live_v3.html` L441 |
-| **TE1** | Sheet separado (otro spreadsheet) | TE1 Sheet (`1QCoIpiQKV1LB6XgUwwoC_e4crRD5mIANLxon9ZVwsg8`) `Hoja 1` | (existencia de fila por beneficiario) | Pre-calculado y embebido en `dashboard/te1-set.js` como `BENEF_CON_TE1` Set |
+| **TE1** | **Triple fuente** (OR logico) — ver § TE1 | (varias) | (varias) | Marca prendida si CUALQUIERA de las tres fuentes tiene dato |
 | **V.AS** (Visita Inspector AS) | AppSheet Sheet | `Seguimiento` | matcher: `must=['visita','as']`, `not=['dom','f1','resol']` | Ver § Matching dinámico |
 | **R.AS** (Resol. Aprob AS) | AppSheet Sheet | `Seguimiento` | matcher: `must=['resol','as']`, `not=['dom','f1']` | |
 | **V.F1** (Visita F1) | AppSheet Sheet | `Seguimiento` | matcher: `must=['visita','f1']`, `not=['fecha','dom']` | |
@@ -38,6 +38,46 @@ Mantener sincronizado con el código de `SCRaices-LLM/dashboard/index_live_v3.ht
 | **Estado General** (texto en expandido) | Calculado | `getEstadoGeneral(estadoEtapas)` — basado en días desde última solicitud. |
 | **Comentarios destacados** | Firebase RTDB | Solo los marcados con estrella. Ver § Filtro por estrella. |
 | **Grupos + Capataz** (headers de bloques) | Firebase RTDB | Nodo `grupos/{proyectoId}` con `[{ id, nombre, capataz, beneficiarios:[ID_Benef,...] }]`. Editable desde tab "Configuración". |
+
+---
+
+## TE1 — triple fuente (OR lógico)
+
+A pedido del usuario (2026-05-19), el checkpoint **TE1** se considera prendido si **cualquiera** de estas tres fuentes tiene dato:
+
+### Fuente 1: Set pre-calculado (legacy)
+- Archivo: `dashboard/te1-set.js`
+- Variable global: `BENEF_CON_TE1` (Set de IDs)
+- Origen: extracción manual del Sheet TE1 separado (`1QCoIpiQKV1LB6XgUwwoC_e4crRD5mIANLxon9ZVwsg8`, `Hoja 1`)
+- Se regenera offline cuando se actualiza el TE1
+
+### Fuente 2: Perfil del beneficiario (PDF en AppSheet)
+- Tabla: `Beneficiario` de AppSheet
+- Columna: detectada dinámicamente — cualquier columna cuyo nombre normalizado contenga `te1` (excluyendo `te10`, `te11`, `te12`)
+- Valor: cualquier cosa no vacía (`nan`/`no`/`false` se ignoran). En la práctica es el campo donde el operador sube el PDF del documento TE1
+- Procesado en `index_live_v3.html` ~L500
+- Log en consola: `[LIVE] TE1: columnas detectadas en Beneficiario: [...]` y `[LIVE] TE1 desde perfil Beneficiario: N`
+
+### Fuente 3: Tabla Seguimiento Cierre de Obras
+- Tabla: `Seguimiento`
+- Columna: detectada dinámicamente (regla `must=['te1'], not=['te10','te11','te12']`)
+- Procesado tras el procesamiento de Seguimiento (~L770)
+- Log en consola: `[LIVE] TE1 desde Seguimiento: N. Total con TE1: X/Y`
+
+### Debug
+Cada beneficiario tiene `_te1_sources = { embedded, profile, seguimiento }` (booleanos por fuente) para inspeccionar de dónde vino el match.
+
+---
+
+## Comentario corto por grupo (tab Viviendas)
+
+Agregado el 2026-05-19. Cada grupo (capataz) puede tener un comentario corto de estado (ej: "cubierta terminada, falta DOM").
+
+- Persiste en Firebase como campo `comentario` del objeto grupo, dentro del nodo `grupos/{proyectoId}`
+- Estructura: `grupos/{proyectoId} = [{ id, nombre, capataz, beneficiarios, comentario }]`
+- Editable inline en el `GrupoHeader` del tab Viviendas (no en el informe Estado General)
+- Componente: `GrupoHeader` en `index_live_v3.html` ~L1810, callback `onUpdateComentario` → `actualizarComentarioGrupo` en App (~L4180)
+- Max 200 caracteres, plaintext
 
 ---
 
@@ -129,3 +169,4 @@ GET {endpoint}?action=manifest
 | Fecha | Cambio | Quién |
 |---|---|---|
 | 2026-05-19 | Doc creada. Eliminado checkpoint T1. Matcher de columnas Seguimiento reescrito a normalización + keywords (mustHave/mustNotHave) para tolerar variantes AppSheet. | Claude (a pedido del usuario) |
+| 2026-05-19 | TE1 ampliado a triple fuente (set embebido + PDF en perfil Beneficiario + columna en Seguimiento). Nueva regla de match `te1` en `SEG_RULES`. Comentario corto editable a nivel grupo persistido en Firebase (`grupos/{pId}/[].comentario`). | Claude (a pedido del usuario) |

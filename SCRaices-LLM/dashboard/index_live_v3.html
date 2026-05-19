@@ -493,13 +493,50 @@ const ETAPAS_CONFIG_FULL = {
 
         const idsBenef = new Set(BENEFICIARIOS_DATA.map(b => String(b.ID_Benef)));
 
-        // Marcar has_te1 desde set pre-calculado (embebido al generar)
-        if (typeof BENEF_CON_TE1 !== 'undefined') {
-            BENEFICIARIOS_DATA.forEach(b => {
-                if (BENEF_CON_TE1.has(String(b.ID_Benef))) b.has_te1 = true;
+        // TE1 - triple fuente (ver app/SOURCES_OF_TRUTH.md):
+        //   1) Set pre-calculado BENEF_CON_TE1 (de hoja TE1 separada)
+        //   2) Columna(s) con 'te1' en el perfil Beneficiario (PDF cargado)
+        //   3) Columna te1 en Seguimiento (resuelto despues, ver L~720)
+        const normTE1 = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+        // Scan raw Beneficiario rows para columnas que contengan 'te1' (pero no te10, te11, te12)
+        const benefTE1FromProfile = new Set();
+        if (benRaw.length > 0) {
+            const sampleKeys = Object.keys(benRaw[0]);
+            const te1Cols = sampleKeys.filter(k => {
+                const n = normTE1(k);
+                return n.includes('te1') && !n.includes('te10') && !n.includes('te11') && !n.includes('te12');
             });
-            console.log('[LIVE] TE1: marcados desde set embebido (' + BENEF_CON_TE1.size + ')');
+            if (te1Cols.length > 0) {
+                console.log('[LIVE] TE1: columnas detectadas en Beneficiario:', te1Cols);
+                benRaw.forEach(b => {
+                    const id = String(b.ID_Benef || b.IDU_Benef || '').trim();
+                    if (!id) return;
+                    for (const col of te1Cols) {
+                        const v = b[col];
+                        if (v !== null && v !== undefined && String(v).trim() !== '' && String(v).toLowerCase() !== 'nan' && String(v).toLowerCase() !== 'no' && String(v).toLowerCase() !== 'false') {
+                            benefTE1FromProfile.add(id);
+                            break;
+                        }
+                    }
+                });
+                console.log('[LIVE] TE1 desde perfil Beneficiario:', benefTE1FromProfile.size);
+            } else {
+                console.warn('[LIVE] TE1: no se encontraron columnas con "te1" en Beneficiario');
+            }
         }
+
+        // Aplicar TE1 a BENEFICIARIOS_DATA (fuente 1 + 2; fuente 3 se aplica tras procesar Seguimiento)
+        let te1FromEmbedded = 0, te1FromProfile = 0;
+        BENEFICIARIOS_DATA.forEach(b => {
+            const id = String(b.ID_Benef);
+            const fromEmbedded = (typeof BENEF_CON_TE1 !== 'undefined') && BENEF_CON_TE1.has(id);
+            const fromProfile = benefTE1FromProfile.has(id);
+            if (fromEmbedded) te1FromEmbedded++;
+            if (fromProfile) te1FromProfile++;
+            b.has_te1 = fromEmbedded || fromProfile;
+            b._te1_sources = { embedded: fromEmbedded, profile: fromProfile, seguimiento: false };
+        });
+        console.log(`[LIVE] TE1 aplicado: embedded=${te1FromEmbedded}, profile=${te1FromProfile}`);
 
         updateLoading('Procesando despachos...', 50);
 
@@ -671,6 +708,7 @@ const ETAPAS_CONFIG_FULL = {
         // Reglas de matching (mustHave, mustNotHave). Estas reglas estan documentadas en
         // app/SOURCES_OF_TRUTH.md - mantenerlas sincronizadas.
         const SEG_RULES = {
+            te1:           { must: ['te1'],                  not: ['te10','te11','te12'] },
             visita_as:     { must: ['visita', 'as'],         not: ['dom', 'f1', 'resol'] },
             resol_as:      { must: ['resol', 'as'],          not: ['dom', 'f1'] },
             visita_f1:     { must: ['visita', 'f1'],         not: ['fecha', 'dom'] },
@@ -725,6 +763,19 @@ const ETAPAS_CONFIG_FULL = {
         } else {
             console.warn('[LIVE] Seguimiento: 0 filas. Verificar que la hoja se llame exactamente "Seguimiento" en el Sheet, o ajustar TABLES_TO_FETCH.');
         }
+
+        // TE1 - fuente 3: columna te1 de Seguimiento. Se aplica ahora que SEGUIMIENTO_DATA esta listo.
+        let te1FromSeguimiento = 0;
+        BENEFICIARIOS_DATA.forEach(b => {
+            const seg = SEGUIMIENTO_DATA[String(b.ID_Benef)];
+            const fromSeg = !!(seg && seg.te1 && isFilled(seg.te1));
+            if (fromSeg) {
+                b.has_te1 = true;
+                if (b._te1_sources) b._te1_sources.seguimiento = true;
+                te1FromSeguimiento++;
+            }
+        });
+        console.log(`[LIVE] TE1 desde Seguimiento: ${te1FromSeguimiento}. Total con TE1: ${BENEFICIARIOS_DATA.filter(b => b.has_te1).length}/${BENEFICIARIOS_DATA.length}`);
 
         updateLoading('Procesando maestros...', 80);
 
@@ -1807,14 +1858,29 @@ const HeaderProyecto = ({ proy, garantiasProy, eeppResumen, kpis }) => {
 };
 
 // ===== GRUPO HEADER =====
-const GrupoHeader = ({ grupo, colorIdx, open, onToggle }) => {
+const GrupoHeader = ({ grupo, colorIdx, open, onToggle, onUpdateComentario }) => {
     if (!grupo.nombre) return null;
     const c = colorIdx >= 0 ? GRUPO_COLORS[colorIdx] : { bg:"bg-gray-50", border:"border-gray-200", text:"text-gray-600", accent:"bg-gray-400" };
     const res = grupoResumen(grupo.viviendas);
+    const [editing, setEditing] = React.useState(false);
+    const [draft, setDraft] = React.useState(grupo.comentario || "");
+    React.useEffect(() => { setDraft(grupo.comentario || ""); }, [grupo.comentario]);
+
+    const stop = (e) => { e.stopPropagation(); };
+    const save = () => {
+        const t = draft.trim();
+        if (onUpdateComentario) onUpdateComentario(grupo.id, t);
+        setEditing(false);
+    };
+    const cancel = () => {
+        setDraft(grupo.comentario || "");
+        setEditing(false);
+    };
+
     return (
         <div className={`${c.bg} border ${c.border} rounded-xl p-3 cursor-pointer hover:shadow-sm transition-shadow`} onClick={onToggle}>
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 flex-shrink-0">
                     <div className={`w-8 h-8 ${c.accent} rounded-lg flex items-center justify-center`}>
                         <span className="text-white text-xs font-bold">{grupo.nombre.replace("Grupo ","G")}</span>
                     </div>
@@ -1833,7 +1899,38 @@ const GrupoHeader = ({ grupo, colorIdx, open, onToggle }) => {
                         </div>
                     </div>
                 </div>
-                <div className="flex items-center gap-3">
+
+                {/* Nota del grupo (editable) */}
+                <div className="flex-1 min-w-0 max-w-2xl" onClick={stop}>
+                    {editing ? (
+                        <div className="flex items-center gap-1.5">
+                            <input
+                                type="text"
+                                value={draft}
+                                onChange={(e) => setDraft(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') cancel(); }}
+                                placeholder="Estado actual del grupo (ej: cubierta terminada, pendiente DOM)..."
+                                maxLength={200}
+                                autoFocus
+                                className="flex-1 text-xs px-2 py-1 bg-white border border-violet-300 rounded focus:outline-none focus:ring-2 focus:ring-violet-400"
+                            />
+                            <button onClick={save} className="text-[10px] px-2 py-1 bg-violet-600 text-white rounded font-medium hover:bg-violet-700">Guardar</button>
+                            <button onClick={cancel} className="text-[10px] px-2 py-1 text-gray-500 hover:text-gray-700">Cancelar</button>
+                        </div>
+                    ) : grupo.comentario ? (
+                        <div className="flex items-start gap-1.5 bg-white/60 border border-gray-200 rounded px-2 py-1 group">
+                            <svg className="w-3 h-3 text-amber-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/><path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd"/></svg>
+                            <p className="text-[11px] text-gray-700 italic flex-1 break-words">{grupo.comentario}</p>
+                            <button onClick={() => setEditing(true)} className="text-[10px] text-gray-400 hover:text-violet-600 opacity-0 group-hover:opacity-100 flex-shrink-0" title="Editar nota">Editar</button>
+                        </div>
+                    ) : (
+                        <button onClick={() => setEditing(true)} className="text-[10px] px-2 py-1 text-gray-400 border border-dashed border-gray-300 rounded hover:text-violet-600 hover:border-violet-300 hover:bg-violet-50 transition-colors">
+                            + Agregar nota del grupo
+                        </button>
+                    )}
+                </div>
+
+                <div className="flex items-center gap-3 flex-shrink-0">
                     <div className="w-24 space-y-0.5">
                         <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden"><div className="h-full rounded-full bg-blue-500" style={{width:`${res.avanceDesp}%`}} /></div>
                         <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden"><div className="h-full rounded-full bg-emerald-500" style={{width:`${res.avanceInsp}%`}} /></div>
@@ -1846,7 +1943,7 @@ const GrupoHeader = ({ grupo, colorIdx, open, onToggle }) => {
 };
 
 // ===== VIVIENDAS TAB =====
-const ViviendasTab = ({ viviendas, grupos, expandida, setExpandida, filtro, setFiltro, busqueda, setBusqueda, observaciones, addObservacion, deleteObservacion, showResumenObs, setShowResumenObs, actividades, toggleActividad, consultas, toggleConsulta, ocultados, ocultarBeneficiario, mostrarBeneficiario }) => {
+const ViviendasTab = ({ viviendas, grupos, expandida, setExpandida, filtro, setFiltro, busqueda, setBusqueda, observaciones, addObservacion, deleteObservacion, showResumenObs, setShowResumenObs, actividades, toggleActividad, consultas, toggleConsulta, ocultados, ocultarBeneficiario, mostrarBeneficiario, onUpdateComentarioGrupo }) => {
     const [showOcultas, setShowOcultas] = React.useState(false);
     const ocultadasProy = viviendas.filter(v => ocultados[v.ID_Benef]);
     const vivVisibles = viviendas.filter(v => !ocultados[v.ID_Benef]);
@@ -2148,7 +2245,7 @@ const ViviendasTab = ({ viviendas, grupos, expandida, setExpandida, filtro, setF
             <div className="space-y-3">
                 {gruposData.map(grupo => (
                     <div key={grupo.id}>
-                        <GrupoHeader grupo={grupo} colorIdx={grupo.colorIdx} open={gruposAbiertos[grupo.id] !== false} onToggle={() => toggleGrupo(grupo.id)} />
+                        <GrupoHeader grupo={grupo} colorIdx={grupo.colorIdx} open={gruposAbiertos[grupo.id] !== false} onToggle={() => toggleGrupo(grupo.id)} onUpdateComentario={onUpdateComentarioGrupo} />
                         {(gruposAbiertos[grupo.id] !== false) && (
                             <div className={`space-y-2 ${grupo.nombre ? "ml-2 pl-3 border-l-2 " + (grupo.colorIdx >= 0 ? GRUPO_COLORS[grupo.colorIdx].border : "border-gray-200") : ""} mt-2`}>
                                 {grupo.viviendas.map(v =>
@@ -4158,6 +4255,15 @@ const App = () => {
         setGruposConfig(prev => ({...prev, [proyectoSel]: newGrupos}));
     };
 
+    // Actualiza el comentario corto de un grupo (persiste en Firebase via setGruposConfig effect)
+    const actualizarComentarioGrupo = React.useCallback((grupoId, comentario) => {
+        setGruposConfig(prev => {
+            const arr = prev[proyectoSel] || [];
+            const next = arr.map(g => g.id === grupoId ? { ...g, comentario: comentario || '' } : g);
+            return { ...prev, [proyectoSel]: next };
+        });
+    }, [proyectoSel]);
+
     // KPIs
     const kpis = React.useMemo(() => {
         const avanceDesp = viviendas.length ? Math.round(viviendas.reduce((s, v) => s + v.avance.porcentaje, 0) / viviendas.length) : 0;
@@ -4850,7 +4956,7 @@ const App = () => {
 
                 {/* CONTENIDO */}
                 <div className="min-h-[500px]">
-                    {tab === "viviendas" && <ViviendasTab viviendas={viviendas} grupos={grupos} expandida={expandida} setExpandida={setExpandida} filtro={filtro} setFiltro={setFiltro} busqueda={busqueda} setBusqueda={setBusqueda} observaciones={observaciones} addObservacion={addObservacion} deleteObservacion={deleteObservacion} showResumenObs={showResumenObs} setShowResumenObs={setShowResumenObs} actividades={actividades} toggleActividad={toggleActividad} consultas={consultas} toggleConsulta={toggleConsulta} ocultados={ocultados} ocultarBeneficiario={ocultarBeneficiario} mostrarBeneficiario={mostrarBeneficiario} />}
+                    {tab === "viviendas" && <ViviendasTab viviendas={viviendas} grupos={grupos} expandida={expandida} setExpandida={setExpandida} filtro={filtro} setFiltro={setFiltro} busqueda={busqueda} setBusqueda={setBusqueda} observaciones={observaciones} addObservacion={addObservacion} deleteObservacion={deleteObservacion} showResumenObs={showResumenObs} setShowResumenObs={setShowResumenObs} actividades={actividades} toggleActividad={toggleActividad} consultas={consultas} toggleConsulta={toggleConsulta} ocultados={ocultados} ocultarBeneficiario={ocultarBeneficiario} mostrarBeneficiario={mostrarBeneficiario} onUpdateComentarioGrupo={actualizarComentarioGrupo} />}
                     {tab === "matriz" && <MatrizAvance viviendas={viviendas} grupos={grupos} />}
                     {tab === "distribucion" && <DistribucionTab viviendas={viviendas} />}
                     {tab === "financiero" && <FinancieroTab viviendas={viviendas} />}
