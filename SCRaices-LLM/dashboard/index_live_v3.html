@@ -640,60 +640,90 @@ const ETAPAS_CONFIG_FULL = {
 
         // 6b. SEGUIMIENTO CIERRE DE OBRAS
         // Tabla AppSheet con docs/hitos finales por beneficiario.
-        // Nombres de columna probables (defensivos — la tabla real puede variar):
-        //   Visita AS, Resol_AS / Resol. Aprob AS, Visita F1, Fecha F1, T1,
-        //   Artefactado, Empalme, Visita DOM, Fecha V. DOM, Recepcion DOM (n°),
-        //   Fecha Recepcion, Observaciones
+        // Doc privada de reglas: app/SOURCES_OF_TRUTH.md
         const segRaw = raw.Seguimiento?.rows || [];
         SEGUIMIENTO_DATA = {};
-        // Helper para resolver alias de columnas (case/espacios/puntos varían en AppSheet)
-        const pickCol = (row, candidates) => {
-            for (const c of candidates) {
-                if (row[c] !== undefined && row[c] !== null && String(row[c]).trim() !== '' && String(row[c]).toLowerCase() !== 'nan') {
-                    return String(row[c]).trim();
+        // Resolucion robusta: normaliza nombre de columna (lower, sin tildes/espacios/puntos)
+        // y matchea cuando TODOS los keywords aparecen Y NINGUNO de los exclude.
+        const normCol = (s) => String(s || '').toLowerCase()
+            .normalize('NFD').replace(/[\u0300-\u036f]/g, '')   // sin tildes
+            .replace(/[^a-z0-9]/g, '');                          // solo alfanumerico
+        const findCol = (row, mustHave, mustNotHave) => {
+            const keys = Object.keys(row);
+            for (const k of keys) {
+                const n = normCol(k);
+                if (mustHave.every(m => n.includes(m)) && !(mustNotHave || []).some(x => n.includes(x))) {
+                    return k;  // devuelve el nombre original de la columna
                 }
             }
-            return '';
+            return null;
+        };
+        const valOf = (row, colName) => {
+            if (!colName) return '';
+            const v = row[colName];
+            if (v === null || v === undefined) return '';
+            const s = String(v).trim();
+            if (!s || s.toLowerCase() === 'nan') return '';
+            return s;
         };
         const isFilled = (v) => v && v !== '' && v.toLowerCase() !== 'nan' && v.toLowerCase() !== 'no' && v.toLowerCase() !== 'false' && v !== '0';
+
+        // Reglas de matching (mustHave, mustNotHave). Estas reglas estan documentadas en
+        // app/SOURCES_OF_TRUTH.md - mantenerlas sincronizadas.
+        const SEG_RULES = {
+            visita_as:     { must: ['visita', 'as'],         not: ['dom', 'f1', 'resol'] },
+            resol_as:      { must: ['resol', 'as'],          not: ['dom', 'f1'] },
+            visita_f1:     { must: ['visita', 'f1'],         not: ['fecha', 'dom'] },
+            fecha_f1:      { must: ['f1'],                   not: ['visita', 'dom', 'tf', 't1'] },
+            artefactado:   { must: ['artefact'],             not: [] },
+            empalme:       { must: ['empalme'],              not: [] },
+            visita_dom:    { must: ['visita', 'dom'],        not: ['fecha'] },
+            fecha_v_dom:   { must: ['fecha', 'dom'],         not: ['recep'] },
+            recepcion_dom: { must: ['recep'],                not: ['fecha'] },
+            fecha_recep:   { must: ['fecha', 'recep'],       not: [] },
+            obs:           { must: ['obs'],                  not: ['vac'] }
+        };
+
+        // Mapa global de qué columna real matcheó cada checkpoint (para debug panel)
+        window._SEG_COL_MAP = {};
+        if (segRaw.length > 0) {
+            const sample = segRaw[0];
+            for (const [k, rule] of Object.entries(SEG_RULES)) {
+                window._SEG_COL_MAP[k] = findCol(sample, rule.must, rule.not);
+            }
+        }
+        window._SEG_RAW_COLS = segRaw.length > 0 ? Object.keys(segRaw[0]) : [];
+
         segRaw.forEach(s => {
             const id = String(s.ID_Benef || s.ID_benef || s.IDU_Benef || '').trim();
             if (!id || id === 'nan' || !idsBenef.has(id)) return;
-            const visita_as     = pickCol(s, ['Visita AS', 'visita_AS', 'V_AS', 'F_V_AS', 'F_visita_AS', 'Fecha Visita AS']);
-            const resol_as      = pickCol(s, ['Resol. Aprob AS', 'Resol Aprob AS', 'Resol_AS', 'F_Resol_AS', 'Fecha Resol AS', 'Aprob_AS']);
-            const visita_f1     = pickCol(s, ['Visita F1', 'V_F1', 'F_V_F1', 'F_visita_F1', 'Fecha Visita F1']);
-            const fecha_f1      = pickCol(s, ['Fecha F1', 'F_F1', 'fecha_F1']);
-            const t1            = pickCol(s, ['T1', 'F_T1', 'Fecha T1', 'fecha_T1']);
-            const artefactado   = pickCol(s, ['Artefactado', 'F_Artefactado', 'Fecha Artefactado']);
-            const empalme       = pickCol(s, ['Empalme', 'F_Empalme', 'Fecha Empalme']);
-            const visita_dom    = pickCol(s, ['Visita DOM', 'V_DOM', 'F_V_DOM']);
-            const fecha_v_dom   = pickCol(s, ['Fecha V. DOM', 'Fecha V DOM', 'F_V_DOM_fecha', 'fecha_visita_DOM']);
-            const recepcion_dom = pickCol(s, ['Recepcion DOM', 'Recep DOM', 'N_Recep_DOM', 'Numero_Recep', 'N° Recepcion', 'N Recepcion']);
-            const fecha_recep   = pickCol(s, ['Fecha Recepcion', 'Fecha Recepción', 'F_Recepcion', 'fecha_recepcion']);
-            const obs           = pickCol(s, ['Observaciones', 'Observacion', 'Obs', 'obs', 'Comentarios']);
+            const out = {};
+            for (const [k, rule] of Object.entries(SEG_RULES)) {
+                const colName = findCol(s, rule.must, rule.not);
+                out[k] = valOf(s, colName);
+            }
             SEGUIMIENTO_DATA[id] = {
-                visita_as, resol_as, visita_f1, fecha_f1, t1,
-                artefactado, empalme, visita_dom, fecha_v_dom, recepcion_dom,
-                fecha_recep, obs,
-                // flags booleanos derivados (para los puntos prendidos/apagados)
+                ...out,
                 _has: {
-                    visita_as: isFilled(visita_as),
-                    resol_as: isFilled(resol_as),
-                    visita_f1: isFilled(visita_f1),
-                    fecha_f1: isFilled(fecha_f1),
-                    t1: isFilled(t1),
-                    artefactado: isFilled(artefactado),
-                    empalme: isFilled(empalme),
-                    visita_dom: isFilled(visita_dom),
-                    fecha_v_dom: isFilled(fecha_v_dom),
-                    recepcion_dom: isFilled(recepcion_dom),
-                    fecha_recep: isFilled(fecha_recep)
+                    visita_as:     isFilled(out.visita_as),
+                    resol_as:      isFilled(out.resol_as),
+                    visita_f1:     isFilled(out.visita_f1),
+                    fecha_f1:      isFilled(out.fecha_f1),
+                    artefactado:   isFilled(out.artefactado),
+                    empalme:       isFilled(out.empalme),
+                    visita_dom:    isFilled(out.visita_dom),
+                    fecha_v_dom:   isFilled(out.fecha_v_dom),
+                    recepcion_dom: isFilled(out.recepcion_dom),
+                    fecha_recep:   isFilled(out.fecha_recep)
                 }
             };
         });
         console.log('[LIVE] Seguimiento procesado:', Object.keys(SEGUIMIENTO_DATA).length, 'registros de', segRaw.length, 'filas crudas');
         if (segRaw.length > 0) {
-            console.log('[LIVE] Columnas detectadas en Seguimiento[0]:', Object.keys(segRaw[0]).join(' | '));
+            console.log('[LIVE] Columnas detectadas en Seguimiento[0]:', window._SEG_RAW_COLS.join(' | '));
+            console.log('[LIVE] Match por checkpoint:', window._SEG_COL_MAP);
+        } else {
+            console.warn('[LIVE] Seguimiento: 0 filas. Verificar que la hoja se llame exactamente "Seguimiento" en el Sheet, o ajustar TABLES_TO_FETCH.');
         }
 
         updateLoading('Procesando maestros...', 80);
@@ -2938,7 +2968,7 @@ const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios
     const [filtro, setFiltro] = React.useState("todas"); // todas | pendientes | recepcionadas
     const [grupoColapsado, setGrupoColapsado] = React.useState({}); // {grupoId: true/false}
 
-    // Definición de checkpoints en orden visual
+    // Definición de checkpoints en orden visual (T1 eliminado por solicitud del usuario)
     const CHECKPOINTS = [
         { key: 'hpc',          label: 'HPC',         tipo: 'beneficiario' },
         { key: 'te1',          label: 'TE1',         tipo: 'te1' },
@@ -2946,7 +2976,6 @@ const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios
         { key: 'resol_as',     label: 'R.AS',        tipo: 'seguimiento' },
         { key: 'visita_f1',    label: 'V.F1',        tipo: 'seguimiento' },
         { key: 'fecha_f1',     label: 'F1',          tipo: 'seguimiento' },
-        { key: 't1',           label: 'T1',          tipo: 'seguimiento' },
         { key: 'artefactado',  label: 'Artef.',      tipo: 'seguimiento' },
         { key: 'empalme',      label: 'Empalme',     tipo: 'seguimiento' },
         { key: 'visita_dom',   label: 'V.DOM',       tipo: 'seguimiento' },
@@ -2972,7 +3001,6 @@ const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios
                 resol_as:      !!seg._has.resol_as,
                 visita_f1:     !!seg._has.visita_f1,
                 fecha_f1:      !!seg._has.fecha_f1,
-                t1:            !!seg._has.t1,
                 artefactado:   !!seg._has.artefactado,
                 empalme:       !!seg._has.empalme,
                 visita_dom:    !!seg._has.visita_dom,
@@ -3059,8 +3087,69 @@ const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios
         return `${meses[parseInt(m,10)-1]}'${y.slice(2)}`;
     };
 
+    // Estado del panel debug
+    const [showDebug, setShowDebug] = React.useState(false);
+    const segRawCount = Object.keys(SEGUIMIENTO_DATA).length;
+    const segColMap = (typeof window !== 'undefined' && window._SEG_COL_MAP) || {};
+    const segRawCols = (typeof window !== 'undefined' && window._SEG_RAW_COLS) || [];
+    const checkpointsSinMatch = CHECKPOINTS.filter(cp => cp.tipo === 'seguimiento' && !segColMap[cp.key]);
+
     return (
         <div className="space-y-4">
+            {/* PANEL DE DEBUG / DIAGNOSTICO Seguimiento */}
+            <div className={`border rounded-xl shadow-sm overflow-hidden ${checkpointsSinMatch.length > 0 || segRawCount === 0 ? 'bg-red-50 border-red-300' : 'bg-blue-50 border-blue-200'}`}>
+                <div onClick={() => setShowDebug(!showDebug)} className="px-3 py-2 cursor-pointer flex items-center justify-between hover:opacity-80">
+                    <div className="flex items-center gap-2">
+                        <span className={`text-xs ${checkpointsSinMatch.length > 0 || segRawCount === 0 ? 'text-red-700' : 'text-blue-700'} font-semibold`}>
+                            {showDebug ? '▼' : '▶'} Diagnostico fuente "Seguimiento" ({segRawCount} registros · {segRawCols.length} columnas · {checkpointsSinMatch.length} checkpoints sin match)
+                        </span>
+                    </div>
+                    {checkpointsSinMatch.length > 0 && segRawCount > 0 && (
+                        <span className="text-[10px] text-red-700 font-medium">⚠ Faltan: {checkpointsSinMatch.map(c => c.label).join(', ')}</span>
+                    )}
+                </div>
+                {showDebug && (
+                    <div className="px-3 pb-3 pt-1 border-t border-current/20 space-y-2">
+                        {segRawCount === 0 ? (
+                            <div className="text-[11px] text-red-700">
+                                <strong>No se cargaron registros de Seguimiento.</strong> Posibles causas:
+                                <ul className="list-disc pl-5 mt-1">
+                                    <li>La hoja del Sheet no se llama "Seguimiento" (puede ser "Seguimiento Cierre de Obras", "SeguimientoCierre", etc.)</li>
+                                    <li>No hay beneficiarios que coincidan (ID_Benef no matchea)</li>
+                                </ul>
+                                <p className="mt-1">Solucion: revisar el Apps Script <code>?action=manifest</code> para listar hojas reales.</p>
+                            </div>
+                        ) : (
+                            <>
+                                <div>
+                                    <div className="text-[10px] font-semibold text-gray-600 uppercase mb-1">Match por checkpoint</div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-1 text-[11px] font-mono">
+                                        {CHECKPOINTS.filter(cp => cp.tipo === 'seguimiento').map(cp => (
+                                            <div key={cp.key} className={`flex items-center gap-2 px-2 py-0.5 rounded ${segColMap[cp.key] ? 'bg-white' : 'bg-red-100'}`}>
+                                                <span className={`w-2 h-2 rounded-full ${segColMap[cp.key] ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                                                <span className="font-semibold text-gray-700 w-20">{cp.label}</span>
+                                                <span className="text-gray-400">→</span>
+                                                <span className={segColMap[cp.key] ? 'text-blue-700' : 'text-red-600 italic'}>{segColMap[cp.key] || 'SIN MATCH'}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div>
+                                    <div className="text-[10px] font-semibold text-gray-600 uppercase mb-1">Columnas reales en la hoja ({segRawCols.length})</div>
+                                    <div className="text-[10px] font-mono text-gray-600 bg-white border border-gray-200 rounded p-1.5 max-h-24 overflow-y-auto leading-snug">
+                                        {segRawCols.join(' · ')}
+                                    </div>
+                                </div>
+                                <div className="text-[10px] text-gray-500 italic">
+                                    Si un checkpoint dice "SIN MATCH", copia el nombre exacto de la columna real y mandamelo para actualizar las reglas en
+                                    <code> SOURCES_OF_TRUTH.md</code> y el matcher.
+                                </div>
+                            </>
+                        )}
+                    </div>
+                )}
+            </div>
+
             {/* STRIP DE KPIS POR CHECKPOINT */}
             <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
                 <div className="flex items-center justify-between mb-2">
