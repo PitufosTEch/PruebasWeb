@@ -880,6 +880,68 @@ const ETAPAS_CONFIG_FULL = {
             console.warn('[LIVE] Seguimiento: 0 filas. Variantes probadas:', SEG_TABLE_CANDIDATES.join(', '), '— verificar nombre real de la hoja.');
         }
 
+        // 6c. CIERRE DESDE BENEFICIARIO (columnas BT en adelante = idx 71+)
+        // Confirmado por el usuario: la informacion completa esta entre 'documentacion'
+        // (flags de existencia de documento) Y Beneficiario columnas BT+ (datos reales).
+        // Vista AppSheet asociada: "Centro de cierre documentaciones".
+        const benefAllCols = benRaw.length > 0 ? Object.keys(benRaw[0]) : [];
+        const benefCierreCols = benefAllCols.slice(71); // BT = columna 72 (1-indexed) = idx 71 (0-indexed)
+        console.log('[LIVE] Beneficiario - total columnas:', benefAllCols.length, '| columnas BT+ usadas para cierre:', benefCierreCols.length);
+        console.log('[LIVE] Beneficiario columnas BT+:', benefCierreCols);
+        window._BENEF_CIERRE_COLS = benefCierreCols;
+        window._BENEF_CIERRE_COL_MAP = {};
+        for (const [k, alternatives] of Object.entries(SEG_RULES)) {
+            window._BENEF_CIERRE_COL_MAP[k] = findCol(benefCierreCols, alternatives);
+        }
+        console.log('[LIVE] Beneficiario.BT+ match por checkpoint:', window._BENEF_CIERRE_COL_MAP);
+
+        // Mergeo: completa SEGUIMIENTO_DATA con datos de Beneficiario.BT+
+        // documentacion gana si tiene valor, Beneficiario.BT+ rellena los huecos
+        let benefCierreEnriched = 0;
+        if (benefCierreCols.length > 0) {
+            benRaw.forEach(b => {
+                const id = String(b.ID_Benef || b.IDU_Benef || '').trim();
+                if (!id || id === 'nan' || !idsBenef.has(id)) return;
+                const out = {};
+                for (const [k, alternatives] of Object.entries(SEG_RULES)) {
+                    const colName = findCol(benefCierreCols, alternatives);
+                    out[k] = valOf(b, colName);
+                }
+                const existing = SEGUIMIENTO_DATA[id] || { _has: {} };
+                let enriched = false;
+                const merged = { ...existing };
+                for (const k of Object.keys(SEG_RULES)) {
+                    if ((!existing[k] || existing[k] === '') && out[k]) {
+                        merged[k] = out[k];
+                        enriched = true;
+                    }
+                }
+                merged._has = {
+                    visita_as:     isFilled(merged.visita_as),
+                    resol_as:      isFilled(merged.resol_as),
+                    visita_f1:     isFilled(merged.visita_f1),
+                    fecha_f1:      isFilled(merged.fecha_f1),
+                    artefactado:   isFilled(merged.artefactado),
+                    empalme:       isFilled(merged.empalme),
+                    visita_dom:    isFilled(merged.visita_dom),
+                    fecha_v_dom:   isFilled(merged.fecha_v_dom),
+                    recepcion_dom: isFilled(merged.recepcion_dom),
+                    fecha_recep:   isFilled(merged.fecha_recep)
+                };
+                SEGUIMIENTO_DATA[id] = merged;
+                if (enriched) benefCierreEnriched++;
+            });
+        }
+        console.log(`[LIVE] Cierre enriquecido desde Beneficiario.BT+: ${benefCierreEnriched} beneficiarios. Total con datos de cierre: ${Object.keys(SEGUIMIENTO_DATA).length}`);
+
+        // Update diagnostic
+        if (window._SEG_DIAG) {
+            window._SEG_DIAG.benefCierreColsCount = benefCierreCols.length;
+            window._SEG_DIAG.benefCierreEnriched = benefCierreEnriched;
+            window._SEG_DIAG.benefCierreColMap = window._BENEF_CIERRE_COL_MAP;
+            window._SEG_DIAG.segMatchedCount = Object.keys(SEGUIMIENTO_DATA).length;
+        }
+
         // TE1 - fuente 3: columna te1 de Seguimiento. Se aplica ahora que SEGUIMIENTO_DATA esta listo.
         let te1FromSeguimiento = 0;
         BENEFICIARIOS_DATA.forEach(b => {
@@ -3497,6 +3559,42 @@ const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios
                                         <code className="block bg-white border border-red-200 rounded px-1 mt-0.5">{(segDiag.sampleBenefIds || []).join(', ')}</code>
                                         <p className="mt-1 italic">Si los IDs son visualmente distintos (uuids vs numeros, o formato distinto), el problema esta en como se referencia el beneficiario entre las hojas.</p>
                                     </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Diagnostico de fuente secundaria: Beneficiario.BT+ */}
+                        {segDiag.benefCierreColsCount > 0 && (
+                            <div className="text-[11px] bg-white border border-gray-200 rounded px-2 py-1.5">
+                                <div className="font-semibold text-gray-700 mb-1">Fuente secundaria: Beneficiario columnas BT+ (idx 71+)</div>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-1 font-mono text-[10px]">
+                                    <div>Columnas BT+: <strong>{segDiag.benefCierreColsCount}</strong></div>
+                                    <div className="text-green-700">Enriquecidos: <strong>{segDiag.benefCierreEnriched || 0}</strong></div>
+                                    <div>Total con datos: <strong>{segDiag.segMatchedCount}</strong></div>
+                                </div>
+                                <div className="mt-1.5">
+                                    <div className="text-[10px] font-semibold text-gray-600 uppercase mb-0.5">Match en Beneficiario.BT+:</div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-0.5 text-[10px] font-mono">
+                                        {CHECKPOINTS.filter(cp => cp.tipo === 'seguimiento').map(cp => {
+                                            const col = (segDiag.benefCierreColMap || {})[cp.key];
+                                            return (
+                                                <div key={cp.key} className={`flex items-center gap-2 px-1 py-0.5 rounded ${col ? 'bg-green-50' : 'bg-gray-50'}`}>
+                                                    <span className={`w-2 h-2 rounded-full ${col ? 'bg-green-500' : 'bg-gray-300'}`}></span>
+                                                    <span className="font-semibold text-gray-700 w-16">{cp.label}</span>
+                                                    <span className="text-gray-400">→</span>
+                                                    <span className={col ? 'text-blue-700' : 'text-gray-400'}>{col || '—'}</span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                                {window._BENEF_CIERRE_COLS && (
+                                    <details className="mt-1.5 text-[10px]">
+                                        <summary className="cursor-pointer text-gray-600">Ver todas las columnas BT+ ({window._BENEF_CIERRE_COLS.length})</summary>
+                                        <div className="font-mono text-gray-600 bg-gray-50 border border-gray-200 rounded p-1.5 mt-1 max-h-32 overflow-y-auto">
+                                            {window._BENEF_CIERRE_COLS.join(' · ')}
+                                        </div>
+                                    </details>
                                 )}
                             </div>
                         )}
