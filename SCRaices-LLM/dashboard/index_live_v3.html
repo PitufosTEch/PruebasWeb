@@ -351,7 +351,7 @@ const ETAPAS_CONFIG_FULL = {
         updateLoading('Descargando datos...', 5, 'Conectando a Google Sheets (4 lotes en paralelo)');
 
         // Dividir en 4 lotes paralelos para evitar timeout
-        const batch1 = fetchBatch('Proyectos,Beneficiario,Tipologias,Maestros,controlBGB,controlEEPP,Seguimiento,Seguimiento Cierre de Obras,Seguimiento_Cierre,SeguimientoCierre', 'Lote 1: Proyectos+Benef');
+        const batch1 = fetchBatch('Proyectos,Beneficiario,Tipologias,Maestros,controlBGB,controlEEPP,Seguimiento,Seguimiento Cierre de Obras,Seguimiento_Cierre,SeguimientoCierre,documentacion,Documentacion', 'Lote 1: Proyectos+Benef');
         const batch2 = fetchBatch('Despacho,soldepacho,Tabla_pago', 'Lote 2: Despachos');
         const batch3 = fetchBatch('Ejecucion,Solpago', 'Lote 3: Insp+Pagos');
 
@@ -678,11 +678,11 @@ const ETAPAS_CONFIG_FULL = {
         // 6b. SEGUIMIENTO CIERRE DE OBRAS
         // Tabla AppSheet con docs/hitos finales por beneficiario.
         // Doc privada de reglas: app/SOURCES_OF_TRUTH.md
-        // OJO: en este Sheet existen MULTIPLES hojas con "Seguimiento" en el nombre:
-        //   - "Seguimiento" (1 fila vieja, P01 - legacy/test)
-        //   - "Seguimiento Cierre de Obras" (la real, con muchas filas)
-        // Por eso elegimos la candidata con MAYOR cantidad de filas, no la primera.
-        const SEG_TABLE_CANDIDATES = ['Seguimiento Cierre de Obras', 'SeguimientoCierre', 'Seguimiento_Cierre', 'Seguimiento'];
+        // Confirmado por el usuario 2026-05-19: la data real esta en la hoja "documentacion"
+        // del mismo Sheet (1JAxxP9W6LJzns5rmGIo7mfk227qMLwsq-gFMCvHU0Zk). La hoja "Seguimiento"
+        // tiene solo 1 fila vieja de P01 (legacy/test).
+        // Probamos varias variantes y nos quedamos con la que tenga MAS filas.
+        const SEG_TABLE_CANDIDATES = ['documentacion', 'Documentacion', 'Seguimiento Cierre de Obras', 'SeguimientoCierre', 'Seguimiento_Cierre', 'Seguimiento'];
         let segRaw = [];
         let segTableUsed = null;
         const segCandidatesReport = [];
