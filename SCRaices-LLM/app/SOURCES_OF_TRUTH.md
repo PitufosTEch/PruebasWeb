@@ -75,7 +75,8 @@ Agregado el 2026-05-19. Cada grupo (capataz) puede tener un comentario corto de 
 
 - Persiste en Firebase como campo `comentario` del objeto grupo, dentro del nodo `grupos/{proyectoId}`
 - Estructura: `grupos/{proyectoId} = [{ id, nombre, capataz, beneficiarios, comentario }]`
-- Editable inline en el `GrupoHeader` del tab Viviendas (no en el informe Estado General)
+- Editable inline en el `GrupoHeader` del tab Viviendas
+- **Visible también en el informe Estado General** como "Nota del Coordinador" (banner ámbar debajo del header de cada grupo, siempre visible aunque el grupo esté colapsado). Cambio a partir de 2026-05-19 por pedido del usuario: es información compartible para que el público externo entienda el juicio del coordinador sobre el avance de cada grupo geográfico.
 - Componente: `GrupoHeader` en `index_live_v3.html` ~L1810, callback `onUpdateComentario` → `actualizarComentarioGrupo` en App (~L4180)
 - Max 200 caracteres, plaintext
 
