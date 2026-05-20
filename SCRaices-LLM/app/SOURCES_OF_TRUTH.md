@@ -32,7 +32,7 @@ Mantener sincronizado con el código de `SCRaices-LLM/dashboard/index_live_v3.ht
 |---|---|---|
 | **% Avance** (columna "% Av") | AppSheet Sheet `Ejecucion` | Cada fila es un delta. Suma acumulada por ID_Benef → `INSPECCIONES_DATA[id].pct_total`. Fórmula: `0.70·%Viv + 0.25·%RC + 0.05·%Hab`. Detalle en `app/etapas_engine.py` y CLAUDE.md. |
 | **M.O. Pagado (acum, Aprob.)** | AppSheet Sheet `Solpago` | Filtrado al cargar: solo filas con `Estado` que incluya "aprobad" (case-insensitive). Suma de `monto` por ID_Benef. Procesado en `index_live_v3.html` L624. |
-| **Ritmo Pagos M.O. mensual** | Mismo `Solpago` filtrado | Agrupación por `YYYY-MM` de la columna `fecha`/`Fecha`. Últimos 12 meses. |
+| **Ritmo Pagos M.O. mensual** | Mismo `Solpago` filtrado | **Ciclo 25-25**: un pago con día ≥ 25 se contabiliza al mes siguiente (no calendario natural). Últimos 12 ciclos. Render: line chart SVG con eje Y autoescalado (no parte de 0). |
 | **Ritmo Despachos mensual** | AppSheet Sheet `Despacho` | Conteo de filas por mes. **TEMPORAL (v1):** es proxy de actividad; pendiente reemplazar por % avance real de `Ejecucion` deltas. |
 | **Tipología** (subtítulo del beneficiario) | AppSheet Sheet `Tipologias` + `Beneficiario.Tipologia Vivienda` / `Tipologia RC` | Concatena familia + dormitorios + plantas + caracterización. |
 | **Estado General** (texto en expandido) | Calculado | `getEstadoGeneral(estadoEtapas)` — basado en días desde última solicitud. |
