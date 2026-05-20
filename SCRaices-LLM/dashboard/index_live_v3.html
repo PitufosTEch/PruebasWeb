@@ -744,7 +744,8 @@ const ETAPAS_CONFIG_FULL = {
         // Ademas hay E_MU, F_E_MU, R_MU, E_antec_elect, F_E_antec_elect, R_factibilidad (no usados)
         const SEG_RULES = {
             te1: [
-                { must: ['te1'], not: ['te10','te11','te12'] }
+                { must: ['te1'], not: ['te10','te11','te12'] },
+                { must: ['t1'],  not: ['te1','t10','t11','t12','tf1','ff1','vf1'] }  // Beneficiario.BT+ usa "T1" (no "TE1")
             ],
             visita_as: [
                 { must: ['vacsan'],     not: ['fvacsan'] },                     // V_acsan -> "vacsan" (boolean Si/No)
@@ -792,7 +793,8 @@ const ETAPAS_CONFIG_FULL = {
             ],
             fecha_recep: [
                 { must: ['fecha','recep'], not: [] },
-                { must: ['frecep'],        not: ['nrecep'] }
+                { must: ['frecep'],        not: ['nrecep'] },
+                { must: ['frdom'],         not: ['vdom','rrdom'] }  // F_R_dom de Beneficiario.BT+
             ],
             obs: [
                 { must: ['observ'], not: [] },
