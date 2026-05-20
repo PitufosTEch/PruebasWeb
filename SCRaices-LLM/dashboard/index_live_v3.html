@@ -3231,6 +3231,95 @@ const EstadosPagoTab = ({ viviendas }) => {
     );
 };
 
+// ===== LINE CHART CARD =====
+// Mini-grafico de linea con autoescala (no parte de 0). Tooltip de info en titulo,
+// tooltip por punto al hover. SVG inline para no agregar dependencias.
+const LineChartCard = ({ titulo, badge, badgeColor, color, fillColor, info, meses, valores, fmtVal, fmtVCorto, fmtMes, emptyMsg }) => {
+    const [hoverIdx, setHoverIdx] = React.useState(null);
+    if (!meses || meses.length === 0) {
+        return (
+            <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
+                <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-xs font-semibold text-gray-700">{titulo}</h3>
+                </div>
+                <p className="text-[11px] text-gray-400 py-4 text-center">{emptyMsg}</p>
+            </div>
+        );
+    }
+    // Geometria del SVG
+    const w = 600, h = 110;
+    const pad = { top: 14, right: 12, bottom: 22, left: 12 };
+    const iw = w - pad.left - pad.right;
+    const ih = h - pad.top - pad.bottom;
+    const n = meses.length;
+    const max = Math.max(...valores);
+    const min = Math.min(...valores);
+    // Autoescala con 10% de margen arriba y abajo (no fuerza Y=0)
+    const range = max - min || max || 1;
+    const yMax = max + range * 0.15;
+    const yMin = Math.max(0, min - range * 0.15);
+    const yDen = yMax - yMin || 1;
+    const xStep = n > 1 ? iw / (n - 1) : 0;
+    const points = meses.map((m, i) => {
+        const x = n > 1 ? pad.left + i * xStep : pad.left + iw / 2;
+        const y = pad.top + ih * (1 - (valores[i] - yMin) / yDen);
+        return { x, y, v: valores[i], m };
+    });
+    // Linea path
+    const pathLine = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
+    // Area path (cerrada abajo)
+    const pathArea = pathLine + ` L ${points[n-1].x.toFixed(1)} ${(pad.top + ih).toFixed(1)} L ${points[0].x.toFixed(1)} ${(pad.top + ih).toFixed(1)} Z`;
+    // Lineas guia horizontales (3 niveles)
+    const gridY = [pad.top, pad.top + ih/2, pad.top + ih];
+    return (
+        <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
+            <div className="flex items-center justify-between mb-2 gap-2">
+                <div className="flex items-center gap-1.5">
+                    <h3 className="text-xs font-semibold text-gray-700">{titulo}</h3>
+                    <span title={info} className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-gray-200 text-gray-600 text-[9px] font-bold cursor-help hover:bg-gray-300" style={{lineHeight: '1'}}>i</span>
+                </div>
+                {badge && <span className={`text-[10px] font-medium ${badgeColor || 'text-gray-500'}`}>{badge}</span>}
+            </div>
+            <div className="relative">
+                <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="w-full" style={{height: '110px'}}>
+                    {/* gridlines */}
+                    {gridY.map((y, i) => (
+                        <line key={i} x1={pad.left} y1={y} x2={w - pad.right} y2={y} stroke="#e5e7eb" strokeWidth="0.5" strokeDasharray={i === 1 ? '2 2' : ''} />
+                    ))}
+                    {/* area + linea */}
+                    <path d={pathArea} fill={fillColor} />
+                    <path d={pathLine} stroke={color} strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                    {/* puntos */}
+                    {points.map((p, i) => (
+                        <g key={i}>
+                            <circle cx={p.x} cy={p.y} r={hoverIdx === i ? 5 : 3} fill={color} stroke="white" strokeWidth="1.5"
+                                    onMouseEnter={() => setHoverIdx(i)} onMouseLeave={() => setHoverIdx(null)}
+                                    style={{cursor: 'pointer', transition: 'r 0.1s'}}>
+                                <title>{`${fmtMes(p.m)}: ${fmtVal(p.v)}`}</title>
+                            </circle>
+                            {/* etiqueta del eje X */}
+                            <text x={p.x} y={h - 6} textAnchor="middle" fontSize="9" fill="#9ca3af">{fmtMes(p.m)}</text>
+                        </g>
+                    ))}
+                    {/* tooltip flotante en hover */}
+                    {hoverIdx !== null && (
+                        <g pointerEvents="none">
+                            <line x1={points[hoverIdx].x} y1={pad.top} x2={points[hoverIdx].x} y2={pad.top + ih} stroke={color} strokeWidth="0.5" strokeDasharray="2 2" opacity="0.6" />
+                            <text x={points[hoverIdx].x} y={Math.max(pad.top + 8, points[hoverIdx].y - 8)} textAnchor="middle" fontSize="10" fontWeight="600" fill="#374151">
+                                {fmtVCorto(points[hoverIdx].v)}
+                            </text>
+                        </g>
+                    )}
+                </svg>
+                {/* Min/Max labels overlay */}
+                <div className="absolute top-3 right-3 text-[9px] text-gray-400 font-mono pointer-events-none">
+                    Max: {fmtVCorto(max)} · Min: {fmtVCorto(min)}
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // ===== ESTADO GENERAL (Informe de Cierre de Obras por Proyecto) =====
 // Cruce: BENEFICIARIOS_DATA (HPC) + BENEF_CON_TE1 (TE1) + SEGUIMIENTO_DATA (hitos cierre AppSheet)
 //        + SOLPAGO_DATA (Aprobado, ritmo mensual MO) + INSPECCIONES_DATA / Ejecucion (ritmo avance)
@@ -3323,25 +3412,39 @@ const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios
         });
     }, [datos]);
 
-    // Ritmo mensual de pagos MO (todo el proyecto, ya filtrado a Aprobado por SOLPAGO_DATA)
+    // Ritmo M.O. por CICLO de pago (dia 25 a dia 24 del mes siguiente)
+    // Razon: los pagos de mano de obra se cierran el dia 25, no calendario natural.
+    // Un pago con fecha >= 25 cuenta para el periodo del mes SIGUIENTE.
     const ritmoMOProy = React.useMemo(() => {
         const buckets = {};
         datos.forEach(d => d.pagosBenef.forEach(p => {
             if (!p.fecha) return;
-            const ym = p.fecha.substring(0, 7); // YYYY-MM
+            // p.fecha viene en formato YYYY-MM-DD
+            const m = p.fecha.match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (!m) return;
+            let year = parseInt(m[1], 10);
+            let month = parseInt(m[2], 10); // 1-12
+            const day = parseInt(m[3], 10);
+            // Si dia >= 25, el ciclo es del mes siguiente
+            if (day >= 25) {
+                month += 1;
+                if (month > 12) { month = 1; year += 1; }
+            }
+            const ym = `${year}-${String(month).padStart(2,'0')}`;
             buckets[ym] = (buckets[ym] || 0) + p.monto;
         }));
-        const ordenado = Object.keys(buckets).sort().slice(-12); // últimos 12 meses
-        const max = Math.max(1, ...ordenado.map(k => buckets[k]));
-        return { meses: ordenado, valores: ordenado.map(k => buckets[k]), max };
+        const ordenado = Object.keys(buckets).sort().slice(-12);
+        const valores = ordenado.map(k => buckets[k]);
+        return {
+            meses: ordenado,
+            valores,
+            max: valores.length ? Math.max(...valores) : 0,
+            min: valores.length ? Math.min(...valores) : 0
+        };
     }, [datos]);
 
-    // Ritmo mensual avance %: usa eventos de Ejecucion como deltas (acumulado por mes)
-    // Aproximación v1: contar # de filas Ejecucion del proyecto por mes (proxy de actividad)
+    // Ritmo despachos por MES CALENDARIO (no 25-25, porque despacho fisico no tiene ciclo de pago)
     const ritmoAvanceProy = React.useMemo(() => {
-        const idsSet = new Set(datos.map(d => String(d.ID_Benef)));
-        // INSPECCIONES_DATA está procesado pero no tiene fecha; uso una proxy basada en última fecha de despacho
-        // ya que Ejecucion no se expone individualmente al cliente. Esto se afina en iteración 2.
         const buckets = {};
         datos.forEach(d => {
             const desps = DESPACHOS_DATA.filter(x => String(x.ID_Benef) === String(d.ID_Benef));
@@ -3352,8 +3455,13 @@ const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios
             });
         });
         const ordenado = Object.keys(buckets).sort().slice(-12);
-        const max = Math.max(1, ...ordenado.map(k => buckets[k]));
-        return { meses: ordenado, valores: ordenado.map(k => buckets[k]), max };
+        const valores = ordenado.map(k => buckets[k]);
+        return {
+            meses: ordenado,
+            valores,
+            max: valores.length ? Math.max(...valores) : 0,
+            min: valores.length ? Math.min(...valores) : 0
+        };
     }, [datos]);
 
     const fmtCorto = (n) => n >= 1e9 ? (n/1e9).toFixed(1)+'B' : n >= 1e6 ? (n/1e6).toFixed(1)+'M' : n >= 1e3 ? (n/1e3).toFixed(0)+'k' : String(n);
@@ -3699,55 +3807,36 @@ const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios
                 </div>
             </div>
 
-            {/* RITMOS MENSUALES */}
+            {/* RITMOS MENSUALES — line charts con autoescala */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
-                    <div className="flex items-center justify-between mb-2">
-                        <h3 className="text-xs font-semibold text-gray-700">Ritmo Pagos M.O. (mensual)</h3>
-                        <span className="text-[10px] text-violet-600 font-medium">Solo Aprobados</span>
-                    </div>
-                    {ritmoMOProy.meses.length === 0 ? (
-                        <p className="text-[11px] text-gray-400 py-4 text-center">Sin pagos aprobados con fecha</p>
-                    ) : (
-                        <div className="flex items-end gap-1 h-24">
-                            {ritmoMOProy.meses.map((m, i) => {
-                                const v = ritmoMOProy.valores[i];
-                                const h = Math.max(2, Math.round((v / ritmoMOProy.max) * 90));
-                                return (
-                                    <div key={m} className="flex-1 flex flex-col items-center gap-1" title={`${m}: ${formatPeso(v)}`}>
-                                        <div className="text-[9px] text-gray-500 font-mono">{fmtCorto(v)}</div>
-                                        <div className="w-full bg-violet-500 rounded-t" style={{height: h + 'px'}}></div>
-                                        <div className="text-[9px] text-gray-400">{fmtMes(m)}</div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
-
-                <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
-                    <div className="flex items-center justify-between mb-2">
-                        <h3 className="text-xs font-semibold text-gray-700">Ritmo Despachos (mensual)</h3>
-                        <span className="text-[10px] text-amber-600 font-medium">v1: proxy de actividad</span>
-                    </div>
-                    {ritmoAvanceProy.meses.length === 0 ? (
-                        <p className="text-[11px] text-gray-400 py-4 text-center">Sin despachos con fecha</p>
-                    ) : (
-                        <div className="flex items-end gap-1 h-24">
-                            {ritmoAvanceProy.meses.map((m, i) => {
-                                const v = ritmoAvanceProy.valores[i];
-                                const h = Math.max(2, Math.round((v / ritmoAvanceProy.max) * 90));
-                                return (
-                                    <div key={m} className="flex-1 flex flex-col items-center gap-1" title={`${m}: ${v} despachos`}>
-                                        <div className="text-[9px] text-gray-500 font-mono">{v}</div>
-                                        <div className="w-full bg-green-500 rounded-t" style={{height: h + 'px'}}></div>
-                                        <div className="text-[9px] text-gray-400">{fmtMes(m)}</div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
+                <LineChartCard
+                    titulo="Ritmo Pagos M.O. (por ciclo 25-25)"
+                    badge="Solo Aprobados"
+                    badgeColor="text-violet-600"
+                    color="#8b5cf6"
+                    fillColor="rgba(139, 92, 246, 0.12)"
+                    info="Cada punto es un ciclo de pago de 25 a 25 (un pago con fecha >= dia 25 se contabiliza al mes siguiente). Solo se incluyen pagos con ESTADO SOLICITUD = Aprobado. Eje Y autoescalado (no parte de 0) para visualizar mejor la variacion."
+                    meses={ritmoMOProy.meses}
+                    valores={ritmoMOProy.valores}
+                    fmtVal={(v) => formatPeso(v)}
+                    fmtVCorto={fmtCorto}
+                    fmtMes={fmtMes}
+                    emptyMsg="Sin pagos aprobados con fecha"
+                />
+                <LineChartCard
+                    titulo="Ritmo Despachos (mensual)"
+                    badge="proxy de actividad"
+                    badgeColor="text-amber-600"
+                    color="#10b981"
+                    fillColor="rgba(16, 185, 129, 0.12)"
+                    info="Cantidad de despachos por mes calendario (cualquier Tipo_despacho registrado en la tabla Despacho del proyecto). Eje Y autoescalado. Es un proxy de actividad mientras integramos los deltas reales de la tabla Ejecucion."
+                    meses={ritmoAvanceProy.meses}
+                    valores={ritmoAvanceProy.valores}
+                    fmtVal={(v) => `${v} despacho${v === 1 ? '' : 's'}`}
+                    fmtVCorto={(v) => String(v)}
+                    fmtMes={fmtMes}
+                    emptyMsg="Sin despachos con fecha"
+                />
             </div>
 
             {/* FILTROS */}
