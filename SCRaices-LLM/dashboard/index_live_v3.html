@@ -3525,53 +3525,42 @@ const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios
     const copiarDebug = () => {
         const benefCierreCols = (typeof window !== 'undefined' && window._BENEF_CIERRE_COLS) || [];
         const benefCierreColMap = (segDiag.benefCierreColMap || {});
-        // Tomar una muestra de valores BT+ del primer beneficiario en BENEFICIARIOS_DATA
-        let benefSampleBT = null;
-        if (typeof BENEFICIARIOS_DATA !== 'undefined' && BENEFICIARIOS_DATA.length > 0) {
-            try {
-                // Re-buscar el raw row del primer benef
-                const firstId = BENEFICIARIOS_DATA[0].ID_Benef;
-                // Sample (no tenemos benRaw global, pero podemos mirar SEGUIMIENTO_DATA[firstId])
-                benefSampleBT = SEGUIMIENTO_DATA[firstId] || null;
-            } catch(e) {}
-        }
         const lines = [
             '=== Diagnostico Seguimiento ===',
-            `Tabla usada: ${segTableUsed || '(NINGUNA)'}`,
+            `Hoja primaria: ${segTableUsed || '(NINGUNA)'} (${segDiag.segRawLen || 0} filas)`,
+            `Beneficiarios activos en el dashboard: ${segDiag.benefDataLen || 0}`,
+            `Filas linkeadas (ID encontrado en BENEFICIARIOS_DATA): ${segDiag.segMatchedCount || 0}`,
+            `Filas sin link (proyectos viejos/cerrados): ${segDiag.segUnmatchedCount || 0}`,
+            `Filas sin ID: ${segDiag.segSkippedNoId || 0}`,
             '',
             'Hojas probadas:',
             ...((segDiag.candidatesReport || []).map(c =>
-                `  ${c.name === segTableUsed ? '* ' : '  '}${c.name}: ${c.rows} filas${c.error ? ' (error: '+c.error+')' : ''}`
+                `  ${c.name === segTableUsed ? '*' : ' '} ${c.name}: ${c.rows} filas${c.error ? ' (no encontrada)' : ''}`
             )),
             '',
-            `Filas brutas en hoja usada: ${segDiag.segRawLen || 0}`,
-            `Beneficiarios cargados (activos): ${segDiag.benefDataLen || 0}`,
-            `Filas matcheadas (linkeadas): ${segDiag.segMatchedCount || 0}`,
-            `Filas sin match (ID no esta en BENEFICIARIOS_DATA): ${segDiag.segUnmatchedCount || 0}`,
-            `Filas sin ID: ${segDiag.segSkippedNoId || 0}`,
-            `Columna ID detectada en Seguimiento: ${segDiag.idCol || '(NINGUNA)'} (candidatos: ${(segDiag.idColCandidates || []).join(', ') || 'ninguno'})`,
+            'Match efectivo por checkpoint:',
+            '  (Beneficiario.BT+ es el dato real. Si BT+ no tiene la columna,',
+            '   documentacion sirve de fallback usando la existencia del PDF.)',
             '',
-            `IDs ejemplo NO matcheados de Seguimiento: ${(segDiag.sampleUnmatched || []).join(', ') || '(ninguno)'}`,
-            `IDs ejemplo de BENEFICIARIOS_DATA: ${(segDiag.sampleBenefIds || []).join(', ') || '(ninguno)'}`,
+            ...CHECKPOINTS.filter(cp => cp.tipo === 'seguimiento').map(cp => {
+                const btCol = benefCierreColMap[cp.key];
+                const docCol = segColMap[cp.key];
+                let primary, fallback = '';
+                if (btCol) {
+                    primary = `Beneficiario.${btCol}`;
+                    if (docCol) fallback = `  (+ fallback documentacion.${docCol})`;
+                } else if (docCol) {
+                    primary = `documentacion.${docCol}  (solo fallback)`;
+                } else {
+                    primary = 'SIN MATCH';
+                }
+                return `  ${cp.label.padEnd(12)} -> ${primary}${fallback}`;
+            }),
             '',
-            'Match por checkpoint (en hoja Seguimiento usada):',
-            ...CHECKPOINTS.filter(cp => cp.tipo === 'seguimiento').map(cp =>
-                `  ${cp.label.padEnd(12)} -> ${segColMap[cp.key] || 'SIN MATCH'}`
-            ),
-            '',
-            `=== Beneficiario columnas BT+ (idx 71+) ===`,
-            `Total columnas BT+: ${benefCierreCols.length}`,
-            `Beneficiarios enriquecidos desde BT+: ${segDiag.benefCierreEnriched || 0}`,
-            '',
-            'Match por checkpoint EN Beneficiario.BT+:',
-            ...CHECKPOINTS.filter(cp => cp.tipo === 'seguimiento').map(cp =>
-                `  ${cp.label.padEnd(12)} -> ${benefCierreColMap[cp.key] || 'SIN MATCH'}`
-            ),
-            '',
-            `Columnas BT+ disponibles (${benefCierreCols.length}):`,
+            `Columnas Beneficiario BT+ disponibles (${benefCierreCols.length}):`,
             ...benefCierreCols.map(c => `  - ${c}`),
             '',
-            `Columnas reales (${segRawCols.length}) en hoja "${segTableUsed || ''}":`,
+            `Columnas en hoja "${segTableUsed || ''}" (${segRawCols.length}):`,
             ...segRawCols.map(c => `  - ${c}`),
             ''
         ];
