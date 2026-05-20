@@ -3408,6 +3408,18 @@ const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios
     }, [manifestData]);
 
     const copiarDebug = () => {
+        const benefCierreCols = (typeof window !== 'undefined' && window._BENEF_CIERRE_COLS) || [];
+        const benefCierreColMap = (segDiag.benefCierreColMap || {});
+        // Tomar una muestra de valores BT+ del primer beneficiario en BENEFICIARIOS_DATA
+        let benefSampleBT = null;
+        if (typeof BENEFICIARIOS_DATA !== 'undefined' && BENEFICIARIOS_DATA.length > 0) {
+            try {
+                // Re-buscar el raw row del primer benef
+                const firstId = BENEFICIARIOS_DATA[0].ID_Benef;
+                // Sample (no tenemos benRaw global, pero podemos mirar SEGUIMIENTO_DATA[firstId])
+                benefSampleBT = SEGUIMIENTO_DATA[firstId] || null;
+            } catch(e) {}
+        }
         const lines = [
             '=== Diagnostico Seguimiento ===',
             `Tabla usada: ${segTableUsed || '(NINGUNA)'}`,
@@ -3427,12 +3439,24 @@ const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios
             `IDs ejemplo NO matcheados de Seguimiento: ${(segDiag.sampleUnmatched || []).join(', ') || '(ninguno)'}`,
             `IDs ejemplo de BENEFICIARIOS_DATA: ${(segDiag.sampleBenefIds || []).join(', ') || '(ninguno)'}`,
             '',
-            'Match por checkpoint:',
+            'Match por checkpoint (en hoja Seguimiento usada):',
             ...CHECKPOINTS.filter(cp => cp.tipo === 'seguimiento').map(cp =>
                 `  ${cp.label.padEnd(12)} -> ${segColMap[cp.key] || 'SIN MATCH'}`
             ),
             '',
-            `Columnas reales (${segRawCols.length}):`,
+            `=== Beneficiario columnas BT+ (idx 71+) ===`,
+            `Total columnas BT+: ${benefCierreCols.length}`,
+            `Beneficiarios enriquecidos desde BT+: ${segDiag.benefCierreEnriched || 0}`,
+            '',
+            'Match por checkpoint EN Beneficiario.BT+:',
+            ...CHECKPOINTS.filter(cp => cp.tipo === 'seguimiento').map(cp =>
+                `  ${cp.label.padEnd(12)} -> ${benefCierreColMap[cp.key] || 'SIN MATCH'}`
+            ),
+            '',
+            `Columnas BT+ disponibles (${benefCierreCols.length}):`,
+            ...benefCierreCols.map(c => `  - ${c}`),
+            '',
+            `Columnas reales (${segRawCols.length}) en hoja "${segTableUsed || ''}":`,
             ...segRawCols.map(c => `  - ${c}`),
             ''
         ];
