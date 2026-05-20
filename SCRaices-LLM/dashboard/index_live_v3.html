@@ -678,19 +678,26 @@ const ETAPAS_CONFIG_FULL = {
         // 6b. SEGUIMIENTO CIERRE DE OBRAS
         // Tabla AppSheet con docs/hitos finales por beneficiario.
         // Doc privada de reglas: app/SOURCES_OF_TRUTH.md
-        // Probamos varios nombres de tabla porque AppSheet puede usar distintas variantes
-        const SEG_TABLE_CANDIDATES = ['Seguimiento', 'Seguimiento Cierre de Obras', 'Seguimiento_Cierre', 'SeguimientoCierre'];
+        // OJO: en este Sheet existen MULTIPLES hojas con "Seguimiento" en el nombre:
+        //   - "Seguimiento" (1 fila vieja, P01 - legacy/test)
+        //   - "Seguimiento Cierre de Obras" (la real, con muchas filas)
+        // Por eso elegimos la candidata con MAYOR cantidad de filas, no la primera.
+        const SEG_TABLE_CANDIDATES = ['Seguimiento Cierre de Obras', 'SeguimientoCierre', 'Seguimiento_Cierre', 'Seguimiento'];
         let segRaw = [];
         let segTableUsed = null;
+        const segCandidatesReport = [];
         for (const _name of SEG_TABLE_CANDIDATES) {
             const _rows = raw[_name]?.rows;
-            if (Array.isArray(_rows) && _rows.length > 0) {
+            const _err = raw[_name]?.error;
+            const _count = Array.isArray(_rows) ? _rows.length : 0;
+            segCandidatesReport.push({ name: _name, rows: _count, error: _err || null });
+            if (_count > segRaw.length) {
                 segRaw = _rows;
                 segTableUsed = _name;
-                break;
             }
         }
         SEGUIMIENTO_DATA = {};
+        console.log('[LIVE] Seguimiento - candidatas evaluadas:', segCandidatesReport);
         // Resolucion robusta: normaliza nombre de columna (lower, sin tildes/espacios/puntos)
         // y matchea cuando TODOS los keywords aparecen Y NINGUNO de los exclude.
         const normCol = (s) => String(s || '').toLowerCase()
@@ -848,6 +855,7 @@ const ETAPAS_CONFIG_FULL = {
         // Diagnostico de match de IDs para el panel
         window._SEG_DIAG = {
             tableUsed: segTableUsed,
+            candidatesReport: segCandidatesReport,
             segRawLen: segRaw.length,
             segMatchedCount: matchedIds.length,
             segUnmatchedCount: unmatchedBenefs.length,
@@ -3307,7 +3315,13 @@ const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios
         const lines = [
             '=== Diagnostico Seguimiento ===',
             `Tabla usada: ${segTableUsed || '(NINGUNA)'}`,
-            `Filas brutas en Seguimiento: ${segDiag.segRawLen || 0}`,
+            '',
+            'Hojas probadas:',
+            ...((segDiag.candidatesReport || []).map(c =>
+                `  ${c.name === segTableUsed ? '* ' : '  '}${c.name}: ${c.rows} filas${c.error ? ' (error: '+c.error+')' : ''}`
+            )),
+            '',
+            `Filas brutas en hoja usada: ${segDiag.segRawLen || 0}`,
             `Beneficiarios cargados (activos): ${segDiag.benefDataLen || 0}`,
             `Filas matcheadas (linkeadas): ${segDiag.segMatchedCount || 0}`,
             `Filas sin match (ID no esta en BENEFICIARIOS_DATA): ${segDiag.segUnmatchedCount || 0}`,
@@ -3371,6 +3385,22 @@ const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios
                                 📋 Copiar diagnostico
                             </button>
                         </div>
+                        {/* Reporte de candidatas de tabla */}
+                        {segDiag.candidatesReport && segDiag.candidatesReport.length > 0 && (
+                            <div className="text-[11px] bg-white border border-gray-200 rounded px-2 py-1.5">
+                                <div className="font-semibold text-gray-700 mb-1">Hojas probadas (se usa la de mayor cantidad de filas)</div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-0.5 font-mono">
+                                    {segDiag.candidatesReport.map(c => (
+                                        <div key={c.name} className={`flex items-center gap-2 ${c.name === segTableUsed ? 'bg-green-50 border-green-300 border rounded px-1' : ''}`}>
+                                            <span className={`w-2 h-2 rounded-full ${c.rows > 0 ? 'bg-green-500' : 'bg-gray-300'}`}></span>
+                                            <span className="font-semibold flex-1">{c.name}</span>
+                                            <span className={c.rows > 0 ? 'text-blue-700' : 'text-gray-400'}>{c.rows} filas {c.error ? '(error: '+c.error+')' : ''}</span>
+                                            {c.name === segTableUsed && <span className="text-[9px] text-green-700 font-bold">← usada</span>}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                         {/* Diagnostico de match de IDs */}
                         {segDiag.segRawLen > 0 && (
                             <div className={`text-[11px] rounded px-2 py-1.5 ${idMatchProblem ? 'bg-red-100 border border-red-300' : 'bg-white border border-gray-200'}`}>
