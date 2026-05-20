@@ -3302,6 +3302,9 @@ const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios
 
     // Estado del panel debug
     const [showDebug, setShowDebug] = React.useState(false);
+    const [manifestData, setManifestData] = React.useState(null);
+    const [manifestLoading, setManifestLoading] = React.useState(false);
+    const [manifestError, setManifestError] = React.useState(null);
     const segRawCount = Object.keys(SEGUIMIENTO_DATA).length;
     const segColMap = (typeof window !== 'undefined' && window._SEG_COL_MAP) || {};
     const segRawCols = (typeof window !== 'undefined' && window._SEG_RAW_COLS) || [];
@@ -3310,6 +3313,37 @@ const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios
     const segDiag = (typeof window !== 'undefined' && window._SEG_DIAG) || {};
     const checkpointsSinMatch = CHECKPOINTS.filter(cp => cp.tipo === 'seguimiento' && !segColMap[cp.key]);
     const idMatchProblem = segDiag.segRawLen > 0 && segDiag.segMatchedCount === 0;
+
+    const cargarManifest = async () => {
+        if (manifestLoading) return;
+        setManifestLoading(true);
+        setManifestError(null);
+        try {
+            const url = APPS_SCRIPT_URL + '?action=manifest';
+            const resp = await fetch(url, { redirect: 'follow' });
+            const text = await resp.text();
+            let data;
+            try { data = JSON.parse(text); } catch (e) { throw new Error('Respuesta no es JSON: ' + text.substring(0, 200)); }
+            if (data.error) throw new Error(data.error);
+            setManifestData(data.tables || {});
+        } catch (e) {
+            setManifestError(e.message);
+        } finally {
+            setManifestLoading(false);
+        }
+    };
+
+    // Filtrar el manifest a hojas que parezcan ser de "seguimiento" o "cierre"
+    const manifestSeguimientoHojas = React.useMemo(() => {
+        if (!manifestData) return [];
+        const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+        return Object.entries(manifestData)
+            .filter(([name]) => {
+                const n = norm(name);
+                return n.includes('seguim') || n.includes('cierre');
+            })
+            .sort((a, b) => b[1] - a[1]); // ordenar por filas desc
+    }, [manifestData]);
 
     const copiarDebug = () => {
         const lines = [
@@ -3398,6 +3432,47 @@ const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios
                                             {c.name === segTableUsed && <span className="text-[9px] text-green-700 font-bold">← usada</span>}
                                         </div>
                                     ))}
+                                </div>
+                                {/* Boton para listar TODAS las hojas del Sheet */}
+                                <div className="mt-2 pt-2 border-t border-gray-200">
+                                    <button onClick={cargarManifest} disabled={manifestLoading}
+                                            className="text-[10px] px-2 py-1 bg-amber-600 text-white rounded font-medium hover:bg-amber-700 disabled:opacity-50">
+                                        {manifestLoading ? 'Cargando...' : '🔍 Listar TODAS las hojas del Google Sheet (manifest)'}
+                                    </button>
+                                    {manifestError && (
+                                        <p className="text-[10px] text-red-700 mt-1">Error: {manifestError}</p>
+                                    )}
+                                    {manifestData && (
+                                        <div className="mt-2 space-y-1">
+                                            {manifestSeguimientoHojas.length > 0 ? (
+                                                <div className="bg-amber-50 border border-amber-300 rounded p-1.5">
+                                                    <div className="text-[10px] font-semibold text-amber-800 mb-0.5">
+                                                        Hojas con "seguim"/"cierre" en el nombre ({manifestSeguimientoHojas.length}):
+                                                    </div>
+                                                    {manifestSeguimientoHojas.map(([name, rows]) => (
+                                                        <div key={name} className="text-[10px] font-mono flex items-center gap-2">
+                                                            <span className="font-bold text-amber-900">{name}</span>
+                                                            <span className="text-amber-700">→ {rows} filas</span>
+                                                            {rows > 1 && <span className="text-[9px] text-green-700 font-bold">← deberia ser esta!</span>}
+                                                        </div>
+                                                    ))}
+                                                    <div className="text-[9px] text-amber-700 mt-1 italic">
+                                                        Pegame el nombre de la hoja correcta y la agrego al matcher.
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <p className="text-[10px] text-red-700">No se encontraron hojas con "seguim"/"cierre" en su nombre. La data quizas este en otro Google Sheet (otro spreadsheet ID).</p>
+                                            )}
+                                            <details className="text-[10px]">
+                                                <summary className="cursor-pointer text-gray-600">Ver TODAS las hojas del Sheet ({Object.keys(manifestData).length})</summary>
+                                                <div className="font-mono text-gray-600 bg-white border border-gray-200 rounded p-1.5 mt-1 max-h-40 overflow-y-auto">
+                                                    {Object.entries(manifestData).sort((a,b) => b[1]-a[1]).map(([name, rows]) => (
+                                                        <div key={name}><strong>{name}</strong>: {rows} filas</div>
+                                                    ))}
+                                                </div>
+                                            </details>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}
