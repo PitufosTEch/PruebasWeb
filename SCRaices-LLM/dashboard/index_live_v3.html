@@ -3697,35 +3697,14 @@ const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios
                             </div>
                         )}
 
-                        {/* Diagnostico de fuente secundaria: Beneficiario.BT+ */}
+                        {/* Resumen fuente secundaria (sin repetir match - eso ya esta arriba) */}
                         {segDiag.benefCierreColsCount > 0 && (
-                            <div className="text-[11px] bg-white border border-gray-200 rounded px-2 py-1.5">
-                                <div className="font-semibold text-gray-700 mb-1">Fuente secundaria: Beneficiario columnas BT+ (idx 71+)</div>
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-1 font-mono text-[10px]">
-                                    <div>Columnas BT+: <strong>{segDiag.benefCierreColsCount}</strong></div>
-                                    <div className="text-green-700">Enriquecidos: <strong>{segDiag.benefCierreEnriched || 0}</strong></div>
-                                    <div>Total con datos: <strong>{segDiag.segMatchedCount}</strong></div>
-                                </div>
-                                <div className="mt-1.5">
-                                    <div className="text-[10px] font-semibold text-gray-600 uppercase mb-0.5">Match en Beneficiario.BT+:</div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-0.5 text-[10px] font-mono">
-                                        {CHECKPOINTS.filter(cp => cp.tipo === 'seguimiento').map(cp => {
-                                            const col = (segDiag.benefCierreColMap || {})[cp.key];
-                                            return (
-                                                <div key={cp.key} className={`flex items-center gap-2 px-1 py-0.5 rounded ${col ? 'bg-green-50' : 'bg-gray-50'}`}>
-                                                    <span className={`w-2 h-2 rounded-full ${col ? 'bg-green-500' : 'bg-gray-300'}`}></span>
-                                                    <span className="font-semibold text-gray-700 w-16">{cp.label}</span>
-                                                    <span className="text-gray-400">→</span>
-                                                    <span className={col ? 'text-blue-700' : 'text-gray-400'}>{col || '—'}</span>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
+                            <div className="text-[10px] text-gray-500 bg-gray-50 border border-gray-200 rounded px-2 py-1">
+                                <strong>Beneficiario.BT+:</strong> {segDiag.benefCierreColsCount} columnas disponibles, {segDiag.benefCierreEnriched || 0} beneficiarios enriquecidos.
                                 {window._BENEF_CIERRE_COLS && (
-                                    <details className="mt-1.5 text-[10px]">
-                                        <summary className="cursor-pointer text-gray-600">Ver todas las columnas BT+ ({window._BENEF_CIERRE_COLS.length})</summary>
-                                        <div className="font-mono text-gray-600 bg-gray-50 border border-gray-200 rounded p-1.5 mt-1 max-h-32 overflow-y-auto">
+                                    <details className="mt-1">
+                                        <summary className="cursor-pointer text-gray-600">Ver columnas BT+</summary>
+                                        <div className="font-mono text-gray-600 bg-white border border-gray-200 rounded p-1.5 mt-1 max-h-32 overflow-y-auto">
                                             {window._BENEF_CIERRE_COLS.join(' · ')}
                                         </div>
                                     </details>
@@ -3740,18 +3719,21 @@ const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios
                         ) : (
                             <>
                                 <div>
-                                    <div className="text-[10px] font-semibold text-gray-600 uppercase mb-1">Match por checkpoint (con valor de muestra)</div>
+                                    <div className="text-[10px] font-semibold text-gray-600 uppercase mb-1">Match efectivo por checkpoint (fuente real usada)</div>
+                                    <div className="text-[10px] text-gray-500 mb-1 italic">Para cada checkpoint se prefiere <code>documentacion</code> si tiene la columna; si no, se usa <code>Beneficiario.BT+</code>.</div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-1 text-[11px] font-mono">
                                         {CHECKPOINTS.filter(cp => cp.tipo === 'seguimiento').map(cp => {
-                                            const col = segColMap[cp.key];
-                                            const sampleVal = (segSampleRow && col) ? String(segSampleRow[col] || '').trim() : '';
+                                            const colDoc = segColMap[cp.key];
+                                            const colBT = (segDiag.benefCierreColMap || {})[cp.key];
+                                            const sourceCol = colDoc || colBT;
+                                            const sourceLabel = colDoc ? 'documentacion' : (colBT ? 'Beneficiario.BT+' : null);
                                             return (
-                                                <div key={cp.key} className={`flex items-center gap-2 px-2 py-0.5 rounded ${col ? 'bg-white' : 'bg-red-100'}`}>
-                                                    <span className={`w-2 h-2 rounded-full ${col ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                                                <div key={cp.key} className={`flex items-center gap-2 px-2 py-0.5 rounded ${sourceCol ? 'bg-white' : 'bg-red-100'}`}>
+                                                    <span className={`w-2 h-2 rounded-full ${sourceCol ? 'bg-green-500' : 'bg-red-500'}`}></span>
                                                     <span className="font-semibold text-gray-700 w-20">{cp.label}</span>
                                                     <span className="text-gray-400">→</span>
-                                                    <span className={col ? 'text-blue-700' : 'text-red-600 italic'} title={col || ''}>{col || 'SIN MATCH'}</span>
-                                                    {sampleVal && <span className="text-gray-500 truncate">= "{sampleVal.substring(0,30)}{sampleVal.length>30?'…':''}"</span>}
+                                                    <span className={sourceCol ? 'text-blue-700' : 'text-red-600 italic'} title={sourceCol || ''}>{sourceCol || 'SIN MATCH'}</span>
+                                                    {sourceLabel && <span className="text-[9px] text-gray-400">({sourceLabel})</span>}
                                                 </div>
                                             );
                                         })}
