@@ -726,21 +726,30 @@ const ETAPAS_CONFIG_FULL = {
         // Reglas de matching (mustHave, mustNotHave). Estas reglas estan documentadas en
         // app/SOURCES_OF_TRUTH.md - mantenerlas sincronizadas.
         // Cada checkpoint es un ARRAY de alternativas {must, not}. Se intenta cada una en orden.
-        // Esto cubre las distintas convenciones de naming en AppSheet:
-        //   "Visita AS" (palabra completa), "F_V_AS" (abreviado fecha), "V_AS"/"V.AS" (abreviado flag)
+        // Nombres reales detectados en la hoja "Seguimiento" (sample del usuario 2026-05-19):
+        //   V_acsan (Visita Accion Sanitaria) / F_V_acsan (fecha)
+        //   R_aprobsan (Resol Aprob Sanitaria)
+        //   V_F1 / F_F1, V_DOM / F_V_DOM
+        //   Artef_elect (Artefactado electrico)
+        //   Empalme, T1 (no usado)
+        //   R_rdom (Recepcion DOM, numero del documento)
+        //   Observaciones_seg
+        // Ademas hay E_MU, F_E_MU, R_MU, E_antec_elect, F_E_antec_elect, R_factibilidad (no usados)
         const SEG_RULES = {
             te1: [
                 { must: ['te1'], not: ['te10','te11','te12'] }
             ],
             visita_as: [
+                { must: ['vacsan'],     not: ['fvacsan'] },                     // V_acsan -> "vacsan" (boolean Si/No)
                 { must: ['visita','as'], not: ['dom','f1','resol','fecha'] },
                 { must: ['fvas'],        not: ['fvasr','fvasf'] },
                 { must: ['vas'],         not: ['fvas','fechavas','resol','dom','f1'] }
             ],
             resol_as: [
+                { must: ['aprobsan'],   not: [] },                              // R_aprobsan -> "raprobsan"
                 { must: ['resol','as'], not: ['dom','f1'] },
                 { must: ['fras'],       not: [] },
-                { must: ['ras'],        not: ['fras','fechara','fechaapr'] }
+                { must: ['ras'],        not: ['fras','fechara','fechaapr','rdom','rraprob'] }
             ],
             visita_f1: [
                 { must: ['visita','f1'], not: ['dom','fecha'] },
@@ -752,14 +761,14 @@ const ETAPAS_CONFIG_FULL = {
                 { must: ['ff1'],        not: [] }
             ],
             artefactado: [
-                { must: ['artefact'], not: [] }
+                { must: ['artef'], not: ['fartef'] }                            // Artef_elect, Artefactado
             ],
             empalme: [
                 { must: ['empalme'], not: [] }
             ],
             visita_dom: [
                 { must: ['visita','dom'], not: ['fecha'] },
-                { must: ['vdom'],         not: ['fvdom','fechavdom'] }
+                { must: ['vdom'],         not: ['fvdom','fechavdom','rdom'] }
             ],
             fecha_v_dom: [
                 { must: ['fecha','visita','dom'], not: ['recep'] },
@@ -768,10 +777,11 @@ const ETAPAS_CONFIG_FULL = {
                 { must: ['fecha','dom'],          not: ['recep'] }
             ],
             recepcion_dom: [
-                { must: ['recep','dom'], not: ['fecha'] },
-                { must: ['nrecep'],      not: [] },
-                { must: ['numerorecep'], not: [] },
-                { must: ['recep'],       not: ['fecha'] }
+                { must: ['rrdom'],         not: [] },                           // R_rdom -> "rrdom" (numero documento)
+                { must: ['recep','dom'],   not: ['fecha','factib'] },
+                { must: ['rdom'],          not: ['frdom','vdom','fvdom'] },
+                { must: ['nrecep'],        not: [] },
+                { must: ['numerorecep'],   not: [] }
             ],
             fecha_recep: [
                 { must: ['fecha','recep'], not: [] },
@@ -794,11 +804,25 @@ const ETAPAS_CONFIG_FULL = {
         window._SEG_TABLE_USED = segTableUsed;
         window._SEG_SAMPLE_ROWS = segRaw.slice(0, 3);
 
+        // Detectar dinamicamente la columna que contiene el ID del beneficiario en Seguimiento
+        // (puede ser ID_Benef, ID_benef, IDU_Benef, ID_benef_seg, etc.)
+        const idColCandidates = segKeysSample.filter(k => {
+            const n = normCol(k);
+            return (n === 'idbenef' || n === 'idubenef' || n.startsWith('idbenef') || n.startsWith('idubenef'));
+        });
+        const idCol = idColCandidates[0] || null;
+        console.log('[LIVE] Seguimiento: columna ID detectada =', idCol, '(candidatos:', idColCandidates, ')');
+
         const unmatchedBenefs = [];
+        const matchedIds = [];
+        let skippedNoId = 0;
         segRaw.forEach(s => {
-            const id = String(s.ID_Benef || s.ID_benef || s.IDU_Benef || '').trim();
-            if (!id || id === 'nan') return;
+            // Usar la columna detectada o fallback a las clasicas
+            let rawId = idCol ? s[idCol] : (s.ID_Benef ?? s.ID_benef ?? s.IDU_Benef);
+            const id = String(rawId == null ? '' : rawId).trim();
+            if (!id || id === 'nan') { skippedNoId++; return; }
             if (!idsBenef.has(id)) { unmatchedBenefs.push(id); return; }
+            matchedIds.push(id);
             const keys = Object.keys(s);
             const out = {};
             for (const [k, alternatives] of Object.entries(SEG_RULES)) {
@@ -821,13 +845,28 @@ const ETAPAS_CONFIG_FULL = {
                 }
             };
         });
-        console.log('[LIVE] Seguimiento: tabla usada =', segTableUsed || '(NINGUNA)', '|', Object.keys(SEGUIMIENTO_DATA).length, 'registros de', segRaw.length, 'filas crudas');
+        // Diagnostico de match de IDs para el panel
+        window._SEG_DIAG = {
+            tableUsed: segTableUsed,
+            segRawLen: segRaw.length,
+            segMatchedCount: matchedIds.length,
+            segUnmatchedCount: unmatchedBenefs.length,
+            segSkippedNoId: skippedNoId,
+            idCol: idCol,
+            idColCandidates: idColCandidates,
+            sampleUnmatched: unmatchedBenefs.slice(0, 10),
+            sampleBenefIds: BENEFICIARIOS_DATA.slice(0, 10).map(b => String(b.ID_Benef)),
+            benefDataLen: BENEFICIARIOS_DATA.length
+        };
+        console.log('[LIVE] Seguimiento: tabla usada =', segTableUsed || '(NINGUNA)', '| segRaw =', segRaw.length, '| matched =', matchedIds.length, '| sin match =', unmatchedBenefs.length, '| sin ID =', skippedNoId);
+        console.log('[LIVE] Seguimiento idCol:', idCol, '| BENEFICIARIOS_DATA =', BENEFICIARIOS_DATA.length);
         if (segRaw.length > 0) {
             console.log('[LIVE] Columnas detectadas en Seguimiento[0]:', segKeysSample.join(' | '));
             console.log('[LIVE] Match por checkpoint:', window._SEG_COL_MAP);
             console.log('[LIVE] Seguimiento[0] muestra completa:', segRaw[0]);
             if (unmatchedBenefs.length > 0) {
-                console.warn(`[LIVE] Seguimiento: ${unmatchedBenefs.length} filas con ID_Benef NO presentes en BENEFICIARIOS_DATA (ej: ${unmatchedBenefs.slice(0,5).join(', ')})`);
+                console.warn(`[LIVE] Seguimiento: ${unmatchedBenefs.length} filas con ID NO presentes en BENEFICIARIOS_DATA. Ejemplos: ${unmatchedBenefs.slice(0,10).join(', ')}`);
+                console.warn(`[LIVE] BENEFICIARIOS_DATA primeros IDs:`, BENEFICIARIOS_DATA.slice(0,10).map(b => b.ID_Benef));
             }
         } else {
             console.warn('[LIVE] Seguimiento: 0 filas. Variantes probadas:', SEG_TABLE_CANDIDATES.join(', '), '— verificar nombre real de la hoja.');
@@ -3260,13 +3299,23 @@ const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios
     const segRawCols = (typeof window !== 'undefined' && window._SEG_RAW_COLS) || [];
     const segTableUsed = (typeof window !== 'undefined' && window._SEG_TABLE_USED) || null;
     const segSampleRow = (typeof window !== 'undefined' && window._SEG_SAMPLE_ROWS && window._SEG_SAMPLE_ROWS[0]) || null;
+    const segDiag = (typeof window !== 'undefined' && window._SEG_DIAG) || {};
     const checkpointsSinMatch = CHECKPOINTS.filter(cp => cp.tipo === 'seguimiento' && !segColMap[cp.key]);
+    const idMatchProblem = segDiag.segRawLen > 0 && segDiag.segMatchedCount === 0;
 
     const copiarDebug = () => {
         const lines = [
             '=== Diagnostico Seguimiento ===',
             `Tabla usada: ${segTableUsed || '(NINGUNA)'}`,
-            `Registros: ${segRawCount} / Columnas: ${segRawCols.length}`,
+            `Filas brutas en Seguimiento: ${segDiag.segRawLen || 0}`,
+            `Beneficiarios cargados (activos): ${segDiag.benefDataLen || 0}`,
+            `Filas matcheadas (linkeadas): ${segDiag.segMatchedCount || 0}`,
+            `Filas sin match (ID no esta en BENEFICIARIOS_DATA): ${segDiag.segUnmatchedCount || 0}`,
+            `Filas sin ID: ${segDiag.segSkippedNoId || 0}`,
+            `Columna ID detectada en Seguimiento: ${segDiag.idCol || '(NINGUNA)'} (candidatos: ${(segDiag.idColCandidates || []).join(', ') || 'ninguno'})`,
+            '',
+            `IDs ejemplo NO matcheados de Seguimiento: ${(segDiag.sampleUnmatched || []).join(', ') || '(ninguno)'}`,
+            `IDs ejemplo de BENEFICIARIOS_DATA: ${(segDiag.sampleBenefIds || []).join(', ') || '(ninguno)'}`,
             '',
             'Match por checkpoint:',
             ...CHECKPOINTS.filter(cp => cp.tipo === 'seguimiento').map(cp =>
@@ -3322,6 +3371,30 @@ const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios
                                 📋 Copiar diagnostico
                             </button>
                         </div>
+                        {/* Diagnostico de match de IDs */}
+                        {segDiag.segRawLen > 0 && (
+                            <div className={`text-[11px] rounded px-2 py-1.5 ${idMatchProblem ? 'bg-red-100 border border-red-300' : 'bg-white border border-gray-200'}`}>
+                                <div className="font-semibold text-gray-700 mb-1">Match de IDs (Seguimiento ↔ BENEFICIARIOS_DATA)</div>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-1 font-mono">
+                                    <div>Filas seguimiento: <strong>{segDiag.segRawLen}</strong></div>
+                                    <div className={segDiag.segMatchedCount === 0 ? 'text-red-700 font-bold' : 'text-green-700'}>Matcheadas: <strong>{segDiag.segMatchedCount}</strong></div>
+                                    <div className={segDiag.segUnmatchedCount > 0 ? 'text-amber-700' : ''}>Sin match: <strong>{segDiag.segUnmatchedCount}</strong></div>
+                                    <div>Benef activos: <strong>{segDiag.benefDataLen}</strong></div>
+                                </div>
+                                <div className="text-[10px] text-gray-600 mt-1">
+                                    Col ID detectada en Seguimiento: <code className="bg-gray-100 px-1 rounded">{segDiag.idCol || '(NINGUNA)'}</code>
+                                </div>
+                                {idMatchProblem && (
+                                    <div className="mt-1 text-[10px] text-red-700">
+                                        <strong>0 filas linkeadas.</strong> Ejemplos IDs de Seguimiento que no estan en BENEFICIARIOS_DATA:
+                                        <code className="block bg-white border border-red-200 rounded px-1 mt-0.5">{(segDiag.sampleUnmatched || []).join(', ')}</code>
+                                        Ejemplos IDs en BENEFICIARIOS_DATA:
+                                        <code className="block bg-white border border-red-200 rounded px-1 mt-0.5">{(segDiag.sampleBenefIds || []).join(', ')}</code>
+                                        <p className="mt-1 italic">Si los IDs son visualmente distintos (uuids vs numeros, o formato distinto), el problema esta en como se referencia el beneficiario entre las hojas.</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                         {segRawCount === 0 ? (
                             <div className="text-[11px] text-red-700">
                                 <strong>No se cargaron registros de Seguimiento.</strong> Probadas: Seguimiento, Seguimiento Cierre de Obras, Seguimiento_Cierre, SeguimientoCierre.
