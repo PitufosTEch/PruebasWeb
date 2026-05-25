@@ -3538,7 +3538,7 @@ const CURVAS_S_CONFIG = {
     ]
 };
 
-const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios, proyectoSel, proy }) => {
+const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios, proyectoSel, proy, garantiasProy = [], muestrasProy = [], kpis = null }) => {
     const [expandida, setExpandida] = React.useState(null);
     const [busqueda, setBusqueda] = React.useState("");
     const [filtro, setFiltro] = React.useState("todas"); // todas | pendientes | recepcionadas
@@ -3700,6 +3700,77 @@ const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios
 
         const avColor = avanceReal >= 80 ? '#16a34a' : avanceReal >= 50 ? '#2563eb' : '#dc2626';
 
+        // ── Resumen administrativo: Contrato, Garantias y Muestras de Hormigon ──
+        const fmtFechaInf = (iso) => { if (!iso) return '—'; const p = String(iso).substring(0, 10).split('-'); return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : String(iso); };
+
+        let contratoCard;
+        if (proy && proy.fecha_inicio && proy.duracion) {
+            const fi = proy.fecha_inicio;
+            const dur = proy.duracion;
+            const inicio = new Date(fi);
+            const vencimiento = new Date(inicio); vencimiento.setDate(vencimiento.getDate() + dur);
+            const fechaRef = (kpis && kpis.esFinalizado && kpis.fechaFin) ? new Date(kpis.fechaFin) : new Date();
+            const diasRestantes = Math.floor((vencimiento - fechaRef) / 86400000);
+            const diasTranscurridos = Math.max(0, Math.floor((fechaRef - inicio) / 86400000));
+            const pctTranscurrido = Math.min(100, Math.max(0, Math.round(diasTranscurridos / dur * 100)));
+            const pctMarca90 = dur > 90 ? Math.round((dur - 90) / dur * 100) : null;
+            const venIso = vencimiento.toISOString().substring(0, 10);
+            const estadoTxt = diasRestantes < 0 ? `Vencido (${Math.abs(diasRestantes)}d)` : `${diasRestantes}d restantes`;
+            const estadoCol = diasRestantes < 0 ? '#dc2626' : diasRestantes < 30 ? '#b45309' : '#16a34a';
+            const barCol = pctTranscurrido >= 100 ? '#ef4444' : pctTranscurrido >= 80 ? '#f59e0b' : pctTranscurrido >= 50 ? '#3b82f6' : '#22c55e';
+            contratoCard = `<div class="rc-card">
+                <div class="rc-h">Contrato</div>
+                <div class="rc-grid4">
+                    <div><div class="rc-l">Inicio</div><div class="rc-v">${fmtFechaInf(fi)}</div></div>
+                    <div><div class="rc-l">Plazo</div><div class="rc-v">${dur} días</div></div>
+                    <div><div class="rc-l">Vencimiento</div><div class="rc-v">${fmtFechaInf(venIso)}</div></div>
+                    <div><div class="rc-l">Estado</div><div class="rc-v" style="color:${estadoCol};">${estadoTxt}</div></div>
+                </div>
+                <div style="margin-top:10px;">
+                    <div style="display:flex;justify-content:space-between;font-size:9px;color:#94a3b8;margin-bottom:3px;"><span>${fmtFechaInf(fi)}</span><span style="font-weight:600;">${diasTranscurridos}d / ${dur}d (${pctTranscurrido}%)</span><span>${fmtFechaInf(venIso)}</span></div>
+                    <div style="position:relative;height:10px;background:#e5e7eb;border-radius:6px;overflow:hidden;"><div style="height:100%;width:${Math.min(pctTranscurrido, 100)}%;background:${barCol};border-radius:6px;"></div>${pctMarca90 !== null ? `<div style="position:absolute;top:0;bottom:0;left:${pctMarca90}%;width:2px;background:#dc2626;"></div>` : ''}</div>
+                    ${pctMarca90 !== null ? `<div style="font-size:8px;color:#ef4444;text-align:right;margin-top:1px;">&#9660; 90d (fase cierre)</div>` : ''}
+                </div>
+            </div>`;
+        } else {
+            contratoCard = `<div class="rc-card"><div class="rc-h">Contrato</div><div style="color:#94a3b8;font-size:11px;padding:8px 0;">Sin datos de contrato (fecha de inicio / duración).</div></div>`;
+        }
+
+        const garantiasItems = (garantiasProy && garantiasProy.length > 0)
+            ? garantiasProy.map(g => {
+                const esV = g.diasVcmto !== null && g.diasVcmto < 0;
+                const porV = g.diasVcmto !== null && g.diasVcmto >= 0 && g.diasVcmto < 60;
+                const tipoCorto = g.tipo && g.tipo.includes('Fiel') ? 'Fiel Cumpl.' : g.tipo && g.tipo.includes('Buena') ? 'Buena Ejec.' : (g.tipo || '—');
+                const right = g.diasVcmto === null ? 'Sin fecha' : esV ? `Vencida (${Math.abs(g.diasVcmto)}d)` : porV ? `${g.diasVcmto}d` : fmtFechaInf(g.fecha_vcmto);
+                const col = esV ? '#dc2626' : porV ? '#b45309' : '#475569';
+                const bg = esV ? '#fef2f2' : porV ? '#fffbeb' : '#f8fafc';
+                return `<div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;padding:5px 8px;border-radius:6px;background:${bg};margin-bottom:4px;"><span><strong>${escapeHtmlBasic(tipoCorto)}</strong> <span style="color:#94a3b8;">${escapeHtmlBasic(g.tipo1 || '')} #${escapeHtmlBasic(g.num_bol || '')}</span>${g.monto_uf > 0 ? ` <span style="color:#94a3b8;">UF ${Number(g.monto_uf).toLocaleString('es-CL')}</span>` : ''}</span><span style="font-weight:600;color:${col};white-space:nowrap;">${escapeHtmlBasic(right)}</span></div>`;
+            }).join('')
+            : '<div style="color:#94a3b8;font-size:11px;padding:8px 0;">Sin garantías registradas.</div>';
+        const garantiasCard = `<div class="rc-card"><div class="rc-h">Garantías</div>${garantiasItems}</div>`;
+
+        const muestras = Array.isArray(muestrasProy) ? muestrasProy : [];
+        const totalProbetas = muestras.reduce((s, m) => s + (m.cantidad || 0), 0);
+        const requeridas = viviendas.length ? Math.ceil(viviendas.length / 6) : 0;
+        const cumpleMuestras = totalProbetas >= requeridas;
+        let muestrasHtml = `<div class="mh-kpis">
+            <div class="mh-kpi"><div class="v">${muestras.length}</div><div class="l">Tomas</div></div>
+            <div class="mh-kpi"><div class="v">${totalProbetas}</div><div class="l">Probetas</div></div>
+            <div class="mh-kpi"><div class="v">${requeridas}</div><div class="l">Requeridas (1/6)</div></div>
+            <div class="mh-kpi"><div class="v" style="color:${cumpleMuestras ? '#16a34a' : '#dc2626'};">${cumpleMuestras ? 'OK' : 'Faltan ' + (requeridas - totalProbetas)}</div><div class="l">Cobertura</div></div>
+        </div>`;
+        if (muestras.length > 0) {
+            const rows = muestras.slice().sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || ''))).map(m => {
+                const res = m.resultadoPedido ? 'Pedido' : 'Pendiente';
+                const resCol = m.resultadoPedido ? '#16a34a' : '#b45309';
+                const casas = (m.casasNombres || []).join(', ');
+                return `<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:5px 8px;">${fmtFechaInf(m.fecha)}</td><td style="padding:5px 8px;text-align:center;">${m.cantidad || 0}</td><td style="padding:5px 8px;text-align:center;color:${resCol};font-weight:600;">${res}</td><td style="padding:5px 8px;color:#475569;">${escapeHtmlBasic(casas)}</td></tr>`;
+            }).join('');
+            muestrasHtml += `<table style="width:100%;border-collapse:collapse;font-size:11px;"><thead><tr style="background:#f8fafc;">${['Fecha toma', 'Probetas', 'Resultado', 'Casas'].map((h, i) => `<th style="padding:5px 8px;text-align:${i === 0 || i === 3 ? 'left' : 'center'};font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:#64748b;border-bottom:1px solid #e2e8f0;">${h}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>`;
+        } else {
+            muestrasHtml += '<div style="color:#94a3b8;font-size:11px;padding:8px 0;">Sin muestras de hormigón registradas para este proyecto.</div>';
+        }
+
         const css = `
 *{margin:0;padding:0;box-sizing:border-box;font-family:'IBM Plex Sans',Arial,sans-serif;}
 body{background:#fff;padding:36px;color:#1a1a2e;max-width:940px;margin:0 auto;}
@@ -3737,7 +3808,17 @@ body{background:#fff;padding:36px;color:#1a1a2e;max-width:940px;margin:0 auto;}
 .gp-nota{background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;margin-bottom:6px;font-size:12px;}
 .gp-nota span{font-size:9px;font-weight:700;text-transform:uppercase;color:#b45309;}
 .gp-nota div{margin-top:2px;font-style:italic;color:#374151;}
-@media print{ .page-break{page-break-before:always;} .grupo-page{margin-top:0;} }`;
+.resumen-cards{display:grid;grid-template-columns:1.7fr 1fr;gap:14px;align-items:start;}
+.rc-card{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;}
+.rc-h{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#64748b;margin-bottom:8px;}
+.rc-grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+.rc-l{font-size:9px;color:#94a3b8;}
+.rc-v{font-size:12px;font-weight:700;color:#1a1a2e;margin-top:1px;}
+.mh-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px;}
+.mh-kpi{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 6px;text-align:center;}
+.mh-kpi .v{font-size:19px;font-weight:700;line-height:1;color:#1a1a2e;}
+.mh-kpi .l{font-size:9px;color:#64748b;margin-top:4px;text-transform:uppercase;letter-spacing:.04em;}
+@media print{ .page-break{page-break-before:always;} .grupo-page{margin-top:0;} .resumen-cards{grid-template-columns:1.7fr 1fr;} }`;
 
         const headerHtml = `<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;padding-bottom:18px;border-bottom:3px solid #8B2332;">
   <div style="display:flex;align-items:center;gap:14px;">
@@ -3756,6 +3837,15 @@ body{background:#fff;padding:36px;color:#1a1a2e;max-width:940px;margin:0 auto;}
 </div>`;
 
         const portadaHtml = `
+<div class="sec-title">Contrato y Garantías</div>
+<div class="resumen-cards">
+  ${contratoCard}
+  ${garantiasCard}
+</div>
+
+<div class="sec-title">Muestras de Hormigón</div>
+${muestrasHtml}
+
 <div class="sec-title">Estado del Proyecto</div>
 <div class="kpis">
   <div class="kpi"><div class="kpi-v" style="color:${avColor};">${avanceReal}%</div><div class="kpi-l">Avance Real (Insp.)</div></div>
@@ -6075,7 +6165,7 @@ const App = () => {
                     {tab === "financiero" && <FinancieroTab viviendas={viviendas} />}
                     {tab === "mano_obra" && <ManoDeObraTab viviendas={viviendas} />}
                     {tab === "estados_pago" && <EstadosPagoTab viviendas={viviendas} />}
-                    {tab === "estado_general" && <EstadoGeneralTab viviendas={viviendas} observaciones={observaciones} grupos={grupos} resumenComentarios={resumenComentarios} proyectoSel={proyectoSel} proy={proy} />}
+                    {tab === "estado_general" && <EstadoGeneralTab viviendas={viviendas} observaciones={observaciones} grupos={grupos} resumenComentarios={resumenComentarios} proyectoSel={proyectoSel} proy={proy} garantiasProy={garantiasProy} muestrasProy={getMuestrasProy()} kpis={kpis} />}
                     {tab === "configuracion" && <ConfiguracionView grupos={grupos} setGrupos={setGruposForProy} viviendas={viviendas} proyectoSel={proyectoSel} />}
                 </div>
 
