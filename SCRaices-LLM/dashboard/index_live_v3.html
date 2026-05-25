@@ -3762,23 +3762,16 @@ const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios
         const totalProbetas = muestras.reduce((s, m) => s + (m.cantidad || 0), 0);
         const requeridas = viviendas.length ? Math.ceil(viviendas.length / 6) : 0;
         const cumpleMuestras = totalProbetas >= requeridas;
-        let muestrasHtml = `<div class="mh-kpis">
-            <div class="mh-kpi"><div class="v">${muestras.length}</div><div class="l">Tomas</div></div>
-            <div class="mh-kpi"><div class="v">${totalProbetas}</div><div class="l">Probetas</div></div>
-            <div class="mh-kpi"><div class="v">${requeridas}</div><div class="l">Requeridas (1/6)</div></div>
-            <div class="mh-kpi"><div class="v" style="color:${cumpleMuestras ? '#16a34a' : '#dc2626'};">${cumpleMuestras ? 'OK' : 'Faltan ' + (requeridas - totalProbetas)}</div><div class="l">Cobertura</div></div>
+        const resPendientes = muestras.filter(m => !m.resultadoPedido).length;
+        const cobTxt = cumpleMuestras ? 'OK' : ('Faltan ' + (requeridas - totalProbetas));
+        const cobCol = cumpleMuestras ? '#16a34a' : '#dc2626';
+        const muestrasHtml = `<div class="mh-strip">
+            <span class="mh-it"><b>${muestras.length}</b> tomas</span>
+            <span class="mh-it"><b>${totalProbetas}</b> probetas</span>
+            <span class="mh-it">requeridas <b>${requeridas}</b> <span style="color:#94a3b8;">(1 / 6 casas)</span></span>
+            <span class="mh-it">Cobertura: <b style="color:${cobCol};">${cobTxt}</b></span>
+            <span class="mh-it">Resultados pendientes: <b style="color:${resPendientes > 0 ? '#b45309' : '#16a34a'};">${resPendientes}</b></span>
         </div>`;
-        if (muestras.length > 0) {
-            const rows = muestras.slice().sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || ''))).map(m => {
-                const res = m.resultadoPedido ? 'Pedido' : 'Pendiente';
-                const resCol = m.resultadoPedido ? '#16a34a' : '#b45309';
-                const casas = (m.casasNombres || []).join(', ');
-                return `<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:5px 8px;">${fmtFechaInf(m.fecha)}</td><td style="padding:5px 8px;text-align:center;">${m.cantidad || 0}</td><td style="padding:5px 8px;text-align:center;color:${resCol};font-weight:600;">${res}</td><td style="padding:5px 8px;color:#475569;">${escapeHtmlBasic(casas)}</td></tr>`;
-            }).join('');
-            muestrasHtml += `<table style="width:100%;border-collapse:collapse;font-size:11px;"><thead><tr style="background:#f8fafc;">${['Fecha toma', 'Probetas', 'Resultado', 'Casas'].map((h, i) => `<th style="padding:5px 8px;text-align:${i === 0 || i === 3 ? 'left' : 'center'};font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:#64748b;border-bottom:1px solid #e2e8f0;">${h}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>`;
-        } else {
-            muestrasHtml += '<div style="color:#94a3b8;font-size:11px;padding:8px 0;">Sin muestras de hormigón registradas para este proyecto.</div>';
-        }
 
         const css = `
 *{margin:0;padding:0;box-sizing:border-box;font-family:'IBM Plex Sans',Arial,sans-serif;}
@@ -3823,10 +3816,9 @@ body{background:#fff;padding:36px;color:#1a1a2e;max-width:940px;margin:0 auto;}
 .rc-grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
 .rc-l{font-size:9px;color:#94a3b8;}
 .rc-v{font-size:12px;font-weight:700;color:#1a1a2e;margin-top:1px;}
-.mh-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px;}
-.mh-kpi{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 6px;text-align:center;}
-.mh-kpi .v{font-size:19px;font-weight:700;line-height:1;color:#1a1a2e;}
-.mh-kpi .l{font-size:9px;color:#64748b;margin-top:4px;text-transform:uppercase;letter-spacing:.04em;}
+.mh-strip{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:8px 14px;font-size:11.5px;color:#475569;}
+.mh-it{white-space:nowrap;}
+.mh-it b{color:#1a1a2e;font-weight:700;}
 @media print{ .page-break{page-break-before:always;} .grupo-page{margin-top:0;} .resumen-cards{grid-template-columns:1.7fr 1fr;} }`;
 
         const headerHtml = `<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;padding-bottom:18px;border-bottom:3px solid #8B2332;">
