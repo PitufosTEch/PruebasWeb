@@ -3584,7 +3584,7 @@ const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios
 
         // Tabla resumen por grupo
         let tablaGruposHtml = '<table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="background:#f8fafc;">'
-            + ['Grupo', 'Capataz', 'Viv.', 'Avance', 'Recep.', 'Críticas'].map((h, i) =>
+            + ['Grupo', 'Capataz', 'Viv.', 'Avance Insp.', 'Recep.', 'Críticas'].map((h, i) =>
                 `<th style="padding:7px 10px;text-align:${i < 2 ? 'left' : 'center'};font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:#64748b;border-bottom:1px solid #e2e8f0;">${h}</th>`).join('')
             + '</tr></thead><tbody>';
         gruposData.forEach(g => {
@@ -3624,6 +3624,68 @@ const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios
         if (!comentariosHtml) {
             comentariosHtml = '<div style="color:#94a3b8;font-size:12px;padding:16px;text-align:center;border:1px dashed #e2e8f0;border-radius:8px;">Sin notas del coordinador ni comentarios marcados con estrella en este proyecto.</div>';
         }
+
+        // Pagina de detalle por grupo: KPIs, tabla por vivienda y ultimos 2 comentarios por beneficiario
+        const estadoColor = { critico: '#dc2626', atencion: '#b45309', en_tiempo: '#16a34a', despachado: '#2563eb', solicitado: '#7c3aed', bloqueado: '#6b7280' };
+        const estadoLabel = { critico: 'Crítico', atencion: 'Atención', en_tiempo: 'En tiempo', despachado: 'Despachado', solicitado: 'Solicitado', bloqueado: 'Bloqueado' };
+        const totalCp = CHECKPOINTS.length;
+        let gruposDetalleHtml = '';
+        gruposData.forEach(g => {
+            if (g.viviendas.length === 0) return;
+            const res = grupoResumen(g.viviendas);
+            const rec = g.viviendas.filter(v => v.flags && v.flags.fecha_recep).length;
+            const avCol = res.avanceInsp >= 80 ? '#16a34a' : res.avanceInsp >= 50 ? '#2563eb' : '#dc2626';
+            const miniKpis = `<div class="gp-kpis">
+                <div class="gp-kpi"><div class="v">${res.n}</div><div class="l">Viviendas</div></div>
+                <div class="gp-kpi"><div class="v" style="color:${avCol};">${res.avanceInsp}%</div><div class="l">Avance Insp.</div></div>
+                <div class="gp-kpi"><div class="v" style="color:#16a34a;">${res.terminadas}</div><div class="l">Terminadas</div></div>
+                <div class="gp-kpi"><div class="v">${rec}/${res.n}</div><div class="l">Recepcionadas</div></div>
+                <div class="gp-kpi"><div class="v" style="color:${res.criticas > 0 ? '#dc2626' : '#6b7280'};">${res.criticas}</div><div class="l">Críticas</div></div>
+            </div>`;
+            const nota = g.comentario
+                ? `<div class="gp-nota"><span>Nota del coordinador</span><div>${escapeHtmlBasic(g.comentario)}</div></div>`
+                : '';
+            let vivRows = '';
+            g.viviendas.forEach(v => {
+                const pct = v.pctTotal != null ? v.pctTotal + '%' : '—';
+                const pctCol = v.pctTotal == null ? '#94a3b8' : v.pctTotal >= 80 ? '#16a34a' : v.pctTotal >= 50 ? '#2563eb' : '#dc2626';
+                const ec = estadoColor[v.estadoGeneral] || '#6b7280';
+                const el = estadoLabel[v.estadoGeneral] || (v.estadoGeneral || '—');
+                const recv = (v.flags && v.flags.fecha_recep) ? 'Sí' : '—';
+                vivRows += `<tr style="border-bottom:1px solid #f1f5f9;">
+                    <td style="padding:6px 10px;font-weight:600;">${escapeHtmlBasic((v.NOMBRES || '') + ' ' + (v.APELLIDOS || ''))}</td>
+                    <td style="padding:6px 10px;text-align:center;font-weight:700;color:${pctCol};">${pct}</td>
+                    <td style="padding:6px 10px;text-align:center;color:#475569;">${v.completados}/${totalCp}</td>
+                    <td style="padding:6px 10px;text-align:center;"><span style="font-size:10px;font-weight:700;color:${ec};">${el}</span></td>
+                    <td style="padding:6px 10px;text-align:center;">${recv}</td>
+                </tr>`;
+            });
+            const vivTable = `<table style="width:100%;border-collapse:collapse;font-size:11.5px;"><thead><tr style="background:#f8fafc;">${['Beneficiario', 'Avance Insp.', 'Checkpoints', 'Estado', 'Recep.'].map((h, i) => `<th style="padding:6px 10px;text-align:${i === 0 ? 'left' : 'center'};font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:#64748b;border-bottom:1px solid #e2e8f0;">${h}</th>`).join('')}</tr></thead><tbody>${vivRows}</tbody></table>`;
+            let comBenef = '';
+            g.viviendas.forEach(v => {
+                const obs = (observaciones && observaciones[v.ID_Benef]) ? observaciones[v.ID_Benef].slice() : [];
+                if (obs.length === 0) return;
+                obs.sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
+                const ult = obs.slice(0, 2);
+                comBenef += `<div style="margin-bottom:8px;break-inside:avoid;"><div style="font-size:12px;font-weight:600;color:#1a1a2e;">${escapeHtmlBasic((v.NOMBRES || '') + ' ' + (v.APELLIDOS || ''))}</div>${ult.map(o => {
+                    const fch = String(o.fecha || '').replace('T', ' ').substring(0, 16);
+                    return `<div style="font-size:11.5px;color:#374151;padding:4px 10px;border-left:3px solid #cbd5e1;margin-top:3px;background:#f8fafc;border-radius:0 6px 6px 0;">${escapeHtmlBasic(o.texto || '')} <span style="font-size:9px;color:#94a3b8;">${fch}</span></div>`;
+                }).join('')}</div>`;
+            });
+            if (!comBenef) comBenef = '<div style="color:#94a3b8;font-size:11.5px;padding:8px 0;">Sin comentarios registrados en este grupo.</div>';
+            gruposDetalleHtml += `<div class="grupo-page page-break">
+                <div class="gp-head">
+                    <div><div class="gp-title">${escapeHtmlBasic(g.nombre || 'Sin Asignar')}</div><div class="gp-sub">Capataz: ${escapeHtmlBasic(g.capataz || '—')}</div></div>
+                    <div class="gp-badge">${res.n} viv.</div>
+                </div>
+                ${miniKpis}
+                ${nota}
+                <div class="sec-title">Detalle por Vivienda</div>
+                ${vivTable}
+                <div class="sec-title">Comentarios Recientes por Beneficiario</div>
+                ${comBenef}
+            </div>`;
+        });
 
         // Curvas S images
         const curvasConf = CURVAS_S_CONFIG[proyectoSel] || [];
@@ -3669,7 +3731,19 @@ body{background:#fff;padding:36px;color:#1a1a2e;max-width:940px;margin:0 auto;}
 .footer{margin-top:36px;padding-top:16px;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;}
 .print-btn{position:fixed;top:20px;right:20px;background:#8B2332;color:#fff;border:none;border-radius:8px;padding:11px 22px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.18);z-index:999;}
 .print-btn:hover{background:#6d1a27;}
-@media print{ .page-break{page-break-before:always;} }
+.grupo-page{margin-top:30px;}
+.gp-head{display:flex;justify-content:space-between;align-items:center;padding-bottom:12px;border-bottom:3px solid #8B2332;margin-bottom:16px;}
+.gp-title{font-size:20px;font-weight:700;color:#1a1a2e;line-height:1.1;}
+.gp-sub{font-size:12px;color:#64748b;margin-top:3px;}
+.gp-badge{background:#1a1a2e;color:#fff;padding:5px 15px;border-radius:20px;font-size:12px;font-weight:600;flex-shrink:0;}
+.gp-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px;}
+.gp-kpi{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 6px;text-align:center;}
+.gp-kpi .v{font-size:21px;font-weight:700;line-height:1;color:#1a1a2e;}
+.gp-kpi .l{font-size:9px;color:#64748b;margin-top:4px;text-transform:uppercase;letter-spacing:.04em;}
+.gp-nota{background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;margin-bottom:6px;font-size:12px;}
+.gp-nota span{font-size:9px;font-weight:700;text-transform:uppercase;color:#b45309;}
+.gp-nota div{margin-top:2px;font-style:italic;color:#374151;}
+@media print{ .page-break{page-break-before:always;} .grupo-page{margin-top:0;} }
 </style>
 </head>
 <body>
@@ -3693,7 +3767,7 @@ body{background:#fff;padding:36px;color:#1a1a2e;max-width:940px;margin:0 auto;}
 
 <div class="sec-title">Estado del Proyecto</div>
 <div class="kpis">
-  <div class="kpi"><div class="kpi-v" style="color:${avColor};">${avanceReal}%</div><div class="kpi-l">Avance Real</div></div>
+  <div class="kpi"><div class="kpi-v" style="color:${avColor};">${avanceReal}%</div><div class="kpi-l">Avance Real (Insp.)</div></div>
   <div class="kpi"><div class="kpi-v" style="color:#1e3a5f;">${viviendas.length}</div><div class="kpi-l">Beneficiarios</div></div>
   <div class="kpi"><div class="kpi-v" style="color:#16a34a;">${terminadas}</div><div class="kpi-l">Terminadas</div></div>
   <div class="kpi"><div class="kpi-v" style="color:${criticos > 0 ? '#dc2626' : '#6b7280'};">${criticos}</div><div class="kpi-l">Críticas</div></div>
@@ -3716,11 +3790,13 @@ body{background:#fff;padding:36px;color:#1a1a2e;max-width:940px;margin:0 auto;}
   <span><span style="display:inline-block;width:20px;height:0;border-top:2px dashed #ef4444;vertical-align:middle;margin-right:4px;opacity:.6;"></span>% Proyectado</span>
 </div>
 
-<div class="sec-title page-break">Resumen por Grupo</div>
+<div class="sec-title">Resumen por Grupo</div>
 <div class="grupos-table">${tablaGruposHtml}</div>
 
-<div class="sec-title">Comentarios del Periodo</div>
+<div class="sec-title">Comentarios Destacados</div>
 ${comentariosHtml}
+
+${gruposDetalleHtml}
 
 <div class="footer">
   <div>SG Raíces — Panel de Control v3 · Datos desde AppSheet y Google Sheets</div>
