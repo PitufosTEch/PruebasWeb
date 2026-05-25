@@ -3236,6 +3236,161 @@ const EstadosPagoTab = ({ viviendas }) => {
     );
 };
 
+// ===== EXPORTAR INFORME COMPARTIBLE (snapshot HTML autocontenido) =====
+// Genera un HTML standalone con los datos del proyecto incrustados. Navegacion por
+// tabs inferiores (General + un tab por grupo), mobile-first, con boton Descargar PDF
+// (window.print + @media print que pagina por grupo). NO incluye diagnostico interno.
+function exportarInformeCompartible({ proy, gruposDatos, kpisCheckpoints, CHECKPOINTS }) {
+    const cps = CHECKPOINTS.map(c => ({ key: c.key, label: c.label }));
+    const grupos = gruposDatos.map(g => ({
+        id: String(g.id),
+        nombre: g.nombre || (g.id === '_all' ? 'Todas las viviendas' : 'Sin Asignar'),
+        capataz: g.capataz || '',
+        comentario: g.comentario || '',
+        viviendas: g.viviendas.map(v => ({
+            nombre: `${v.NOMBRES || ''} ${v.APELLIDOS || ''}`.trim() || String(v.ID_Benef),
+            tipologia: v.tipologia || '',
+            pct: (v.pctTotal != null ? v.pctTotal : null),
+            flags: cps.reduce((acc, c) => { acc[c.key] = !!(v.flags && v.flags[c.key]); return acc; }, {})
+        }))
+    }));
+    const kpis = kpisCheckpoints.map(k => ({ label: k.label, n: k.n, total: k.total }));
+    const payload = {
+        proyecto: proy ? proy.NOMBRE_PROYECTO : 'Proyecto',
+        comuna: proy ? proy.COMUNA : '',
+        generadoEl: new Date().toLocaleString('es-CL'),
+        checkpoints: cps,
+        kpis,
+        grupos
+    };
+    const html = construirHTMLInforme(payload);
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const fechaStr = new Date().toISOString().substring(0, 10);
+    const safe = (payload.proyecto || 'proyecto').replace(/[^a-z0-9]/gi, '_').substring(0, 40);
+    a.href = url;
+    a.download = `Informe_Cierre_${safe}_${fechaStr}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function construirHTMLInforme(payload) {
+    const jsonData = JSON.stringify(payload).replace(/</g, '\\u003c');
+    // CSS y JS de la pagina generada (sin backticks para evitar conflicto con el template literal externo)
+    const css = [
+        "*{box-sizing:border-box;margin:0;padding:0}",
+        "body{font-family:'IBM Plex Sans',system-ui,-apple-system,sans-serif;background:#f3f4f6;color:#1f2937;padding-bottom:64px;font-size:14px}",
+        ".topbar{position:sticky;top:0;z-index:10;background:#7c3aed;color:#fff;padding:12px 16px;box-shadow:0 1px 4px rgba(0,0,0,.15)}",
+        ".topbar h1{font-size:16px;font-weight:700}",
+        ".topbar .sub{font-size:11px;opacity:.85;margin-top:2px}",
+        ".pdf-btn{position:fixed;top:10px;right:12px;z-index:20;background:#fff;color:#7c3aed;border:none;border-radius:8px;padding:6px 10px;font-size:12px;font-weight:600;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.2)}",
+        ".wrap{max-width:1000px;margin:0 auto;padding:12px}",
+        ".card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 1px 2px rgba(0,0,0,.04)}",
+        ".card h2{font-size:16px;font-weight:700;margin-bottom:4px}",
+        ".card h3{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:#6b7280;margin-bottom:8px}",
+        ".muted{color:#6b7280;font-size:12px}",
+        ".nota{margin-top:6px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:6px 10px;font-size:12px;font-style:italic;color:#374151}",
+        ".kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(58px,1fr));gap:6px}",
+        ".kpi{border:1px solid #e5e7eb;border-radius:8px;padding:6px 4px;text-align:center}",
+        ".kpi.g{background:#f0fdf4;border-color:#bbf7d0;color:#15803d}",
+        ".kpi.a{background:#fffbeb;border-color:#fde68a;color:#b45309}",
+        ".kpi.x{background:#f9fafb;border-color:#e5e7eb;color:#6b7280}",
+        ".kpi .kl{font-size:9px;font-weight:600;opacity:.8}",
+        ".kpi .kn{font-size:18px;font-weight:700;line-height:1.1}",
+        ".kpi .kt{font-size:9px;opacity:.6}",
+        ".grow{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #f3f4f6}",
+        ".grow:last-child{border-bottom:none}",
+        ".tablewrap{overflow-x:auto;-webkit-overflow-scrolling:touch}",
+        "table{border-collapse:collapse;width:100%;font-size:12px}",
+        "th,td{padding:5px 6px;text-align:center;border-bottom:1px solid #f3f4f6;white-space:nowrap}",
+        "th{background:#f9fafb;font-size:9px;text-transform:uppercase;color:#6b7280;font-weight:600;position:sticky;top:0}",
+        "th.sticky,td.sticky{position:sticky;left:0;background:#fff;text-align:left;z-index:1;min-width:150px}",
+        "th.sticky{background:#f9fafb}",
+        ".bn{font-weight:600;font-size:12px}",
+        ".bt{font-size:10px;color:#9ca3af}",
+        ".ok{color:#16a34a;font-weight:700}",
+        ".no{color:#d1d5db}",
+        ".pct{font-weight:700;font-family:'IBM Plex Mono',monospace}",
+        ".bottom-tabs{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #e5e7eb;display:flex;overflow-x:auto;white-space:nowrap;z-index:15;box-shadow:0 -1px 4px rgba(0,0,0,.06)}",
+        ".bottom-tabs button{flex:0 0 auto;border:none;background:none;padding:10px 14px;font-size:12px;color:#6b7280;cursor:pointer;border-top:2px solid transparent}",
+        ".bottom-tabs button.active{color:#7c3aed;border-top-color:#7c3aed;font-weight:600;background:#faf5ff}",
+        "#printall{display:none}",
+        "@media print{",
+        "  .topbar{position:static}.pdf-btn,.bottom-tabs,#content{display:none!important}",
+        "  #printall{display:block!important}",
+        "  body{background:#fff;padding-bottom:0;font-size:11px}",
+        "  .tab-section{page-break-after:always}.tab-section:last-child{page-break-after:auto}",
+        "  .card{box-shadow:none;border:1px solid #d1d5db}",
+        "  th.sticky,td.sticky{position:static}",
+        "  .kpi.g{background:#f0fdf4!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}",
+        "}"
+    ].join("\n");
+
+    const script = [
+        "(function(){",
+        "var D=window.__INFORME__;var cps=D.checkpoints;",
+        "function mark(on){return on?'<span class=\"ok\">&#10003;</span>':'<span class=\"no\">&middot;</span>';}",
+        "function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}",
+        "function renderGeneral(){",
+        "  var h='';",
+        "  h+='<div class=\"card\"><h2>'+esc(D.proyecto)+'</h2><div class=\"muted\">'+esc(D.comuna)+' &middot; Generado: '+esc(D.generadoEl)+'</div></div>';",
+        "  h+='<div class=\"card\"><h3>Resumen de checkpoints</h3><div class=\"kpis\">';",
+        "  D.kpis.forEach(function(k){var pct=k.total?Math.round(k.n/k.total*100):0;var cls=pct>=80?'g':(pct>=40?'a':'x');h+='<div class=\"kpi '+cls+'\"><div class=\"kl\">'+esc(k.label)+'</div><div class=\"kn\">'+k.n+'</div><div class=\"kt\">/'+k.total+'</div></div>';});",
+        "  h+='</div></div>';",
+        "  h+='<div class=\"card\"><h3>Grupos ('+D.grupos.length+')</h3>';",
+        "  D.grupos.forEach(function(g){var rec=g.viviendas.filter(function(v){return v.flags.fecha_recep;}).length;h+='<div class=\"grow\"><div><b>'+esc(g.nombre)+'</b>'+(g.capataz?' <span class=\"muted\">- '+esc(g.capataz)+'</span>':'')+'</div><div class=\"muted\">'+g.viviendas.length+' viv. &middot; '+rec+' recep.</div></div>';});",
+        "  h+='</div>';return h;",
+        "}",
+        "function renderGrupo(g){",
+        "  var h='<div class=\"card\"><h2>'+esc(g.nombre)+'</h2>';",
+        "  if(g.capataz)h+='<div class=\"muted\">Capataz: <b>'+esc(g.capataz)+'</b></div>';",
+        "  if(g.comentario)h+='<div class=\"nota\">Nota del coordinador: '+esc(g.comentario)+'</div>';",
+        "  h+='</div>';",
+        "  h+='<div class=\"card tablewrap\"><table><thead><tr><th class=\"sticky\">Beneficiario</th>';",
+        "  cps.forEach(function(c){h+='<th>'+esc(c.label)+'</th>';});",
+        "  h+='<th>% Av</th></tr></thead><tbody>';",
+        "  g.viviendas.forEach(function(v){h+='<tr><td class=\"sticky\"><div class=\"bn\">'+esc(v.nombre)+'</div><div class=\"bt\">'+esc(v.tipologia)+'</div></td>';cps.forEach(function(c){h+='<td>'+mark(v.flags[c.key])+'</td>';});h+='<td class=\"pct\">'+(v.pct!=null?v.pct+'%':'-')+'</td></tr>';});",
+        "  h+='</tbody></table></div>';return h;",
+        "}",
+        "var tabs=[{id:'_general',label:'General'}].concat(D.grupos.map(function(g){return {id:g.id,label:g.nombre};}));",
+        "var active='_general';",
+        "function render(){var app=document.getElementById('content');if(active==='_general'){app.innerHTML=renderGeneral();}else{var g=null;D.grupos.forEach(function(x){if(x.id===active)g=x;});app.innerHTML=g?renderGrupo(g):'';}Array.prototype.forEach.call(document.querySelectorAll('.bottom-tabs button'),function(b){if(b.getAttribute('data-id')===active)b.classList.add('active');else b.classList.remove('active');});}",
+        "function buildNav(){var nav=document.getElementById('nav');nav.innerHTML='';tabs.forEach(function(t){var b=document.createElement('button');b.textContent=t.label;b.setAttribute('data-id',t.id);b.onclick=function(){active=t.id;render();window.scrollTo(0,0);};nav.appendChild(b);});}",
+        "function buildPrint(){var p=document.getElementById('printall');var h='<div class=\"tab-section\">'+renderGeneral()+'</div>';D.grupos.forEach(function(g){h+='<div class=\"tab-section\">'+renderGrupo(g)+'</div>';});p.innerHTML=h;}",
+        "buildNav();render();buildPrint();",
+        "document.getElementById('pdfbtn').onclick=function(){window.print();};",
+        "})();"
+    ].join("\n");
+
+    return [
+        "<!DOCTYPE html>",
+        "<html lang=\"es\">",
+        "<head>",
+        "<meta charset=\"UTF-8\">",
+        "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
+        "<title>Informe Cierre - " + escapeHtmlBasic(payload.proyecto) + "</title>",
+        "<style>" + css + "</style>",
+        "</head>",
+        "<body>",
+        "<div class=\"topbar\"><h1>Informe de Estado de Cierre</h1><div class=\"sub\">" + escapeHtmlBasic(payload.proyecto) + " &middot; " + escapeHtmlBasic(payload.comuna) + "</div></div>",
+        "<button class=\"pdf-btn\" id=\"pdfbtn\">Descargar PDF</button>",
+        "<div class=\"wrap\"><div id=\"content\"></div></div>",
+        "<div class=\"wrap\" id=\"printall\"></div>",
+        "<nav class=\"bottom-tabs\" id=\"nav\"></nav>",
+        "<script>window.__INFORME__=" + jsonData + ";</scr" + "ipt>",
+        "<script>" + script + "</scr" + "ipt>",
+        "</body>",
+        "</html>"
+    ].join("\n");
+}
+
+function escapeHtmlBasic(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 // ===== LINE CHART CARD =====
 // Mini-grafico de linea con autoescala (no parte de 0). Tooltip de info en titulo,
 // tooltip por punto al hover. SVG inline para no agregar dependencias.
@@ -3998,6 +4153,12 @@ ${obsHtml}
                         {l}
                     </button>
                 ))}
+                <button onClick={() => exportarInformeCompartible({ proy, gruposDatos, kpisCheckpoints, CHECKPOINTS, ritmoMOProy, ritmoAvanceProy, fmtMes })}
+                        className="px-2.5 py-1.5 text-[11px] rounded-lg border bg-green-600 text-white border-green-600 hover:bg-green-700 transition-colors flex items-center gap-1"
+                        title="Genera un HTML autocontenido para compartir (mobile + PDF), sin diagnostico interno">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v12m0 0l-4-4m4 4l4-4M4 20h16"/></svg>
+                    Exportar informe
+                </button>
                 <span className="text-[10px] text-gray-400 ml-auto">{datosFiltrados.length} de {datos.length}</span>
             </div>
 
