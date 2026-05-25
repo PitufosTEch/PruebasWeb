@@ -3391,6 +3391,43 @@ function escapeHtmlBasic(s) {
     return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+// SVG line chart como string (para reportes HTML/PDF, sin React). Autoescala (no parte de 0).
+function svgLineChartString({ meses, valores, color, fillColor, fmtMes, fmtV }) {
+    if (!meses || meses.length === 0) {
+        return '<div style="color:#94a3b8;font-size:12px;padding:24px;text-align:center;border:1px dashed #e2e8f0;border-radius:8px;">Sin datos en el periodo</div>';
+    }
+    const w = 760, h = 150;
+    const pad = { top: 18, right: 16, bottom: 24, left: 16 };
+    const iw = w - pad.left - pad.right, ih = h - pad.top - pad.bottom;
+    const n = meses.length;
+    const max = Math.max(...valores), min = Math.min(...valores);
+    const range = max - min || max || 1;
+    const yMax = max + range * 0.15, yMin = Math.max(0, min - range * 0.15);
+    const yDen = yMax - yMin || 1;
+    const xStep = n > 1 ? iw / (n - 1) : 0;
+    const pts = meses.map((m, i) => {
+        const x = n > 1 ? pad.left + i * xStep : pad.left + iw / 2;
+        const y = pad.top + ih * (1 - (valores[i] - yMin) / yDen);
+        return { x: +x.toFixed(1), y: +y.toFixed(1), v: valores[i], m };
+    });
+    const line = pts.map((p, i) => (i === 0 ? 'M' : 'L') + ' ' + p.x + ' ' + p.y).join(' ');
+    const baseY = (pad.top + ih).toFixed(1);
+    const area = line + ' L ' + pts[n - 1].x + ' ' + baseY + ' L ' + pts[0].x + ' ' + baseY + ' Z';
+    let svg = '<svg viewBox="0 0 ' + w + ' ' + h + '" style="width:100%;height:150px;">';
+    [pad.top, pad.top + ih / 2, pad.top + ih].forEach(y => {
+        svg += '<line x1="' + pad.left + '" y1="' + y + '" x2="' + (w - pad.right) + '" y2="' + y + '" stroke="#e5e7eb" stroke-width="0.5"/>';
+    });
+    svg += '<path d="' + area + '" fill="' + fillColor + '"/>';
+    svg += '<path d="' + line + '" stroke="' + color + '" stroke-width="2" fill="none" stroke-linejoin="round" stroke-linecap="round"/>';
+    pts.forEach(p => {
+        svg += '<circle cx="' + p.x + '" cy="' + p.y + '" r="3" fill="' + color + '" stroke="#fff" stroke-width="1.5"/>';
+        svg += '<text x="' + p.x + '" y="' + (p.y - 7).toFixed(1) + '" text-anchor="middle" font-size="9" fill="#475569" font-weight="600">' + escapeHtmlBasic(fmtV(p.v)) + '</text>';
+        svg += '<text x="' + p.x + '" y="' + (h - 7) + '" text-anchor="middle" font-size="9" fill="#94a3b8">' + escapeHtmlBasic(fmtMes(p.m)) + '</text>';
+    });
+    svg += '</svg>';
+    return svg;
+}
+
 // ===== LINE CHART CARD =====
 // Mini-grafico de linea con autoescala (no parte de 0). Tooltip de info en titulo,
 // tooltip por punto al hover. SVG inline para no agregar dependencias.
@@ -3528,45 +3565,75 @@ const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios
             return todasDesp && insp && insp.pct_total >= 90;
         }).length;
         const criticos  = viviendas.filter(v => v.estadoGeneral === "critico").length;
-        const enAtencion = viviendas.filter(v => v.estadoGeneral === "atencion").length;
 
-        // Datos por grupo
-        const gruposData = agruparViviendas(viviendas, grupos);
+        // Datos por grupo (usa 'datos' procesado: trae flags de checkpoints, obsPublicas y comentario)
+        const gruposData = agruparViviendas(datos, grupos);
 
-        // Observaciones automáticas
-        const obs = [];
+        // Checkpoints completos del proyecto
+        const cpKpisHtml = kpisCheckpoints.map(k => {
+            const pct = k.total ? Math.round(k.n / k.total * 100) : 0;
+            const col = pct >= 80 ? '#16a34a' : pct >= 40 ? '#b45309' : '#64748b';
+            const bg = pct >= 80 ? '#f0fdf4' : pct >= 40 ? '#fffbeb' : '#f8fafc';
+            const bd = pct >= 80 ? '#bbf7d0' : pct >= 40 ? '#fde68a' : '#e2e8f0';
+            return `<div style="border:1px solid ${bd};border-radius:8px;padding:7px 3px;text-align:center;background:${bg};"><div style="font-size:8.5px;font-weight:600;color:#64748b;">${escapeHtmlBasic(k.label)}</div><div style="font-size:17px;font-weight:700;color:${col};line-height:1.1;">${k.n}</div><div style="font-size:8.5px;color:#94a3b8;">/ ${k.total}</div></div>`;
+        }).join('');
+
+        // Graficos de ritmo (SVG inline)
+        const chartMO = svgLineChartString({ meses: ritmoMOProy.meses, valores: ritmoMOProy.valores, color: '#7c3aed', fillColor: 'rgba(124,58,237,0.10)', fmtMes, fmtV: (v) => fmtCorto(v) });
+        const chartDesp = svgLineChartString({ meses: ritmoAvanceProy.meses, valores: ritmoAvanceProy.valores, color: '#10b981', fillColor: 'rgba(16,185,129,0.10)', fmtMes, fmtV: (v) => String(v) });
+
+        // Tabla resumen por grupo
+        let tablaGruposHtml = '<table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="background:#f8fafc;">'
+            + ['Grupo', 'Capataz', 'Viv.', 'Avance', 'Recep.', 'Críticas'].map((h, i) =>
+                `<th style="padding:7px 10px;text-align:${i < 2 ? 'left' : 'center'};font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:#64748b;border-bottom:1px solid #e2e8f0;">${h}</th>`).join('')
+            + '</tr></thead><tbody>';
         gruposData.forEach(g => {
-            if (!g.nombre || g.viviendas.length === 0) return;
+            if (g.viviendas.length === 0) return;
             const res = grupoResumen(g.viviendas);
-            if (res.terminadas === res.n && res.n > 0) {
-                obs.push({ tipo: 'ok',     texto: `<strong>${g.nombre}</strong>: Completado (${res.terminadas}/${res.n} viv.). Pendiente recepción DOM.` });
-            } else if (res.criticas > 0) {
-                obs.push({ tipo: 'critico', texto: `<strong>${g.nombre}</strong>: ${res.criticas} vivienda(s) crítica(s). Avance real: ${res.avanceInsp}%.` });
-            } else if (res.avanceInsp >= 70) {
-                obs.push({ tipo: 'ok',     texto: `<strong>${g.nombre}</strong>: Avance avanzado (${res.avanceInsp}%). Próximo a finalizar.` });
-            } else if (res.avanceInsp > 0 && res.avanceInsp < 25) {
-                obs.push({ tipo: 'alerta', texto: `<strong>${g.nombre}</strong>: Inicio de obras (${res.avanceInsp}%). Requiere seguimiento activo.` });
+            const rec = g.viviendas.filter(v => v.flags && v.flags.fecha_recep).length;
+            const avCol = res.avanceInsp >= 80 ? '#16a34a' : res.avanceInsp >= 50 ? '#2563eb' : '#dc2626';
+            tablaGruposHtml += `<tr style="border-bottom:1px solid #f1f5f9;">
+                <td style="padding:7px 10px;font-weight:600;">${escapeHtmlBasic(g.nombre || 'Sin Asignar')}</td>
+                <td style="padding:7px 10px;color:#475569;">${escapeHtmlBasic(g.capataz || '—')}</td>
+                <td style="padding:7px 10px;text-align:center;">${res.n}</td>
+                <td style="padding:7px 10px;text-align:center;font-weight:700;color:${avCol};">${res.avanceInsp}%</td>
+                <td style="padding:7px 10px;text-align:center;">${rec}/${res.n}</td>
+                <td style="padding:7px 10px;text-align:center;color:${res.criticas > 0 ? '#dc2626' : '#94a3b8'};font-weight:${res.criticas > 0 ? '700' : '400'};">${res.criticas}</td>
+            </tr>`;
+        });
+        tablaGruposHtml += '</tbody></table>';
+
+        // Comentarios reales: nota del coordinador + comentarios con estrella, por grupo
+        let comentariosHtml = '';
+        gruposData.forEach(g => {
+            if (g.viviendas.length === 0) return;
+            const items = [];
+            if (g.comentario) {
+                items.push(`<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;margin-bottom:6px;font-size:12px;"><span style="font-size:9px;font-weight:700;text-transform:uppercase;color:#b45309;">Nota del coordinador</span><div style="margin-top:2px;font-style:italic;color:#374151;">${escapeHtmlBasic(g.comentario)}</div></div>`);
+            }
+            g.viviendas.forEach(v => {
+                (v.obsPublicas || []).forEach(o => {
+                    const fch = (o.fecha || '').toString().substring(0, 10);
+                    items.push(`<div style="padding:6px 12px;margin-bottom:5px;font-size:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;"><span style="font-weight:600;color:#1a1a2e;">${escapeHtmlBasic((v.NOMBRES || '') + ' ' + (v.APELLIDOS || ''))}</span> <span style="font-size:10px;color:#94a3b8;">${fch}</span><div style="color:#374151;margin-top:1px;">${escapeHtmlBasic(o.texto || '')}</div></div>`);
+                });
+            });
+            if (items.length > 0) {
+                comentariosHtml += `<div style="margin-bottom:14px;break-inside:avoid;"><div style="font-size:13px;font-weight:700;color:#1a1a2e;margin-bottom:6px;">${escapeHtmlBasic(g.nombre || 'Sin Asignar')}</div>${items.join('')}</div>`;
             }
         });
-        if (enAtencion > 0) obs.push({ tipo: 'alerta', texto: `<strong>${enAtencion} vivienda(s)</strong> en estado de atención (etapas pendientes o fuera de plazo).` });
-        if (obs.length === 0) obs.push({ tipo: 'ok', texto: 'Sin observaciones críticas registradas esta semana.' });
+        if (!comentariosHtml) {
+            comentariosHtml = '<div style="color:#94a3b8;font-size:12px;padding:16px;text-align:center;border:1px dashed #e2e8f0;border-radius:8px;">Sin notas del coordinador ni comentarios marcados con estrella en este proyecto.</div>';
+        }
 
         // Curvas S images
         const curvasConf = CURVAS_S_CONFIG[proyectoSel] || [];
         const curvasHtml = curvasConf.length > 0
             ? curvasConf.map(c => `
                 <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;break-inside:avoid;">
-                  <div style="background:#f8fafc;padding:6px 12px;font-size:11px;font-weight:600;color:#475569;border-bottom:1px solid #e2e8f0;">${c.label}</div>
-                  <img src="https://drive.google.com/thumbnail?id=${c.id}&sz=w800" style="width:100%;display:block;" alt="${c.label}" loading="lazy"/>
+                  <div style="background:#f8fafc;padding:6px 12px;font-size:11px;font-weight:600;color:#475569;border-bottom:1px solid #e2e8f0;">${escapeHtmlBasic(c.label)}</div>
+                  <img src="https://drive.google.com/thumbnail?id=${c.id}&sz=w800" style="width:100%;display:block;" alt="${escapeHtmlBasic(c.label)}" loading="lazy"/>
                 </div>`).join('')
             : `<div style="grid-column:1/-1;color:#94a3b8;font-size:12px;padding:20px;text-align:center;border:1px dashed #e2e8f0;border-radius:8px;">Las curvas S se actualizan automáticamente cada lunes 08:00.<br>Verifica que el proyecto tenga curvas S configuradas.</div>`;
-
-        const obsHtml = obs.map(o => {
-            const icons = { ok: '✅', alerta: '⚠️', critico: '🔴' };
-            const bg    = { ok: '#f0fdf4', alerta: '#fffbeb', critico: '#fef2f2' };
-            const bdr   = { ok: '#bbf7d0', alerta: '#fde68a', critico: '#fecaca' };
-            return `<div style="display:flex;gap:10px;align-items:flex-start;padding:10px 14px;border-radius:8px;margin-bottom:8px;font-size:12.5px;line-height:1.5;background:${bg[o.tipo]};border:1px solid ${bdr[o.tipo]};"><span style="font-size:15px;line-height:1.3;flex-shrink:0;">${icons[o.tipo]}</span><span>${o.texto}</span></div>`;
-        }).join('');
 
         const avColor = avanceReal >= 80 ? '#16a34a' : avanceReal >= 50 ? '#2563eb' : '#dc2626';
 
@@ -3586,20 +3653,27 @@ body{background:#fff;padding:36px;color:#1a1a2e;max-width:940px;margin:0 auto;}
   @page{margin:15mm;size:A4;}
   img{max-height:280px;object-fit:contain;}
 }
-.sec-title{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#8B2332;margin:28px 0 14px;display:flex;align-items:center;gap:10px;}
+.sec-title{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#8B2332;margin:26px 0 12px;display:flex;align-items:center;gap:10px;}
 .sec-title::after{content:'';flex:1;height:1px;background:#e2e8f0;}
 .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:4px;}
 .kpi{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;text-align:center;}
 .kpi-v{font-size:28px;font-weight:700;line-height:1;}
 .kpi-l{font-size:10px;color:#64748b;margin-top:5px;text-transform:uppercase;letter-spacing:.05em;}
+.cp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(48px,1fr));gap:6px;}
+.charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.chart-box{border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;break-inside:avoid;}
+.chart-box .ct{font-size:11px;font-weight:600;color:#475569;margin-bottom:2px;}
+.chart-box .cs{font-size:9px;color:#94a3b8;margin-bottom:4px;}
+.grupos-table{break-inside:avoid;}
 .curvas-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
 .footer{margin-top:36px;padding-top:16px;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;}
 .print-btn{position:fixed;top:20px;right:20px;background:#8B2332;color:#fff;border:none;border-radius:8px;padding:11px 22px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.18);z-index:999;}
 .print-btn:hover{background:#6d1a27;}
+@media print{ .page-break{page-break-before:always;} }
 </style>
 </head>
 <body>
-<button class="print-btn no-print" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+<button class="print-btn no-print" onclick="window.print()">Imprimir / Guardar PDF</button>
 
 <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;padding-bottom:18px;border-bottom:3px solid #8B2332;">
   <div style="display:flex;align-items:center;gap:14px;">
@@ -3607,7 +3681,7 @@ body{background:#fff;padding:36px;color:#1a1a2e;max-width:940px;margin:0 auto;}
     <div>
       <div style="font-size:22px;font-weight:700;color:#1a1a2e;line-height:1.1;">SG Raíces</div>
       <div style="font-size:13px;color:#64748b;margin-top:3px;">Informe de Avance Semanal</div>
-      <div style="font-size:13px;color:#475569;margin-top:5px;">Proyecto: <strong style="color:#1a1a2e;">${proyNombre}</strong> <span style="font-size:11px;color:#94a3b8;">(${proyectoSel})</span></div>
+      <div style="font-size:13px;color:#475569;margin-top:5px;">Proyecto: <strong style="color:#1a1a2e;">${escapeHtmlBasic(proyNombre)}</strong> <span style="font-size:11px;color:#94a3b8;">(${escapeHtmlBasic(proyectoSel)})</span></div>
     </div>
   </div>
   <div style="text-align:right;flex-shrink:0;">
@@ -3617,7 +3691,7 @@ body{background:#fff;padding:36px;color:#1a1a2e;max-width:940px;margin:0 auto;}
   </div>
 </div>
 
-<div class="sec-title">📊 Estado del Proyecto</div>
+<div class="sec-title">Estado del Proyecto</div>
 <div class="kpis">
   <div class="kpi"><div class="kpi-v" style="color:${avColor};">${avanceReal}%</div><div class="kpi-l">Avance Real</div></div>
   <div class="kpi"><div class="kpi-v" style="color:#1e3a5f;">${viviendas.length}</div><div class="kpi-l">Beneficiarios</div></div>
@@ -3625,17 +3699,28 @@ body{background:#fff;padding:36px;color:#1a1a2e;max-width:940px;margin:0 auto;}
   <div class="kpi"><div class="kpi-v" style="color:${criticos > 0 ? '#dc2626' : '#6b7280'};">${criticos}</div><div class="kpi-l">Críticas</div></div>
 </div>
 
-<div class="sec-title">📈 Curvas S de Control</div>
+<div class="sec-title">Checkpoints del Proyecto</div>
+<div class="cp-grid">${cpHtml}</div>
+
+<div class="sec-title">Ritmo de Pagos M.O. y Despachos</div>
+<div class="charts-grid">
+  <div class="chart-box"><div class="ct">Ritmo Pagos M.O.</div><div class="cs">Ciclo de pago 25 a 25 &middot; solo aprobados &middot; eje autoescalado</div>${chartMO}</div>
+  <div class="chart-box"><div class="ct">Ritmo Despachos</div><div class="cs">Cantidad de despachos por mes calendario</div>${chartDesp}</div>
+</div>
+
+<div class="sec-title">Curvas S de Control</div>
 <div class="curvas-grid">${curvasHtml}</div>
 <div style="display:flex;gap:18px;font-size:10px;color:#94a3b8;margin-top:10px;margin-bottom:4px;">
   <span><span style="display:inline-block;width:20px;height:3px;background:#22c55e;border-radius:2px;vertical-align:middle;margin-right:4px;"></span>% Real</span>
   <span><span style="display:inline-block;width:20px;height:0;border-top:2px dashed #3b82f6;vertical-align:middle;margin-right:4px;"></span>% Programado</span>
   <span><span style="display:inline-block;width:20px;height:0;border-top:2px dashed #ef4444;vertical-align:middle;margin-right:4px;opacity:.6;"></span>% Proyectado</span>
-  <span>⁞ Fecha de corte</span>
 </div>
 
-<div class="sec-title">🔍 Observaciones Destacadas</div>
-${obsHtml}
+<div class="sec-title page-break">Resumen por Grupo</div>
+<div class="grupos-table">${tablaGruposHtml}</div>
+
+<div class="sec-title">Comentarios del Periodo</div>
+${comentariosHtml}
 
 <div class="footer">
   <div>SG Raíces — Panel de Control v3 · Datos desde AppSheet y Google Sheets</div>
