@@ -3653,15 +3653,24 @@ const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios
                 const ec = estadoColor[v.estadoGeneral] || '#6b7280';
                 const el = estadoLabel[v.estadoGeneral] || (v.estadoGeneral || '—');
                 const recv = (v.flags && v.flags.fecha_recep) ? 'Sí' : '—';
-                vivRows += `<tr style="border-bottom:1px solid #f1f5f9;">
-                    <td style="padding:6px 10px;font-weight:600;">${escapeHtmlBasic((v.NOMBRES || '') + ' ' + (v.APELLIDOS || ''))}</td>
-                    <td style="padding:6px 10px;text-align:center;font-weight:700;color:${pctCol};">${pct}</td>
-                    <td style="padding:6px 10px;text-align:center;color:#475569;">${v.completados}/${totalCp}</td>
-                    <td style="padding:6px 10px;text-align:center;"><span style="font-size:10px;font-weight:700;color:${ec};">${el}</span></td>
-                    <td style="padding:6px 10px;text-align:center;">${recv}</td>
-                </tr>`;
+                const chips = CHECKPOINTS.map(cp => {
+                    const on = !!(v.flags && v.flags[cp.key]);
+                    const st = on
+                        ? 'background:#dcfce7;color:#166534;border:1px solid #bbf7d0;'
+                        : 'background:#f1f5f9;color:#94a3b8;border:1px solid #e2e8f0;';
+                    return `<span style="display:inline-block;font-size:8.5px;font-weight:600;padding:2px 6px;border-radius:5px;margin:0 3px 3px 0;${st}">${escapeHtmlBasic(cp.label)}</span>`;
+                }).join('');
+                vivRows += `<tr>
+                    <td style="padding:7px 10px 2px;font-weight:600;">${escapeHtmlBasic((v.NOMBRES || '') + ' ' + (v.APELLIDOS || ''))}</td>
+                    <td style="padding:7px 10px 2px;text-align:center;font-weight:700;color:${pctCol};">${pct}</td>
+                    <td style="padding:7px 10px 2px;text-align:center;color:#475569;">${v.completados}/${totalCp}</td>
+                    <td style="padding:7px 10px 2px;text-align:center;"><span style="font-size:10px;font-weight:700;color:${ec};">${el}</span></td>
+                    <td style="padding:7px 10px 2px;text-align:center;">${recv}</td>
+                </tr>
+                <tr style="border-bottom:1px solid #e2e8f0;"><td colspan="5" style="padding:0 10px 8px;">${chips}</td></tr>`;
             });
-            const vivTable = `<table style="width:100%;border-collapse:collapse;font-size:11.5px;"><thead><tr style="background:#f8fafc;">${['Beneficiario', 'Avance Insp.', 'Checkpoints', 'Estado', 'Recep.'].map((h, i) => `<th style="padding:6px 10px;text-align:${i === 0 ? 'left' : 'center'};font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:#64748b;border-bottom:1px solid #e2e8f0;">${h}</th>`).join('')}</tr></thead><tbody>${vivRows}</tbody></table>`;
+            const vivTable = `<table style="width:100%;border-collapse:collapse;font-size:11.5px;"><thead><tr style="background:#f8fafc;">${['Beneficiario', 'Avance Insp.', 'Checkpoints', 'Estado', 'Recep.'].map((h, i) => `<th style="padding:6px 10px;text-align:${i === 0 ? 'left' : 'center'};font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:#64748b;border-bottom:1px solid #e2e8f0;">${h}</th>`).join('')}</tr></thead><tbody>${vivRows}</tbody></table>
+                <div style="font-size:9px;color:#94a3b8;margin-top:5px;">Checkpoints por beneficiario: <span style="display:inline-block;background:#dcfce7;color:#166534;border:1px solid #bbf7d0;border-radius:4px;padding:1px 5px;font-weight:600;">cumplido</span> <span style="display:inline-block;background:#f1f5f9;color:#94a3b8;border:1px solid #e2e8f0;border-radius:4px;padding:1px 5px;font-weight:600;">pendiente</span></div>`;
             let comBenef = '';
             g.viviendas.forEach(v => {
                 const obs = (observaciones && observaciones[v.ID_Benef]) ? observaciones[v.ID_Benef].slice() : [];
