@@ -3567,6 +3567,11 @@ const CURVAS_S_CONFIG = {
         { id: '11e_9UFwdSEX-cwJC1PyGhpbLzyJeb0ez', label: 'Grupo 2 · Nuevo Cunco' },
         { id: '1MoziW_PF_xY_WoNR63AjM_au82uqvXvp', label: 'Grupo 3 · Nuevo Cunco' },
         { id: '1dhZ2IpNudXQeJxfU7Azbst-5xMqFtPIN', label: 'Grupo 4 · Nuevo Cunco' },
+    ],
+    'P12': [
+        { id: '1IhJvl7RcUObr3pz9Q-BFMrjaIIfCjAFw', label: 'Total Proyecto · Juan Huilcan Tolten' },
+        { id: '1BX_jMbTGaagz5hFPi9VAvipCRhpzTL2a', label: 'Todos los Grupos · Juan Huilcan Tolten' },
+        { id: '14rndy1xku_4b6knIAK9KJtDxHHqZLE8D', label: 'Grupo 1 · Juan Huilcan Tolten' },
     ]
 };
 
@@ -6182,7 +6187,8 @@ const App = () => {
                 {/* TABS */}
                 <div className="flex items-center gap-1 mb-4 overflow-x-auto hide-scrollbar border-b border-gray-200 pb-px">
                     {tabs.map(([key, label]) => (
-                        <button key={key} onClick={() => setTab(key)} className={`px-4 py-2.5 text-sm font-medium rounded-t-lg transition-colors whitespace-nowrap ${tab === key ? "bg-white text-violet-700 border border-gray-200 border-b-white shadow-sm -mb-px" : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"}`}>
+                        <button key={key} onClick={() => setTab(key)} className={`px-4 py-2.5 text-sm font-medium rounded-t-lg transition-colors whitespace-nowrap flex items-center gap-1.5 ${key === "estado_general" ? (tab === key ? "bg-white text-[#8B2332] border border-[#8B2332]/30 border-b-white shadow-sm -mb-px" : "text-[#8B2332] bg-red-50 hover:bg-red-100 border border-[#8B2332]/20 border-b-transparent -mb-px") : (tab === key ? "bg-white text-violet-700 border border-gray-200 border-b-white shadow-sm -mb-px" : "text-gray-500 hover:text-gray-700 hover:bg-gray-100")}`}>
+                            {key === "estado_general" && <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>}
                             {label}
                             {key === "viviendas" && kpis.criticos > 0 && <span className="ml-2 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{kpis.criticos}</span>}
                             {key === "configuracion" && grupos.length > 0 && <span className="ml-1.5 bg-violet-100 text-violet-600 text-[10px] px-1.5 py-0.5 rounded-full">{grupos.length}G</span>}
