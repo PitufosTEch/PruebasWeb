@@ -1226,15 +1226,17 @@ const FAMILIA_LABELS = {
 };
 const FAMILIAS_CRITICAS = ["01 - Fundaciones", "02 - 1era Etapa", "03 - 2da Etapa", "04 - Gasfiteria", "05 - Cerámica"];
 // Partidas por familia (Viv = Vivienda, RC = Recinto Complementario)
+// Partidas por familia. IMPORTANTE: los nombres deben coincidir con VIV_COLUMNS[].short
+// (asi se indexan las partidas de inspeccion en INSPECCIONES_DATA). RC va en rc_vals aparte.
 const FAMILIA_PARTIDAS = {
-    "01 - Fundaciones": ["Viv. Fundaciones", "Viv. Radier", "RC Fundaciones", "RC Radier"],
-    "02 - 1era Etapa": ["Viv. Estruc. tabiques", "Viv. Estruc. Cubierta", "Viv. Rev. exterior", "Viv. Ventanas", "Viv. Cubierta", "Viv. Entr. Cielo", "Viv. Entr. Alero", "RC Estruc. tabiques", "RC Estruc. Cubierta", "RC Rev. exterior", "RC Ventanas", "RC Cubierta", "RC Entr. Cielo", "RC Entr. Alero", "Viv. Saldo viv. prefab."],
-    "03 - 2da Etapa": ["Viv. Rev. zona seca", "Viv. Rev. Zona húmeda", "Viv. Aisl. muros", "Viv. Aisl. cielo", "Viv. Puertas", "Viv. Molduras", "RC Rev. interior", "RC Aisl. muros", "RC Aisl. cielo", "RC Cerámicos Piso", "RC Puertas", "RC Molduras", "RC Art. eléctricos"],
-    "04 - Gasfiteria": ["Viv. Planta alcantarillado", "Viv. Red agua potable", "Viv. Art. baño", "Viv. Art. cocina", "Viv. Agua pot. exterior", "Viv. Alcantarillado exterior"],
-    "05 - Cerámica": ["Viv. Cerámicos Piso", "Viv. Cerámicos muro"],
-    "06 - Pintura": ["Viv. Pint. exterior", "Viv. Pint. interior", "RC Pint. exterior", "RC Pint. interior"],
-    "07 - Eléctricidad": ["Viv. Red eléctrica", "Viv. Art. eléctricos", "Viv. Ins. eléct. exterior", "RC Red eléctrica"],
-    "08 - Obras Exteriores": ["Viv. Habilitación"]
+    "01 - Fundaciones": ["Fundaciones", "Radier"],
+    "02 - 1era Etapa": ["Tabiques", "Techumbre", "Rev. Exterior", "Ventanas", "Cubierta", "Cielo", "Alero"],
+    "03 - 2da Etapa": ["Rev. Zona Seca", "Rev. Zona Húmeda", "Aisl. Muro", "Aisl. Cielo", "Puertas", "Molduras"],
+    "04 - Gasfiteria": ["Alcantarillado", "Red Agua Pot.", "Art. Baño", "Art. Cocina", "Agua Pot. Ext.", "Alcant. Ext."],
+    "05 - Cerámica": ["Cerámico Piso", "Cerámico Muro"],
+    "06 - Pintura": ["Pintura Ext.", "Pintura Int."],
+    "07 - Eléctricidad": ["Red Eléctrica", "Art. Eléctricos", "Inst. Eléc. Ext."],
+    "08 - Obras Exteriores": []
 };
 
 // ========== UTILITY FUNCTIONS ==========
