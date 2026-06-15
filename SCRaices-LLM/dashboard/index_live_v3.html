@@ -1495,14 +1495,11 @@ function agruparViviendas(viviendas, grupos) {
 function grupoResumen(vivs) {
     const n = vivs.length;
     const avanceDesp = n ? Math.round(vivs.reduce((s,v) => s + v.avance.porcentaje, 0) / n) : 0;
-    const conInsp = vivs.filter(v => getInspeccion(v.ID_Benef));
-    const avanceInsp = conInsp.length ? Math.round(conInsp.reduce((s,v) => s + getInspeccion(v.ID_Benef).pct_total, 0) / conInsp.length) : 0;
+    // Avance Insp.: promedio sobre TODAS las viviendas del grupo; las sin inspeccion cuentan 0%
+    const avanceInsp = n ? Math.round(vivs.reduce((s,v) => { const i = getInspeccion(v.ID_Benef); return s + (i ? i.pct_total : 0); }, 0) / n) : 0;
     const criticas = vivs.filter(v => v.estadoGeneral === "critico").length;
-    const terminadas = vivs.filter(v => {
-        const todasDesp = SECUENCIA_PRINCIPAL.every(k => v.estadoEtapas[k]?.estado === "despachado");
-        const insp = getInspeccion(v.ID_Benef);
-        return todasDesp && insp && insp.pct_total >= 90;
-    }).length;
+    // Terminada = tiene Recepcion Definitiva (RF). Antes de RF no es "terminada" aunque tenga 100% de avance/inspeccion.
+    const terminadas = vivs.filter(v => !!v.fecha_recepcion).length;
     const habiles = vivs.filter(v => v.habil).length;
     const recepcionadas = vivs.filter(v => v.fecha_recepcion).length;
     return { n, avanceDesp, avanceInsp, criticas, terminadas, habiles, recepcionadas };
@@ -3349,7 +3346,7 @@ function construirHTMLInforme(payload) {
         "  D.kpis.forEach(function(k){var pct=k.total?Math.round(k.n/k.total*100):0;var cls=pct>=80?'g':(pct>=40?'a':'x');h+='<div class=\"kpi '+cls+'\"><div class=\"kl\">'+esc(k.label)+'</div><div class=\"kn\">'+k.n+'</div><div class=\"kt\">/'+k.total+'</div></div>';});",
         "  h+='</div></div>';",
         "  h+='<div class=\"card\"><h3>Grupos ('+D.grupos.length+')</h3>';",
-        "  D.grupos.forEach(function(g){var rec=g.viviendas.filter(function(v){return v.flags.fecha_recep;}).length;h+='<div class=\"grow\"><div><b>'+esc(g.nombre)+'</b>'+(g.capataz?' <span class=\"muted\">- '+esc(g.capataz)+'</span>':'')+'</div><div class=\"muted\">'+g.viviendas.length+' viv. &middot; '+rec+' recep.</div></div>';});",
+        "  D.grupos.forEach(function(g){var n=g.viviendas.length;var rec=g.viviendas.filter(function(v){return v.flags.fecha_recep;}).length;var hpc=g.viviendas.filter(function(v){return v.flags.hpc;}).length;h+='<div class=\"grow\"><div><b>'+esc(g.nombre)+'</b>'+(g.capataz?' <span class=\"muted\">- '+esc(g.capataz)+'</span>':'')+'</div><div class=\"muted\">'+n+' viv. &middot; HPC '+hpc+'/'+n+' &middot; RF '+rec+'/'+n+'</div></div>';});",
         "  h+='</div>';return h;",
         "}",
         "function renderGrupo(g){",
@@ -3360,7 +3357,7 @@ function construirHTMLInforme(payload) {
         "  h+='<div class=\"card tablewrap\"><table><thead><tr><th class=\"sticky\">Beneficiario</th>';",
         "  cps.forEach(function(c){h+='<th>'+esc(c.label)+'</th>';});",
         "  h+='<th>% Av</th></tr></thead><tbody>';",
-        "  g.viviendas.forEach(function(v){h+='<tr><td class=\"sticky\"><div class=\"bn\">'+esc(v.nombre)+'</div><div class=\"bt\">'+esc(v.tipologia)+'</div></td>';cps.forEach(function(c){h+='<td>'+mark(v.flags[c.key])+'</td>';});h+='<td class=\"pct\">'+(v.pct!=null?v.pct+'%':'-')+'</td></tr>';});",
+        "  g.viviendas.forEach(function(v){var rf=v.flags.fecha_recep;var trS=rf?' style=\"background-color:#ecfdf5;background-image:repeating-linear-gradient(45deg,#94a3b8 0,#94a3b8 1.5px,transparent 1.5px,transparent 6px);\"':'';var tdS=rf?' style=\"background:#d1fae5;\"':'';h+='<tr'+trS+'><td class=\"sticky\"'+tdS+'><div class=\"bn\">'+esc(v.nombre)+(rf?' <span style=\"font-size:8.5px;font-weight:700;color:#047857;background:#a7f3d0;border-radius:4px;padding:1px 4px;\">&#10003; RF</span>':'')+'</div><div class=\"bt\">'+esc(v.tipologia)+'</div></td>';cps.forEach(function(c){h+='<td>'+mark(v.flags[c.key])+'</td>';});h+='<td class=\"pct\">'+(v.pct!=null?v.pct+'%':'-')+'</td></tr>';});",
         "  h+='</tbody></table></div>';return h;",
         "}",
         "var tabs=[{id:'_general',label:'General'}].concat(D.grupos.map(function(g){return {id:g.id,label:g.nombre};}));",
@@ -3604,7 +3601,7 @@ const CURVAS_S_CONFIG = {
     ]
 };
 
-const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios, proyectoSel, proy, garantiasProy = [], muestrasProy = [], kpis = null }) => {
+const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios, proyectoSel, proy, garantiasProy = [], muestrasProy = [], muestrasResumen = null, kpis = null }) => {
     const [expandida, setExpandida] = React.useState(null);
     const [busqueda, setBusqueda] = React.useState("");
     const [filtro, setFiltro] = React.useState("todas"); // todas | pendientes | recepcionadas
@@ -3622,15 +3619,13 @@ const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios
         const proyNombre = proy ? proy.NOMBRE_PROYECTO : proyectoSel;
 
         // KPIs
+        // Avance Real: promedio sobre TODAS las viviendas del proyecto; las sin inspeccion cuentan 0%
         const conInsp   = viviendas.filter(v => getInspeccion(v.ID_Benef));
-        const avanceReal = conInsp.length
-            ? Math.round(conInsp.reduce((s, v) => s + getInspeccion(v.ID_Benef).pct_total, 0) / conInsp.length)
+        const avanceReal = viviendas.length
+            ? Math.round(viviendas.reduce((s, v) => { const i = getInspeccion(v.ID_Benef); return s + (i ? i.pct_total : 0); }, 0) / viviendas.length)
             : 0;
-        const terminadas = viviendas.filter(v => {
-            const insp = getInspeccion(v.ID_Benef);
-            const todasDesp = SECUENCIA_PRINCIPAL.every(k => v.estadoEtapas[k]?.estado === "despachado");
-            return todasDesp && insp && insp.pct_total >= 90;
-        }).length;
+        // Terminada = tiene Recepcion Definitiva (RF), no por % de avance/inspeccion.
+        const terminadas = viviendas.filter(v => !!v.fecha_recepcion).length;
         const criticos  = viviendas.filter(v => v.estadoGeneral === "critico").length;
 
         // Datos por grupo (usa 'datos' procesado: trae flags de checkpoints, obsPublicas y comentario)
@@ -3718,7 +3713,11 @@ const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios
                 const pctCol = v.pctTotal == null ? '#94a3b8' : v.pctTotal >= 80 ? '#16a34a' : v.pctTotal >= 50 ? '#2563eb' : '#dc2626';
                 const ec = estadoColor[v.estadoGeneral] || '#6b7280';
                 const el = estadoLabel[v.estadoGeneral] || (v.estadoGeneral || '—');
-                const recv = (v.flags && v.flags.fecha_recep) ? 'Sí' : '—';
+                const rfDone = !!v.fecha_recepcion;
+                const recv = rfDone ? 'Sí' : ((v.flags && v.flags.fecha_recep) ? 'Sí' : '—');
+                // Beneficiario TERMINADO (RF) -> achurado verde+gris en sus filas del informe
+                const rowBg = rfDone ? 'background-color:#ecfdf5;background-image:repeating-linear-gradient(45deg,#94a3b8 0,#94a3b8 1.5px,transparent 1.5px,transparent 6px);' : '';
+                const nameShadow = rfDone ? 'text-shadow:0 0 3px #fff,0 0 5px #fff;' : '';
                 const chips = CHECKPOINTS.map(cp => {
                     const on = !!(v.flags && v.flags[cp.key]);
                     const st = on
@@ -3726,14 +3725,14 @@ const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios
                         : 'background:#f1f5f9;color:#94a3b8;border:1px solid #e2e8f0;';
                     return `<span style="display:inline-block;font-size:8.5px;font-weight:600;padding:2px 6px;border-radius:5px;margin:0 3px 3px 0;${st}">${escapeHtmlBasic(cp.label)}</span>`;
                 }).join('');
-                vivRows += `<tr>
-                    <td style="padding:7px 10px 2px;font-weight:600;">${escapeHtmlBasic((v.NOMBRES || '') + ' ' + (v.APELLIDOS || ''))}</td>
+                vivRows += `<tr style="${rowBg}">
+                    <td style="padding:7px 10px 2px;font-weight:600;${nameShadow}">${escapeHtmlBasic((v.NOMBRES || '') + ' ' + (v.APELLIDOS || ''))}${rfDone ? ' <span style="font-size:8.5px;font-weight:700;color:#047857;background:#d1fae5;border:1px solid #6ee7b7;border-radius:4px;padding:1px 4px;white-space:nowrap;">&#10003; RF</span>' : ''}</td>
                     <td style="padding:7px 10px 2px;text-align:center;font-weight:700;color:${pctCol};">${pct}</td>
                     <td style="padding:7px 10px 2px;text-align:center;color:#475569;">${v.completados}/${totalCp}</td>
-                    <td style="padding:7px 10px 2px;text-align:center;"><span style="font-size:10px;font-weight:700;color:${ec};">${el}</span></td>
+                    <td style="padding:7px 10px 2px;text-align:center;"><span style="font-size:10px;font-weight:700;color:${rfDone ? '#047857' : ec};">${rfDone ? 'Terminada (RF)' : el}</span></td>
                     <td style="padding:7px 10px 2px;text-align:center;">${recv}</td>
                 </tr>
-                <tr style="border-bottom:1px solid #e2e8f0;"><td colspan="5" style="padding:0 10px 8px;">${chips}</td></tr>`;
+                <tr style="border-bottom:1px solid #e2e8f0;${rowBg}"><td colspan="5" style="padding:0 10px 8px;">${chips}</td></tr>`;
             });
             const vivTable = `<table style="width:100%;border-collapse:collapse;font-size:11.5px;"><thead><tr style="background:#f8fafc;">${['Beneficiario', 'Avance Insp.', 'Checkpoints', 'Estado', 'Recep.'].map((h, i) => `<th style="padding:6px 10px;text-align:${i === 0 ? 'left' : 'center'};font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:#64748b;border-bottom:1px solid #e2e8f0;">${h}</th>`).join('')}</tr></thead><tbody>${vivRows}</tbody></table>
                 <div style="font-size:9px;color:#94a3b8;margin-top:5px;">Checkpoints por beneficiario: <span style="display:inline-block;background:#dcfce7;color:#166534;border:1px solid #bbf7d0;border-radius:4px;padding:1px 5px;font-weight:600;">cumplido</span> <span style="display:inline-block;background:#f1f5f9;color:#94a3b8;border:1px solid #e2e8f0;border-radius:4px;padding:1px 5px;font-weight:600;">pendiente</span></div>`;
@@ -3825,18 +3824,15 @@ const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios
         const garantiasCard = `<div class="rc-card"><div class="rc-h">Garantías</div>${garantiasItems}</div>`;
 
         const muestras = Array.isArray(muestrasProy) ? muestrasProy : [];
-        const totalProbetas = muestras.reduce((s, m) => s + (m.cantidad || 0), 0);
-        const requeridas = viviendas.length ? Math.ceil(viviendas.length / 6) : 0;
-        const cumpleMuestras = totalProbetas >= requeridas;
-        const resPendientes = muestras.filter(m => !m.resultadoPedido).length;
-        const cobTxt = cumpleMuestras ? 'OK' : ('Faltan ' + (requeridas - totalProbetas));
-        const cobCol = cumpleMuestras ? '#16a34a' : '#dc2626';
+        const mr = muestrasResumen || { okCount: 0, malaPend: 0, pendientes: 0, requeridas: (viviendas.length ? Math.ceil(viviendas.length / 6) : 0), completo: false, total: muestras.length };
+        const cobCol = mr.completo ? '#16a34a' : (mr.malaPend > 0 ? '#dc2626' : '#b45309');
+        const cobTxt = mr.completo ? 'Completo' : (mr.malaPend > 0 ? (mr.malaPend + ' mala(s) por re-tomar') : ('Faltan ' + Math.max(mr.requeridas - mr.okCount, 0) + ' OK'));
         const muestrasHtml = `<div class="mh-strip">
-            <span class="mh-it"><b>${muestras.length}</b> tomas</span>
-            <span class="mh-it"><b>${totalProbetas}</b> probetas</span>
-            <span class="mh-it">requeridas <b>${requeridas}</b> <span style="color:#94a3b8;">(1 / 6 casas)</span></span>
-            <span class="mh-it">Cobertura: <b style="color:${cobCol};">${cobTxt}</b></span>
-            <span class="mh-it">Resultados pendientes: <b style="color:${resPendientes > 0 ? '#b45309' : '#16a34a'};">${resPendientes}</b></span>
+            <span class="mh-it"><b>${mr.total}</b> muestras</span>
+            <span class="mh-it"><b style="color:#16a34a;">${mr.okCount}</b> OK</span>
+            <span class="mh-it">requeridas <b>${mr.requeridas}</b></span>
+            ${mr.malaPend > 0 ? `<span class="mh-it"><b style="color:#dc2626;">${mr.malaPend}</b> mala(s) por re-tomar</span>` : ''}
+            <span class="mh-it">Estado: <b style="color:${cobCol};">${cobTxt}</b></span>
         </div>`;
 
         const css = `
@@ -3915,7 +3911,7 @@ ${muestrasHtml}
 
 <div class="sec-title">Estado del Proyecto</div>
 <div class="kpis">
-  <div class="kpi"><div class="kpi-v" style="color:${avColor};">${avanceReal}%</div><div class="kpi-l">Avance Real (Insp.)</div></div>
+  <div class="kpi"><div class="kpi-v" style="color:${avColor};">${avanceReal}%</div><div class="kpi-l">Avance Real (Insp.)<br><span style="font-size:8px;color:#94a3b8;">${conInsp.length}/${viviendas.length} con insp. · sin insp = 0%</span></div></div>
   <div class="kpi"><div class="kpi-v" style="color:#1e3a5f;">${viviendas.length}</div><div class="kpi-l">Beneficiarios</div></div>
   <div class="kpi"><div class="kpi-v" style="color:#16a34a;">${terminadas}</div><div class="kpi-l">Terminadas</div></div>
   <div class="kpi"><div class="kpi-v" style="color:${criticos > 0 ? '#dc2626' : '#6b7280'};">${criticos}</div><div class="kpi-l">Críticas</div></div>
@@ -5413,6 +5409,12 @@ const App = () => {
             skipMuestrasPush.current = true;
             setMuestrasHormigon(val || {});
         });
+        // Listener Firebase para Config/Historico de Muestras (por proyecto)
+        muestrasConfigRef.current = fbDB.ref('muestras_config');
+        muestrasConfigRef.current.on('value', (snap) => {
+            skipMuestrasConfigPush.current = true;
+            setMuestrasConfig(snap.val() || {});
+        });
         // Listener Firebase para Sugerencias
         sugRef.current = fbDB.ref('sugerencias');
         sugRef.current.on('value', (snap) => {
@@ -5444,6 +5446,7 @@ const App = () => {
             if (consultasRef.current) consultasRef.current.off();
             if (sugRef.current) sugRef.current.off();
             if (muestrasRef.current) muestrasRef.current.off();
+            if (muestrasConfigRef.current) muestrasConfigRef.current.off();
             if (ocultadosRef.current) ocultadosRef.current.off();
             if (resumenRef.current) resumenRef.current.off();
             if (proyTermRef.current) proyTermRef.current.off();
@@ -5504,6 +5507,10 @@ const App = () => {
     const muestrasRef = React.useRef(null);
     const skipMuestrasPush = React.useRef(true);
     const [showMuestras, setShowMuestras] = React.useState(false);
+    // Config/estandar + historico de muestras, por proyecto (Firebase: muestras_config)
+    const [muestrasConfig, setMuestrasConfig] = React.useState({});
+    const muestrasConfigRef = React.useRef(null);
+    const skipMuestrasConfigPush = React.useRef(true);
 
     React.useEffect(() => {
         if (skipConsPush.current) { skipConsPush.current = false; return; }
@@ -5515,6 +5522,12 @@ const App = () => {
         if (skipMuestrasPush.current) { skipMuestrasPush.current = false; return; }
         if (muestrasRef.current) muestrasRef.current.set(muestrasHormigon);
     }, [muestrasHormigon]);
+
+    // Push config/historico de muestras a Firebase
+    React.useEffect(() => {
+        if (skipMuestrasConfigPush.current) { skipMuestrasConfigPush.current = false; return; }
+        if (muestrasConfigRef.current) muestrasConfigRef.current.set(muestrasConfig);
+    }, [muestrasConfig]);
 
     // Muestras Hormigon: registrar toma de muestras por proyecto
     // Estructura: muestrasHormigon[proyectoId] = array de registros
@@ -5554,6 +5567,87 @@ const App = () => {
     const getMuestrasProy = () => {
         const raw = muestrasHormigon[proyectoSel];
         return Array.isArray(raw) ? raw : [];
+    };
+
+    // --- Estandar de muestras por proyecto (requeridas + minimos MPa + historico) ---
+    const getMuestrasCfg = () => {
+        const c = muestrasConfig[proyectoSel] || {};
+        return {
+            requeridas: (c.requeridas != null && c.requeridas !== '') ? Number(c.requeridas) : Math.ceil(viviendas.length / 6),
+            requeridasManual: (c.requeridas != null && c.requeridas !== ''),
+            minCimiento: c.minCimiento || '',
+            minSobrecimiento: c.minSobrecimiento || '',
+            minRadier: c.minRadier || '',
+            historico: c.historico || ''
+        };
+    };
+    const guardarMuestrasCfg = (patch) => {
+        setMuestrasConfig(prev => ({ ...prev, [proyectoSel]: { ...(prev[proyectoSel] || {}), ...patch } }));
+    };
+
+    // Estado de una muestra segun resultados por elemento: pendiente | ok | mala | mala_retomada
+    const muestraEstado = (m) => {
+        const r = m.resultados;
+        const has = r && (r.cimiento || r.sobrecimiento || r.radier);
+        if (!has) return 'pendiente';
+        const malo = r.cimiento === 'mala' || r.sobrecimiento === 'mala' || r.radier === 'mala';
+        if (malo) return m.reTomada ? 'mala_retomada' : 'mala';
+        return 'ok';
+    };
+    const setResultadoElemento = (muestraId, elemento, valor) => {
+        const key = proyectoSel;
+        setMuestrasHormigon(prev => {
+            const arr = prev[key] || [];
+            const idx = arr.findIndex(m => m.id === muestraId);
+            if (idx === -1) return prev;
+            const nextArr = [...arr];
+            const r = { ...(arr[idx].resultados || {}) };
+            r[elemento] = (r[elemento] === valor) ? '' : valor; // toggle
+            nextArr[idx] = { ...arr[idx], resultados: r, fechaResultado: arr[idx].fechaResultado || fechaChile() };
+            return { ...prev, [key]: nextArr };
+        });
+    };
+    // Guarda el valor medido (MPa) por elemento y auto-evalua OK/Mala vs el minimo configurado
+    const setValorElemento = (muestraId, elemento, valor) => {
+        const key = proyectoSel;
+        const cfg = getMuestrasCfg();
+        const min = ({ cimiento: cfg.minCimiento, sobrecimiento: cfg.minSobrecimiento, radier: cfg.minRadier })[elemento];
+        setMuestrasHormigon(prev => {
+            const arr = prev[key] || [];
+            const idx = arr.findIndex(m => m.id === muestraId);
+            if (idx === -1) return prev;
+            const nextArr = [...arr];
+            const valores = { ...(arr[idx].valores || {}) };
+            valores[elemento] = valor;
+            const resultados = { ...(arr[idx].resultados || {}) };
+            // Si hay valor medido y minimo configurado, deriva OK/Mala automaticamente
+            if (valor !== '' && min !== '' && min != null && !isNaN(Number(valor)) && !isNaN(Number(min))) {
+                resultados[elemento] = Number(valor) >= Number(min) ? 'ok' : 'mala';
+            }
+            nextArr[idx] = { ...arr[idx], valores, resultados, fechaResultado: arr[idx].fechaResultado || fechaChile() };
+            return { ...prev, [key]: nextArr };
+        });
+    };
+    const toggleReTomada = (muestraId) => {
+        const key = proyectoSel;
+        setMuestrasHormigon(prev => {
+            const arr = prev[key] || [];
+            const idx = arr.findIndex(m => m.id === muestraId);
+            if (idx === -1) return prev;
+            const nextArr = [...arr];
+            nextArr[idx] = { ...arr[idx], reTomada: !arr[idx].reTomada };
+            return { ...prev, [key]: nextArr };
+        });
+    };
+    // Resumen de completitud del proyecto bajo la nueva regla
+    const getMuestrasResumen = () => {
+        const arr = getMuestrasProy();
+        const cfg = getMuestrasCfg();
+        const okCount = arr.filter(m => muestraEstado(m) === 'ok').length;
+        const malaPend = arr.filter(m => muestraEstado(m) === 'mala').length;
+        const pendientes = arr.filter(m => muestraEstado(m) === 'pendiente').length;
+        const completo = okCount >= cfg.requeridas && malaPend === 0;
+        return { okCount, malaPend, pendientes, requeridas: cfg.requeridas, completo, total: arr.length };
     };
 
     // Resumen comentarios (Firebase) - para tick de incorporar al resumen
@@ -5696,15 +5790,12 @@ const App = () => {
     const kpis = React.useMemo(() => {
         const avanceDesp = viviendas.length ? Math.round(viviendas.reduce((s, v) => s + v.avance.porcentaje, 0) / viviendas.length) : 0;
         const conInsp = viviendas.filter(v => getInspeccion(v.ID_Benef));
-        const avanceInsp = conInsp.length ? Math.round(conInsp.reduce((s, v) => s + getInspeccion(v.ID_Benef).pct_total, 0) / conInsp.length) : 0;
+        const avanceInsp = viviendas.length ? Math.round(viviendas.reduce((s, v) => { const i = getInspeccion(v.ID_Benef); return s + (i ? i.pct_total : 0); }, 0) / viviendas.length) : 0;
         const totalPagadoProy = viviendas.reduce((s, v) => s + getTotalPagado(v.ID_Benef), 0);
         const conAlertasRojas = viviendas.filter(v => calcCoherencia(v.ID_Benef, v.estadoEtapas).some(a => a.tipo === "rojo")).length;
 
-        const terminadas = viviendas.filter(v => {
-            const insp = getInspeccion(v.ID_Benef);
-            const todasDesp = SECUENCIA_PRINCIPAL.every(k => v.estadoEtapas[k]?.estado === "despachado");
-            return todasDesp && insp && insp.pct_total >= 90;
-        }).length;
+        // Terminada = tiene Recepcion Definitiva (RF), no por % de avance/inspeccion.
+        const terminadas = viviendas.filter(v => !!v.fecha_recepcion).length;
 
         // Solicitudes pendientes
         const totalSolicitadas = viviendas.reduce((s, v) => s + Object.values(v.estadoEtapas).filter(e => e.estado === "solicitado").length, 0);
@@ -5985,31 +6076,27 @@ const App = () => {
             render: (it) => `${it.benef} — ${it.familia}: Pagado ${formatPeso(it.pagado)} vs Presup. ${formatPeso(it.presupuesto)}${it.tieneRC ? ' (Viv+RC)' : ''} (+${formatPeso(it.exceso)}, +${it.pctExceso}%)`
         });
 
-        // CHECK 7: Muestras de Hormigon pendientes
-        // Detecta: Proyecto sin suficientes muestras registradas
-        // Regla: 1 muestra cada 6 casas del proyecto (total beneficiarios)
+        // CHECK 7: Muestras de Hormigon incompletas
+        // Completo = muestras OK >= requeridas (config o 1 cada 6 casas) y sin malas pendientes de re-toma
         const c7 = [];
         const muestrasArr = (() => { const raw = muestrasHormigon[proyectoSel]; return Array.isArray(raw) ? raw : []; })();
         if (viviendas.length > 0) {
-            const totalMuestras = muestrasArr.reduce((s, m) => s + (m.cantidad || 0), 0);
-            const muestrasRequeridas = Math.ceil(viviendas.length / 6);
-            if (totalMuestras < muestrasRequeridas) {
-                c7.push({
-                    totalCasas: viviendas.length,
-                    muestrasRequeridas,
-                    muestrasTomadas: totalMuestras,
-                    faltantes: muestrasRequeridas - totalMuestras
-                });
+            const cfgM = muestrasConfig[proyectoSel] || {};
+            const requeridas = (cfgM.requeridas != null && cfgM.requeridas !== '') ? Number(cfgM.requeridas) : Math.ceil(viviendas.length / 6);
+            const okCount = muestrasArr.filter(m => muestraEstado(m) === 'ok').length;
+            const malaPend = muestrasArr.filter(m => muestraEstado(m) === 'mala').length;
+            if (okCount < requeridas || malaPend > 0) {
+                c7.push({ totalCasas: viviendas.length, muestrasRequeridas: requeridas, okCount, malaPend, faltantes: Math.max(requeridas - okCount, 0) });
             }
         }
         checks.push({
             id: 'muestras_hormigon',
-            titulo: 'Muestras Hormigon Pendientes',
-            desc: 'El proyecto no tiene suficientes muestras de hormigon registradas. Se requiere 1 muestra cada 6 casas (total beneficiarios del proyecto).',
-            compara: 'Despacho (Fundaciones) vs Registro Muestras (Firebase)',
+            titulo: 'Muestras Hormigon Incompletas',
+            desc: 'La toma de muestras no esta completa: deben llegar las requeridas con resultado OK y ninguna mala pendiente de re-toma.',
+            compara: 'Registro Muestras (resultados por elemento) vs Estandar del proyecto',
             tipo: 'naranja',
             items: c7,
-            render: (it) => `${it.totalCasas} casas en proyecto, requiere ${it.muestrasRequeridas} muestra(s), tiene ${it.muestrasTomadas} (faltan ${it.faltantes})`
+            render: (it) => `${it.totalCasas} casas, requiere ${it.muestrasRequeridas} OK, tiene ${it.okCount} OK` + (it.malaPend > 0 ? `, ${it.malaPend} mala(s) por re-tomar` : '') + (it.faltantes > 0 ? ` (faltan ${it.faltantes})` : '')
         });
 
         // CHECK 8: Resultados de laboratorio pendientes (28 dias)
@@ -6017,7 +6104,7 @@ const App = () => {
         const c8 = [];
         const hoy = new Date();
         muestrasArr.forEach(m => {
-            if (m.resultadoPedido) return;
+            if (muestraEstado(m) !== 'pendiente') return;
             const fechaToma = new Date(m.fecha);
             const diasDesde = Math.floor((hoy - fechaToma) / (1000 * 60 * 60 * 24));
             if (diasDesde >= 28) {
@@ -6041,7 +6128,7 @@ const App = () => {
         });
 
         return checks;
-    }, [viviendas, muestrasHormigon]);
+    }, [viviendas, muestrasHormigon, muestrasConfig]);
 
     const totalHallazgos = validaciones.reduce((s, c) => s + c.items.length, 0);
 
@@ -6206,82 +6293,136 @@ const App = () => {
                 {/* MUESTRAS HORMIGON - Botón + Modal */}
                 {(() => {
                     if (viviendas.length === 0) return null;
-                    const muestrasArr = getMuestrasProy();
-                    const totalMuestras = muestrasArr.reduce((s, m) => s + (m.cantidad || 0), 0);
-                    const requeridas = Math.ceil(viviendas.length / 6);
-                    const alertaLab = muestrasArr.filter(m => !m.resultadoPedido && Math.floor((new Date() - new Date(m.fecha)) / (1000*60*60*24)) >= 28).length;
-                    return <button onClick={() => setShowMuestras(true)} className={`mb-3 ml-2 flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${alertaLab > 0 ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100' : totalMuestras >= requeridas ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100' : totalMuestras > 0 ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100' : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'}`}>
+                    const rm = getMuestrasResumen();
+                    const cls = rm.malaPend > 0 ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'
+                        : rm.completo ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'
+                        : rm.total > 0 ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
+                        : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100';
+                    return <button onClick={() => setShowMuestras(true)} className={`mb-3 ml-2 flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${cls}`}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M9 3h6v2a3 3 0 0 1-6 0V3z"/><path d="M12 5v6"/><path d="M8 11h8l1 10H7L8 11z"/>
                         </svg>
-                        Muestras Hormigón {totalMuestras}/{requeridas}
-                        {alertaLab > 0 && <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{alertaLab} lab</span>}
+                        Muestras Hormigón {rm.okCount}/{rm.requeridas}
+                        {rm.malaPend > 0 && <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{rm.malaPend} mala{rm.malaPend > 1 ? 's' : ''}</span>}
+                        {rm.completo && <span className="bg-green-600 text-white text-[10px] px-1.5 py-0.5 rounded-full">Completo</span>}
                     </button>;
                 })()}
                 {showMuestras && (() => {
                     const muestrasArr = getMuestrasProy();
-                    const totalMuestras = muestrasArr.reduce((s, m) => s + (m.cantidad || 0), 0);
-                    const requeridas = Math.ceil(viviendas.length / 6);
-                    const hoy = new Date();
+                    const cfg = getMuestrasCfg();
+                    const rm = getMuestrasResumen();
+                    const ELEMENTOS = [['cimiento', 'Cimiento', cfg.minCimiento], ['sobrecimiento', 'Sobrecimiento', cfg.minSobrecimiento], ['radier', 'Radier', cfg.minRadier]];
+                    const estadoBadge = { ok: ['bg-green-100 text-green-700', 'OK'], mala: ['bg-red-100 text-red-700', 'MALA — re-tomar'], mala_retomada: ['bg-gray-100 text-gray-500', 'Mala (re-tomada)'], pendiente: ['bg-amber-100 text-amber-700', 'Pendiente'] };
                     return <div className="fixed inset-0 z-[60] bg-black/40 flex items-start justify-center pt-8 px-4" onClick={(e) => e.target === e.currentTarget && setShowMuestras(false)}>
-                        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
+                        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[88vh] overflow-hidden flex flex-col">
                             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
                                 <div>
                                     <h2 className="text-lg font-bold text-gray-800">Muestras de Hormigón — Fundaciones</h2>
-                                    <p className="text-xs text-gray-500 mt-0.5">1 muestra (probeta) cada 6 casas. Registra toma y seguimiento de resultados.</p>
+                                    <p className="text-xs text-gray-500 mt-0.5">Cada muestra registra Cimiento, Sobrecimiento y Radier. Completo = muestras OK ≥ requeridas y sin malas pendientes.</p>
                                 </div>
                                 <button onClick={() => setShowMuestras(false)} className="text-gray-400 hover:text-gray-600 text-xl font-bold w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100">x</button>
                             </div>
                             <div className="overflow-y-auto p-6 space-y-5">
                                 {/* Resumen del proyecto */}
-                                <div className="rounded-xl border border-blue-200 bg-blue-50/50 px-4 py-3">
+                                <div className={`rounded-xl border px-4 py-3 ${rm.completo ? 'border-green-200 bg-green-50/60' : rm.malaPend > 0 ? 'border-red-200 bg-red-50/50' : 'border-blue-200 bg-blue-50/50'}`}>
                                     <div className="flex items-center justify-between">
                                         <div>
-                                            <p className="text-sm font-semibold text-blue-800">{proy?.NOMBRE_PROYECTO || proyectoSel}</p>
-                                            <p className="text-[11px] text-blue-600 mt-0.5">
-                                                {viviendas.length} casa{viviendas.length !== 1 ? 's' : ''} en proyecto | Requiere {requeridas} muestra{requeridas !== 1 ? 's' : ''} (1 cada 6) | Registradas: {totalMuestras}
+                                            <p className="text-sm font-semibold text-gray-800">{proy?.NOMBRE_PROYECTO || proyectoSel}</p>
+                                            <p className="text-[11px] text-gray-600 mt-0.5">
+                                                {viviendas.length} casa{viviendas.length !== 1 ? 's' : ''} · Requiere {rm.requeridas} muestra{rm.requeridas !== 1 ? 's' : ''} OK · <b className="text-green-700">{rm.okCount} OK</b>{rm.malaPend > 0 ? <span className="text-red-600"> · {rm.malaPend} mala(s) pendiente(s)</span> : ''}{rm.pendientes > 0 ? <span className="text-amber-600"> · {rm.pendientes} sin resultado</span> : ''}
                                             </p>
                                         </div>
-                                        {totalMuestras >= requeridas
-                                            ? <span className="text-[10px] bg-green-100 text-green-700 px-2.5 py-1 rounded-full font-medium">Completo</span>
-                                            : <span className="text-[10px] bg-orange-100 text-orange-700 px-2.5 py-1 rounded-full font-medium">Faltan {requeridas - totalMuestras}</span>
+                                        {rm.completo
+                                            ? <span className="text-[10px] bg-green-600 text-white px-2.5 py-1 rounded-full font-medium">Completo ✓</span>
+                                            : rm.malaPend > 0
+                                                ? <span className="text-[10px] bg-red-100 text-red-700 px-2.5 py-1 rounded-full font-medium">Hay malas por re-tomar</span>
+                                                : <span className="text-[10px] bg-orange-100 text-orange-700 px-2.5 py-1 rounded-full font-medium">Faltan {Math.max(rm.requeridas - rm.okCount, 0)} OK</span>
                                         }
                                     </div>
+                                </div>
+
+                                {/* Estandar del proyecto (configurable) */}
+                                <div className="rounded-xl border border-violet-200 overflow-hidden">
+                                    <div className="px-4 py-2.5 bg-violet-50 border-b border-violet-200">
+                                        <h3 className="text-xs font-semibold text-violet-800">⚙ Estándar del proyecto</h3>
+                                    </div>
+                                    <div className="px-4 py-3 grid grid-cols-2 md:grid-cols-4 gap-3" key={proyectoSel}>
+                                        <div>
+                                            <label className="text-[10px] text-gray-500 block mb-1">Muestras requeridas</label>
+                                            <input type="number" min="0" defaultValue={cfg.requeridasManual ? cfg.requeridas : ''} placeholder={`auto ${Math.ceil(viviendas.length / 6)}`} onBlur={(e) => guardarMuestrasCfg({ requeridas: e.target.value === '' ? '' : parseInt(e.target.value) })} className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-violet-400" />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] text-gray-500 block mb-1">Mín. Cimiento (MPa)</label>
+                                            <input type="number" min="0" defaultValue={cfg.minCimiento} onBlur={(e) => guardarMuestrasCfg({ minCimiento: e.target.value })} className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-violet-400" />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] text-gray-500 block mb-1">Mín. Sobrecimiento (MPa)</label>
+                                            <input type="number" min="0" defaultValue={cfg.minSobrecimiento} onBlur={(e) => guardarMuestrasCfg({ minSobrecimiento: e.target.value })} className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-violet-400" />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] text-gray-500 block mb-1">Mín. Radier (MPa)</label>
+                                            <input type="number" min="0" defaultValue={cfg.minRadier} onBlur={(e) => guardarMuestrasCfg({ minRadier: e.target.value })} className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-violet-400" />
+                                        </div>
+                                    </div>
+                                    <p className="px-4 pb-2 text-[10px] text-gray-400">Si dejas vacía la cantidad, se usa 1 cada 6 casas. Los mínimos son la referencia para marcar OK/Mala.</p>
                                 </div>
 
                                 {/* Lista de muestras registradas */}
                                 {muestrasArr.length > 0 && (
                                     <div className="rounded-xl border border-gray-200 overflow-hidden">
                                         <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-200">
-                                            <h3 className="text-xs font-semibold text-gray-700">Muestras registradas</h3>
+                                            <h3 className="text-xs font-semibold text-gray-700">Muestras registradas ({muestrasArr.length})</h3>
                                         </div>
                                         <div className="divide-y divide-gray-100">
-                                            {muestrasArr.map(m => {
-                                                const diasDesde = Math.floor((hoy - new Date(m.fecha)) / (1000*60*60*24));
-                                                const alertaLab = !m.resultadoPedido && diasDesde >= 30;
-                                                return <div key={m.id} className={`px-4 py-2.5 flex items-center gap-3 ${alertaLab ? 'bg-red-50/60' : ''}`}>
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-xs font-medium text-gray-700">{m.cantidad || 1} probeta{(m.cantidad || 1) > 1 ? 's' : ''}</span>
+                                            {muestrasArr.map((m, i) => {
+                                                const est = muestraEstado(m);
+                                                const [bcls, blabel] = estadoBadge[est] || estadoBadge.pendiente;
+                                                const legacy = !m.resultados && (m.resultadoPedido || m.cantidad);
+                                                return <div key={m.id} className={`px-4 py-3 ${est === 'mala' ? 'bg-red-50/50' : ''}`}>
+                                                    <div className="flex items-center justify-between gap-3 mb-2">
+                                                        <div className="flex items-center gap-2 min-w-0">
+                                                            <span className="text-xs font-semibold text-gray-700">Muestra #{i + 1}</span>
                                                             <span className="text-[10px] text-gray-400">{m.fecha}</span>
-                                                            <span className="text-[10px] text-gray-400">({diasDesde}d)</span>
+                                                            {m.casasNombres && m.casasNombres.length > 0 && <span className="text-[10px] text-gray-400 truncate">· {m.casasNombres.join(', ')}</span>}
                                                         </div>
-                                                        {m.casasNombres && m.casasNombres.length > 0 && (
-                                                            <p className="text-[10px] text-gray-400 mt-0.5 truncate">Casas: {m.casasNombres.join(', ')}</p>
-                                                        )}
-                                                        {m.notas && <p className="text-[10px] text-gray-500 mt-0.5 italic">{m.notas}</p>}
+                                                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                                                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${bcls}`}>{blabel}</span>
+                                                            <button onClick={() => eliminarMuestra(m.id)} className="text-gray-300 hover:text-red-500 transition-colors" title="Eliminar">
+                                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                                            </button>
+                                                        </div>
                                                     </div>
-                                                    <div className="flex items-center gap-1.5">
-                                                        {m.resultadoPedido
-                                                            ? <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Resultado OK</span>
-                                                            : alertaLab
-                                                                ? <button onClick={() => marcarResultadoPedido(m.id)} className="text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded-full hover:bg-red-200 transition-colors font-medium animate-pulse">Pedir resultado!</button>
-                                                                : <button onClick={() => marcarResultadoPedido(m.id)} className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full hover:bg-gray-200 transition-colors">Marcar resultado</button>
-                                                        }
-                                                        <button onClick={() => eliminarMuestra(m.id)} className="text-gray-300 hover:text-red-500 transition-colors" title="Eliminar">
-                                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                                                        </button>
+                                                    {legacy && <p className="text-[10px] text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-1 mb-2">Formato anterior{m.cantidad ? ` · ${m.cantidad} probeta(s)` : ''}{m.resultadoPedido ? ' · marcada "Resultado OK" antes' : ''}. Re-ingresa los resultados por elemento abajo.</p>}
+                                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                                        {ELEMENTOS.map(([key, label, min]) => {
+                                                            const val = (m.resultados || {})[key] || '';
+                                                            const medido = (m.valores || {})[key];
+                                                            return <div key={key} className="border border-gray-100 rounded-lg px-2 py-1.5 bg-gray-50/40">
+                                                                <div className="text-[10px] text-gray-600 leading-tight mb-1">{label}{min ? <span className="text-gray-400"> · mín {min} MPa</span> : ''}</div>
+                                                                <div className="flex items-center gap-1">
+                                                                    <input type="number" min="0" step="0.1" defaultValue={medido != null ? medido : ''} placeholder="MPa" onBlur={(e) => setValorElemento(m.id, key, e.target.value)} className="w-16 px-1.5 py-0.5 border border-gray-300 rounded text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                                                                    <button onClick={() => setResultadoElemento(m.id, key, 'ok')} className={`text-[10px] px-2 py-0.5 rounded font-medium transition-colors ${val === 'ok' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-500 hover:bg-green-100'}`}>OK</button>
+                                                                    <button onClick={() => setResultadoElemento(m.id, key, 'mala')} className={`text-[10px] px-2 py-0.5 rounded font-medium transition-colors ${val === 'mala' ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-500 hover:bg-red-100'}`}>Mala</button>
+                                                                </div>
+                                                                {medido != null && medido !== '' && min && !isNaN(Number(medido)) && !isNaN(Number(min)) && (
+                                                                    <div className={`text-[9px] mt-0.5 font-medium ${Number(medido) >= Number(min) ? 'text-green-600' : 'text-red-600'}`}>{Number(medido) >= Number(min) ? `✓ ${medido} ≥ ${min}` : `✗ ${medido} < ${min}`}</div>
+                                                                )}
+                                                            </div>;
+                                                        })}
                                                     </div>
+                                                    {est === 'mala' && (
+                                                        <div className="mt-2 flex items-center justify-between gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-1.5">
+                                                            <span className="text-[11px] text-red-700 font-medium">⚠ Muestra con resultado malo — debe volver a tomarse.</span>
+                                                            <button onClick={() => toggleReTomada(m.id)} className="text-[10px] bg-white border border-red-300 text-red-700 px-2 py-0.5 rounded-full hover:bg-red-100 font-medium whitespace-nowrap">Marcar re-tomada</button>
+                                                        </div>
+                                                    )}
+                                                    {est === 'mala_retomada' && (
+                                                        <div className="mt-2 flex items-center justify-between gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1">
+                                                            <span className="text-[11px] text-gray-500">Re-tomada (resuelta). No bloquea el "Completo".</span>
+                                                            <button onClick={() => toggleReTomada(m.id)} className="text-[10px] text-gray-400 hover:text-red-600 underline whitespace-nowrap">Deshacer</button>
+                                                        </div>
+                                                    )}
+                                                    {m.notas && <p className="text-[10px] text-gray-500 mt-1 italic">{m.notas}</p>}
                                                 </div>;
                                             })}
                                         </div>
@@ -6296,7 +6437,7 @@ const App = () => {
                                     <div className="px-4 py-3">
                                         <div className="flex items-end gap-2">
                                             <div className="flex-1">
-                                                <label className="text-[10px] text-gray-500 block mb-1">Cantidad probetas</label>
+                                                <label className="text-[10px] text-gray-500 block mb-1">Probetas (info)</label>
                                                 <input type="number" min="1" defaultValue="1" id="mh_cant" className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
                                             </div>
                                             <div className="flex-[2]">
@@ -6312,17 +6453,36 @@ const App = () => {
                                                 const casasStr = document.getElementById('mh_casas').value;
                                                 const notas = document.getElementById('mh_notas').value;
                                                 const casasNombres = casasStr ? casasStr.split(',').map(c => c.trim()).filter(Boolean) : [];
-                                                registrarMuestra({ cantidad: cant, casasNombres, notas });
+                                                registrarMuestra({ cantidad: cant, casasNombres, notas, resultados: { cimiento: '', sobrecimiento: '', radier: '' }, reTomada: false });
                                                 document.getElementById('mh_cant').value = '1';
                                                 document.getElementById('mh_casas').value = '';
                                                 document.getElementById('mh_notas').value = '';
                                             }} className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap">+ Registrar</button>
                                         </div>
+                                        <p className="text-[10px] text-gray-400 mt-2">Cada registro es una muestra. Tras registrarla, marca OK/Mala por elemento en la lista de arriba.</p>
+                                    </div>
+                                </div>
+
+                                {/* Historico (texto libre) */}
+                                <div className="rounded-xl border border-gray-200 overflow-hidden">
+                                    <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+                                        <h3 className="text-xs font-semibold text-gray-700">Histórico (texto libre)</h3>
+                                        <button onClick={() => {
+                                            const el = document.getElementById('mh_historico');
+                                            const dump = muestrasArr.map((m, i) => `- Muestra #${i + 1} | ${m.fecha || ''} | ${m.cantidad || 1} probeta(s)` + (m.casasNombres && m.casasNombres.length ? ` | Casas: ${m.casasNombres.join(', ')}` : '') + (m.notas ? ` | ${m.notas}` : '') + (m.resultadoPedido ? ' | [Resultado OK - formato anterior]' : '')).join('\n');
+                                            const prev = el.value ? el.value + '\n' : '';
+                                            el.value = prev + `--- Importado ${fechaChile()} ---\n` + dump;
+                                            guardarMuestrasCfg({ historico: el.value });
+                                        }} className="text-[10px] bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full hover:bg-blue-100 font-medium">Importar registros actuales</button>
+                                    </div>
+                                    <div className="px-4 py-3">
+                                        <textarea id="mh_historico" key={proyectoSel} defaultValue={cfg.historico} onBlur={(e) => guardarMuestrasCfg({ historico: e.target.value })} rows={5} placeholder="Pega o anota aquí la información histórica de muestras (se guarda en Firebase). Útil para no perder lo ya ingresado mientras re-ingresas en el formato nuevo." className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-400 font-mono leading-relaxed" />
+                                        <p className="text-[10px] text-gray-400 mt-1">Se guarda al salir del campo. El botón "Importar" vuelca los registros actuales a este texto sin borrarlos de la lista.</p>
                                     </div>
                                 </div>
                             </div>
                             <div className="px-6 py-3 border-t border-gray-100 bg-gray-50/50">
-                                <p className="text-[10px] text-gray-400 text-center">Regla: 1 probeta cada 6 casas (casas con fundación). A los 28 días de la toma, pedir resultados al laboratorio.</p>
+                                <p className="text-[10px] text-gray-400 text-center">Completo cuando hay {rm.requeridas} muestras OK y ninguna mala pendiente de re-toma. Las re-tomas extra no estorban.</p>
                             </div>
                         </div>
                     </div>;
@@ -6391,7 +6551,7 @@ const App = () => {
                     {tab === "financiero" && <FinancieroTab viviendas={viviendas} />}
                     {tab === "mano_obra" && <ManoDeObraTab viviendas={viviendas} />}
                     {tab === "estados_pago" && <EstadosPagoTab viviendas={viviendas} />}
-                    {tab === "estado_general" && <EstadoGeneralTab viviendas={viviendas} observaciones={observaciones} grupos={grupos} resumenComentarios={resumenComentarios} proyectoSel={proyectoSel} proy={proy} garantiasProy={garantiasProy} muestrasProy={getMuestrasProy()} kpis={kpis} />}
+                    {tab === "estado_general" && <EstadoGeneralTab viviendas={viviendas} observaciones={observaciones} grupos={grupos} resumenComentarios={resumenComentarios} proyectoSel={proyectoSel} proy={proy} garantiasProy={garantiasProy} muestrasProy={getMuestrasProy()} muestrasResumen={getMuestrasResumen()} kpis={kpis} />}
                     {tab === "configuracion" && <ConfiguracionView grupos={grupos} setGrupos={setGruposForProy} viviendas={viviendas} proyectoSel={proyectoSel} />}
                 </div>
 
