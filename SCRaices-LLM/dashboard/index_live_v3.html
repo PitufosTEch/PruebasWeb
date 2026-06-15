@@ -1313,6 +1313,50 @@ const mapearTipoDespacho = (tipo) => {
     return etapas;
 };
 
+// Clasificador FINO de despacho (solo para Validacion Cruzada CHECK 1).
+// A diferencia de mapearSegmento, separa alcantarillado interior/planta vs exterior
+// y separa Sol. AC de gasfiteria, para distinguir que material respalda cada familia de pago.
+const clasificarDespachoFino = (segmento) => {
+    if (!segmento) return [];
+    const t = segmento.toLowerCase().trim();
+    if (t.includes('alcantarillado') || t.includes('planta alc')) {
+        if (t.includes('exterior') || t.includes(' ext') || t.includes('-ext')) return ['alc_exterior'];
+        if (t.includes('interior') || t.includes('planta')) return ['alc_interior'];
+        return ['alc_interior', 'alc_exterior']; // sin calificar: cuenta para ambas (evita falso positivo)
+    }
+    if (t.includes('fundacion') && !t.includes('eifs') && !t.includes('aislacion')) return ['fundacion'];
+    if (t.includes('1era')) return ['1era'];
+    if (t.includes('ventana')) return ['ventana'];
+    if (t.includes('eifs') || t.includes('aislacion fund')) return ['eifs'];
+    if (t.includes('2da')) return ['2da'];
+    if (t.includes('piso') && t.includes('ceram')) return ['ceramica_piso'];
+    if (t.includes('07-') && t.includes('piso')) return ['ceramica_piso'];
+    if (t.includes('muro') && t.includes('ceram')) return ['ceramica_muro'];
+    if (t.includes('08-') && t.includes('muro')) return ['ceramica_muro'];
+    if (t.includes('pintura int') || t.includes('10-')) return ['pintura_int'];
+    if (t.includes('pintura')) return ['pintura_ext']; // ext, r.c. o generico
+    if (t.includes('sol. ac') || t.includes('sol ac') || t.includes('cocina') || t.includes('calefon')) return ['sol_ac'];
+    if (t.includes('gasfiter') || t.includes('artefact')) return ['gasfiteria'];
+    return [];
+};
+const despachoTagsDe = (idBenef) => {
+    const tags = new Set();
+    DESPACHOS_DATA.filter(d => String(d.ID_Benef) === String(idBenef)).forEach(d => {
+        String(d.Tipo_despacho || '').split(',').forEach(seg => clasificarDespachoFino(seg).forEach(t => tags.add(t)));
+    });
+    return tags;
+};
+// Que tags de despacho respaldan el pago de cada familia (CHECK 1).
+// Electricidad (07) y Obras Exteriores (08) NO se evaluan: no figuran aqui.
+const CHECK1_FAMILIA_TAGS = {
+    "01 - Fundaciones": ['fundacion', 'alc_interior'],
+    "02 - 1era Etapa":  ['1era', 'ventana'],
+    "03 - 2da Etapa":   ['2da'],
+    "04 - Gasfiteria":  ['gasfiteria', 'sol_ac', 'alc_exterior'],
+    "05 - Cerámica":    ['ceramica_piso', 'ceramica_muro'],
+    "06 - Pintura":     ['pintura_ext', 'pintura_int']
+};
+
 const calcularDias = (fecha) => {
     if (!fecha) return null;
     return Math.floor((new Date() - new Date(fecha)) / (1000 * 60 * 60 * 24));
@@ -5916,18 +5960,20 @@ const App = () => {
         const checks = [];
 
         // CHECK 1: Pago M.O. sin Despacho
-        // Compara: Solpago (pagos aprobados) vs Despachos por familia
-        // Detecta: Se pagó maestro pero no hay registro de que se haya despachado material
+        // Compara: Solpago (pagos aprobados) vs Despachos del beneficiario (clasificacion fina)
+        // Detecta: Se pagó maestro pero no hay despacho de material que respalde esa familia.
+        // No se evaluan Electricidad ni Obras Exteriores. Fundaciones respalda con alcantarillado
+        // INTERIOR (planta); Gasfiteria respalda con alcantarillado EXTERIOR + Sol. AC.
         const c1 = [];
         viviendas.forEach(v => {
             const pagos = getSolpago(v.ID_Benef);
-            Object.entries(FAMILIA_PAGO_MAP).forEach(([fam, etapasKeys]) => {
-                if (etapasKeys.length === 0) return;
+            const tags = despachoTagsDe(v.ID_Benef);
+            Object.entries(CHECK1_FAMILIA_TAGS).forEach(([fam, famTags]) => {
                 const pagosFam = pagos.filter(p => p.Familia_pago === fam);
                 const totalPagado = pagosFam.reduce((s, p) => s + p.monto, 0);
                 // Gasfiteria: los primeros $50.000 son alcantarillado que viene con Fundaciones
                 const umbral = fam === '04 - Gasfiteria' ? 50000 : 0;
-                const tieneDespacho = etapasKeys.some(k => v.estadoEtapas[k]?.estado === "despachado");
+                const tieneDespacho = famTags.some(t => tags.has(t));
                 if (totalPagado > umbral && !tieneDespacho) {
                     c1.push({ benef: v.NOMBRES + ' ' + v.APELLIDOS, id: v.ID_Benef, familia: FAMILIA_LABELS[fam] || fam, monto: totalPagado });
                 }
@@ -5936,8 +5982,8 @@ const App = () => {
         checks.push({
             id: 'pago_sin_despacho',
             titulo: 'Pago sin Despacho',
-            desc: 'Se registró pago de Mano de Obra en una familia, pero no existe despacho de material para esa etapa. Gasfitería excluye los primeros $50.000 (alcantarillado con fundaciones).',
-            compara: 'Solpago (pagos aprobados) vs Despacho (entregas de material)',
+            desc: 'Se registró pago de Mano de Obra en una familia, pero no hay despacho de material que la respalde. No se evalúan Electricidad ni Obras Exteriores. Fundaciones se respalda con Fundaciones + Alcantarillado interior (planta); Gasfitería con Gasfitería + Sol. AC + Alcantarillado exterior. Gasfitería excluye los primeros $50.000.',
+            compara: 'Solpago (pagos aprobados) vs Despacho (Tipo_despacho clasificado por familia)',
             tipo: 'rojo',
             items: c1,
             render: (it) => `${it.benef} — ${it.familia} (${formatPeso(it.monto)} pagado)`
