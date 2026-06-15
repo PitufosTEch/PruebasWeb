@@ -1649,7 +1649,7 @@ const LineaTiempo = ({ estadoEtapas, fechaHPC }) => {
 };
 
 // ===== VIVIENDA CARD =====
-const ViviendaCard = ({ beneficiario, estadoEtapas, expanded, onToggle, grupoColor, obsCount, observaciones, addObservacion, deleteObservacion, actividades, toggleActividad, consultas, toggleConsulta, ocultarBeneficiario }) => {
+const ViviendaCard = ({ beneficiario, estadoEtapas, expanded, onToggle, grupoColor, obsCount, observaciones, addObservacion, deleteObservacion, actividades, toggleActividad, consultas, toggleConsulta, ocultarBeneficiario, resumenComentarios }) => {
     const [obsTexto, setObsTexto] = React.useState("");
     const [showObsInput, setShowObsInput] = React.useState(false);
     const [showOcultarInput, setShowOcultarInput] = React.useState(false);
@@ -2128,7 +2128,7 @@ const GrupoHeader = ({ grupo, colorIdx, open, onToggle, onUpdateComentario }) =>
 };
 
 // ===== VIVIENDAS TAB =====
-const ViviendasTab = ({ viviendas, grupos, expandida, setExpandida, filtro, setFiltro, busqueda, setBusqueda, observaciones, addObservacion, deleteObservacion, showResumenObs, setShowResumenObs, actividades, toggleActividad, consultas, toggleConsulta, ocultados, ocultarBeneficiario, mostrarBeneficiario, onUpdateComentarioGrupo }) => {
+const ViviendasTab = ({ viviendas, grupos, expandida, setExpandida, filtro, setFiltro, busqueda, setBusqueda, observaciones, addObservacion, deleteObservacion, showResumenObs, setShowResumenObs, actividades, toggleActividad, consultas, toggleConsulta, ocultados, ocultarBeneficiario, mostrarBeneficiario, onUpdateComentarioGrupo, resumenComentarios }) => {
     const [showOcultas, setShowOcultas] = React.useState(false);
     const ocultadasProy = viviendas.filter(v => ocultados[v.ID_Benef]);
     const vivVisibles = viviendas.filter(v => !ocultados[v.ID_Benef]);
@@ -2434,7 +2434,7 @@ const ViviendasTab = ({ viviendas, grupos, expandida, setExpandida, filtro, setF
                         {(gruposAbiertos[grupo.id] !== false) && (
                             <div className={`space-y-2 ${grupo.nombre ? "ml-2 pl-3 border-l-2 " + (grupo.colorIdx >= 0 ? GRUPO_COLORS[grupo.colorIdx].border : "border-gray-200") : ""} mt-2`}>
                                 {grupo.viviendas.map(v =>
-                                    <ViviendaCard key={v.ID_Benef} beneficiario={v} estadoEtapas={v.estadoEtapas} expanded={expandida === v.ID_Benef} onToggle={() => setExpandida(expandida === v.ID_Benef ? null : v.ID_Benef)} grupoColor={grupo.colorIdx} obsCount={(observaciones[v.ID_Benef] || []).length} observaciones={observaciones[v.ID_Benef] || []} addObservacion={addObservacion} deleteObservacion={deleteObservacion} actividades={actividades[v.ID_Benef] || {}} toggleActividad={toggleActividad} consultas={consultas[v.ID_Benef] || {}} toggleConsulta={toggleConsulta} ocultarBeneficiario={ocultarBeneficiario} />
+                                    <ViviendaCard key={v.ID_Benef} beneficiario={v} estadoEtapas={v.estadoEtapas} expanded={expandida === v.ID_Benef} onToggle={() => setExpandida(expandida === v.ID_Benef ? null : v.ID_Benef)} grupoColor={grupo.colorIdx} obsCount={(observaciones[v.ID_Benef] || []).length} observaciones={observaciones[v.ID_Benef] || []} addObservacion={addObservacion} deleteObservacion={deleteObservacion} actividades={actividades[v.ID_Benef] || {}} toggleActividad={toggleActividad} consultas={consultas[v.ID_Benef] || {}} toggleConsulta={toggleConsulta} ocultarBeneficiario={ocultarBeneficiario} resumenComentarios={resumenComentarios} />
                                 )}
                             </div>
                         )}
@@ -5033,18 +5033,171 @@ const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel }) => {
         );
     };
 
+    // ========== FUNCIONAMIENTO (autodocumentacion viva del dashboard) ==========
+    const FuncionamientoTab = () => {
+        const seg = (typeof window !== 'undefined' && window._SEG_DIAG) || {};
+        const nProy = (typeof PROYECTOS_DATA !== 'undefined' ? PROYECTOS_DATA.length : 0);
+        const nViv = viviendas.length;
+        const nInsp = (typeof INSPECCIONES_DATA !== 'undefined' ? INSPECCIONES_DATA.length : 0);
+        const te1Count = (typeof BENEF_CON_TE1 !== 'undefined' && BENEF_CON_TE1 && BENEF_CON_TE1.size) ? BENEF_CON_TE1.size : 0;
+        const curvasCfg = (typeof CURVAS_S_CONFIG !== 'undefined' ? CURVAS_S_CONFIG : {});
+        const curvasKeys = Object.keys(curvasCfg);
+        const curvasProyActual = (curvasCfg[proyectoSel] || []).length;
+        const tablas = (typeof TABLES_TO_FETCH !== 'undefined' ? TABLES_TO_FETCH.split(',') : []);
+        const familias = (typeof FAMILIAS_CRITICAS !== 'undefined' ? FAMILIAS_CRITICAS : []);
+        const segCheckpoints = (typeof window !== 'undefined' && window._SEG_COL_MAP) ? Object.keys(window._SEG_COL_MAP)
+            : ['te1', 'visita_as', 'resol_as', 'visita_f1', 'fecha_f1', 'artefactado', 'empalme', 'visita_dom', 'fecha_v_dom', 'recepcion_dom', 'fecha_recep', 'obs'];
+        const endpoint = (typeof APPS_SCRIPT_URL !== 'undefined' ? APPS_SCRIPT_URL : '');
+
+        const [solReg, setSolReg] = React.useState(null);
+        const [solTxt, setSolTxt] = React.useState('');
+        const enviarSolicitud = (regla) => {
+            const t = solTxt.trim();
+            if (!t) return;
+            const id = Date.now();
+            const fecha = (typeof fechaChile === 'function') ? fechaChile() : new Date().toISOString();
+            fbDB.ref('sugerencias/' + id).set({ id, texto: '[Funcionamiento · ' + regla + '] ' + t, imagen: null, fecha, resuelta: false });
+            setSolReg(null); setSolTxt('');
+            alert('Solicitud registrada en Sugerencias. El equipo la revisara desde ese panel.');
+        };
+
+        const REGLAS = [
+            { id: 'avance',    nombre: 'Formula % Avance (70/25/5)',        estado: 'ok',   detalle: '% Total = 0.70 x %Viv + 0.25 x %RC + 0.05 x %Hab. Coincide con la definicion de negocio. Cada fila de Ejecucion es un delta que se suma por beneficiario.' },
+            { id: 'solpago',   nombre: 'Pagos M.O. — solo "Aprobado"',      estado: 'ok',   detalle: 'Suma montos de Solpago cuyo ESTADO incluye "aprobad". Los no aprobados no cuentan.' },
+            { id: 'ciclo',     nombre: 'Ciclo de pago 25 a 25',             estado: 'ok',   detalle: 'Un pago con fecha dia >= 25 se contabiliza en el mes siguiente (no calendario natural).' },
+            { id: 'te1',       nombre: 'TE1 — triple fuente (OR logico)',   estado: 'ok',   detalle: 'Prendido si CUALQUIERA: set embebido (' + te1Count + ' IDs) OR columna en perfil Beneficiario OR columna en tabla de cierre.' },
+            { id: 'estrella',  nombre: 'Comentarios publicos (estrella)',   estado: 'ok',   detalle: 'Solo las observaciones marcadas con estrella se muestran en el informe Estado General. El resto son internas.' },
+            { id: 'seg',       nombre: 'Matching de columnas de Cierre',    estado: 'warn', detalle: 'SEG_RULES normaliza nombres (must/not) y tolera variantes de AppSheet, pero un renombre de columna lo puede romper en silencio. Tabla en uso: ' + (seg.tableUsed || '—') + '.' },
+            { id: 'semaforo',  nombre: 'Semaforo de plazos por etapa',      estado: 'warn', detalle: 'El codigo usa tiempo_optimo/alerta por etapa (desde despacho de la dependencia). CLAUDE.md describe otro modelo (dias desde ultima solicitud 7/14). Conviene definir UNO solo.' },
+            { id: 'config',    nombre: 'Tiempos de etapa — fuente unica',   estado: 'warn', detalle: 'Hoy existen 3 copias: ETAPAS_CONFIG embebido en este HTML, config/etapas_config.json y Etapas.md. Pueden divergir; el dashboard usa el embebido.' },
+            { id: 'despachos', nombre: 'Ritmo Despachos (proxy temporal)',  estado: 'warn', detalle: 'Es un proxy de actividad (conteo de despachos por mes). Pendiente reemplazar por % avance real desde los deltas de Ejecucion.' },
+            { id: 'curvas',    nombre: 'Curvas S — imagenes estaticas',     estado: 'bad',  detalle: 'Son imagenes PNG de Drive hardcodeadas por proyecto (CURVAS_S_CONFIG), generadas afuera. Estan desconectadas del % real vivo que el dashboard YA calcula. El "% Real" mostrado puede estar desactualizado.' },
+            { id: 'firebase',  nombre: 'Reglas de Firebase abiertas',       estado: 'bad',  detalle: 'El RTDB no tiene autenticacion: cualquiera con la URL puede leer y escribir observaciones, grupos, etc. Riesgo de integridad de lo supervisado.' },
+        ];
+        const estiloEstado = { ok: { c: '#16a34a', bg: '#f0fdf4', b: '#bbf7d0', t: 'OK' }, warn: { c: '#d97706', bg: '#fffbeb', b: '#fde68a', t: 'REVISAR' }, bad: { c: '#dc2626', bg: '#fef2f2', b: '#fecaca', t: 'CORREGIR' } };
+
+        const Stat = ({ label, value, sub }) => (
+            <div className="bg-white rounded-lg border border-gray-200 px-3 py-2">
+                <div className="text-[18px] font-bold text-gray-800 leading-none">{value}</div>
+                <div className="text-[10px] text-gray-500 mt-1">{label}</div>
+                {sub && <div className="text-[9px] text-gray-400">{sub}</div>}
+            </div>
+        );
+        const Pill = ({ children, tone }) => (
+            <span className="inline-block text-[10px] font-medium px-2 py-0.5 rounded-full mr-1 mb-1" style={{ background: tone === 'warn' ? '#fffbeb' : tone === 'bad' ? '#fef2f2' : '#eff6ff', color: tone === 'warn' ? '#b45309' : tone === 'bad' ? '#b91c1c' : '#1d4ed8', border: '1px solid ' + (tone === 'warn' ? '#fde68a' : tone === 'bad' ? '#fecaca' : '#bfdbfe') }}>{children}</span>
+        );
+
+        return (
+            <div className="space-y-5">
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                    <h3 className="text-sm font-semibold text-blue-800 mb-1">Funcionamiento del Dashboard (ficha tecnica viva)</h3>
+                    <p className="text-xs text-blue-600 leading-relaxed">
+                        Esta seccion documenta — con los valores reales cargados en este momento — de donde sale la informacion,
+                        que reglas de negocio aplica el panel y como se calcula cada cosa. Sirve para <strong>supervisar las reglas, juzgarlas y solicitar cambios</strong> sin
+                        salir del dashboard. En cada regla puedes pulsar <em>"Solicitar cambio"</em> y queda registrado en el panel de Sugerencias.
+                    </p>
+                </div>
+
+                {/* ---- FUENTES DE DATOS (EN VIVO) ---- */}
+                <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+                    <h4 className="text-sm font-semibold text-gray-700 mb-3">1. Fuentes de informacion <span className="text-[10px] font-normal text-green-600">● en vivo</span></h4>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
+                        <Stat label="Proyectos cargados" value={nProy} />
+                        <Stat label="Viviendas (proy. actual)" value={nViv} sub={proyectoSel} />
+                        <Stat label="Con inspeccion/avance" value={nInsp} />
+                        <Stat label="Beneficiarios con TE1" value={te1Count} sub="set embebido" />
+                    </div>
+                    <div className="text-xs text-gray-600 space-y-1.5">
+                        <div><span className="font-semibold text-gray-700">Google Sheets</span> via Apps Script <code className="bg-gray-100 px-1 rounded text-[10px]">{endpoint ? (endpoint.slice(0, 52) + '…') : '—'}</code></div>
+                        <div className="flex flex-wrap items-center"><span className="font-semibold text-gray-700 mr-1">Tablas descargadas:</span>{tablas.map(t => <Pill key={t}>{t.trim()}</Pill>)}</div>
+                        <div><span className="font-semibold text-gray-700">Firebase RTDB</span> (lectura+escritura): <span className="text-gray-500">grupos · observaciones · actividades · consultas · muestras_hormigon · sugerencias · proyectos_terminados · ocultados · resumen_comentarios</span></div>
+                        <div><span className="font-semibold text-gray-700">Tabla de cierre en uso:</span> <code className="bg-gray-100 px-1 rounded text-[10px]">{seg.tableUsed || '—'}</code> <span className="text-gray-400">({seg.segMatchedCount != null ? seg.segMatchedCount : '?'} matches de {seg.benefDataLen != null ? seg.benefDataLen : '?'} benef.)</span></div>
+                        <div><span className="font-semibold text-gray-700">Google Drive:</span> imagenes de Curvas S (estaticas, cargadas como thumbnail)</div>
+                    </div>
+                </div>
+
+                {/* ---- SEMAFORO DE PLAZOS (leido de la config viva) ---- */}
+                <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+                    <h4 className="text-sm font-semibold text-gray-700 mb-1">2. Reglas de plazos por etapa <span className="text-[10px] font-normal text-green-600">● refleja el Editor de Tiempos</span></h4>
+                    <p className="text-[11px] text-gray-500 mb-2">Verde si dias &lt; optimo · Amarillo entre optimo y alerta · Rojo si &gt;= alerta. Si editas en "Editor de Tiempos", esta tabla cambia.</p>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                            <thead><tr className="text-gray-400 border-b border-gray-200"><th className="text-left py-1.5 px-2">Etapa</th><th className="text-center px-2">Optimo</th><th className="text-center px-2">Alerta</th><th className="text-left px-2">Depende de</th><th className="text-center px-2">Critica</th></tr></thead>
+                            <tbody>
+                                {Object.keys(etapas).map(k => { const e = etapas[k]; return (
+                                    <tr key={k} className="border-b border-gray-50">
+                                        <td className="py-1.5 px-2 text-gray-700 font-medium">{e.nombre} <span className="text-gray-400">({e.codigo})</span></td>
+                                        <td className="text-center px-2 text-gray-600">{e.tiempo_optimo ?? '—'}</td>
+                                        <td className="text-center px-2 text-gray-600">{e.tiempo_alerta ?? '—'}</td>
+                                        <td className="px-2 text-gray-500">{e.dependencia ? (etapas[e.dependencia]?.nombre || e.dependencia) : '—'}</td>
+                                        <td className="text-center px-2">{e.critico ? <span className="text-red-500 font-bold">si</span> : <span className="text-gray-300">no</span>}</td>
+                                    </tr>
+                                ); })}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div className="mt-2 text-[11px] text-gray-600"><span className="font-semibold">Pagos M.O.:</span> ciclo 25 a 25 · solo "Aprobado" · familias criticas: {familias.map(f => <Pill key={f} tone="warn">{f}</Pill>)}</div>
+                </div>
+
+                {/* ---- CURVAS S (cobertura viva) ---- */}
+                <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+                    <h4 className="text-sm font-semibold text-gray-700 mb-1">3. Curvas S — cobertura actual</h4>
+                    <div className="flex items-center gap-3 text-xs mb-2">
+                        <Stat label="Proyectos con curvas" value={curvasKeys.length + ' / ' + nProy} />
+                        <div className={"px-3 py-2 rounded-lg border " + (curvasProyActual > 0 ? "bg-green-50 border-green-200 text-green-700" : "bg-red-50 border-red-200 text-red-600")}>
+                            Proyecto actual ({proyectoSel}): {curvasProyActual > 0 ? (curvasProyActual + ' curva(s) configurada(s)') : 'SIN curvas configuradas'}
+                        </div>
+                    </div>
+                    <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2">
+                        <strong>Limitacion conocida:</strong> las Curvas S son imagenes estaticas de Drive agregadas a mano por proyecto (en codigo). El "% Real" que muestran es una foto, no el % vivo que este mismo panel ya calcula. Optimizacion sugerida: graficarlas desde la data viva.
+                    </div>
+                </div>
+
+                {/* ---- SUPERVISION DE REGLAS + SOLICITAR CAMBIO ---- */}
+                <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+                    <h4 className="text-sm font-semibold text-gray-700 mb-1">4. Supervision de reglas — juzgar y solicitar cambios</h4>
+                    <p className="text-[11px] text-gray-500 mb-3">Estado de cada regla frente al modelo de negocio. Pulsa "Solicitar cambio" para registrar una observacion en Sugerencias.</p>
+                    <div className="space-y-2">
+                        {REGLAS.map(r => { const s = estiloEstado[r.estado]; return (
+                            <div key={r.id} className="rounded-lg border p-3" style={{ background: s.bg, borderColor: s.b }}>
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: s.c, color: '#fff' }}>{s.t}</span>
+                                            <span className="text-sm font-semibold text-gray-800">{r.nombre}</span>
+                                        </div>
+                                        <p className="text-[11px] text-gray-600 mt-1 leading-relaxed">{r.detalle}</p>
+                                    </div>
+                                    <button onClick={() => { setSolReg(solReg === r.id ? null : r.id); setSolTxt(''); }} className="text-[11px] whitespace-nowrap px-2.5 py-1 rounded-md border border-gray-300 bg-white text-gray-600 hover:bg-gray-50">Solicitar cambio</button>
+                                </div>
+                                {solReg === r.id && (
+                                    <div className="mt-2 flex items-end gap-2">
+                                        <textarea value={solTxt} onChange={e => setSolTxt(e.target.value)} rows={2} placeholder={'Que cambio propones para "' + r.nombre + '"? (por que, y como deberia comportarse)'} className="flex-1 text-xs border border-gray-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-400" />
+                                        <button onClick={() => enviarSolicitud(r.nombre)} className="px-3 py-1.5 text-xs bg-violet-600 text-white rounded-lg hover:bg-violet-700 font-medium whitespace-nowrap">Enviar</button>
+                                    </div>
+                                )}
+                            </div>
+                        ); })}
+                    </div>
+                </div>
+
+                <p className="text-[10px] text-gray-400">Checkpoints de cierre rastreados ({segCheckpoints.length}): {segCheckpoints.join(' · ')}</p>
+            </div>
+        );
+    };
+
     return (
         <div>
             {/* Sub-tabs */}
             <div className="flex items-center justify-between mb-4">
                 <div className="flex gap-1 bg-white border border-gray-200 rounded-lg p-1 shadow-sm">
-                    {[["grupos", "Grupos de Trabajo"], ["diagrama", "Diagrama de Dependencias"], ["editor", "Editor de Tiempos"]].map(([k, l]) => (
+                    {[["grupos", "Grupos de Trabajo"], ["diagrama", "Diagrama de Dependencias"], ["editor", "Editor de Tiempos"], ["funcionamiento", "Funcionamiento"]].map(([k, l]) => (
                         <button key={k} onClick={() => setSubTab(k)} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${subTab === k ? "bg-raices-red text-white" : "text-gray-600 hover:bg-gray-100"}`}>
                             {l}
                         </button>
                     ))}
                 </div>
-                {subTab !== 'grupos' && (
+                {(subTab === 'diagrama' || subTab === 'editor') && (
                     <div className="flex items-center gap-2">
                         {dirty && <span className="text-xs text-orange-500 font-medium mr-2">Cambios sin guardar</span>}
                         <button onClick={restaurar} className="px-3 py-1.5 text-sm border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors">Restaurar Original</button>
@@ -5176,7 +5329,10 @@ const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel }) => {
             {/* ========== EDITOR ========== */}
             {subTab === 'editor' && <EditorTab />}
 
-            {subTab !== 'grupos' && (
+            {/* ========== FUNCIONAMIENTO ========== */}
+            {subTab === 'funcionamiento' && <FuncionamientoTab />}
+
+            {(subTab === 'diagrama' || subTab === 'editor') && (
                 <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-xs text-yellow-700">
                     <strong>Nota:</strong> Para aplicar cambios al dashboard, exporta el JSON y reemplaza <code className="bg-yellow-100 px-1 rounded">config/etapas_config.json</code>, luego regenera el dashboard.
                 </div>
@@ -6219,7 +6375,7 @@ const App = () => {
 
                 {/* CONTENIDO */}
                 <div className="min-h-[500px]">
-                    {tab === "viviendas" && <ViviendasTab viviendas={viviendas} grupos={grupos} expandida={expandida} setExpandida={setExpandida} filtro={filtro} setFiltro={setFiltro} busqueda={busqueda} setBusqueda={setBusqueda} observaciones={observaciones} addObservacion={addObservacion} deleteObservacion={deleteObservacion} showResumenObs={showResumenObs} setShowResumenObs={setShowResumenObs} actividades={actividades} toggleActividad={toggleActividad} consultas={consultas} toggleConsulta={toggleConsulta} ocultados={ocultados} ocultarBeneficiario={ocultarBeneficiario} mostrarBeneficiario={mostrarBeneficiario} onUpdateComentarioGrupo={actualizarComentarioGrupo} />}
+                    {tab === "viviendas" && <ViviendasTab viviendas={viviendas} grupos={grupos} expandida={expandida} setExpandida={setExpandida} filtro={filtro} setFiltro={setFiltro} busqueda={busqueda} setBusqueda={setBusqueda} observaciones={observaciones} addObservacion={addObservacion} deleteObservacion={deleteObservacion} showResumenObs={showResumenObs} setShowResumenObs={setShowResumenObs} actividades={actividades} toggleActividad={toggleActividad} consultas={consultas} toggleConsulta={toggleConsulta} ocultados={ocultados} ocultarBeneficiario={ocultarBeneficiario} mostrarBeneficiario={mostrarBeneficiario} onUpdateComentarioGrupo={actualizarComentarioGrupo} resumenComentarios={resumenComentarios} />}
                     {tab === "matriz" && <MatrizAvance viviendas={viviendas} grupos={grupos} />}
                     {tab === "distribucion" && <DistribucionTab viviendas={viviendas} />}
                     {tab === "financiero" && <FinancieroTab viviendas={viviendas} />}
