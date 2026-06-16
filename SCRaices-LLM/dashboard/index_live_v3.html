@@ -6114,7 +6114,7 @@ const App = () => {
 
         // CHECK 4: Solicitud vencida (>8 días sin despacho)
         // Compara: soldepacho (solicitudes) vs Despacho
-        // Detecta: Se pidió material hace más de 14 días y no se ha despachado
+        // Detecta: Solicitud que sigue "solicitada" (no cubierta por despacho) hace mas de 8 dias
         const c4 = [];
         viviendas.forEach(v => {
             Object.entries(v.estadoEtapas).forEach(([key, info]) => {
@@ -6139,17 +6139,20 @@ const App = () => {
         const c5 = [];
         viviendas.forEach(v => {
             if (v.habil && v.numDespachos === 0) {
-                c5.push({ benef: v.NOMBRES + ' ' + v.APELLIDOS, id: v.ID_Benef });
+                const dias = calcularDias(v.fecha_hpc);
+                if (dias !== null && dias > 14) {
+                    c5.push({ benef: v.NOMBRES + ' ' + v.APELLIDOS, id: v.ID_Benef, dias });
+                }
             }
         });
         checks.push({
             id: 'habil_sin_desp',
-            titulo: 'Habilitada sin Despachos',
-            desc: 'El beneficiario está marcado como "Hábil para construir" pero no tiene ningún despacho registrado. Verificar si está pendiente el inicio de obra.',
-            compara: 'Beneficiario (Habil para construir) vs Despacho (registros)',
+            titulo: 'Habilitada sin Despachos (+14 días)',
+            desc: 'El beneficiario está "Hábil para construir" desde hace más de 14 días pero no tiene ningún despacho registrado. Verificar si está pendiente el inicio de obra.',
+            compara: 'Beneficiario (fecha HPC) vs Despacho (registros)',
             tipo: 'amarillo',
             items: c5,
-            render: (it) => `${it.benef}`
+            render: (it) => `${it.benef} (${it.dias} días habilitada sin despacho)`
         });
 
         // CHECK 6: Posible Pago en Exceso
@@ -6177,6 +6180,7 @@ const App = () => {
                 const totalPagado = pagosFam.reduce((s, p) => s + p.monto, 0);
                 if (totalPagado > montoBase) {
                     const exceso = totalPagado - montoBase;
+                    if (exceso < 10000) return; // ignorar excesos menores a $10.000
                     const pctExceso = Math.round((exceso / montoBase) * 100);
                     c6.push({
                         benef: v.NOMBRES + ' ' + v.APELLIDOS,
@@ -6195,7 +6199,7 @@ const App = () => {
         checks.push({
             id: 'pago_exceso',
             titulo: 'Posible Pago en Exceso',
-            desc: 'El total pagado en Mano de Obra supera la suma de presupuestos Vivienda + Recinto Complementario (Tabla_pago). Solo compara pagos aprobados.',
+            desc: 'El total pagado en Mano de Obra supera la suma de presupuestos Vivienda + Recinto Complementario (Tabla_pago) por más de $10.000. Solo compara pagos aprobados.',
             compara: 'Solpago (pagos aprobados) vs Tabla_pago (presupuesto Viv + RC por tipología)',
             tipo: 'rojo',
             items: c6,
