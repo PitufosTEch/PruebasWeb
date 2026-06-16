@@ -1326,6 +1326,10 @@ const clasificarDespachoFino = (segmento) => {
         if (t.includes('interior') || t.includes('planta')) return ['alc_interior'];
         return ['alc_interior', 'alc_exterior']; // sin calificar: cuenta para ambas (evita falso positivo)
     }
+    // Agua potable interior (red AP) -> respalda la partida "Red Agua Pot."
+    if (!t.includes('exterior') && !t.includes(' ext') && ((t.includes('agua') && t.includes('potab')) || t.includes('red agua') || t.includes('ap interior') || t.includes('ap. interior') || t.includes('agua pot'))) {
+        return ['ap_interior'];
+    }
     if (t.includes('fundacion') && !t.includes('eifs') && !t.includes('aislacion')) return ['fundacion'];
     if (t.includes('1era')) return ['1era'];
     if (t.includes('ventana')) return ['ventana'];
@@ -1357,6 +1361,67 @@ const CHECK1_FAMILIA_TAGS = {
     "04 - Gasfiteria":  ['gasfiteria', 'sol_ac', 'alc_exterior'],
     "05 - Cerámica":    ['ceramica_piso', 'ceramica_muro'],
     "06 - Pintura":     ['pintura_ext', 'pintura_int']
+};
+
+// Mapa PARTIDA de inspeccion (VIV_COLUMNS[].short) -> despacho(s) que la respaldan (tags finos).
+// Usado por CHECK 2/3 para comparar a nivel PARTIDA y no de familia completa.
+// [] = no se evalua (Electricidad). EIFS no respalda ninguna partida (queda fuera).
+const PARTIDA_DESPACHO = {
+    "Fundaciones": ['fundacion'],
+    "Radier": ['fundacion'],
+    "Alcantarillado": ['alc_interior'],
+    "Tabiques": ['1era'],
+    "Techumbre": ['1era'],
+    "Rev. Exterior": ['1era'],
+    "Ventanas": ['ventana'],
+    "Cubierta": ['1era'],
+    "Cielo": ['1era'],
+    "Alero": ['1era'],
+    "Rev. Zona Seca": ['2da'],
+    "Rev. Zona Húmeda": ['2da'],
+    "Aisl. Muro": ['2da'],
+    "Aisl. Cielo": ['2da'],
+    "Puertas": ['2da'],
+    "Molduras": ['2da'],
+    "Cerámico Piso": ['ceramica_piso'],
+    "Cerámico Muro": ['ceramica_muro'],
+    "Pintura Ext.": ['pintura_ext'],
+    "Pintura Int.": ['pintura_int'],
+    "Red Agua Pot.": ['ap_interior'],
+    "Art. Baño": ['gasfiteria'],
+    "Art. Cocina": ['gasfiteria', 'sol_ac'],
+    "Agua Pot. Ext.": [],
+    "Alcant. Ext.": ['alc_exterior'],
+    "Red Eléctrica": [],
+    "Art. Eléctricos": [],
+    "Inst. Eléc. Ext.": []
+};
+// Inverso de PARTIDA_DESPACHO: despacho (tag) -> partidas de inspeccion que produce. Para CHECK 3.
+const DESPACHO_PARTIDAS = (() => {
+    const inv = {};
+    Object.entries(PARTIDA_DESPACHO).forEach(([partida, tags]) => {
+        (tags || []).forEach(t => { (inv[t] = inv[t] || []).push(partida); });
+    });
+    return inv;
+})();
+const DESPACHO_LABEL = {
+    fundacion: 'Fundaciones', alc_interior: 'Alcantarillado interior', alc_exterior: 'Alcantarillado exterior (fosa)',
+    '1era': '1era Etapa', ventana: 'Ventanas', '2da': '2da Etapa',
+    ceramica_piso: 'Cerámico Piso', ceramica_muro: 'Cerámico Muro',
+    pintura_ext: 'Pintura Exterior', pintura_int: 'Pintura Interior',
+    gasfiteria: 'Gasfitería', sol_ac: 'Sol. AC (cocina/calefón)', ap_interior: 'Agua Potable interior'
+};
+// Tags de despacho del beneficiario con su fecha MAS ANTIGUA (para medir dias sin inspeccion)
+const despachoTagsFechaDe = (idBenef) => {
+    const map = {};
+    DESPACHOS_DATA.filter(d => String(d.ID_Benef) === String(idBenef)).forEach(d => {
+        const fecha = d.Fecha || d.fecha;
+        if (!fecha) return;
+        String(d.Tipo_despacho || '').split(',').forEach(seg => clasificarDespachoFino(seg).forEach(tag => {
+            if (!map[tag] || new Date(fecha) < new Date(map[tag])) map[tag] = fecha;
+        }));
+    });
+    return map;
 };
 
 const calcularDias = (fecha) => {
@@ -5991,61 +6056,60 @@ const App = () => {
             render: (it) => `${it.benef} — ${it.familia} (${formatPeso(it.monto)} pagado)`
         });
 
-        // CHECK 2: Inspección alta sin Despacho
-        // Compara: Ejecucion (inspecciones acumuladas) vs Despacho
-        // Detecta: El inspector marcó avance alto pero nunca se despachó esa familia
+        // CHECK 2: Inspección alta sin Despacho (a nivel PARTIDA)
+        // Compara: cada partida de inspeccion (>=50%) vs el despacho fino que la respalda.
+        // Evita el falso positivo de marcar toda una familia cuando solo una partida con su
+        // despacho propio (ej. Alcant. Ext. = la fosa) elevaba el promedio familiar.
         const c2 = [];
         viviendas.forEach(v => {
-            const avanceFam = getAvancePorFamilia(v.ID_Benef);
-            Object.entries(FAMILIA_PAGO_MAP).forEach(([fam, etapasKeys]) => {
-                if (etapasKeys.length === 0) return;
-                const tieneDespacho = etapasKeys.some(k => v.estadoEtapas[k]?.estado === "despachado");
-                const avance = avanceFam[fam];
-                if (!tieneDespacho && avance && avance.pct >= 50) {
-                    c2.push({ benef: v.NOMBRES + ' ' + v.APELLIDOS, id: v.ID_Benef, familia: FAMILIA_LABELS[fam] || fam, pct: avance.pct });
+            const insp = getInspeccion(v.ID_Benef);
+            if (!insp || !insp.partidas) return;
+            const tags = despachoTagsDe(v.ID_Benef);
+            Object.entries(insp.partidas).forEach(([partida, pct]) => {
+                const backing = PARTIDA_DESPACHO[partida];
+                if (!backing || backing.length === 0) return; // no evaluada (Electricidad) o desconocida
+                if (pct >= 50 && !backing.some(t => tags.has(t))) {
+                    c2.push({ benef: v.NOMBRES + ' ' + v.APELLIDOS, id: v.ID_Benef, partida, pct });
                 }
             });
         });
         checks.push({
             id: 'insp_sin_despacho',
             titulo: 'Inspección sin Despacho',
-            desc: 'La inspección registra avance significativo (>=50%) en partidas de una familia, pero no hay despacho de material. Puede que se esté trabajando con material de otra fuente o falta registrar despacho.',
-            compara: 'Ejecucion (% inspección por partida) vs Despacho (entregas)',
+            desc: 'Una partida de inspección registra avance significativo (>=50%) pero no hay despacho del material que la respalda. Se compara por partida (no por familia completa): así una partida con su propio despacho (ej. Alcant. Ext. = la fosa) ya no marca a toda la Gasfitería. No se evalúa Electricidad.',
+            compara: 'Ejecucion (% inspección por partida) vs Despacho que respalda esa partida',
             tipo: 'rojo',
             items: c2,
-            render: (it) => `${it.benef} — ${it.familia} (Insp: ${it.pct}%)`
+            render: (it) => `${it.benef} — ${it.partida} (Insp: ${it.pct}%)`
         });
 
-        // CHECK 3: Despacho sin Inspección
-        // Compara: Despacho vs Ejecucion
-        // Detecta: Se despachó material pero la inspección no registra avance
+        // CHECK 3: Despacho sin Inspección (a nivel DESPACHO)
+        // Por cada despacho del beneficiario (>12 dias), revisa las partidas que ESE material
+        // produce: si todas siguen <10%, marca. Misma logica fina que CHECK 2, al reves.
         const c3 = [];
         viviendas.forEach(v => {
             const insp = getInspeccion(v.ID_Benef);
-            Object.entries(FAMILIA_PAGO_MAP).forEach(([fam, etapasKeys]) => {
-                if (etapasKeys.length === 0) return;
-                const tieneDespacho = etapasKeys.some(k => v.estadoEtapas[k]?.estado === "despachado");
-                const fechaDesp = etapasKeys.reduce((min, k) => {
-                    const f = v.estadoEtapas[k]?.fechaDespacho;
-                    return f && (!min || f < min) ? f : min;
-                }, null);
-                if (!tieneDespacho || !fechaDesp) return;
-                const diasDesdeDesp = Math.floor((new Date() - new Date(fechaDesp)) / (1000*60*60*24));
-                const avanceFam = getAvancePorFamilia(v.ID_Benef);
-                const avance = avanceFam[fam];
-                if (diasDesdeDesp > 12 && (!avance || avance.pct < 10)) {
-                    c3.push({ benef: v.NOMBRES + ' ' + v.APELLIDOS, id: v.ID_Benef, familia: FAMILIA_LABELS[fam] || fam, dias: diasDesdeDesp, pct: avance ? avance.pct : 0 });
+            const partidas = (insp && insp.partidas) || {};
+            const tagsFecha = despachoTagsFechaDe(v.ID_Benef);
+            Object.entries(tagsFecha).forEach(([tag, fecha]) => {
+                const backed = DESPACHO_PARTIDAS[tag];
+                if (!backed || backed.length === 0) return; // despacho que no produce partida evaluable
+                const dias = Math.floor((new Date() - new Date(fecha)) / (1000*60*60*24));
+                if (dias <= 12) return;
+                const maxPct = backed.reduce((m, p) => Math.max(m, partidas[p] || 0), 0);
+                if (maxPct < 10) {
+                    c3.push({ benef: v.NOMBRES + ' ' + v.APELLIDOS, id: v.ID_Benef, material: DESPACHO_LABEL[tag] || tag, dias, pct: maxPct });
                 }
             });
         });
         checks.push({
             id: 'desp_sin_insp',
             titulo: 'Despacho sin Inspección (+12 días)',
-            desc: 'Se despachó material hace más de 12 días pero la inspección registra menos de 10% de avance. Puede que falte una inspección o que el trabajo no haya comenzado.',
-            compara: 'Despacho (fecha entrega) vs Ejecucion (% avance acumulado)',
+            desc: 'Se despachó un material hace más de 12 días pero las partidas de inspección que ese material produce siguen bajo 10%. Se evalúa por tipo de despacho (no por familia completa). No se evalúan Electricidad ni Agua Potable exterior.',
+            compara: 'Despacho (fecha entrega, clasificado) vs Inspección de las partidas que produce',
             tipo: 'naranja',
             items: c3,
-            render: (it) => `${it.benef} — ${it.familia} (${it.dias}d desde despacho, Insp: ${it.pct}%)`
+            render: (it) => `${it.benef} — ${it.material} (${it.dias}d desde despacho, Insp: ${it.pct}%)`
         });
 
         // CHECK 4: Solicitud vencida (>8 días sin despacho)
