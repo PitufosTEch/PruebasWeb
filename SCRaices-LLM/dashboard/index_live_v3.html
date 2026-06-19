@@ -4109,15 +4109,21 @@ ${inf.footerHtml}
     };
 
     // Reporte obra/logística — igual que ejecutivo pero sección "Contrato y Garantías" → "Programa" con fechas del Gantt
-    const generarInformeObraLogistica = () => {
+    const generarInformeObraLogistica = async () => {
         const inf = construirInforme();
         const fmtFechaInf = (iso) => { if (!iso) return '—'; const p = String(iso).substring(0, 10).split('-'); return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : String(iso); };
 
-        // Obtener fechas del Gantt de control desde Firebase (actualizar_gantt_programa.py)
+        // Fetch directo a Firebase — no depende del estado React ni de timing de carga
+        let _ganttRaw = {};
+        try {
+            const _r = await fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/gantt_programa.json');
+            _ganttRaw = (await _r.json()) || {};
+        } catch(_e) { _ganttRaw = {}; }
+
         let programaCard;
         let inicioGantt = null, terminoGantt = null, plazoGantt = null, diasRestantesGantt = null;
 
-        const pgData = ganttPrograma[proyectoSel] || null;
+        const pgData = _ganttRaw[proyectoSel] || null;
         if (pgData && pgData.inicio && pgData.finProg) {
             inicioGantt = pgData.inicio;
             terminoGantt = pgData.finProg;
