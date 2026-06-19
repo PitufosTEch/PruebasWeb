@@ -4151,12 +4151,68 @@ ${inf.footerHtml}
             programaCard = `<div class="rc-card"><div class="rc-h">Programa</div><div style="color:#94a3b8;font-size:11px;padding:8px 0;">Sin datos de programa. Verificar que actualizar_gantt_programa.py se haya ejecutado.</div></div>`;
         }
 
-        // Construir portada con sección "Programa" en lugar de "Contrato y Garantías"
-        const portadaObraHtml = inf.portadaHtml
+        // ── Modificaciones para informe Obra/Logística ──
+        // Checkpoints excluidos del informe de obra (no relevantes para logística de terreno)
+        const CP_OBRA_EXCL = ['V.AS', 'V.F1', 'F.V.DOM', 'F.Recep'];
+        const CP_OBRA_TOTAL = 12 - CP_OBRA_EXCL.length; // 8 checkpoints restantes
+
+        // --- Portada ---
+        let portadaObraHtml = inf.portadaHtml
             .replace('<div class="sec-title">Contrato y Garantías</div>', '<div class="sec-title">Programa</div>')
             .replace(inf.contratoCard, programaCard);
 
-        const gruposHtml = inf.gruposPaginas.map(g => `<div class="grupo-page page-break">${g.contenidoHtml}</div>`).join('');
+        // (1) Eliminar card de Garantías — busca div.rc-card con ese header y elimina hasta su </div> de cierre
+        const _rmRcCard = (html, hdrText) => {
+            const sm = '<div class="rc-card"><div class="rc-h">' + hdrText + '</div>';
+            const si = html.indexOf(sm);
+            if (si === -1) return html;
+            let depth = 0, pos = si;
+            while (pos < html.length) {
+                if (html.substring(pos, pos + 4) === '<div') { depth++; const gt = html.indexOf('>', pos); pos = gt + 1; }
+                else if (html.substring(pos, pos + 6) === '</div>') { depth--; pos += 6; if (depth === 0) break; }
+                else pos++;
+            }
+            return html.substring(0, si) + html.substring(pos);
+        };
+        portadaObraHtml = _rmRcCard(portadaObraHtml, 'Garantías');
+
+        // (2) Eliminar KPIs de checkpoints excluidos de la sección "Checkpoints del Proyecto"
+        portadaObraHtml = portadaObraHtml.replace(
+            /<div style="border:1px solid [^;]+;border-radius:8px;padding:7px 3px[^"]*"><div style="font-size:8\.5px;font-weight:600;color:#64748b;">(V\.AS|V\.F1|F\.V\.DOM|F\.Recep)<\/div><div style="[^"]*">\d+<\/div><div style="[^"]*">\/\s*\d+<\/div><\/div>/g,
+            ''
+        );
+
+        // --- Páginas de grupos ---
+        const gruposHtml = inf.gruposPaginas.map(g => {
+            let contenido = g.contenidoHtml;
+
+            // (3) Eliminar sección "Comentarios Recientes por Beneficiario"
+            contenido = contenido.replace(
+                /<div class="sec-title">Comentarios Recientes por Beneficiario<\/div>[\s\S]*/,
+                ''
+            );
+
+            // (4) Procesar chips y actualizar conteo X/12 → X'/8 por beneficiario
+            //     Cada beneficiario tiene 2 <tr>: datos (con X/12) + chips (colspan="5")
+            contenido = contenido.replace(
+                /(<td style="padding:7px 10px 2px;text-align:center;color:#475569;">)(\d+)(\/12)(<\/td>[\s\S]*?<tr[^>]*><td colspan="5"[^>]*>)([\s\S]*?)(<\/td><\/tr>)/g,
+                (match, tdOpen, count, _slash12, closingPart, chips, ending) => {
+                    let greenRemoved = 0;
+                    CP_OBRA_EXCL.forEach(label => {
+                        const lRe = label.replace(/\./g, '\\.');
+                        if (new RegExp('background:#dcfce7[^>]*>' + lRe + '<\\/span>').test(chips)) greenRemoved++;
+                    });
+                    const newChips = chips.replace(
+                        /<span style="[^"]*">(V\.AS|V\.F1|F\.V\.DOM|F\.Recep)<\/span>/g, ''
+                    );
+                    const newCount = parseInt(count) - greenRemoved;
+                    return tdOpen + newCount + '/' + CP_OBRA_TOTAL + closingPart + newChips + ending;
+                }
+            );
+
+            return '<div class="grupo-page page-break">' + contenido + '</div>';
+        }).join('');
+
         const html = `<!DOCTYPE html>
 <html lang="es">
 <head>
