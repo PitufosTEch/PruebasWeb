@@ -11,6 +11,7 @@
     <script src="https://unpkg.com/@babel/standalone@7.25.6/babel.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
     <script>
         // Firebase Config
         const firebaseConfig = {
@@ -2056,7 +2057,17 @@ const HeaderProyecto = ({ proy, garantiasProy, eeppResumen, kpis }) => {
         const pctMarca90 = dur > 90 ? Math.round(diaMarca90 / dur * 100) : null;
         const fechaMarca90 = dur > 90 ? (() => { const d = new Date(inicio); d.setDate(d.getDate() + diaMarca90); return d.toISOString().substring(0,10); })() : null;
         const enFaseCierre = !kpis?.esFinalizado && diasTranscurridos >= diaMarca90 && dur > 90;
-        return { inicio: fi, duracion: dur, vencimiento: vencimiento.toISOString().substring(0,10), diasRestantes, diasTranscurridos, pctTranscurrido, pctMarca90, fechaMarca90, enFaseCierre };
+        // Marca de cierre real: ultima recepcion definitiva del proyecto, o fecha de marcado "Terminado"
+        let pctCierre = null, fechaCierre = null, diasCierreVsVenc = null;
+        if (kpis && kpis.fechaFin) {
+            const fc = new Date(kpis.fechaFin);
+            if (!isNaN(fc.getTime())) {
+                fechaCierre = String(kpis.fechaFin).substring(0, 10);
+                pctCierre = Math.round((fc - inicio) / 86400000 / dur * 100);
+                diasCierreVsVenc = Math.floor((vencimiento - fc) / 86400000); // + = antes del vencimiento, - = despues
+            }
+        }
+        return { inicio: fi, duracion: dur, vencimiento: vencimiento.toISOString().substring(0,10), diasRestantes, diasTranscurridos, pctTranscurrido, pctMarca90, fechaMarca90, enFaseCierre, pctCierre, fechaCierre, diasCierreVsVenc };
     }, [proy, kpis]);
 
     const formatFecha = (iso) => { if (!iso) return "—"; const [y,m,d] = iso.split("-"); return `${d}/${m}/${y}`; };
@@ -2094,9 +2105,17 @@ const HeaderProyecto = ({ proy, garantiasProy, eeppResumen, kpis }) => {
                             {contratoInfo.pctTranscurrido > 8 && contratoInfo.pctTranscurrido <= 100 && <div className="absolute inset-0 flex items-center" style={{left: `${Math.min(contratoInfo.pctTranscurrido, 100) - 1}%`}}>
                                 <div className="w-0.5 h-4 bg-gray-700 rounded-full" style={{marginTop: "-2px"}}></div>
                             </div>}
+                            {contratoInfo.pctCierre !== null && <div className="absolute inset-0 flex items-center" style={{left: `${Math.max(0, Math.min(contratoInfo.pctCierre, 100))}%`}}>
+                                <div className="w-1 h-6 bg-emerald-600 rounded-full ring-1 ring-white" style={{marginTop: "-6px"}} title={`Cierre del proyecto: ${formatFecha(contratoInfo.fechaCierre)} (${kpis && kpis.finalizadoManual && !kpis.finalizadoRecep ? 'marcado Terminado' : 'ultima recepcion definitiva'})`}></div>
+                            </div>}
                         </div>
                         {contratoInfo.pctMarca90 !== null && <div className="flex items-center justify-end mt-0.5">
                             <span className="text-[8px] text-red-500" style={{marginRight: `${100 - contratoInfo.pctMarca90 - 3}%`}}>&#9660; 90d</span>
+                        </div>}
+                        {contratoInfo.fechaCierre && <div className="mt-1 flex items-center gap-1.5 text-[10px]">
+                            <span className="inline-block w-2 h-2 rounded-full bg-emerald-600"></span>
+                            <span className="font-semibold text-emerald-700">{kpis && kpis.finalizadoManual && !kpis.finalizadoRecep ? "Terminado" : "Recepcion definitiva final"}: {formatFecha(contratoInfo.fechaCierre)}</span>
+                            {contratoInfo.diasCierreVsVenc !== null && <span className="text-gray-400">{contratoInfo.diasCierreVsVenc >= 0 ? `(${contratoInfo.diasCierreVsVenc}d antes del vencimiento)` : `(${Math.abs(contratoInfo.diasCierreVsVenc)}d despues del vencimiento)`}</span>}
                         </div>}
                         {contratoInfo.pctTranscurrido >= 100 && <p className="text-[9px] text-red-500 font-semibold mt-1 text-center">Plazo excedido por {contratoInfo.diasTranscurridos - contratoInfo.duracion} dias</p>}
                         {contratoInfo.enFaseCierre && contratoInfo.diasRestantes >= 0 && <div className="mt-2 bg-red-50 border border-red-300 rounded-lg px-3 py-2">
@@ -5459,6 +5478,123 @@ const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel }) => {
 };
 
 // ===== APP PRINCIPAL =====
+// ===== EXPORTAR: Solicitudes de Pago M.O. APROBADAS pero NO PAGADAS (EN CURSO) =====
+// Hace su propia consulta fresca al Apps Script (independiente del pipeline del dashboard)
+// Criterio: Estado Solicitud = Aprobado  Y  sin Comprobante (Estado Operacion pendiente).
+async function exportarSolpagoEnCurso(btn) {
+    if (typeof XLSX === 'undefined') { alert('No se pudo cargar la libreria de Excel (XLSX). Revisa tu conexion y recarga.'); return; }
+    if (typeof APPS_SCRIPT_URL === 'undefined') { alert('No hay conexion a la base (APPS_SCRIPT_URL no definido).'); return; }
+    const old = btn ? btn.innerHTML : null;
+    try {
+        if (btn) { btn.disabled = true; btn.classList.add('animate-pulse'); }
+        const url = APPS_SCRIPT_URL + '?tables=' + encodeURIComponent('Solpago,Maestros,Proyectos');
+        const resp = await fetch(url, { redirect: 'follow' });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const data = await resp.json();
+        if (data.error) throw new Error(data.error);
+        const SP = (data.Solpago && data.Solpago.rows) || [];
+        const MA = (data.Maestros && data.Maestros.rows) || [];
+        const PR = (data.Proyectos && data.Proyectos.rows) || [];
+
+        const pname = {}; PR.forEach(p => { pname[String(p.ID_proy || '').trim()] = String(p.NOMBRE_PROYECTO || '').trim(); });
+        const mname = {}, mesp = {};
+        MA.forEach(m => {
+            const id = String(m.IDU_maestros || '').trim();
+            mname[id] = ((String(m.Nombres || '').trim()) + ' ' + (String(m.Apellidos || '').trim())).trim() || id;
+            mesp[id] = String(m.Especialidad || '').trim();
+        });
+        const num = x => { const n = parseFloat(String(x == null ? '' : x).replace(/[$\s.]/g, '').replace(',', '.')); return isNaN(n) ? 0 : n; };
+        const pdate = s => { s = String(s || '').trim(); if (!s) return null; if (s.includes('T')) s = s.split('T')[0]; const m = s.match(/(\d{4})-(\d{1,2})-(\d{1,2})/); if (m) return new Date(+m[1], +m[2] - 1, +m[3]); const d = new Date(s); return isNaN(d.getTime()) ? null : d; };
+
+        // FILTRO: Aprobado (Estado Solicitud) + sin Comprobante (no pagado / en curso)
+        const cand = SP.filter(s => String(s.Estado || '').toLowerCase().includes('aprobad') && !String(s.Comprobante || '').trim());
+        if (cand.length === 0) { alert('No se encontraron solicitudes APROBADAS sin pagar. (Revisa el criterio o que haya datos.)'); return; }
+        const N = cand.length;
+        const TOT = cand.reduce((a, r) => a + num(r.monto), 0);
+        const today = new Date();
+
+        const aggregate = keyFn => {
+            const m = {};
+            cand.forEach(r => { const k = keyFn(r) || '(sin dato)'; if (!m[k]) m[k] = [0, 0]; m[k][0]++; m[k][1] += num(r.monto); });
+            return Object.entries(m).sort((a, b) => b[1][1] - a[1][1]);
+        };
+        const byProy = aggregate(r => pname[String(r.ID_proy || '').trim()] || String(r.ID_proy || '').trim());
+        const byPart = aggregate(r => String(r.Familia_pago || '').trim());
+        // Maestro con especialidad
+        const mAgg = {};
+        cand.forEach(r => { const code = String(r.maestro || '').trim(); const nm = mname[code] || code || '(sin maestro)'; if (!mAgg[nm]) mAgg[nm] = [0, 0, mesp[code] || '']; mAgg[nm][0]++; mAgg[nm][1] += num(r.monto); });
+        const byMaestro = Object.entries(mAgg).sort((a, b) => b[1][1] - a[1][1]);
+
+        const ages = cand.map(r => { const d = pdate(r.fecha); return d ? Math.floor((today - d) / 86400000) : null; }).filter(x => x != null);
+        const fechaStr = today.getFullYear() + String(today.getMonth() + 1).padStart(2, '0') + String(today.getDate()).padStart(2, '0');
+
+        const wb = XLSX.utils.book_new();
+        const setMoney = (ws, colsZeroBased, fromRow) => {
+            const ref = XLSX.utils.decode_range(ws['!ref']);
+            for (let R = fromRow; R <= ref.e.r; R++) {
+                colsZeroBased.forEach(C => { const cell = ws[XLSX.utils.encode_cell({ r: R, c: C })]; if (cell && typeof cell.v === 'number') cell.z = '#,##0'; });
+            }
+        };
+
+        // Hoja Resumen
+        const resumen = [
+            ['Solicitudes de Pago M.O. APROBADAS pero NO PAGADAS (EN CURSO)'],
+            ['Criterio: Estado Solicitud = Aprobado  Y  sin Comprobante (Estado Operacion = pendiente)'],
+            ['Generado', today.toLocaleString('es-CL')],
+            [],
+            ['Total solicitudes en curso', N],
+            ['Monto total pendiente ($)', TOT],
+            ['Antiguedad promedio (dias)', ages.length ? Math.round(ages.reduce((a, b) => a + b, 0) / ages.length) : 0],
+            ['Antiguedad maxima (dias)', ages.length ? Math.max.apply(null, ages) : 0],
+            ['Proyectos involucrados', byProy.length],
+            ['Maestros involucrados', byMaestro.length],
+            ['Partidas involucradas', byPart.length],
+        ];
+        const wsR = XLSX.utils.aoa_to_sheet(resumen); wsR['!cols'] = [{ wch: 50 }, { wch: 28 }];
+        if (wsR['B6']) wsR['B6'].z = '#,##0';
+        XLSX.utils.book_append_sheet(wb, wsR, 'Resumen');
+
+        // Hojas de agregacion (Proyecto / Partida)
+        const aggSheet = (agg, col1) => {
+            const aoa = [[col1, 'N solicitudes', 'Monto pendiente ($)', '% del total']];
+            agg.forEach(([k, v]) => aoa.push([k, v[0], v[1], TOT ? Math.round(v[1] / TOT * 1000) / 10 : 0]));
+            aoa.push(['TOTAL', N, TOT, 100]);
+            const ws = XLSX.utils.aoa_to_sheet(aoa); ws['!cols'] = [{ wch: 34 }, { wch: 14 }, { wch: 20 }, { wch: 11 }];
+            setMoney(ws, [2], 1);
+            return ws;
+        };
+        XLSX.utils.book_append_sheet(wb, aggSheet(byProy, 'Proyecto'), 'Por Proyecto');
+
+        const aoaM = [['Maestro', 'Especialidad', 'N solicitudes', 'Monto pendiente ($)']];
+        byMaestro.forEach(([k, v]) => aoaM.push([k, v[2], v[0], v[1]]));
+        aoaM.push(['TOTAL', '', N, TOT]);
+        const wsM = XLSX.utils.aoa_to_sheet(aoaM); wsM['!cols'] = [{ wch: 28 }, { wch: 22 }, { wch: 14 }, { wch: 20 }];
+        setMoney(wsM, [3], 1);
+        XLSX.utils.book_append_sheet(wb, wsM, 'Por Maestro');
+
+        XLSX.utils.book_append_sheet(wb, aggSheet(byPart, 'Partida / Familia de pago'), 'Por Partida');
+
+        // Hoja Detalle
+        const det = cand.map(r => {
+            const d = pdate(r.fecha);
+            return [String(r.IDU_solpago || ''), d ? (String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear()) : '-',
+                d ? Math.floor((today - d) / 86400000) : '', pname[String(r.ID_proy || '').trim()] || String(r.ID_proy || '').trim(),
+                mname[String(r.maestro || '').trim()] || String(r.maestro || '').trim(), String(r.Familia_pago || '').trim(), num(r.monto)];
+        }).sort((a, b) => b[6] - a[6]);
+        const aoaD = [['ID Solpago', 'Fecha solicitud', 'Dias en curso', 'Proyecto', 'Maestro', 'Partida', 'Monto ($)']].concat(det);
+        const wsD = XLSX.utils.aoa_to_sheet(aoaD); wsD['!cols'] = [{ wch: 14 }, { wch: 15 }, { wch: 13 }, { wch: 28 }, { wch: 26 }, { wch: 18 }, { wch: 16 }];
+        setMoney(wsD, [6], 1);
+        XLSX.utils.book_append_sheet(wb, wsD, 'Detalle');
+
+        XLSX.writeFile(wb, 'Solpago_EnCurso_AprobadasNoPagadas_' + fechaStr + '.xlsx');
+    } catch (e) {
+        console.error('[EXPORT EnCurso]', e);
+        alert('Error al generar el Excel: ' + e.message);
+    } finally {
+        if (btn) { btn.disabled = false; btn.classList.remove('animate-pulse'); if (old != null) btn.innerHTML = old; }
+    }
+}
+
 const App = () => {
     const defaultProy = [...PROYECTOS_DATA].sort((a, b) => (b.fecha_inicio || '').localeCompare(a.fecha_inicio || ''))[0]?.ID_proy || "";
     const [proyectoSel, setProyectoSel] = React.useState(defaultProy);
@@ -6340,6 +6476,10 @@ const App = () => {
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                             </button>
                         )}
+                        <button type="button" onClick={(e) => { exportarSolpagoEnCurso(e.currentTarget); }} title="Descargar Excel: Solicitudes de pago M.O. aprobadas pero NO pagadas (en curso)" className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-300 hover:bg-emerald-100 transition-colors">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M12 3v12m0 0l-4-4m4 4l4-4"/></svg>
+                            <span className="hidden md:inline">Pagos en curso</span>
+                        </button>
                         <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowSugerencias(true); }} title="Sugerencias de mejora" className="relative p-1.5 rounded-lg text-gray-400 hover:text-violet-600 hover:bg-violet-50 transition-colors">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                             {pendientesSug > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">{pendientesSug}</span>}
