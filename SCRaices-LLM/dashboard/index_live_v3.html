@@ -4078,6 +4078,10 @@ ${comentariosHtml}`;
         return { meta: { proyNombre, proyectoSel, semana, fechaCorte, fechaGen }, css, headerHtml, portadaHtml, footerHtml, gruposPaginas, contratoCard };
     };
 
+    // Programa de ejecución desde Gantt de control (Firebase — escrito por actualizar_gantt_programa.py)
+    const [ganttPrograma, setGanttPrograma] = React.useState({});
+    const ganttProgramaRef = React.useRef(null);
+
     // Reporte ejecutivo orientado a impresion/PDF (paginas separadas por page-break)
     const generarInformePDF = () => {
         const inf = construirInforme();
@@ -6001,10 +6005,6 @@ const App = () => {
     // Proyectos marcados como terminados manualmente (Firebase)
     const [proyTerminados, setProyTerminados] = React.useState({});
     const proyTermRef = React.useRef(null);
-
-    // Programa de ejecución desde Gantt de control (Firebase — escrito por actualizar_gantt_programa.py)
-    const [ganttPrograma, setGanttPrograma] = React.useState({});
-    const ganttProgramaRef = React.useRef(null);
 
     const marcarTerminado = (proyId, motivo) => {
         const entry = { fecha: fechaChile(), motivo: motivo || '' };
