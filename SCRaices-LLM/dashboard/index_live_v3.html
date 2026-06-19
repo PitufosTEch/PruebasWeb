@@ -4109,30 +4109,16 @@ ${inf.footerHtml}
         const inf = construirInforme();
         const fmtFechaInf = (iso) => { if (!iso) return '—'; const p = String(iso).substring(0, 10).split('-'); return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : String(iso); };
 
-        // Calcular fechas del Gantt a partir de fecha_hpc por beneficiario
+        // Obtener fechas del Gantt de control desde Firebase (actualizar_gantt_programa.py)
         let programaCard;
-        const vivConFecha = viviendas.filter(v => v.fecha_hpc);
         let inicioGantt = null, terminoGantt = null, plazoGantt = null, diasRestantesGantt = null;
 
-        if (vivConFecha.length > 0) {
-            const sorted = [...vivConFecha].sort((a, b) => (a.fecha_hpc || '').localeCompare(b.fecha_hpc || ''));
-            const primerHPC = new Date(sorted[0].fecha_hpc);
-            const ultimoHPC = new Date(sorted[sorted.length - 1].fecha_hpc);
-            const dur = (proy && proy.duracion) ? proy.duracion : 0;
-            const ultimoFin = new Date(ultimoHPC);
-            ultimoFin.setDate(ultimoFin.getDate() + dur);
-            inicioGantt = sorted[0].fecha_hpc.substring(0, 10);
-            terminoGantt = ultimoFin.toISOString().substring(0, 10);
-            plazoGantt = Math.round((ultimoFin - primerHPC) / 86400000);
-            diasRestantesGantt = Math.floor((ultimoFin - new Date()) / 86400000);
-        } else if (proy && proy.fecha_inicio && proy.duracion) {
-            const inicio = new Date(proy.fecha_inicio);
-            const fin = new Date(inicio);
-            fin.setDate(fin.getDate() + proy.duracion);
-            inicioGantt = proy.fecha_inicio.substring(0, 10);
-            terminoGantt = fin.toISOString().substring(0, 10);
-            plazoGantt = proy.duracion;
-            diasRestantesGantt = Math.floor((fin - new Date()) / 86400000);
+        const pgData = ganttPrograma[proyectoSel] || null;
+        if (pgData && pgData.inicio && pgData.finProg) {
+            inicioGantt = pgData.inicio;
+            terminoGantt = pgData.finProg;
+            plazoGantt = pgData.plazo;
+            diasRestantesGantt = Math.floor((new Date(terminoGantt) - new Date()) / 86400000);
         }
 
         if (inicioGantt !== null) {
@@ -4156,7 +4142,7 @@ ${inf.footerHtml}
                 </div>
             </div>`;
         } else {
-            programaCard = `<div class="rc-card"><div class="rc-h">Programa</div><div style="color:#94a3b8;font-size:11px;padding:8px 0;">Sin datos de programa (fechas HPC no disponibles).</div></div>`;
+            programaCard = `<div class="rc-card"><div class="rc-h">Programa</div><div style="color:#94a3b8;font-size:11px;padding:8px 0;">Sin datos de programa. Verificar que actualizar_gantt_programa.py se haya ejecutado.</div></div>`;
         }
 
         // Construir portada con sección "Programa" en lugar de "Contrato y Garantías"
@@ -5777,6 +5763,11 @@ const App = () => {
         resumenRef.current.on('value', (snap) => {
             setResumenComentarios(snap.val() || {});
         });
+        // Listener Firebase para Programa de Gantt (generado por actualizar_gantt_programa.py)
+        ganttProgramaRef.current = fbDB.ref('gantt_programa');
+        ganttProgramaRef.current.once('value').then(snap => {
+            setGanttPrograma(snap.val() || {});
+        });
         return () => {
             if (gruposRef.current) gruposRef.current.off();
             if (obsRef.current) obsRef.current.off();
@@ -5788,6 +5779,7 @@ const App = () => {
             if (ocultadosRef.current) ocultadosRef.current.off();
             if (resumenRef.current) resumenRef.current.off();
             if (proyTermRef.current) proyTermRef.current.off();
+            if (ganttProgramaRef.current) ganttProgramaRef.current.off();
         };
     }, []);
 
@@ -6009,6 +6001,10 @@ const App = () => {
     // Proyectos marcados como terminados manualmente (Firebase)
     const [proyTerminados, setProyTerminados] = React.useState({});
     const proyTermRef = React.useRef(null);
+
+    // Programa de ejecución desde Gantt de control (Firebase — escrito por actualizar_gantt_programa.py)
+    const [ganttPrograma, setGanttPrograma] = React.useState({});
+    const ganttProgramaRef = React.useRef(null);
 
     const marcarTerminado = (proyId, motivo) => {
         const entry = { fecha: fechaChile(), motivo: motivo || '' };
