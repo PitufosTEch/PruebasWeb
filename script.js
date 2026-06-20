@@ -2,195 +2,193 @@
 // AGROTECH EXPERIENCE PUCÓN - INTERACTIVE SCRIPT
 // ===============================================
 
-// ========== MOBILE NAVIGATION ==========
+// ========== CACHED DOM REFERENCES ==========
 const navToggle = document.getElementById('navToggle');
-const navMenu = document.getElementById('navMenu');
-const navLinks = document.querySelectorAll('.nav-link');
+const navMenu   = document.getElementById('navMenu');
+const navbar    = document.getElementById('navbar');
+const stickyCta = document.getElementById('stickyCta');
+const finalCtaSection = document.querySelector('.final-cta-section');
+const aiLog           = document.querySelector('.ai-log');
+const annotationEls   = document.querySelectorAll('.annotation');
+const heroBackground  = document.querySelector('.hero-background');
 
-navToggle.addEventListener('click', () => {
-    navMenu.classList.toggle('active');
-});
+// Cache metric value elements to avoid repeated DOM queries inside setInterval
+const metricEls = [
+    document.querySelector('.metric:nth-child(1) .metric-value'),
+    document.querySelector('.metric:nth-child(2) .metric-value'),
+    document.querySelector('.metric:nth-child(3) .metric-value'),
+    document.querySelector('.metric:nth-child(4) .metric-value')
+];
 
-// Close menu when clicking on a link
-navLinks.forEach(link => {
-    link.addEventListener('click', () => {
-        navMenu.classList.remove('active');
-    });
-});
+// Compute once at load — avoids per-scroll matchMedia calls
+const isMobile = window.matchMedia('(max-width: 768px)').matches;
 
-// ========== NAVBAR SCROLL EFFECT ==========
-const navbar = document.getElementById('navbar');
+// ========== MOBILE NAVIGATION ==========
+navToggle.addEventListener('click', () => navMenu.classList.toggle('active'));
 
-window.addEventListener('scroll', () => {
-    if (window.scrollY > 100) {
-        navbar.classList.add('scrolled');
-    } else {
-        navbar.classList.remove('scrolled');
-    }
+document.querySelectorAll('.nav-link').forEach(link => {
+    link.addEventListener('click', () => navMenu.classList.remove('active'));
 });
 
 // ========== SMOOTH SCROLLING ==========
 document.querySelectorAll('a[href^="#"]').forEach(anchor => {
     anchor.addEventListener('click', function (e) {
-        e.preventDefault();
         const target = document.querySelector(this.getAttribute('href'));
         if (target) {
-            target.scrollIntoView({
-                behavior: 'smooth',
-                block: 'start'
-            });
+            e.preventDefault();
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
     });
 });
 
+// ========== SINGLE THROTTLED SCROLL HANDLER ==========
+// Combines navbar + parallax into one rAF-throttled listener with passive flag
+let scrollPending = false;
+
+window.addEventListener('scroll', () => {
+    if (scrollPending) return;
+    scrollPending = true;
+    requestAnimationFrame(() => {
+        const y = window.scrollY;
+        navbar.classList.toggle('scrolled', y > 100);
+        // Parallax is expensive on mobile — skip it
+        if (!isMobile && heroBackground) {
+            heroBackground.style.transform = `translateY(${y * 0.5}px)`;
+        }
+        scrollPending = false;
+    });
+}, { passive: true });
+
+// ========== SHARED OBSERVER OPTIONS ==========
+const halfThreshold  = { threshold: 0.5, rootMargin: '0px 0px -100px 0px' };
+const tenthThreshold = { threshold: 0.1 };
+
 // ========== ANIMATED COUNTERS ==========
-const observerOptions = {
-    threshold: 0.5,
-    rootMargin: '0px 0px -100px 0px'
-};
-
-const animateCounter = (element) => {
-    const target = parseInt(element.dataset.target);
-    const duration = 2000; // 2 seconds
-    const increment = target / (duration / 16); // 60fps
+const animateCounter = (el) => {
+    const target    = parseInt(el.dataset.target);
+    const increment = target / (2000 / 16); // 2 s at ~60 fps
     let current = 0;
-
-    const updateCounter = () => {
+    const tick = () => {
         current += increment;
         if (current < target) {
-            element.textContent = Math.floor(current);
-            requestAnimationFrame(updateCounter);
+            el.textContent = Math.floor(current);
+            requestAnimationFrame(tick);
         } else {
-            element.textContent = target;
+            el.textContent = target;
         }
     };
-
-    updateCounter();
+    tick();
 };
 
 const counterObserver = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
-        if (entry.isIntersecting && !entry.target.classList.contains('counted')) {
-            animateCounter(entry.target);
-            entry.target.classList.add('counted');
-        }
+        if (!entry.isIntersecting) return;
+        animateCounter(entry.target);
+        entry.target.classList.add('counted');
+        counterObserver.unobserve(entry.target); // fire-once
     });
-}, observerOptions);
+}, halfThreshold);
 
-document.querySelectorAll('.stat-number').forEach(counter => {
-    counterObserver.observe(counter);
-});
+document.querySelectorAll('.stat-number').forEach(el => counterObserver.observe(el));
 
-// ========== FADE IN ANIMATION ON SCROLL ==========
-const fadeElements = document.querySelectorAll('.feature-card, .program-card, .service-card, .pillar-card, .benchmark-card');
-
+// ========== FADE IN CARDS ==========
 const fadeObserver = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
-        if (entry.isIntersecting) {
-            entry.target.classList.add('fade-in', 'visible');
-        }
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add('visible');
+        fadeObserver.unobserve(entry.target); // fire-once
     });
-}, observerOptions);
+}, halfThreshold);
 
-fadeElements.forEach(element => {
-    element.classList.add('fade-in');
-    fadeObserver.observe(element);
+document.querySelectorAll('.feature-card, .program-card, .service-card, .pillar-card, .benchmark-card')
+    .forEach(el => {
+        el.classList.add('fade-in');
+        fadeObserver.observe(el);
+    });
+
+// ========== SECTION ENTRANCE ANIMATION ==========
+// Skip .hero — it's immediately visible and has its own CSS animations
+const sectionObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add('section-visible');
+        sectionObserver.unobserve(entry.target); // fire-once
+    });
+}, tenthThreshold);
+
+document.querySelectorAll('section:not(.hero)').forEach(section => {
+    section.classList.add('section-hidden');
+    sectionObserver.observe(section);
 });
 
+// ========== METRIC BARS ANIMATION ==========
+// Store target widths before zeroing to avoid reading style.width after reset
+const metricBars = document.querySelectorAll('.metric-fill');
+metricBars.forEach(bar => {
+    bar.dataset.targetWidth = bar.style.width;
+    bar.style.width = '0';
+});
+
+const metricsObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        const bar = entry.target;
+        setTimeout(() => { bar.style.width = bar.dataset.targetWidth; }, 100);
+        metricsObserver.unobserve(bar); // fire-once
+    });
+}, tenthThreshold);
+
+metricBars.forEach(bar => metricsObserver.observe(bar));
+
+// ========== STICKY CTA ==========
+if (isMobile && finalCtaSection) {
+    const stickyObserver = new IntersectionObserver(([entry]) => {
+        stickyCta.style.display = entry.isIntersecting ? 'none' : 'block';
+    }, tenthThreshold);
+    stickyObserver.observe(finalCtaSection);
+}
+
 // ========== FAQ ACCORDION ==========
-const faqItems = document.querySelectorAll('.faq-item');
-
-faqItems.forEach(item => {
-    const question = item.querySelector('.faq-question');
-
-    question.addEventListener('click', () => {
-        // Close other FAQs
-        faqItems.forEach(otherItem => {
-            if (otherItem !== item && otherItem.classList.contains('active')) {
-                otherItem.classList.remove('active');
-            }
-        });
-
-        // Toggle current FAQ
-        item.classList.toggle('active');
+document.querySelectorAll('.faq-item').forEach(item => {
+    item.querySelector('.faq-question').addEventListener('click', () => {
+        const isActive = item.classList.contains('active');
+        document.querySelectorAll('.faq-item.active').forEach(open => open.classList.remove('active'));
+        if (!isActive) item.classList.add('active');
     });
 });
 
 // ========== NEWSLETTER FORM ==========
-const newsletterForm = document.getElementById('newsletterForm');
-
-newsletterForm.addEventListener('submit', (e) => {
+document.getElementById('newsletterForm').addEventListener('submit', (e) => {
     e.preventDefault();
-    const email = newsletterForm.querySelector('input[type="email"]').value;
-
-    // Here you would typically send the email to your backend
-    alert(`¡Gracias por suscribirte! Te enviaremos actualizaciones a ${email}`);
-    newsletterForm.reset();
+    const form = e.currentTarget;
+    const btn  = form.querySelector('button[type="submit"]');
+    const original = btn.textContent;
+    btn.textContent = '✓ ¡Suscrito!';
+    btn.disabled = true;
+    setTimeout(() => {
+        btn.textContent = original;
+        btn.disabled = false;
+        form.reset();
+    }, 3000);
 });
 
-// ========== STICKY CTA VISIBILITY ==========
-const stickyCta = document.getElementById('stickyCta');
-const finalCtaSection = document.querySelector('.final-cta-section');
+// ========== REAL-TIME DASHBOARD ==========
+const metricConfig = [
+    { min: 20,  max: 25,  unit: '°C'    },
+    { min: 80,  max: 95,  unit: '%'     },
+    { min: 800, max: 900, unit: ' ppm'  },
+    { min: 11,  max: 14,  unit: 'k lux' }
+];
 
-const stickyObserver = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-        if (entry.isIntersecting) {
-            stickyCta.style.display = 'none';
-        } else {
-            stickyCta.style.display = 'block';
-        }
-    });
-}, {
-    threshold: 0.1
-});
-
-if (window.innerWidth <= 768) {
-    stickyObserver.observe(finalCtaSection);
-}
-
-// ========== ANIMATED METRICS BARS ==========
-const metricBars = document.querySelectorAll('.metric-fill');
-
-const metricsObserver = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-        if (entry.isIntersecting) {
-            const width = entry.target.style.width;
-            entry.target.style.width = '0';
-            setTimeout(() => {
-                entry.target.style.width = width;
-            }, 100);
-        }
-    });
-}, observerOptions);
-
-metricBars.forEach(bar => {
-    metricsObserver.observe(bar);
-});
-
-// ========== SIMULATED REAL-TIME DATA ==========
-// Simulate AI dashboard updates
 const updateDashboard = () => {
-    const metrics = [
-        { label: 'Temperatura', min: 20, max: 25, unit: '°C', selector: '.metric:nth-child(1) .metric-value' },
-        { label: 'Humedad', min: 80, max: 95, unit: '%', selector: '.metric:nth-child(2) .metric-value' },
-        { label: 'CO₂', min: 800, max: 900, unit: ' ppm', selector: '.metric:nth-child(3) .metric-value' },
-        { label: 'Luz', min: 11, max: 14, unit: 'k lux', selector: '.metric:nth-child(4) .metric-value' }
-    ];
-
-    metrics.forEach(metric => {
-        const element = document.querySelector(metric.selector);
-        if (element) {
-            const randomValue = (Math.random() * (metric.max - metric.min) + metric.min).toFixed(1);
-            element.textContent = randomValue + metric.unit;
-        }
+    metricEls.forEach((el, i) => {
+        if (!el) return;
+        const { min, max, unit } = metricConfig[i];
+        el.textContent = (Math.random() * (max - min) + min).toFixed(1) + unit;
     });
 };
 
-// Update dashboard every 5 seconds
-setInterval(updateDashboard, 5000);
-
 // ========== AI LOG SIMULATOR ==========
-const aiLog = document.querySelector('.ai-log');
 const logMessages = [
     'IA detectó baja humedad → Activó nebulizador 30 seg',
     'Temperatura alta → Incrementó ventilación',
@@ -204,127 +202,77 @@ const logMessages = [
 
 const addLogEntry = () => {
     if (!aiLog) return;
+    const entries = aiLog.querySelectorAll('.log-entry');
+    const now  = new Date();
+    const time = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const msg  = logMessages[Math.floor(Math.random() * logMessages.length)];
 
-    const logEntries = aiLog.querySelectorAll('.log-entry');
-    const randomMessage = logMessages[Math.floor(Math.random() * logMessages.length)];
-    const now = new Date();
-    const time = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+    const entry = document.createElement('div');
+    entry.className   = 'log-entry';
+    entry.textContent = `${time} - ${msg}`;
+    entry.style.cssText = 'opacity:0;transform:translateY(-10px)';
 
-    const newEntry = document.createElement('div');
-    newEntry.className = 'log-entry';
-    newEntry.textContent = `${time} - ${randomMessage}`;
-    newEntry.style.opacity = '0';
-    newEntry.style.transform = 'translateY(-10px)';
+    aiLog.insertBefore(entry, entries[0] || null);
 
-    // Insert at the beginning
-    if (logEntries.length > 0) {
-        aiLog.insertBefore(newEntry, logEntries[0]);
-    } else {
-        aiLog.appendChild(newEntry);
-    }
+    // Force reflow so initial styles paint before transition starts
+    entry.getBoundingClientRect();
+    entry.style.cssText = 'transition:opacity 0.3s ease,transform 0.3s ease;opacity:1;transform:none';
 
-    // Animate in
-    setTimeout(() => {
-        newEntry.style.transition = 'all 0.3s ease';
-        newEntry.style.opacity = '1';
-        newEntry.style.transform = 'translateY(0)';
-    }, 100);
-
-    // Keep only the last 3 entries
-    if (logEntries.length >= 3) {
-        logEntries[logEntries.length - 1].remove();
-    }
+    if (entries.length >= 3) entries[entries.length - 1].remove();
 };
 
-// Add new log entry every 8 seconds
-setInterval(addLogEntry, 8000);
-
-// ========== AI ANNOTATIONS ANIMATION ==========
+// ========== AI ANNOTATIONS ==========
 const updateAnnotations = () => {
-    const annotations = document.querySelectorAll('.annotation');
-    const mushroomCount = Math.floor(Math.random() * 10) + 30;
-    const dayCount = Math.floor(Math.random() * 5) + 10;
-    const humidity = Math.floor(Math.random() * 8) + 82;
-    const harvestHours = Math.floor(Math.random() * 24) + 36;
-
-    const updates = [
-        `Día ${dayCount} de cultivo`,
-        `${mushroomCount} hongos shiitake detectados`,
-        `Humedad óptima: ${humidity}%`,
-        `Cosecha estimada: ${harvestHours} horas`
+    const values = [
+        `Día ${Math.floor(Math.random() * 5) + 10} de cultivo`,
+        `${Math.floor(Math.random() * 10) + 30} hongos shiitake detectados`,
+        `Humedad óptima: ${Math.floor(Math.random() * 8) + 82}%`,
+        `Cosecha estimada: ${Math.floor(Math.random() * 24) + 36} horas`
     ];
-
-    annotations.forEach((annotation, index) => {
-        if (updates[index]) {
-            annotation.textContent = updates[index];
-        }
-    });
+    annotationEls.forEach((el, i) => { el.textContent = values[i]; });
 };
 
-// Update annotations every 10 seconds
-setInterval(updateAnnotations, 10000);
+// ========== INTERVAL MANAGEMENT (Page Visibility API) ==========
+// Pause all intervals when the tab is hidden to save CPU and battery
+let timers = [];
 
-// ========== PARALLAX EFFECT ==========
-window.addEventListener('scroll', () => {
-    const scrolled = window.pageYOffset;
-    const parallaxElements = document.querySelectorAll('.hero-background');
+const startTimers = () => {
+    stopTimers(); // guard against duplicates
+    timers = [
+        setInterval(updateDashboard,   5000),
+        setInterval(addLogEntry,        8000),
+        setInterval(updateAnnotations, 10000)
+    ];
+};
 
-    parallaxElements.forEach(element => {
-        element.style.transform = `translateY(${scrolled * 0.5}px)`;
-    });
+const stopTimers = () => {
+    timers.forEach(clearInterval);
+    timers = [];
+};
+
+document.addEventListener('visibilitychange', () => {
+    document.hidden ? stopTimers() : startTimers();
 });
 
-// ========== INTERSECTION OBSERVER FOR SECTIONS ==========
-const sections = document.querySelectorAll('section');
-
-const sectionObserver = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-        if (entry.isIntersecting) {
-            entry.target.style.opacity = '1';
-            entry.target.style.transform = 'translateY(0)';
-        }
-    });
-}, {
-    threshold: 0.1
-});
-
-sections.forEach(section => {
-    section.style.opacity = '0';
-    section.style.transform = 'translateY(20px)';
-    section.style.transition = 'all 0.6s ease';
-    sectionObserver.observe(section);
-});
-
-// ========== INITIALIZE ON LOAD ==========
+// ========== INITIALIZE ON DOM READY ==========
 document.addEventListener('DOMContentLoaded', () => {
-    // Set initial dashboard values
     updateDashboard();
     updateAnnotations();
-
-    // Add initial log entries
     addLogEntry();
     setTimeout(addLogEntry, 3000);
     setTimeout(addLogEntry, 6000);
-
+    startTimers();
     console.log('🌱 Agrotech Experience Pucón - Website Loaded Successfully');
 });
 
 // ========== EASTER EGG: KONAMI CODE ==========
-const konamiCode = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
-let konamiIndex = 0;
-
-document.addEventListener('keydown', (e) => {
-    if (e.key === konamiCode[konamiIndex]) {
-        konamiIndex++;
-        if (konamiIndex === konamiCode.length) {
-            document.body.style.filter = 'hue-rotate(180deg)';
-            alert('🍄 ¡Modo Hongos Psicodélicos Activado! 🍄');
-            konamiIndex = 0;
-            setTimeout(() => {
-                document.body.style.filter = 'none';
-            }, 5000);
-        }
-    } else {
-        konamiIndex = 0;
+const konami = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a'];
+let ki = 0;
+document.addEventListener('keydown', ({ key }) => {
+    ki = key === konami[ki] ? ki + 1 : 0;
+    if (ki === konami.length) {
+        document.body.style.filter = 'hue-rotate(180deg)';
+        ki = 0;
+        setTimeout(() => { document.body.style.filter = ''; }, 5000);
     }
 });
