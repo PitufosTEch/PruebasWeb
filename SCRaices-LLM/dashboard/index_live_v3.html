@@ -5032,6 +5032,29 @@ ${viewerCss}</style>
                 />
             </div>
 
+            {/* CURVAS S DE CONTROL */}
+            {(CURVAS_S_CONFIG[proyectoSel] || []).length > 0 && (
+                <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+                    <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Curvas S de Control</h3>
+                        <span className="text-[10px] text-gray-400">{(CURVAS_S_CONFIG[proyectoSel] || []).length} gráficos</span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {(CURVAS_S_CONFIG[proyectoSel] || []).map(c => (
+                            <div key={c.id} className="border border-gray-100 rounded-lg overflow-hidden">
+                                <div className="bg-gray-50 px-3 py-1.5 text-[11px] font-semibold text-gray-600 border-b border-gray-100">{c.label}</div>
+                                <img
+                                    src={`https://drive.google.com/thumbnail?id=${c.id}&sz=w800`}
+                                    alt={c.label}
+                                    className="w-full block"
+                                    loading="lazy"
+                                />
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* FILTROS */}
             <div className="flex items-center gap-2 flex-wrap">
                 <input type="text" value={busqueda} onChange={e => setBusqueda(e.target.value)}
