@@ -4309,7 +4309,7 @@ ${inf.footerHtml}
         const chartDesp = svgLineChartString({ meses:_oD, valores:_oD.map(k=>_bD[k]), color:'#10b981', fillColor:'rgba(16,185,129,0.10)', fmtMes, fmtV:(v)=>String(v) });
 
         // Curvas S — solo grupos del capataz (excluye "Total Proyecto" y "Todos los Grupos")
-        const grupoNums = new Set(gruposCapataz.map(g => { const mm=(g.nombre||'').match(/[Nn][°º]?\s*(\d+)/); return mm?parseInt(mm[1]):null; }).filter(n=>n!==null));
+        const grupoNums = new Set(gruposCapataz.map(g => { const mm=(g.nombre||'').match(/[Gg]rupo\s+(\d+)/); return mm?parseInt(mm[1]):null; }).filter(n=>n!==null));
         const curvasFull = CURVAS_S_CONFIG[proyectoSel] || [];
         const curvasCapataz = curvasFull.filter(c => { const mm=c.label.match(/[Gg]rupo\s+(\d+)/); return mm ? grupoNums.has(parseInt(mm[1])) : false; });
         const curvasHtml = curvasCapataz.length > 0
