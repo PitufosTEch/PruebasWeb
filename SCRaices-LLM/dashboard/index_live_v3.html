@@ -4236,12 +4236,6 @@ ${inf.footerHtml}
         else alert('Por favor permite ventanas emergentes para generar el PDF.');
     };
 
-    // Listado único de capataces con grupos asignados en el proyecto actual
-    const capataces = React.useMemo(() => {
-        const gd = agruparViviendas(datos, grupos);
-        return [...new Set(gd.filter(g => g.capataz).map(g => g.capataz))].sort();
-    }, [datos, grupos]);
-
     // Reporte filtrado por capataz: métricas, curvas S y grupos solo de ese capataz
     const generarReporteCapataz = async (capatazFiltro) => {
         const inf = construirInforme();
@@ -4548,6 +4542,12 @@ ${viewerCss}</style>
             };
         });
     }, [viviendas, observaciones, resumenComentarios, proyectoSel]);
+
+    // Listado único de capataces del proyecto (declarado después de datos para evitar TDZ)
+    const capataces = React.useMemo(() => {
+        const gd = agruparViviendas(datos, grupos);
+        return [...new Set(gd.filter(g => g.capataz).map(g => g.capataz))].sort();
+    }, [datos, grupos]);
 
     // Filtros + búsqueda
     const datosFiltrados = React.useMemo(() => {
