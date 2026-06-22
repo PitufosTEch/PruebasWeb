@@ -3736,6 +3736,7 @@ const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios
     const [busqueda, setBusqueda] = React.useState("");
     const [filtro, setFiltro] = React.useState("todas"); // todas | pendientes | recepcionadas
     const [grupoColapsado, setGrupoColapsado] = React.useState({}); // {grupoId: true/false}
+    const [showCapatazMenu, setShowCapatazMenu] = React.useState(false);
 
     // ── Generador de Informe PDF Semanal ─────────────────────────────────────
     // Computa todas las piezas del informe (compartido por el PDF y la version HTML navegable)
@@ -4075,7 +4076,7 @@ ${comentariosHtml}`;
   <div>Generado: ${fechaGen}</div>
 </div>`;
 
-        return { meta: { proyNombre, proyectoSel, semana, fechaCorte, fechaGen }, css, headerHtml, portadaHtml, footerHtml, gruposPaginas, contratoCard };
+        return { meta: { proyNombre, proyectoSel, semana, fechaCorte, fechaGen }, css, headerHtml, portadaHtml, footerHtml, gruposPaginas, contratoCard, muestrasHtml, gruposData };
     };
 
     // Reporte ejecutivo orientado a impresion/PDF (paginas separadas por page-break)
@@ -4227,6 +4228,175 @@ ${inf.footerHtml}
 ${inf.headerHtml}
 ${portadaObraHtml}
 ${gruposHtml}
+${inf.footerHtml}
+</body>
+</html>`;
+        const w = window.open('', '_blank', 'width=980,height=820');
+        if (w) { w.document.write(html); w.document.close(); }
+        else alert('Por favor permite ventanas emergentes para generar el PDF.');
+    };
+
+    // Listado único de capataces con grupos asignados en el proyecto actual
+    const capataces = React.useMemo(() => {
+        const gd = agruparViviendas(datos, grupos);
+        return [...new Set(gd.filter(g => g.capataz).map(g => g.capataz))].sort();
+    }, [datos, grupos]);
+
+    // Reporte filtrado por capataz: métricas, curvas S y grupos solo de ese capataz
+    const generarReporteCapataz = async (capatazFiltro) => {
+        const inf = construirInforme();
+
+        // Firebase gantt (igual que Obra)
+        const fmtFechaInf = (iso) => { if (!iso) return '—'; const p = String(iso).substring(0,10).split('-'); return p.length===3 ? `${p[2]}/${p[1]}/${p[0]}` : String(iso); };
+        let _ganttRaw = {};
+        try { const _r = await fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/gantt_programa.json'); _ganttRaw = (await _r.json()) || {}; } catch(_e) {}
+
+        let programaCard;
+        const pgData = _ganttRaw[proyectoSel] || null;
+        if (pgData && pgData.inicio && pgData.finProg) {
+            const inicioG = pgData.inicio, terminoG = pgData.finProg, plazoG = pgData.plazo;
+            const diasR = Math.floor((new Date(terminoG) - new Date()) / 86400000);
+            const estadoTxt = diasR < 0 ? `Vencido (${Math.abs(diasR)}d)` : `${diasR}d restantes`;
+            const estadoCol = diasR < 0 ? '#dc2626' : diasR < 30 ? '#b45309' : '#16a34a';
+            const pctTr = plazoG > 0 ? Math.min(100, Math.max(0, Math.round((plazoG - Math.max(0,diasR)) / plazoG * 100))) : 0;
+            const pct90 = plazoG > 90 ? Math.round((plazoG-90)/plazoG*100) : null;
+            const barCol = pctTr >= 100 ? '#ef4444' : pctTr >= 80 ? '#f59e0b' : pctTr >= 50 ? '#3b82f6' : '#22c55e';
+            programaCard = `<div class="rc-card"><div class="rc-h">Programa</div><div class="rc-grid4"><div><div class="rc-l">Inicio</div><div class="rc-v">${fmtFechaInf(inicioG)}</div></div><div><div class="rc-l">Plazo</div><div class="rc-v">${plazoG} días</div></div><div><div class="rc-l">Vencimiento</div><div class="rc-v">${fmtFechaInf(terminoG)}</div></div><div><div class="rc-l">Estado</div><div class="rc-v" style="color:${estadoCol};">${estadoTxt}</div></div></div><div style="margin-top:10px;"><div style="display:flex;justify-content:space-between;font-size:9px;color:#94a3b8;margin-bottom:3px;"><span>${fmtFechaInf(inicioG)}</span><span style="font-weight:600;">${plazoG-Math.max(0,diasR)}d / ${plazoG}d (${pctTr}%)</span><span>${fmtFechaInf(terminoG)}</span></div><div style="position:relative;height:10px;background:#e5e7eb;border-radius:6px;overflow:hidden;"><div style="height:100%;width:${Math.min(pctTr,100)}%;background:${barCol};border-radius:6px;"></div>${pct90!==null?`<div style="position:absolute;top:0;bottom:0;left:${pct90}%;width:2px;background:#dc2626;"></div>`:''}</div>${pct90!==null?`<div style="font-size:8px;color:#ef4444;text-align:right;margin-top:1px;">&#9660; 90d (fase cierre)</div>`:''}</div></div>`;
+        } else {
+            programaCard = `<div class="rc-card"><div class="rc-h">Programa</div><div style="color:#94a3b8;font-size:11px;padding:8px 0;">Sin datos de programa.</div></div>`;
+        }
+
+        // Filtrar grupos del capataz
+        const gruposCapataz = inf.gruposData.filter(g => g.capataz === capatazFiltro && g.viviendas.length > 0);
+        const vivCap = gruposCapataz.flatMap(g => g.viviendas);
+        if (vivCap.length === 0) { alert(`Sin viviendas para: ${capatazFiltro}`); return; }
+
+        // Métricas filtradas
+        const avanceReal = Math.round(vivCap.reduce((s,v) => s + (v.pctTotal || 0), 0) / vivCap.length);
+        const conInsp = vivCap.filter(v => v.pctTotal != null).length;
+        const terminadas = vivCap.filter(v => !!v.fecha_recepcion).length;
+        const criticos = vivCap.filter(v => v.estadoGeneral === 'critico').length;
+        const avColor = avanceReal >= 80 ? '#16a34a' : avanceReal >= 50 ? '#2563eb' : '#dc2626';
+
+        // Checkpoints (excluir mismos 4 que en Obra)
+        const CP_EXCL = ['V.AS', 'V.F1', 'F.V.DOM', 'F.Recep'];
+        const CP_TOTAL = CHECKPOINTS.length - CP_EXCL.length; // 8
+        const cpKpisHtml = CHECKPOINTS.filter(cp => !CP_EXCL.includes(cp.label)).map(cp => {
+            const n = vivCap.filter(v => v.flags && v.flags[cp.key]).length;
+            const tot = vivCap.length;
+            const pct = tot ? Math.round(n/tot*100) : 0;
+            const col = pct>=80?'#16a34a':pct>=40?'#b45309':'#64748b';
+            const bg  = pct>=80?'#f0fdf4':pct>=40?'#fffbeb':'#f8fafc';
+            const bd  = pct>=80?'#bbf7d0':pct>=40?'#fde68a':'#e2e8f0';
+            return `<div style="border:1px solid ${bd};border-radius:8px;padding:7px 3px;text-align:center;background:${bg};"><div style="font-size:8.5px;font-weight:600;color:#64748b;">${escapeHtmlBasic(cp.label)}</div><div style="font-size:17px;font-weight:700;color:${col};line-height:1.1;">${n}</div><div style="font-size:8.5px;color:#94a3b8;">/ ${tot}</div></div>`;
+        }).join('');
+
+        // Ritmo M.O. filtrado al capataz
+        const _bMO = {};
+        vivCap.forEach(v => (v.pagosBenef||[]).forEach(p => {
+            if (!p.fecha) return;
+            const m = p.fecha.match(/^(\d{4})-(\d{2})-(\d{2})/); if (!m) return;
+            let y=parseInt(m[1]), mo=parseInt(m[2]), d=parseInt(m[3]);
+            if (d>=25) { mo++; if (mo>12){mo=1;y++;} }
+            const ym=`${y}-${String(mo).padStart(2,'0')}`;
+            _bMO[ym]=(_bMO[ym]||0)+p.monto;
+        }));
+        const _oMO = Object.keys(_bMO).sort().slice(-12);
+        const chartMO = svgLineChartString({ meses:_oMO, valores:_oMO.map(k=>_bMO[k]), color:'#7c3aed', fillColor:'rgba(124,58,237,0.10)', fmtMes, fmtV:(v)=>fmtCorto(v) });
+
+        // Ritmo Despachos filtrado al capataz
+        const _bD = {};
+        vivCap.forEach(v => DESPACHOS_DATA.filter(x=>String(x.ID_Benef)===String(v.ID_Benef)).forEach(x => {
+            if (!x.Fecha) return;
+            const ym=x.Fecha.substring(0,7);
+            _bD[ym]=(_bD[ym]||0)+1;
+        }));
+        const _oD = Object.keys(_bD).sort().slice(-12);
+        const chartDesp = svgLineChartString({ meses:_oD, valores:_oD.map(k=>_bD[k]), color:'#10b981', fillColor:'rgba(16,185,129,0.10)', fmtMes, fmtV:(v)=>String(v) });
+
+        // Curvas S — solo grupos del capataz (excluye "Total Proyecto" y "Todos los Grupos")
+        const grupoNums = new Set(gruposCapataz.map(g => { const mm=(g.nombre||'').match(/[Nn][°º]?\s*(\d+)/); return mm?parseInt(mm[1]):null; }).filter(n=>n!==null));
+        const curvasFull = CURVAS_S_CONFIG[proyectoSel] || [];
+        const curvasCapataz = curvasFull.filter(c => { const mm=c.label.match(/[Gg]rupo\s+(\d+)/); return mm ? grupoNums.has(parseInt(mm[1])) : false; });
+        const curvasHtml = curvasCapataz.length > 0
+            ? curvasCapataz.map(c => `<div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;break-inside:avoid;"><div style="background:#f8fafc;padding:6px 12px;font-size:11px;font-weight:600;color:#475569;border-bottom:1px solid #e2e8f0;">${escapeHtmlBasic(c.label)}</div><img src="https://drive.google.com/thumbnail?id=${c.id}&sz=w800" style="width:100%;display:block;" alt="${escapeHtmlBasic(c.label)}" loading="lazy"/></div>`).join('')
+            : `<div style="color:#94a3b8;font-size:12px;padding:20px;text-align:center;border:1px dashed #e2e8f0;border-radius:8px;">Sin curvas S para este capataz.</div>`;
+
+        // Tabla resumen de grupos del capataz
+        let tablaGruposHtml = '<table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="background:#f8fafc;">'
+            + ['Grupo','Viv.','Avance Insp.','Recep.','Críticas'].map((h,i)=>`<th style="padding:7px 10px;text-align:${i===0?'left':'center'};font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:#64748b;border-bottom:1px solid #e2e8f0;">${h}</th>`).join('')
+            + '</tr></thead><tbody>';
+        gruposCapataz.forEach(g => {
+            const res = grupoResumen(g.viviendas);
+            const rec = g.viviendas.filter(v => v.flags && v.flags.fecha_recep).length;
+            const avCol = res.avanceInsp>=80?'#16a34a':res.avanceInsp>=50?'#2563eb':'#dc2626';
+            tablaGruposHtml += `<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:7px 10px;font-weight:600;">${escapeHtmlBasic(g.nombre||'Sin Asignar')}</td><td style="padding:7px 10px;text-align:center;">${res.n}</td><td style="padding:7px 10px;text-align:center;font-weight:700;color:${avCol};">${res.avanceInsp}%</td><td style="padding:7px 10px;text-align:center;">${rec}/${res.n}</td><td style="padding:7px 10px;text-align:center;color:${res.criticas>0?'#dc2626':'#94a3b8'};font-weight:${res.criticas>0?'700':'400'};">${res.criticas}</td></tr>`;
+        });
+        tablaGruposHtml += '</tbody></table>';
+
+        // Portada del capataz
+        const portadaCapatazHtml = `
+<div style="display:inline-block;background:#1a1a2e;color:#fff;padding:5px 16px;font-size:11px;font-weight:700;letter-spacing:.06em;border-radius:6px;margin-bottom:12px;">CAPATAZ: ${escapeHtmlBasic(capatazFiltro)}</div>
+<div class="sec-title">Programa</div>
+<div class="resumen-cards">${programaCard}</div>
+${inf.muestrasHtml ? '<div class="sec-title">Muestras de Hormigón</div>' + inf.muestrasHtml : ''}
+<div class="sec-title">Estado del Proyecto</div>
+<div class="kpis">
+  <div class="kpi"><div class="kpi-v" style="color:${avColor};">${avanceReal}%</div><div class="kpi-l">Avance Real (Insp.)<br><span style="font-size:8px;color:#94a3b8;">${conInsp}/${vivCap.length} con insp. · sin insp = 0%</span></div></div>
+  <div class="kpi"><div class="kpi-v" style="color:#1e3a5f;">${vivCap.length}</div><div class="kpi-l">Beneficiarios</div></div>
+  <div class="kpi"><div class="kpi-v" style="color:#16a34a;">${terminadas}</div><div class="kpi-l">Terminadas</div></div>
+  <div class="kpi"><div class="kpi-v" style="color:${criticos>0?'#dc2626':'#6b7280'};">${criticos}</div><div class="kpi-l">Críticas</div></div>
+</div>
+<div class="sec-title">Checkpoints del Proyecto</div>
+<div class="cp-grid">${cpKpisHtml}</div>
+<div class="sec-title">Ritmo de Pagos M.O. y Despachos</div>
+<div class="charts-grid">
+  <div class="chart-box"><div class="ct">Ritmo Pagos M.O.</div><div class="cs">Ciclo de pago 25 a 25 &middot; solo aprobados &middot; eje autoescalado</div>${chartMO}</div>
+  <div class="chart-box"><div class="ct">Ritmo Despachos</div><div class="cs">Cantidad de despachos por mes calendario</div>${chartDesp}</div>
+</div>
+<div class="sec-title">Curvas S de Control</div>
+<div class="curvas-grid">${curvasHtml}</div>
+<div style="display:flex;gap:18px;font-size:10px;color:#94a3b8;margin-top:10px;margin-bottom:4px;">
+  <span><span style="display:inline-block;width:20px;height:3px;background:#22c55e;border-radius:2px;vertical-align:middle;margin-right:4px;"></span>% Real</span>
+  <span><span style="display:inline-block;width:20px;height:0;border-top:2px dashed #3b82f6;vertical-align:middle;margin-right:4px;"></span>% Programado</span>
+  <span><span style="display:inline-block;width:20px;height:0;border-top:2px dashed #ef4444;vertical-align:middle;margin-right:4px;opacity:.6;"></span>% Proyectado</span>
+</div>
+<div class="sec-title">Resumen por Grupo</div>
+<div class="grupos-table">${tablaGruposHtml}</div>`;
+
+        // Páginas de grupos del capataz (mismas exclusiones que Obra)
+        const gruposCapatazNombres = new Set(gruposCapataz.map(g => g.nombre || 'Sin Asignar'));
+        const CP_OBRA_TOTAL = CP_TOTAL;
+        const labelsReCap = CP_EXCL.map(l => l.replace(/\./g,'\\.')).join('|');
+        const gruposHtmlCap = inf.gruposPaginas.filter(g => gruposCapatazNombres.has(g.nombre)).map(g => {
+            let contenido = g.contenidoHtml;
+            contenido = contenido.replace(/<div class="sec-title">Comentarios Recientes por Beneficiario<\/div>[\s\S]*/, '');
+            contenido = contenido.replace(
+                /(<td style="padding:7px 10px 2px;text-align:center;color:#475569;">)(\d+)(\/12)(<\/td>[\s\S]*?<tr[^>]*><td colspan="5"[^>]*>)([\s\S]*?)(<\/td><\/tr>)/g,
+                (match, tdOpen, count, _s12, closingPart, chips, ending) => {
+                    let gr = 0;
+                    CP_EXCL.forEach(label => { const lRe=label.replace(/\./g,'\\.'); if (new RegExp('background:#dcfce7[^>]*>'+lRe+'<\\/span>').test(chips)) gr++; });
+                    const newChips = chips.replace(new RegExp('<span style="[^"]*">('+labelsReCap+')<\\/span>','g'), '');
+                    return tdOpen+(parseInt(count)-gr)+'/'+CP_OBRA_TOTAL+closingPart+newChips+ending;
+                }
+            );
+            return '<div class="grupo-page page-break">'+contenido+'</div>';
+        }).join('');
+
+        const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Reporte Capataz ${escapeHtmlBasic(capatazFiltro)} — ${inf.meta.proyNombre} — Sem ${inf.meta.semana}</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>${inf.css}</style>
+</head>
+<body>
+<button class="print-btn no-print" onclick="window.print()">Imprimir / Guardar PDF</button>
+${inf.headerHtml}
+${portadaCapatazHtml}
+${gruposHtmlCap}
 ${inf.footerHtml}
 </body>
 </html>`;
@@ -4592,6 +4762,35 @@ ${viewerCss}</style>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
                         Reporte obra/logística
                     </button>
+                    <div style={{position:'relative'}}>
+                        <button
+                            onClick={() => setShowCapatazMenu(v => !v)}
+                            className="flex items-center gap-2 px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors"
+                            title="Genera un informe de obra filtrado por capataz (solo sus grupos, curvas S y métricas)"
+                        >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+                            Reporte por Capataz
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                        </button>
+                        {showCapatazMenu && capataces.length > 0 && (
+                            <div style={{position:'absolute',top:'calc(100% + 4px)',left:0,zIndex:200,background:'#fff',border:'1px solid #e2e8f0',borderRadius:8,boxShadow:'0 4px 20px rgba(0,0,0,.12)',minWidth:220,overflow:'hidden'}}>
+                                <div style={{padding:'6px 10px',fontSize:9,fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',color:'#94a3b8',borderBottom:'1px solid #f1f5f9'}}>Seleccionar capataz</div>
+                                {capataces.map(cap => (
+                                    <button
+                                        key={cap}
+                                        className={`capataz-report-btn-${cap.replace(/\s+/g,'_')}`}
+                                        data-capataz={cap}
+                                        onClick={() => { generarReporteCapataz(cap); setShowCapatazMenu(false); }}
+                                        style={{display:'block',width:'100%',textAlign:'left',padding:'9px 14px',fontSize:12,fontWeight:600,color:'#1a1a2e',background:'transparent',border:'none',borderBottom:'1px solid #f8fafc',cursor:'pointer'}}
+                                        onMouseEnter={e => e.currentTarget.style.background='#f0fdfa'}
+                                        onMouseLeave={e => e.currentTarget.style.background='transparent'}
+                                    >
+                                        {cap}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                     <button
                         onClick={generarInformeNavegable}
                         className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-900 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors"
