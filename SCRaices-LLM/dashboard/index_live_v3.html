@@ -4513,12 +4513,14 @@ table tr:hover{background:#fafafa;}
 @media print{.footer{display:none;}.section{display:block !important;page-break-after:always;}}
 </style>`;
 
-        const js = `<script>
+        const jsOpen = '<scr' + 'ipt>';
+        const jsClose = '</scr' + 'ipt>';
+        const js = jsOpen + `
 const secciones=${JSON.stringify(allSections)};
 let idx=0;
 function cambiar(i){idx=Math.max(0,Math.min(${obrasData.length-1},i));document.getElementById('obra-sel').value=idx;mostrar('resumen');}
 function mostrar(t){document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.tabs button').forEach(b=>b.classList.remove('active'));document.getElementById('sec-'+t).classList.add('active');event.target.classList.add('active');document.getElementById('sec-'+t).innerHTML=secciones[idx][t];}
-</script>`;
+` + jsClose;
 
         const tabs = `<div class="tabs">
 <button class="tab-btn active" onclick="mostrar('resumen')">Resumen</button>
