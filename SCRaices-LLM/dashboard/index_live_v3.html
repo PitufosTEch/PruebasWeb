@@ -4479,13 +4479,17 @@ ${inf.footerHtml}
                     const cDiasR = cFin ? Math.floor((new Date(cFin) - new Date()) / 86400000) : null;
                     const cEstado = cDiasR === null ? '—' : cDiasR < 0 ? `Vencido (${Math.abs(cDiasR)}d)` : `${cDiasR}d restantes`;
                     const cCol = cDiasR === null ? '#6b7280' : cDiasR < 0 ? '#dc2626' : cDiasR < 30 ? '#b45309' : '#16a34a';
+                    const cPctTr = cDur > 0 && cFin ? Math.min(100, Math.round((cDur - Math.max(0, cDiasR)) / cDur * 100)) : 0;
+                    const cBarCol = cPctTr >= 100 ? '#ef4444' : cPctTr >= 80 ? '#f59e0b' : cPctTr >= 50 ? '#3b82f6' : '#22c55e';
                     h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📄 Contrato</h3>
 <div class="summary-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));">
   <div class="summary-card"><div class="summary-card-label">Inicio</div><div style="font-size:14px;font-weight:700;">${fmtFecha(cIni)}</div></div>
   <div class="summary-card"><div class="summary-card-label">Término</div><div style="font-size:14px;font-weight:700;">${fmtFecha(cFin)}</div></div>
   <div class="summary-card"><div class="summary-card-label">Plazo</div><div style="font-size:14px;font-weight:700;">${cDur} días</div></div>
   <div class="summary-card"><div class="summary-card-label">Estado</div><div style="font-size:13px;font-weight:700;color:${cCol};">${cEstado}</div></div>
-</div>`;
+</div>
+<div style="margin:8px 0 4px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;"><span>${fmtFecha(cIni)}</span><span style="font-weight:600;">${cPctTr}% transcurrido</span><span>${fmtFecha(cFin)}</span></div>
+<div style="height:10px;background:#e5e7eb;border-radius:6px;overflow:hidden;margin-bottom:4px;"><div style="height:100%;width:${cPctTr}%;background:${cBarCol};border-radius:6px;"></div></div>`;
                 }
                 // Programa de Obra desde Firebase (gantt_programa)
                 const pg = ganttRaw[obra.ID_proy] || null;
