@@ -4470,7 +4470,24 @@ ${inf.footerHtml}
   <div class="summary-card"><div class="summary-card-label">Terminadas</div><div class="summary-card-value" style="color:#16a34a;">${term}</div><div class="summary-card-detail">Con recepción</div></div>
   <div class="summary-card"><div class="summary-card-label">En Proceso</div><div class="summary-card-value" style="color:#2563eb;">${tot - term}</div><div class="summary-card-detail">Sin recepción</div></div>
 </div>`;
-                // Datos de programa desde Firebase
+                // Contrato (PROYECTOS_DATA: fecha_inicio + duracion)
+                const proyRec = PROYECTOS_DATA.find(p => p.ID_proy === obra.ID_proy);
+                if (proyRec && proyRec.fecha_inicio) {
+                    const cIni = proyRec.fecha_inicio;
+                    const cDur = proyRec.duracion || 0;
+                    const cFin = cDur > 0 ? (() => { const d = new Date(cIni); d.setDate(d.getDate() + cDur); return d.toISOString().substring(0,10); })() : null;
+                    const cDiasR = cFin ? Math.floor((new Date(cFin) - new Date()) / 86400000) : null;
+                    const cEstado = cDiasR === null ? '—' : cDiasR < 0 ? `Vencido (${Math.abs(cDiasR)}d)` : `${cDiasR}d restantes`;
+                    const cCol = cDiasR === null ? '#6b7280' : cDiasR < 0 ? '#dc2626' : cDiasR < 30 ? '#b45309' : '#16a34a';
+                    h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📄 Contrato</h3>
+<div class="summary-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));">
+  <div class="summary-card"><div class="summary-card-label">Inicio</div><div style="font-size:14px;font-weight:700;">${fmtFecha(cIni)}</div></div>
+  <div class="summary-card"><div class="summary-card-label">Término</div><div style="font-size:14px;font-weight:700;">${fmtFecha(cFin)}</div></div>
+  <div class="summary-card"><div class="summary-card-label">Plazo</div><div style="font-size:14px;font-weight:700;">${cDur} días</div></div>
+  <div class="summary-card"><div class="summary-card-label">Estado</div><div style="font-size:13px;font-weight:700;color:${cCol};">${cEstado}</div></div>
+</div>`;
+                }
+                // Programa de Obra desde Firebase (gantt_programa)
                 const pg = ganttRaw[obra.ID_proy] || null;
                 if (pg && pg.inicio && pg.finProg) {
                     const diasR = Math.floor((new Date(pg.finProg) - new Date()) / 86400000);
@@ -4506,7 +4523,39 @@ ${inf.footerHtml}
                 curvas.forEach(c => h += `<div class="curva-card"><div class="curva-header">${c.label}</div><img src="https://drive.google.com/thumbnail?id=${c.id}&sz=w800" style="width:100%;display:block;" alt="${c.label}" loading="lazy"/></div>`);
                 h += `</div>`;
             } else if (tab === 'ritmos') {
-                h += `Ritmos M.O. y Despachos</div><p style="color:#94a3b8;font-size:12px;margin-top:8px;">Los gráficos de ritmo de Mano de Obra y Despachos están disponibles en el Informe Ejecutivo PDF.</p>`;
+                h += `Ritmos M.O. y Despachos</div>`;
+                const fmtCortoR = (n) => n >= 1e6 ? (n/1e6).toFixed(1)+'M' : n >= 1e3 ? (n/1e3).toFixed(0)+'k' : String(n);
+                const fmtMesR = (ym) => { if (!ym || ym.length < 7) return ym; const [y,m] = ym.split('-'); const ms=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']; return `${ms[parseInt(m,10)-1]}'${y.slice(2)}`; };
+                // Ritmo M.O. (pagos ciclo 25-25)
+                const bMO = {};
+                obra.viviendas.forEach(v => {
+                    getSolpago(v.ID_Benef).forEach(p => {
+                        if (!p.fecha) return;
+                        const m2 = p.fecha.match(/^(\d{4})-(\d{2})-(\d{2})/);
+                        if (!m2) return;
+                        let yr = parseInt(m2[1]), mo = parseInt(m2[2]), dy = parseInt(m2[3]);
+                        if (dy >= 25) { mo += 1; if (mo > 12) { mo = 1; yr += 1; } }
+                        const ym = `${yr}-${String(mo).padStart(2,'0')}`;
+                        bMO[ym] = (bMO[ym] || 0) + p.monto;
+                    });
+                });
+                const oMO = Object.keys(bMO).sort().slice(-12);
+                const chartMO = svgLineChartString({ meses: oMO, valores: oMO.map(k => bMO[k]), color: '#7c3aed', fillColor: 'rgba(124,58,237,0.10)', fmtMes: fmtMesR, fmtV: fmtCortoR });
+                // Ritmo Despachos
+                const bD = {};
+                obra.viviendas.forEach(v => {
+                    DESPACHOS_DATA.filter(x => String(x.ID_Benef) === String(v.ID_Benef)).forEach(x => {
+                        if (!x.Fecha) return;
+                        const ym = x.Fecha.substring(0, 7);
+                        bD[ym] = (bD[ym] || 0) + 1;
+                    });
+                });
+                const oD = Object.keys(bD).sort().slice(-12);
+                const chartD = svgLineChartString({ meses: oD, valores: oD.map(k => bD[k]), color: '#10b981', fillColor: 'rgba(16,185,129,0.10)', fmtMes: fmtMesR, fmtV: (v) => String(v) });
+                h += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px;">
+<div><div style="font-size:12px;font-weight:600;color:#333;margin-bottom:8px;">Ritmo Mano de Obra (ciclo 25-25)</div>${chartMO}</div>
+<div><div style="font-size:12px;font-weight:600;color:#333;margin-bottom:8px;">Ritmo Despachos (por mes)</div>${chartD}</div>
+</div>`;
             } else if (tab === 'viviendas') {
                 h += `Detalle de Viviendas</div>
 <div class="table-container"><table>
