@@ -4399,6 +4399,171 @@ ${inf.footerHtml}
         else alert('Por favor permite ventanas emergentes para generar el PDF.');
     };
 
+    // HTML Navegable Multi-Obras: selector de obra + tabs (Resumen, Checkpoints, Curvas S, Ritmos, Viviendas)
+    const generarInformeMultiObras = () => {
+        const obrasConCurva = PROYECTOS_DATA.filter(p => (CURVAS_S_CONFIG[p.ID_proy] || []).length > 0);
+        if (obrasConCurva.length === 0) { alert('No hay obras activas con curvas S configuradas.'); return; }
+
+        const obrasData = obrasConCurva.map(proy => {
+            const vivs = BENEFICIARIOS_DATA.filter(b => String(b.ID_Proy) === String(proy.ID_proy));
+            return { ID_proy: proy.ID_proy, nombre: proy.NOMBRE_PROYECTO, viviendas: vivs };
+        });
+
+        const renderTab = (idx, tab) => {
+            const obra = obrasData[idx];
+            const proy = PROYECTOS_DATA.find(p => p.ID_proy === obra.ID_proy);
+            let h = `<div class="breadcrumb">Obra <strong>${obra.nombre}</strong> · `;
+
+            if (tab === 'resumen') {
+                const av = Math.round(obra.viviendas.reduce((s,v) => s+(v.avance?.porcentaje||0),0) / Math.max(1, obra.viviendas.length));
+                const term = obra.viviendas.filter(v => v.fecha_recepcion).length;
+                const crit = obra.viviendas.filter(v => v.estadoGeneral === 'critico').length;
+                h += `Estado General</div>
+<div class="summary-grid">
+  <div class="summary-card"><div class="summary-card-label">Avance</div><div class="summary-card-value" style="color:${av>=80?'#16a34a':av>=50?'#2563eb':'#dc2626'};">${av}%</div><div class="summary-card-detail">Real</div></div>
+  <div class="summary-card"><div class="summary-card-label">Viviendas</div><div class="summary-card-value">${obra.viviendas.length}</div><div class="summary-card-detail">Total</div></div>
+  <div class="summary-card"><div class="summary-card-label">Terminadas</div><div class="summary-card-value" style="color:#16a34a;">${term}</div><div class="summary-card-detail">Recepción</div></div>
+  <div class="summary-card"><div class="summary-card-label">Críticas</div><div class="summary-card-value" style="color:${crit>0?'#dc2626':'#6b7280'};">${crit}</div></div>
+</div>`;
+                if (proy) {
+                    h += `<h3 style="font-size:13px;color:#333;margin:14px 0 8px;">📋 Contrato</h3>
+<div class="summary-grid">
+  <div class="summary-card"><div class="summary-card-label">Inicio</div><div style="font-size:13px;font-weight:600;">${proy.fecha_inicio}</div></div>
+  <div class="summary-card"><div class="summary-card-label">Plazo</div><div style="font-size:13px;font-weight:600;">${proy.duracion} días</div></div>
+</div>`;
+                }
+            } else if (tab === 'checkpoints') {
+                const CPS = [{key:'hpc',label:'HPC'},{key:'te1',label:'TE1'},{key:'visita_f1',label:'V.F1'},{key:'fecha_f1',label:'F1'},
+                             {key:'artefactado',label:'Artef.'},{key:'empalme',label:'Empalme'},{key:'visita_dom',label:'V.DOM'},{key:'recepcion_dom',label:'Recep.'}];
+                h += `Checkpoints</div><div class="summary-grid">`;
+                CPS.forEach(cp => {
+                    const n = obra.viviendas.filter(v => v.flags && v.flags[cp.key]).length;
+                    const tot = obra.viviendas.length;
+                    h += `<div class="summary-card"><div class="summary-card-label">${cp.label}</div><div class="summary-card-value" style="color:${n===tot?'#16a34a':n>0?'#2563eb':'#6b7280'};">${n}</div><div class="summary-card-detail">/ ${tot}</div></div>`;
+                });
+                h += `</div>`;
+            } else if (tab === 'curvas') {
+                const curvas = CURVAS_S_CONFIG[obra.ID_proy] || [];
+                h += `Curvas S</div><div class="curvas-grid">`;
+                curvas.forEach(c => h += `<div class="curva-card"><div class="curva-header">${c.label}</div><img src="https://drive.google.com/thumbnail?id=${c.id}&sz=w800" style="width:100%;display:block;" alt="${c.label}" loading="lazy"/></div>`);
+                h += `</div>`;
+            } else if (tab === 'ritmos') {
+                h += `Ritmos</div><p style="color:#666;font-size:12px;">Ver informe ejecutivo PDF para gráficos de ritmo M.O. y despachos.</p>`;
+            } else if (tab === 'viviendas') {
+                h += `Viviendas</div><div class="table-container"><table><thead><tr><th>Beneficiario</th><th>Avance</th><th>Estado</th><th>Recepción</th></tr></thead><tbody>`;
+                obra.viviendas.forEach(v => {
+                    const pct = v.avance?.porcentaje || 0;
+                    h += `<tr><td>${v.NOMBRES||''} ${v.APELLIDOS||''}</td><td><span style="color:${pct>=80?'#16a34a':pct>=50?'#f59e0b':'#dc2626'};font-weight:600;">${pct}%</span></td><td>${v.estadoGeneral||'normal'}</td><td>${v.fecha_recepcion?'✓':''}</td></tr>`;
+                });
+                h += `</tbody></table></div>`;
+            }
+            return h;
+        };
+
+        // Pre-generar todas las secciones de todas las obras
+        const allSections = {};
+        obrasData.forEach((o, idx) => {
+            allSections[idx] = {
+                resumen: renderTab(idx, 'resumen'),
+                checkpoints: renderTab(idx, 'checkpoints'),
+                curvas: renderTab(idx, 'curvas'),
+                ritmos: renderTab(idx, 'ritmos'),
+                viviendas: renderTab(idx, 'viviendas')
+            };
+        });
+
+        const css = `<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'IBM Plex Sans',Arial,sans-serif;background:#f5f5f5;color:#1a1a2e;}
+.multi-container{max-width:1000px;margin:0 auto;background:white;box-shadow:0 2px 8px rgba(0,0,0,.1);}
+.header{background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);color:white;padding:20px 24px;border-bottom:3px solid #8B2332;}
+.header h1{font-size:22px;margin-bottom:14px;}
+.header-controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
+.header-controls label{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;}
+.header-controls select{padding:8px 12px;border:2px solid #8B2332;border-radius:4px;background:white;color:#1a1a2e;font-weight:600;cursor:pointer;min-width:280px;}
+.tabs{display:flex;gap:0;border-bottom:1px solid #e0e0e0;background:#fafafa;padding:0 24px;overflow-x:auto;}
+.tabs button{padding:12px 14px;border:none;background:transparent;cursor:pointer;font-size:12px;font-weight:600;color:#666;border-bottom:3px solid transparent;white-space:nowrap;}
+.tabs button:hover{color:#1a1a2e;background:#f0f0f0;}
+.tabs button.active{color:#8B2332;border-bottom-color:#8B2332;background:white;}
+.content{padding:24px;min-height:500px;}
+.section{display:none;}
+.section.active{display:block;animation:fadeIn 0.3s;}
+@keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px;}
+.summary-card{background:#f8f8f8;border:1px solid #e0e0e0;border-radius:6px;padding:14px;text-align:center;}
+.summary-card-label{font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;font-weight:600;}
+.summary-card-value{font-size:26px;font-weight:700;color:#8B2332;}
+.summary-card-detail{font-size:10px;color:#999;margin-top:3px;}
+.curvas-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-top:12px;}
+.curva-card{border:1px solid #e0e0e0;border-radius:6px;overflow:hidden;}
+.curva-header{background:#f0f0f0;padding:10px 12px;font-size:11px;font-weight:600;color:#333;border-bottom:1px solid #e0e0e0;}
+.table-container{overflow-x:auto;margin-top:12px;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+table thead{background:#f5f5f5;}
+table th{padding:10px;text-align:left;font-weight:600;color:#333;border-bottom:2px solid #ddd;}
+table td{padding:10px;border-bottom:1px solid #e8e8e8;}
+table tr:hover{background:#fafafa;}
+.footer{background:#fafafa;padding:14px 24px;border-top:1px solid #e0e0e0;display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;}
+.btn{padding:8px 14px;border:1px solid #ddd;border-radius:4px;background:white;cursor:pointer;font-size:12px;font-weight:600;}
+.btn:hover{background:#f0f0f0;border-color:#999;}
+.btn-pdf{background:#8B2332;color:white;border-color:#8B2332;}
+.btn-pdf:hover{background:#6d1a27;}
+.breadcrumb{font-size:12px;color:#999;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid #e8e8e8;}
+.breadcrumb strong{color:#1a1a2e;}
+@media print{.footer{display:none;}.section{display:block !important;page-break-after:always;}}
+</style>`;
+
+        const js = `<script>
+const secciones=${JSON.stringify(allSections)};
+let idx=0;
+function cambiar(i){idx=Math.max(0,Math.min(${obrasData.length-1},i));document.getElementById('obra-sel').value=idx;mostrar('resumen');}
+function mostrar(t){document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.tabs button').forEach(b=>b.classList.remove('active'));document.getElementById('sec-'+t).classList.add('active');event.target.classList.add('active');document.getElementById('sec-'+t).innerHTML=secciones[idx][t];}
+</script>`;
+
+        const tabs = `<div class="tabs">
+<button class="tab-btn active" onclick="mostrar('resumen')">Resumen</button>
+<button class="tab-btn" onclick="mostrar('checkpoints')">Checkpoints</button>
+<button class="tab-btn" onclick="mostrar('curvas')">Curvas S</button>
+<button class="tab-btn" onclick="mostrar('ritmos')">Ritmos</button>
+<button class="tab-btn" onclick="mostrar('viviendas')">Viviendas</button>
+</div>`;
+
+        const secs = ['resumen','checkpoints','curvas','ritmos','viviendas'].map(t =>
+            `<div class="section${t==='resumen'?' active':''}" id="sec-${t}">${allSections[0][t]}</div>`
+        ).join('');
+
+        const opts = obrasData.map((o,i) => `<option value="${i}">✓ ${o.ID_proy} · ${o.nombre} (${o.viviendas.length} viv.)</option>`).join('');
+
+        const html = `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Informes Ejecutivos - Multi Obras</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+${css}</head><body>
+<div class="multi-container">
+  <div class="header"><h1>📊 Informes Ejecutivos - Multi Obras</h1>
+  <div class="header-controls"><label>Seleccionar obra:</label>
+  <select id="obra-sel" onchange="cambiar(parseInt(this.value))">${opts}</select></div></div>
+  ${tabs}
+  <div class="content">${secs}</div>
+  <div class="footer">
+  <button class="btn" onclick="cambiar(idx-1);">← Anterior</button>
+  <button class="btn" onclick="cambiar(idx+1);">Siguiente →</button>
+  <button class="btn btn-pdf" onclick="window.print();">📄 Imprimir/PDF</button></div>
+</div>
+${js}</body></html>`;
+
+        const fname = `Informes_MultiObras_${new Date().toISOString().substring(0,10)}.html`;
+        const blob = new Blob([html], {type:'text/html;charset=utf-8'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = fname;
+        document.body.appendChild(a); a.click(); a.remove();
+        const w = window.open(url, '_blank');
+        if (!w) alert('Archivo descargado: ' + fname);
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+    };
+
     // Version HTML autocontenida con menu inferior para navegar entre paginas (portada + 1 por grupo)
     const generarInformeNavegable = () => {
         const inf = construirInforme();
@@ -4792,9 +4957,9 @@ ${viewerCss}</style>
                         )}
                     </div>
                     <button
-                        onClick={generarInformeNavegable}
+                        onClick={generarInformeMultiObras}
                         className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-900 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors"
-                        title="Descarga un HTML autocontenido con menu inferior para navegar entre paginas (portada + 1 pagina por grupo)"
+                        title="Descarga HTML con selector de obra y tabs para navegar entre secciones (Resumen, Checkpoints, Curvas S, Ritmos, Viviendas)"
                     >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
                         HTML navegable
