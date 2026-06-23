@@ -4400,60 +4400,125 @@ ${inf.footerHtml}
     };
 
     // HTML Navegable Multi-Obras: selector de obra + tabs (Resumen, Checkpoints, Curvas S, Ritmos, Viviendas)
-    const generarInformeMultiObras = () => {
+    const generarInformeMultiObras = async () => {
         const obrasConCurva = PROYECTOS_DATA.filter(p => (CURVAS_S_CONFIG[p.ID_proy] || []).length > 0);
         if (obrasConCurva.length === 0) { alert('No hay obras activas con curvas S configuradas.'); return; }
+
+        // Obtener datos de programa (fechas) desde Firebase
+        let ganttRaw = {};
+        try {
+            const r = await fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/gantt_programa.json');
+            ganttRaw = (await r.json()) || {};
+        } catch(e) { ganttRaw = {}; }
+
+        const fmtFecha = (iso) => {
+            if (!iso) return '—';
+            const p = String(iso).substring(0, 10).split('-');
+            return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : String(iso);
+        };
+
+        // Helper: calcular flags de checkpoints usando globals (SEGUIMIENTO_DATA, BENEFICIARIOS_DATA)
+        const getFlags = (v) => {
+            const seg = SEGUIMIENTO_DATA[String(v.ID_Benef)] || { _has: {} };
+            return {
+                hpc:           !!v.habil,
+                te1:           !!v.has_te1,
+                visita_as:     !!seg._has.visita_as,
+                resol_as:      !!seg._has.resol_as,
+                visita_f1:     !!seg._has.visita_f1,
+                fecha_f1:      !!seg._has.fecha_f1,
+                artefactado:   !!seg._has.artefactado,
+                empalme:       !!seg._has.empalme,
+                visita_dom:    !!seg._has.visita_dom,
+                fecha_v_dom:   !!seg._has.fecha_v_dom,
+                recepcion_dom: !!seg._has.recepcion_dom,
+                fecha_recep:   !!(v.fecha_recepcion || seg._has.fecha_recep)
+            };
+        };
 
         const obrasData = obrasConCurva.map(proy => {
             const vivs = BENEFICIARIOS_DATA.filter(b => String(b.ID_Proy) === String(proy.ID_proy));
             return { ID_proy: proy.ID_proy, nombre: proy.NOMBRE_PROYECTO, viviendas: vivs };
         });
 
+        const CPS = [
+            {key:'hpc',label:'HPC'}, {key:'te1',label:'TE1'},
+            {key:'visita_as',label:'V.AS'}, {key:'resol_as',label:'R.AS'},
+            {key:'visita_f1',label:'V.F1'}, {key:'fecha_f1',label:'F1'},
+            {key:'artefactado',label:'Artef.'}, {key:'empalme',label:'Empalme'},
+            {key:'visita_dom',label:'V.DOM'}, {key:'recepcion_dom',label:'Recep.'},
+            {key:'fecha_recep',label:'F.Recep.'}
+        ];
+
         const renderTab = (idx, tab) => {
             const obra = obrasData[idx];
-            const proy = PROYECTOS_DATA.find(p => p.ID_proy === obra.ID_proy);
             let h = `<div class="breadcrumb">Obra <strong>${obra.nombre}</strong> · `;
 
             if (tab === 'resumen') {
-                const av = Math.round(obra.viviendas.reduce((s,v) => s+(v.avance?.porcentaje||0),0) / Math.max(1, obra.viviendas.length));
+                const tot = obra.viviendas.length;
+                const av = tot ? Math.round(obra.viviendas.reduce((s,v) => {
+                    const insp = getInspeccion(v.ID_Benef);
+                    return s + (insp ? insp.pct_total : 0);
+                }, 0) / tot) : 0;
+                const conInsp = obra.viviendas.filter(v => getInspeccion(v.ID_Benef) !== null).length;
                 const term = obra.viviendas.filter(v => v.fecha_recepcion).length;
-                const crit = obra.viviendas.filter(v => v.estadoGeneral === 'critico').length;
+                const crit = obra.viviendas.filter(v => getFlags(v).fecha_f1 && !v.fecha_recepcion && av < 50).length;
                 h += `Estado General</div>
 <div class="summary-grid">
-  <div class="summary-card"><div class="summary-card-label">Avance</div><div class="summary-card-value" style="color:${av>=80?'#16a34a':av>=50?'#2563eb':'#dc2626'};">${av}%</div><div class="summary-card-detail">Real</div></div>
-  <div class="summary-card"><div class="summary-card-label">Viviendas</div><div class="summary-card-value">${obra.viviendas.length}</div><div class="summary-card-detail">Total</div></div>
-  <div class="summary-card"><div class="summary-card-label">Terminadas</div><div class="summary-card-value" style="color:#16a34a;">${term}</div><div class="summary-card-detail">Recepción</div></div>
-  <div class="summary-card"><div class="summary-card-label">Críticas</div><div class="summary-card-value" style="color:${crit>0?'#dc2626':'#6b7280'};">${crit}</div></div>
+  <div class="summary-card"><div class="summary-card-label">Avance Real</div><div class="summary-card-value" style="color:${av>=80?'#16a34a':av>=50?'#2563eb':'#dc2626'};">${av}%</div><div class="summary-card-detail">${conInsp}/${tot} inspeccionadas</div></div>
+  <div class="summary-card"><div class="summary-card-label">Viviendas</div><div class="summary-card-value">${tot}</div><div class="summary-card-detail">Beneficiarios</div></div>
+  <div class="summary-card"><div class="summary-card-label">Terminadas</div><div class="summary-card-value" style="color:#16a34a;">${term}</div><div class="summary-card-detail">Con recepción</div></div>
+  <div class="summary-card"><div class="summary-card-label">En Proceso</div><div class="summary-card-value" style="color:#2563eb;">${tot - term}</div><div class="summary-card-detail">Sin recepción</div></div>
 </div>`;
-                if (proy) {
-                    h += `<h3 style="font-size:13px;color:#333;margin:14px 0 8px;">📋 Contrato</h3>
-<div class="summary-grid">
-  <div class="summary-card"><div class="summary-card-label">Inicio</div><div style="font-size:13px;font-weight:600;">${proy.fecha_inicio}</div></div>
-  <div class="summary-card"><div class="summary-card-label">Plazo</div><div style="font-size:13px;font-weight:600;">${proy.duracion} días</div></div>
-</div>`;
+                // Datos de programa desde Firebase
+                const pg = ganttRaw[obra.ID_proy] || null;
+                if (pg && pg.inicio && pg.finProg) {
+                    const diasR = Math.floor((new Date(pg.finProg) - new Date()) / 86400000);
+                    const estadoTxt = diasR < 0 ? `Vencido (${Math.abs(diasR)}d)` : `${diasR}d restantes`;
+                    const estadoCol = diasR < 0 ? '#dc2626' : diasR < 30 ? '#b45309' : '#16a34a';
+                    const pctTr = pg.plazo > 0 ? Math.min(100, Math.round((pg.plazo - Math.max(0,diasR)) / pg.plazo * 100)) : 0;
+                    const barCol = pctTr >= 100 ? '#ef4444' : pctTr >= 80 ? '#f59e0b' : pctTr >= 50 ? '#3b82f6' : '#22c55e';
+                    h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📋 Programa de Obra</h3>
+<div class="summary-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));">
+  <div class="summary-card"><div class="summary-card-label">Inicio</div><div style="font-size:14px;font-weight:700;">${fmtFecha(pg.inicio)}</div></div>
+  <div class="summary-card"><div class="summary-card-label">Término</div><div style="font-size:14px;font-weight:700;">${fmtFecha(pg.finProg)}</div></div>
+  <div class="summary-card"><div class="summary-card-label">Plazo</div><div style="font-size:14px;font-weight:700;">${pg.plazo} días</div></div>
+  <div class="summary-card"><div class="summary-card-label">Estado</div><div style="font-size:13px;font-weight:700;color:${estadoCol};">${estadoTxt}</div></div>
+</div>
+<div style="margin:10px 0 4px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;"><span>${fmtFecha(pg.inicio)}</span><span style="font-weight:600;">${pctTr}% transcurrido</span><span>${fmtFecha(pg.finProg)}</span></div>
+<div style="height:10px;background:#e5e7eb;border-radius:6px;overflow:hidden;"><div style="height:100%;width:${pctTr}%;background:${barCol};border-radius:6px;"></div></div>`;
+                } else {
+                    h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📋 Programa de Obra</h3><p style="color:#94a3b8;font-size:12px;">Sin datos de programa disponibles.</p>`;
                 }
             } else if (tab === 'checkpoints') {
-                const CPS = [{key:'hpc',label:'HPC'},{key:'te1',label:'TE1'},{key:'visita_f1',label:'V.F1'},{key:'fecha_f1',label:'F1'},
-                             {key:'artefactado',label:'Artef.'},{key:'empalme',label:'Empalme'},{key:'visita_dom',label:'V.DOM'},{key:'recepcion_dom',label:'Recep.'}];
-                h += `Checkpoints</div><div class="summary-grid">`;
+                h += `Checkpoints del Proyecto</div><div class="summary-grid" style="grid-template-columns:repeat(auto-fit,minmax(90px,1fr));">`;
+                const tot = obra.viviendas.length;
                 CPS.forEach(cp => {
-                    const n = obra.viviendas.filter(v => v.flags && v.flags[cp.key]).length;
-                    const tot = obra.viviendas.length;
-                    h += `<div class="summary-card"><div class="summary-card-label">${cp.label}</div><div class="summary-card-value" style="color:${n===tot?'#16a34a':n>0?'#2563eb':'#6b7280'};">${n}</div><div class="summary-card-detail">/ ${tot}</div></div>`;
+                    const n = obra.viviendas.filter(v => getFlags(v)[cp.key]).length;
+                    const pct = tot ? Math.round(n/tot*100) : 0;
+                    const col = n===tot?'#16a34a':n>0?'#2563eb':'#6b7280';
+                    h += `<div class="summary-card"><div class="summary-card-label">${cp.label}</div><div class="summary-card-value" style="color:${col};">${n}</div><div class="summary-card-detail">/ ${tot} · ${pct}%</div></div>`;
                 });
                 h += `</div>`;
             } else if (tab === 'curvas') {
                 const curvas = CURVAS_S_CONFIG[obra.ID_proy] || [];
-                h += `Curvas S</div><div class="curvas-grid">`;
+                h += `Curvas S de Control</div><div class="curvas-grid">`;
                 curvas.forEach(c => h += `<div class="curva-card"><div class="curva-header">${c.label}</div><img src="https://drive.google.com/thumbnail?id=${c.id}&sz=w800" style="width:100%;display:block;" alt="${c.label}" loading="lazy"/></div>`);
                 h += `</div>`;
             } else if (tab === 'ritmos') {
-                h += `Ritmos</div><p style="color:#666;font-size:12px;">Ver informe ejecutivo PDF para gráficos de ritmo M.O. y despachos.</p>`;
+                h += `Ritmos M.O. y Despachos</div><p style="color:#94a3b8;font-size:12px;margin-top:8px;">Los gráficos de ritmo de Mano de Obra y Despachos están disponibles en el Informe Ejecutivo PDF.</p>`;
             } else if (tab === 'viviendas') {
-                h += `Viviendas</div><div class="table-container"><table><thead><tr><th>Beneficiario</th><th>Avance</th><th>Estado</th><th>Recepción</th></tr></thead><tbody>`;
+                h += `Detalle de Viviendas</div>
+<div class="table-container"><table>
+<thead><tr><th>Beneficiario</th><th>Avance</th><th>HPC</th><th>TE1</th><th>F1</th><th>Empalme</th><th>Recep.</th></tr></thead><tbody>`;
                 obra.viviendas.forEach(v => {
-                    const pct = v.avance?.porcentaje || 0;
-                    h += `<tr><td>${v.NOMBRES||''} ${v.APELLIDOS||''}</td><td><span style="color:${pct>=80?'#16a34a':pct>=50?'#f59e0b':'#dc2626'};font-weight:600;">${pct}%</span></td><td>${v.estadoGeneral||'normal'}</td><td>${v.fecha_recepcion?'✓':''}</td></tr>`;
+                    const insp = getInspeccion(v.ID_Benef);
+                    const pct = insp ? insp.pct_total : null;
+                    const fl = getFlags(v);
+                    const pctTxt = pct !== null ? `${pct}%` : '—';
+                    const pctCol = pct === null ? '#94a3b8' : pct >= 80 ? '#16a34a' : pct >= 50 ? '#2563eb' : '#dc2626';
+                    const ck = (ok) => ok ? `<span style="color:#16a34a;font-weight:700;">✓</span>` : `<span style="color:#e5e7eb;">—</span>`;
+                    h += `<tr><td>${v.NOMBRES||''} ${v.APELLIDOS||''}</td><td style="font-weight:700;color:${pctCol};">${pctTxt}</td><td>${ck(fl.hpc)}</td><td>${ck(fl.te1)}</td><td>${ck(fl.fecha_f1)}</td><td>${ck(fl.empalme)}</td><td>${ck(fl.fecha_recep)}</td></tr>`;
                 });
                 h += `</tbody></table></div>`;
             }
