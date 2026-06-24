@@ -35,7 +35,7 @@ GMAIL_CFG_FILE       = Path(r"C:\Users\rodri\.claude\gmail_config.json")
 OUTPUT_DIR           = Path(os.environ.get("OUTPUT_DIR", "/tmp/informes_html" if os.name != "nt" else r"C:\Users\rodri\.claude\informes_html"))
 LOG_FILE             = Path(os.environ.get("LOG_FILE",   "/tmp/informe_html.log" if os.name != "nt" else r"C:\Users\rodri\.claude\logs\informe_html.log"))
 
-DESTINATARIO_DEFAULT = "rlagos@scraices.cl"
+DESTINATARIOS_DEFAULT = ["rlagos@scraices.cl", "aespinoza@scraices.cl"]
 REMITENTE_NOMBRE     = "SG Raíces Control"
 TIMEOUT_CARGA        = 300   # segundos esperando que cargue el dashboard
 
@@ -117,7 +117,7 @@ def capturar_html() -> Path:
 # ─────────────────────────────────────────────────────────────────────────────
 # 2. ENVIAR POR CORREO
 # ─────────────────────────────────────────────────────────────────────────────
-def enviar_correo(html_path: Path, destinatario: str):
+def enviar_correo(html_path: Path, destinatarios: list[str]):
     remitente, app_pw = _leer_credenciales()
 
     fecha  = datetime.now().strftime("%d.%m.%Y")
@@ -125,7 +125,7 @@ def enviar_correo(html_path: Path, destinatario: str):
 
     msg            = MIMEMultipart()
     msg["From"]    = f"{REMITENTE_NOMBRE} <{remitente}>"
-    msg["To"]      = destinatario
+    msg["To"]      = ", ".join(destinatarios)
     msg["Subject"] = asunto
 
     cuerpo = f"""Estimado/a,
@@ -152,13 +152,13 @@ Generado automáticamente — Panel de Control v3 SG Raíces.
     part.add_header("Content-Disposition", f'attachment; filename="{html_path.name}"')
     msg.attach(part)
 
-    log.info(f"Enviando correo a {destinatario}...")
+    log.info(f"Enviando correo a: {', '.join(destinatarios)}...")
     with smtplib.SMTP("smtp.gmail.com", 587, timeout=120) as server:
         server.ehlo()
         server.starttls()
         server.ehlo()
         server.login(remitente, app_pw)
-        server.send_message(msg)
+        server.sendmail(remitente, destinatarios, msg.as_string())
 
     log.info("Correo enviado exitosamente.")
 
@@ -168,7 +168,8 @@ Generado automáticamente — Panel de Control v3 SG Raíces.
 # ─────────────────────────────────────────────────────────────────────────────
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--para",         default=DESTINATARIO_DEFAULT)
+    parser.add_argument("--para", nargs="+", default=DESTINATARIOS_DEFAULT,
+                        help="Uno o más destinatarios (separados por espacio)")
     parser.add_argument("--solo-guardar", action="store_true")
     args = parser.parse_args()
 

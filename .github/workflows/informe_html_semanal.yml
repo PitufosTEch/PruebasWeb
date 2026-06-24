@@ -7,10 +7,10 @@ on:
     - cron: '30 13 * * 1'
   workflow_dispatch:
     inputs:
-      destinatario:
-        description: 'Correo destinatario (dejar vacío para usar el default)'
+      destinatarios:
+        description: 'Destinatarios separados por coma (vacío = lista completa)'
         required: false
-        default: 'rlagos@scraices.cl'
+        default: ''
 
 jobs:
   generar-y-enviar:
@@ -39,8 +39,15 @@ jobs:
           OUTPUT_DIR:         /tmp/informes_html
           LOG_FILE:           /tmp/informe_html.log
         run: |
-          DEST="${{ github.event.inputs.destinatario || 'rlagos@scraices.cl' }}"
-          python SCRaices-LLM/app/enviar_informe_html.py --para "$DEST"
+          # Si se pasaron destinatarios manuales, usarlos; si no, usar la lista completa
+          CUSTOM="${{ github.event.inputs.destinatarios }}"
+          if [ -n "$CUSTOM" ]; then
+            # Convertir "a@x.cl,b@x.cl" en "--para a@x.cl b@x.cl"
+            DESTS=$(echo "$CUSTOM" | tr ',' ' ')
+            python SCRaices-LLM/app/enviar_informe_html.py --para $DESTS
+          else
+            python SCRaices-LLM/app/enviar_informe_html.py
+          fi
 
       - name: Subir HTML como artefacto (respaldo 7 días)
         if: always()
