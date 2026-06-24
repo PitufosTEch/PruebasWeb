@@ -4404,12 +4404,25 @@ ${inf.footerHtml}
         const obrasConCurva = PROYECTOS_DATA.filter(p => (CURVAS_S_CONFIG[p.ID_proy] || []).length > 0);
         if (obrasConCurva.length === 0) { alert('No hay obras activas con curvas S configuradas.'); return; }
 
-        // Obtener datos de programa (fechas) desde Firebase
-        let ganttRaw = {};
+        // Obtener datos de programa (fechas) y grupos (capataz) desde Firebase
+        let ganttRaw = {}, gruposRaw = {};
         try {
-            const r = await fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/gantt_programa.json');
-            ganttRaw = (await r.json()) || {};
-        } catch(e) { ganttRaw = {}; }
+            const [rGantt, rGrupos] = await Promise.all([
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/gantt_programa.json'),
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/grupos.json')
+            ]);
+            ganttRaw  = (await rGantt.json())  || {};
+            gruposRaw = (await rGrupos.json()) || {};
+        } catch(e) { ganttRaw = {}; gruposRaw = {}; }
+
+        // Devuelve el capataz para un label de curva (ej "Grupo 1 · El Maitén") y un proyecto
+        const getCapataz = (idProy, curvaLabel) => {
+            const gList = gruposRaw[idProy] || [];
+            // Extraer la parte "Grupo X" o "Grupo Rezagados" del label
+            const grupoNombre = curvaLabel.split(' · ')[0].trim().toLowerCase();
+            const found = gList.find(g => (g.nombre || '').toLowerCase() === grupoNombre);
+            return found && found.capataz ? found.capataz : null;
+        };
 
         const fmtFecha = (iso) => {
             if (!iso) return '—';
@@ -4534,7 +4547,11 @@ ${inf.footerHtml}
             } else if (tab === 'curvas') {
                 const curvas = CURVAS_S_CONFIG[obra.ID_proy] || [];
                 h += `Curvas S de Control</div><div class="curvas-grid">`;
-                curvas.forEach(c => h += `<div class="curva-card"><div class="curva-header">${c.label}</div><img src="https://drive.google.com/thumbnail?id=${c.id}&sz=w800" style="width:100%;display:block;" alt="${c.label}" loading="lazy"/></div>`);
+                curvas.forEach(c => {
+                    const cap = getCapataz(obra.ID_proy, c.label);
+                    const capHtml = cap ? `<div style="font-size:10px;color:#64748b;margin-top:2px;">👷 ${cap}</div>` : '';
+                    h += `<div class="curva-card"><div class="curva-header">${c.label}${capHtml}</div><img src="https://drive.google.com/thumbnail?id=${c.id}&sz=w800" style="width:100%;display:block;" alt="${c.label}" loading="lazy"/></div>`;
+                });
                 h += `</div>`;
             } else if (tab === 'ritmos') {
                 h += `Ritmos M.O. y Despachos</div>`;
