@@ -6348,17 +6348,6 @@ const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel, personal
                             </div>
                             <button onClick={agregarPersonal} className="px-4 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 transition-colors whitespace-nowrap">+ Agregar</button>
                         </div>
-                        <div className="mt-3">
-                            <label className="text-[10px] text-gray-500 font-medium">Informes a recibir por correo</label>
-                            <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-1.5">
-                                {INFORME_TIPOS.map(t => (
-                                    <label key={t.key} className="flex items-center gap-1.5 text-xs cursor-pointer text-gray-600 hover:text-gray-800">
-                                        <input type="checkbox" checked={(nuevoPersonal.informes || []).includes(t.key)} onChange={e => setNuevoPersonal(p => ({ ...p, informes: e.target.checked ? [...(p.informes||[]), t.key] : (p.informes||[]).filter(k => k !== t.key) }))} className="rounded border-gray-300 text-amber-500 focus:ring-amber-400" />
-                                        {t.label}
-                                    </label>
-                                ))}
-                            </div>
-                        </div>
 
                         <div className="mt-4 grid grid-cols-2 gap-4">
                             {ROLES_PERSONAL.filter(r => personalProy.some(([,p]) => p.rol === r.key)).map(rolObj => (
