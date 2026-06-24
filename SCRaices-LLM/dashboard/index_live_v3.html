@@ -381,9 +381,9 @@ const ETAPAS_CONFIG_FULL = {
         return { ...r1, ...r2, ...r3, ...r4 };
     }
 
-    // Descarga el snapshot crudo pre-generado (CDN GitHub). Mismo formato que
-    // fetchAllData, por lo que processRawData lo procesa igual. Trae _snapshot_ts
-    // (epoch segundos) para mostrar la antiguedad en el banner.
+    // Descarga el snapshot PROCESADO pre-generado (CDN GitHub). Mismo formato
+    // que el cache de localStorage (saveProcessedCache), por lo que se aplica
+    // con restoreFromCache. Trae `ts` (ms) para mostrar la antiguedad.
     async function fetchSnapshot() {
         const resp = await fetch(SNAPSHOT_URL + '?t=' + Date.now(), { cache: 'no-store' });
         if (!resp.ok) throw new Error('Snapshot HTTP ' + resp.status);
@@ -1198,11 +1198,11 @@ const ETAPAS_CONFIG_FULL = {
             try {
                 updateLoading('Cargando datos pre-cargados...', 15, 'Snapshot (CDN)');
                 const snap = await fetchSnapshot();
-                processRawData(snap);
+                restoreFromCache(snap);
                 saveProcessedCache();
                 renderApp();
                 snapshotOk = true;
-                const snapTs = snap._snapshot_ts ? snap._snapshot_ts * 1000 : Date.now();
+                const snapTs = snap.ts || Date.now();
                 showCacheBanner(snapTs);
                 console.log('[SNAPSHOT] Render desde snapshot (' + formatCacheAge(snapTs) + ')');
             } catch (e) {
