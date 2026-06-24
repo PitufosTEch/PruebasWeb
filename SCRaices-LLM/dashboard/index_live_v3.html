@@ -2118,7 +2118,7 @@ const ViviendaCard = ({ beneficiario, estadoEtapas, expanded, onToggle, grupoCol
 };
 
 // ===== HEADER PROYECTO =====
-const HeaderProyecto = ({ proy, garantiasProy, eeppResumen, kpis }) => {
+const HeaderProyecto = ({ proy, garantiasProy, eeppResumen, kpis, avanceInsp = 0 }) => {
     if (!proy) return null;
     const contratoInfo = React.useMemo(() => {
         const fi = proy.fecha_inicio;
@@ -2252,15 +2252,23 @@ const HeaderProyecto = ({ proy, garantiasProy, eeppResumen, kpis }) => {
                                 <span className="text-[10px] text-gray-400">{montoProy > 0 ? 'Total Proyecto' : 'Total EP'}</span>
                                 <span className="text-[11px] font-mono font-bold text-violet-800">{formatUF(base)}</span>
                             </div>
-                            <div className="flex rounded-full h-5 overflow-hidden mb-2 bg-violet-100">
-                                {pagado > 0 && <div className="bg-green-500 flex items-center justify-center text-[9px] font-bold text-white" style={{width:`${w(pagado)}%`}}>{w(pagado)}%</div>}
-                                {ingresado > 0 && <div className="bg-yellow-400 flex items-center justify-center text-[9px] font-bold text-yellow-900" style={{width:`${w(ingresado)}%`}}>{w(ingresado)}%</div>}
+                            <div className="relative mb-2">
+                                <div className="flex rounded-full h-5 overflow-hidden bg-violet-100">
+                                    {pagado > 0 && <div className="bg-green-500 flex items-center justify-center text-[9px] font-bold text-white" style={{width:`${w(pagado)}%`}}>{w(pagado)}%</div>}
+                                    {ingresado > 0 && <div className="bg-yellow-400 flex items-center justify-center text-[9px] font-bold text-yellow-900" style={{width:`${w(ingresado)}%`}}>{w(ingresado)}%</div>}
+                                </div>
+                                {avanceInsp > 0 && (
+                                    <div className="absolute -top-1 pointer-events-none" style={{ left: `${Math.min(avanceInsp, 100)}%`, transform: 'translateX(-50%)' }} title={`Avance fisico segun inspecciones: ${avanceInsp}%`}>
+                                        <div className="w-0.5 bg-red-600" style={{ height: '28px' }}></div>
+                                    </div>
+                                )}
                             </div>
                             <div className="grid grid-cols-3 gap-1 text-[10px]">
                                 <div><span className="text-green-600 font-semibold">Pagado</span><br/><span className="font-mono font-bold text-gray-700">{formatUF(pagado)}</span> <span className="text-gray-400">· {w(pagado)}%</span></div>
                                 <div><span className="text-yellow-600 font-semibold">Ingresado</span><br/><span className="font-mono font-bold text-gray-700">{formatUF(ingresado)}</span> <span className="text-gray-400">· {w(ingresado)}%</span></div>
                                 <div><span className="text-violet-600 font-semibold">Pendiente</span><br/><span className="font-mono font-bold text-gray-700">{formatUF(pendiente)}</span> <span className="text-gray-400">· {w(pendiente)}%</span></div>
                             </div>
+                            {avanceInsp > 0 && <p className="text-[9px] text-red-500 mt-1 flex items-center gap-1"><span className="inline-block w-0.5 h-3 bg-red-600" />Avance físico (inspecciones): {avanceInsp}%</p>}
                         </div>
                     );
                 })()}
@@ -3315,6 +3323,12 @@ const EstadosPagoTab = ({ viviendas }) => {
     const pct = (n, d) => (d > 0 ? (n / d * 100) : 0);
     const fmtPct = (n) => n.toFixed(1) + '%';
 
+    // Avance fisico segun inspecciones (promedio pct_total de las viviendas).
+    // Sirve de referencia: si el cobro va por detras del avance, hay que apurar EP.
+    const avanceInsp = viviendas.length
+        ? Math.round(viviendas.reduce((s, v) => { const i = getInspeccion(v.ID_Benef); return s + (i ? i.pct_total : 0); }, 0) / viviendas.length)
+        : 0;
+
     return (
         <div className="space-y-6">
             {montoProy > 0 && (
@@ -3375,17 +3389,26 @@ const EstadosPagoTab = ({ viviendas }) => {
                     const pctS = montoProy > 0 ? pct(sinIniciar, base).toFixed(1) : '0.0';
                     return (
                         <div>
-                            <div className="flex rounded-full h-8 overflow-hidden mb-2 bg-gray-100">
-                                {montoPag > 0 && <div className="bg-green-500 flex items-center justify-center text-xs font-bold text-white" style={{ width: `${pctP}%` }}>{pctP}%</div>}
-                                {montoIng > 0 && <div className="bg-yellow-400 flex items-center justify-center text-xs font-bold text-yellow-900" style={{ width: `${pctI}%` }}>{pctI}%</div>}
-                                {montoPrep > 0 && <div className="bg-gray-300 flex items-center justify-center text-xs font-bold text-gray-600" style={{ width: `${pctR}%` }}>{pctR}%</div>}
-                                {montoProy > 0 && sinIniciar > 0 && <div className="bg-violet-100 flex items-center justify-center text-[10px] font-semibold text-violet-500" style={{ width: `${pctS}%` }}>{pctS}%</div>}
+                            <div className="relative mb-2" style={{ paddingBottom: avanceInsp > 0 ? '14px' : '0' }}>
+                                <div className="flex rounded-full h-8 overflow-hidden bg-gray-100">
+                                    {montoPag > 0 && <div className="bg-green-500 flex items-center justify-center text-xs font-bold text-white" style={{ width: `${pctP}%` }}>{pctP}%</div>}
+                                    {montoIng > 0 && <div className="bg-yellow-400 flex items-center justify-center text-xs font-bold text-yellow-900" style={{ width: `${pctI}%` }}>{pctI}%</div>}
+                                    {montoPrep > 0 && <div className="bg-gray-300 flex items-center justify-center text-xs font-bold text-gray-600" style={{ width: `${pctR}%` }}>{pctR}%</div>}
+                                    {montoProy > 0 && sinIniciar > 0 && <div className="bg-violet-100 flex items-center justify-center text-[10px] font-semibold text-violet-500" style={{ width: `${pctS}%` }}>{pctS}%</div>}
+                                </div>
+                                {avanceInsp > 0 && (
+                                    <div className="absolute top-0 flex flex-col items-center pointer-events-none" style={{ left: `${Math.min(avanceInsp, 100)}%`, transform: 'translateX(-50%)' }} title={`Avance fisico segun inspecciones: ${avanceInsp}%`}>
+                                        <div className="w-0.5 bg-red-600" style={{ height: '40px' }}></div>
+                                        <span className="text-[9px] font-bold text-red-600 whitespace-nowrap leading-none">{avanceInsp}% avance</span>
+                                    </div>
+                                )}
                             </div>
                             <div className="flex flex-wrap gap-4 text-xs text-gray-500">
                                 <span className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-green-500" />Pagado / cobrado ({pctP}%)</span>
                                 <span className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-yellow-400" />Ingresado ({pctI}%)</span>
                                 <span className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-gray-300" />En Prep. ({pctR}%)</span>
                                 {montoProy > 0 && <span className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-violet-100 border border-violet-200" />Sin iniciar ({pctS}%)</span>}
+                                {avanceInsp > 0 && <span className="flex items-center gap-1"><div className="w-0.5 h-3 bg-red-600" />Avance físico ({avanceInsp}%)</span>}
                                 <span className="font-medium text-gray-700 ml-auto">
                                     {montoProy > 0
                                         ? <>Cobrado (pagado) {formatUF(montoPag)} / Total proyecto {formatUF(montoProy)} · Por facturar {formatUF(porFacturar)}</>
@@ -7123,6 +7146,11 @@ const App = () => {
         return { pagado: montoPag, ingresado: montoIng, preparacion: montoPrep, total: montoPag + montoIng + montoPrep };
     }, [eeppProy]);
 
+    // Avance fisico segun inspecciones (promedio pct_total de las viviendas).
+    const avanceInsp = React.useMemo(() => viviendas.length
+        ? Math.round(viviendas.reduce((s, v) => { const i = getInspeccion(v.ID_Benef); return s + (i ? i.pct_total : 0); }, 0) / viviendas.length)
+        : 0, [viviendas]);
+
     const formatUF = (val) => {
         if (!val && val !== 0) return '—';
         return val.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' UF';
@@ -7479,7 +7507,7 @@ const App = () => {
 
             <div className="max-w-[1400px] mx-auto px-4 py-4">
                 {/* HEADER: Contrato + Garantías + EP */}
-                <HeaderProyecto proy={proy} garantiasProy={garantiasProy} eeppResumen={eeppResumen} kpis={kpis} />
+                <HeaderProyecto proy={proy} garantiasProy={garantiasProy} eeppResumen={eeppResumen} kpis={kpis} avanceInsp={avanceInsp} />
 
                 {/* Banner Finalizado */}
                 {kpis.esFinalizado && (
