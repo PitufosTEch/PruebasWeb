@@ -5909,6 +5909,7 @@ const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel, personal
     const [nuevoGrupoResidente, setNuevoGrupoResidente] = React.useState("");
     const [nuevoPersonal, setNuevoPersonal] = React.useState({ nombre: '', telefono: '', correo: '', rol: 'capataz', informes: [] });
     const [editandoPersonal, setEditandoPersonal] = React.useState(null); // { key, datos }
+    const [informesOpenKey, setInformesOpenKey] = React.useState(null);
 
     React.useEffect(() => {
         // Solo resetear si no hay cambios pendientes del usuario
@@ -5986,6 +5987,13 @@ const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel, personal
             nombre: editandoPersonal.datos.nombre.trim()
         });
         setEditandoPersonal(null);
+    };
+
+    const toggleInformePersonal = (key, informeKey, currentInformes, checked) => {
+        const nuevos = checked
+            ? [...currentInformes, informeKey]
+            : currentInformes.filter(k => k !== informeKey);
+        fbDB.ref(`personal_obra/${proyectoSel}/${key}/informes`).set(nuevos.length > 0 ? nuevos : null);
     };
 
     const personalProy = Object.entries((personalObra || {})[proyectoSel] || {});
@@ -6381,24 +6389,43 @@ const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel, personal
                                                     </div>
                                                 </div>
                                             ) : (
-                                                <div className="flex items-start justify-between">
-                                                    <div>
-                                                        <div className="text-sm font-medium text-gray-700">{p.nombre}</div>
-                                                        {p.telefono && <div className="text-[10px] text-gray-400">📞 {p.telefono}</div>}
-                                                        {p.correo && <div className="text-[10px] text-gray-400">✉ {p.correo}</div>}
-                                                        {(p.informes || []).length > 0 && (
-                                                            <div className="flex flex-wrap gap-1 mt-1">
-                                                                {(p.informes || []).map(k => {
-                                                                    const t = INFORME_TIPOS.find(t => t.key === k);
-                                                                    return t ? <span key={k} className="text-[9px] bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full">{t.label}</span> : null;
-                                                                })}
+                                                <div>
+                                                    <div className="flex items-start justify-between">
+                                                        <div>
+                                                            <div className="text-sm font-medium text-gray-700">{p.nombre}</div>
+                                                            {p.telefono && <div className="text-[10px] text-gray-400">📞 {p.telefono}</div>}
+                                                            {p.correo && <div className="text-[10px] text-gray-400">✉ {p.correo}</div>}
+                                                        </div>
+                                                        <div className="flex items-center gap-1 ml-2 mt-0.5 shrink-0">
+                                                            <button
+                                                                onClick={() => setInformesOpenKey(informesOpenKey === key ? null : key)}
+                                                                title="Gestionar informes"
+                                                                className={`flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded border transition-colors ${(p.informes||[]).length > 0 ? 'bg-amber-100 text-amber-700 border-amber-300 hover:bg-amber-200' : 'bg-gray-100 text-gray-400 border-gray-200 hover:bg-amber-50 hover:text-amber-500 hover:border-amber-200'}`}
+                                                            >
+                                                                📧 {(p.informes||[]).length > 0 ? (p.informes||[]).length : '—'}
+                                                            </button>
+                                                            <button onClick={() => setEditandoPersonal({ key, datos: { informes: [], ...p } })} className="text-amber-500 hover:text-amber-700 text-xs px-1" title="Editar">✎</button>
+                                                            <button onClick={() => eliminarPersonal(key)} className="text-red-400 hover:text-red-600 text-xs px-1" title="Eliminar">×</button>
+                                                        </div>
+                                                    </div>
+                                                    {informesOpenKey === key && (
+                                                        <div className="mt-2 p-2.5 bg-amber-50 rounded-lg border border-amber-200">
+                                                            <div className="text-[10px] text-amber-700 font-semibold mb-2 uppercase tracking-wide">Informes a recibir por correo</div>
+                                                            <div className="space-y-1.5">
+                                                                {INFORME_TIPOS.map(t => (
+                                                                    <label key={t.key} className="flex items-center gap-2 text-xs cursor-pointer text-gray-600 hover:text-amber-700 select-none">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={(p.informes||[]).includes(t.key)}
+                                                                            onChange={e => toggleInformePersonal(key, t.key, p.informes||[], e.target.checked)}
+                                                                            className="rounded border-gray-300 text-amber-500 focus:ring-amber-400"
+                                                                        />
+                                                                        {t.label}
+                                                                    </label>
+                                                                ))}
                                                             </div>
-                                                        )}
-                                                    </div>
-                                                    <div className="flex items-center gap-1 ml-2 mt-0.5 shrink-0">
-                                                        <button onClick={() => setEditandoPersonal({ key, datos: { informes: [], ...p } })} className="text-amber-500 hover:text-amber-700 text-xs px-1" title="Editar">✎</button>
-                                                        <button onClick={() => eliminarPersonal(key)} className="text-red-400 hover:text-red-600 text-xs px-1" title="Eliminar">×</button>
-                                                    </div>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             )}
                                         </div>
