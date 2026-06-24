@@ -1093,6 +1093,10 @@ const ETAPAS_CONFIG_FULL = {
                 COMENTARIOS_BENEF_DATA,
                 SEGUIMIENTO_DATA
             };
+            // Exponer el payload en memoria para el generador de snapshot
+            // (Playwright lo lee de window.__SNAPSHOT__). No tiene el limite de
+            // tamano de localStorage: el dataset procesado supera los ~4.5 MB.
+            try { window.__SNAPSHOT__ = payload; } catch (_) {}
             const json = JSON.stringify(payload);
             const sizeKB = Math.round(json.length / 1024);
             if (sizeKB > 4500) {

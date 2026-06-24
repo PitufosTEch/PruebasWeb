@@ -25,9 +25,12 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 DASHBOARD_URL = "https://pitufostech.github.io/PruebasWeb/SCRaices-LLM/dashboard/index_live_v3.html"
-CACHE_KEY = "scraices_v3_cache"
 OUT = Path(os.environ.get("SNAPSHOT_OUT", "data_snapshot.json"))
 TIMEOUT_LIVE = 540  # segundos esperando a que termine la carga en vivo (~4 min reales)
+
+# El dashboard expone el payload procesado en window.__SNAPSHOT__ tras cada
+# carga (sin el limite de 4.5 MB de localStorage). Lo leemos de ahi.
+GET_SNAPSHOT_JS = "() => window.__SNAPSHOT__ ? JSON.stringify(window.__SNAPSHOT__) : null"
 
 
 def main() -> int:
@@ -49,21 +52,21 @@ def main() -> int:
         deadline = time.time() + TIMEOUT_LIVE
         start = time.time()
         while time.time() < deadline:
-            raw = page.evaluate("(k) => localStorage.getItem(k)", CACHE_KEY)
+            raw = page.evaluate(GET_SNAPSHOT_JS)
             live_done = any("[LIVE] Datos" in line for line in logs)
             if raw and live_done:
                 payload = json.loads(raw)
                 break
             if int(time.time() - start) % 30 < 3:
                 print(f"  ...esperando carga en vivo ({int(time.time()-start)}s, "
-                      f"cache={'si' if raw else 'no'}, live={'si' if live_done else 'no'})")
+                      f"data={'si' if raw else 'no'}, live={'si' if live_done else 'no'})")
             time.sleep(3)
 
-        # Fallback: si el live no logueo a tiempo pero ya hay cache, usarlo
+        # Fallback: si el live no logueo a tiempo pero ya hay payload, usarlo
         if payload is None:
-            raw = page.evaluate("(k) => localStorage.getItem(k)", CACHE_KEY)
+            raw = page.evaluate(GET_SNAPSHOT_JS)
             if raw:
-                print("WARN: usando cache sin confirmacion de log [LIVE]")
+                print("WARN: usando payload sin confirmacion de log [LIVE]")
                 payload = json.loads(raw)
 
         if payload is None:
