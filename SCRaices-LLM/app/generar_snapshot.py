@@ -27,7 +27,7 @@ from playwright.sync_api import sync_playwright
 DASHBOARD_URL = "https://pitufostech.github.io/PruebasWeb/SCRaices-LLM/dashboard/index_live_v3.html"
 CACHE_KEY = "scraices_v3_cache"
 OUT = Path(os.environ.get("SNAPSHOT_OUT", "data_snapshot.json"))
-TIMEOUT_LIVE = 300  # segundos esperando a que termine la carga en vivo
+TIMEOUT_LIVE = 540  # segundos esperando a que termine la carga en vivo (~4 min reales)
 
 
 def main() -> int:
@@ -38,28 +38,38 @@ def main() -> int:
         browser = p.chromium.launch()
         page = browser.new_context().new_page()
         page.on("console", lambda m: logs.append(m.text))
+        page.on("pageerror", lambda e: logs.append(f"PAGEERROR: {e}"))
 
         print(f"Abriendo {DASHBOARD_URL}")
         page.goto(DASHBOARD_URL, wait_until="domcontentloaded", timeout=60_000)
 
         # Esperar a que el dashboard complete la carga EN VIVO y popule el
         # cache procesado fresco. El HTML loguea "[LIVE] Datos ..." al terminar.
+        # Requerimos el log de LIVE para no capturar un snapshot viejo restaurado.
         deadline = time.time() + TIMEOUT_LIVE
+        start = time.time()
         while time.time() < deadline:
-            raw = page.evaluate(
-                "(k) => localStorage.getItem(k)", CACHE_KEY
-            )
+            raw = page.evaluate("(k) => localStorage.getItem(k)", CACHE_KEY)
             live_done = any("[LIVE] Datos" in line for line in logs)
             if raw and live_done:
                 payload = json.loads(raw)
                 break
+            if int(time.time() - start) % 30 < 3:
+                print(f"  ...esperando carga en vivo ({int(time.time()-start)}s, "
+                      f"cache={'si' if raw else 'no'}, live={'si' if live_done else 'no'})")
             time.sleep(3)
 
         # Fallback: si el live no logueo a tiempo pero ya hay cache, usarlo
         if payload is None:
             raw = page.evaluate("(k) => localStorage.getItem(k)", CACHE_KEY)
             if raw:
+                print("WARN: usando cache sin confirmacion de log [LIVE]")
                 payload = json.loads(raw)
+
+        if payload is None:
+            print("--- ultimos logs de consola del dashboard ---")
+            for line in logs[-40:]:
+                print("  ", line)
 
         browser.close()
 
