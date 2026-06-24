@@ -83,6 +83,9 @@ let GARANTIAS_DATA = [];
 let EEPP_DATA = [];
 let COMENTARIOS_BENEF_DATA = [];
 let SEGUIMIENTO_DATA = {};
+// Monto total por cobrar por proyecto (suma de la tabla Montos, en UF).
+// { [ID_proy]: { total, viviendas } }
+let MONTOS_PROY_DATA = {};
 const ETAPAS_CONFIG_FULL = {
   "_comentario": "Configuración de tiempos para etapas de construcción. Tiempos en DÍAS.",
   "_instrucciones": {
@@ -357,7 +360,7 @@ const ETAPAS_CONFIG_FULL = {
 
         // Dividir en 4 lotes paralelos para evitar timeout
         const batch1 = fetchBatch('Proyectos,Beneficiario,Tipologias,Maestros,controlBGB,controlEEPP,Seguimiento,Seguimiento Cierre de Obras,Seguimiento_Cierre,SeguimientoCierre,documentacion,Documentacion', 'Lote 1: Proyectos+Benef');
-        const batch2 = fetchBatch('Despacho,soldepacho,Tabla_pago', 'Lote 2: Despachos');
+        const batch2 = fetchBatch('Despacho,soldepacho,Tabla_pago,Montos', 'Lote 2: Despachos');
         const batch3 = fetchBatch('Ejecucion,Solpago', 'Lote 3: Insp+Pagos');
 
         let r1, r2, r3, r4;
@@ -1049,6 +1052,28 @@ const ETAPAS_CONFIG_FULL = {
                 Fecha: parseDate(ep.Fecha) || ''
             }));
 
+        // 10.5 MONTO TOTAL POR PROYECTO (tabla Montos, en UF)
+        // El total por cobrar de un proyecto = suma de todas las columnas de
+        // monto de sus beneficiarios. Se EXCLUYE 'Factor' (es un multiplicador,
+        // no un monto). Verificado contra P119 (Ñuke Mapu) = 48.826,43 UF.
+        const MONTO_COLS = [
+            'Base', 'RAL', 'Ampliacion1', 'Ampliacion2', 'Terreno', 'Conexiones',
+            'Discapacidad', 'entorno', 'mejvivienda', 'premio_ahorro',
+            'A_Base', 'A_Amp1', 'A_Amp2', 'A_M_ent', 'A_M_viv',
+            'M_termico', 'M_eficiencia', 'Regularizacion', 'incremento',
+            'homologacion', 'ajuste_ppto'
+        ];
+        const montosRaw = raw.Montos?.rows || [];
+        MONTOS_PROY_DATA = {};
+        montosRaw.forEach(m => {
+            const pid = String(m.ID_proy || '');
+            if (!pid || !idsProyActivos.has(pid)) return;
+            const totalBenef = MONTO_COLS.reduce((acc, c) => acc + parseMontoUF(m[c]), 0);
+            if (!MONTOS_PROY_DATA[pid]) MONTOS_PROY_DATA[pid] = { total: 0, viviendas: 0 };
+            MONTOS_PROY_DATA[pid].total += totalBenef;
+            MONTOS_PROY_DATA[pid].viviendas += 1;
+        });
+
         updateLoading('Procesando comentarios...', 97);
 
         // 11. COMENTARIOS BENEFICIARIO (combenef)
@@ -1091,7 +1116,8 @@ const ETAPAS_CONFIG_FULL = {
                 GARANTIAS_DATA,
                 EEPP_DATA,
                 COMENTARIOS_BENEF_DATA,
-                SEGUIMIENTO_DATA
+                SEGUIMIENTO_DATA,
+                MONTOS_PROY_DATA
             };
             // Exponer el payload en memoria para el generador de snapshot
             // (Playwright lo lee de window.__SNAPSHOT__). No tiene el limite de
@@ -1141,6 +1167,7 @@ const ETAPAS_CONFIG_FULL = {
         EEPP_DATA = cache.EEPP_DATA || [];
         COMENTARIOS_BENEF_DATA = cache.COMENTARIOS_BENEF_DATA || [];
         SEGUIMIENTO_DATA = cache.SEGUIMIENTO_DATA || {};
+        MONTOS_PROY_DATA = cache.MONTOS_PROY_DATA || {};
     }
 
     function formatCacheAge(ts) {
@@ -3256,8 +3283,44 @@ const EstadosPagoTab = ({ viviendas }) => {
     const montoPrep = eeppResumen.preparacion;
     const montoTotal = eeppResumen.total;
 
+    // Monto total POR COBRAR del proyecto completo (tabla Montos, en UF).
+    const projId = (eeppProy[0] && eeppProy[0].ID_Proy) || (viviendas[0] && viviendas[0].ID_Proy) || '';
+    const montoProyInfo = MONTOS_PROY_DATA[projId] || null;
+    const montoProy = montoProyInfo ? montoProyInfo.total : 0;
+    const vivProy = montoProyInfo ? montoProyInfo.viviendas : 0;
+    const facturado = montoTotal;                                  // EP cargados (pag+ing+prep)
+    const porFacturar = montoProy > 0 ? Math.max(0, montoProy - facturado) : 0;
+    const pct = (n, d) => (d > 0 ? (n / d * 100) : 0);
+    const fmtPct = (n) => n.toFixed(1) + '%';
+
     return (
         <div className="space-y-6">
+            {montoProy > 0 && (
+                <div className="bg-gradient-to-r from-violet-50 to-white border border-violet-200 rounded-xl p-4 shadow-sm">
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                        <div>
+                            <p className="text-violet-700 text-xs font-medium">Total por cobrar (proyecto)</p>
+                            <p className="text-2xl font-bold text-violet-800 mt-1 font-mono">{formatUF(montoProy)}</p>
+                            <p className="text-[10px] text-gray-400 mt-1">{vivProy} viviendas · tabla Montos</p>
+                        </div>
+                        <div>
+                            <p className="text-gray-500 text-xs font-medium">Facturado (EP cargados)</p>
+                            <p className="text-2xl font-bold text-gray-800 mt-1 font-mono">{formatUF(facturado)}</p>
+                            <p className="text-[10px] text-gray-400 mt-1">{fmtPct(pct(facturado, montoProy))} del proyecto</p>
+                        </div>
+                        <div>
+                            <p className="text-green-600 text-xs font-medium">Pagado</p>
+                            <p className="text-2xl font-bold text-green-700 mt-1 font-mono">{formatUF(montoPag)}</p>
+                            <p className="text-[10px] text-gray-400 mt-1">{fmtPct(pct(montoPag, montoProy))} del proyecto</p>
+                        </div>
+                        <div>
+                            <p className="text-gray-500 text-xs font-medium">Por facturar</p>
+                            <p className="text-2xl font-bold text-gray-700 mt-1 font-mono">{formatUF(porFacturar)}</p>
+                            <p className="text-[10px] text-gray-400 mt-1">{fmtPct(pct(porFacturar, montoProy))} del proyecto</p>
+                        </div>
+                    </div>
+                </div>
+            )}
             <div className="grid grid-cols-3 gap-4">
                 <div className="bg-white border border-green-200 rounded-xl p-4 shadow-sm">
                     <p className="text-green-600 text-xs font-medium">Pagado</p>
@@ -3277,24 +3340,35 @@ const EstadosPagoTab = ({ viviendas }) => {
             </div>
 
             <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
-                <h3 className="text-sm font-medium text-gray-700 mb-3">Progreso de Cobro</h3>
+                <h3 className="text-sm font-medium text-gray-700 mb-3">
+                    Progreso de Cobro {montoProy > 0 ? '(sobre el total del proyecto)' : '(sobre EP cargados)'}
+                </h3>
                 {(() => {
-                    if (montoTotal === 0) return <p className="text-gray-400 text-sm">Sin EP registrados</p>;
-                    const pctP = (montoPag / montoTotal * 100).toFixed(1);
-                    const pctI = (montoIng / montoTotal * 100).toFixed(1);
-                    const pctR = (montoPrep / montoTotal * 100).toFixed(1);
+                    if (montoTotal === 0 && montoProy === 0) return <p className="text-gray-400 text-sm">Sin EP registrados</p>;
+                    // Denominador: total del proyecto si existe; si no, total de EP cargados.
+                    const base = montoProy > 0 ? montoProy : montoTotal;
+                    const pctP = pct(montoPag, base).toFixed(1);
+                    const pctI = pct(montoIng, base).toFixed(1);
+                    const pctR = pct(montoPrep, base).toFixed(1);
+                    const pctF = montoProy > 0 ? pct(porFacturar, base).toFixed(1) : '0.0';
                     return (
                         <div>
-                            <div className="flex rounded-full h-8 overflow-hidden mb-2">
+                            <div className="flex rounded-full h-8 overflow-hidden mb-2 bg-gray-100">
                                 {montoPag > 0 && <div className="bg-green-500 flex items-center justify-center text-xs font-bold text-white" style={{ width: `${pctP}%` }}>{pctP}%</div>}
                                 {montoIng > 0 && <div className="bg-yellow-400 flex items-center justify-center text-xs font-bold text-yellow-900" style={{ width: `${pctI}%` }}>{pctI}%</div>}
                                 {montoPrep > 0 && <div className="bg-gray-300 flex items-center justify-center text-xs font-bold text-gray-600" style={{ width: `${pctR}%` }}>{pctR}%</div>}
+                                {montoProy > 0 && porFacturar > 0 && <div className="bg-violet-100 flex items-center justify-center text-[10px] font-semibold text-violet-500" style={{ width: `${pctF}%` }}>{pctF}%</div>}
                             </div>
-                            <div className="flex gap-4 text-xs text-gray-500">
+                            <div className="flex flex-wrap gap-4 text-xs text-gray-500">
                                 <span className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-green-500" />Pagado ({pctP}%)</span>
                                 <span className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-yellow-400" />Ingresado ({pctI}%)</span>
                                 <span className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-gray-300" />En Prep. ({pctR}%)</span>
-                                <span className="font-medium text-gray-700">Total: {formatUF(montoTotal)}</span>
+                                {montoProy > 0 && <span className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-violet-100 border border-violet-200" />Por facturar ({pctF}%)</span>}
+                                <span className="font-medium text-gray-700 ml-auto">
+                                    {montoProy > 0
+                                        ? <>Facturado {formatUF(facturado)} / Total proyecto {formatUF(montoProy)}</>
+                                        : <>Total EP: {formatUF(montoTotal)}</>}
+                                </span>
                             </div>
                         </div>
                     );
