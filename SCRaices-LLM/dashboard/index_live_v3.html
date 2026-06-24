@@ -2245,22 +2245,28 @@ const HeaderProyecto = ({ proy, garantiasProy, eeppResumen, kpis, avanceInsp = 0
                     const epId = String((proy && proy.ID_proy) || '');
                     const mp = MONTOS_PROY_DATA[epId];
                     const montoProy = mp ? mp.total : 0;
-                    const base = montoProy > 0 ? montoProy : eeppResumen.total;     // denominador = Total Proyecto
-                    if (base === 0) return <p className="text-gray-400 text-xs">Sin EP registrados</p>;
                     const pagado = eeppResumen.pagado;
                     const ingresado = eeppResumen.ingresado;
-                    const pendiente = Math.max(0, base - pagado - ingresado);  // ni pagado ni ingresado
-                    const w = (n) => (n / base * 100).toFixed(0);
+                    const hayEP = eeppResumen.total > 0;
+                    const base = montoProy > 0 ? montoProy : (hayEP ? eeppResumen.total : 0);  // Total Proyecto
+                    // Siempre mostrar lo que haya (total, avance y/o EP). Solo si no hay
+                    // absolutamente nada se muestra un guion neutro (nunca "Sin EP").
+                    if (base === 0 && avanceInsp === 0 && !hayEP) return <p className="text-gray-300 text-xs">—</p>;
+                    const pendiente = base > 0 ? Math.max(0, base - pagado - ingresado) : 0;
+                    const wpct = (n) => (base > 0 ? (n / base * 100) : 0);
+                    const wtxt = (n) => (base > 0 ? (n / base * 100).toFixed(0) + '%' : '—');
                     return (
                         <div>
-                            <div className="flex items-center justify-between mb-1">
-                                <span className="text-[10px] text-gray-400">{montoProy > 0 ? 'Total Proyecto' : 'Total EP'}</span>
-                                <span className="text-[11px] font-mono font-bold text-violet-800">{formatUF(base)}</span>
-                            </div>
+                            {base > 0 && (
+                                <div className="flex items-center justify-between mb-1">
+                                    <span className="text-[10px] text-gray-400">{montoProy > 0 ? 'Total Proyecto' : 'Total EP'}</span>
+                                    <span className="text-[11px] font-mono font-bold text-violet-800">{formatUF(base)}</span>
+                                </div>
+                            )}
                             <div className="relative mb-2" style={{ paddingTop: avanceInsp > 0 ? '12px' : '0' }}>
                                 <div className="flex rounded-full h-5 overflow-hidden bg-violet-100">
-                                    {pagado > 0 && <div className="bg-green-500 flex items-center justify-center text-[9px] font-bold text-white" style={{width:`${w(pagado)}%`}}>{w(pagado)}%</div>}
-                                    {ingresado > 0 && <div className="bg-yellow-400 flex items-center justify-center text-[9px] font-bold text-yellow-900" style={{width:`${w(ingresado)}%`}}>{w(ingresado)}%</div>}
+                                    {pagado > 0 && <div className="bg-green-500 flex items-center justify-center text-[9px] font-bold text-white" style={{width:`${wpct(pagado)}%`}}>{wtxt(pagado)}</div>}
+                                    {ingresado > 0 && <div className="bg-yellow-400 flex items-center justify-center text-[9px] font-bold text-yellow-900" style={{width:`${wpct(ingresado)}%`}}>{wtxt(ingresado)}</div>}
                                 </div>
                                 {avanceInsp > 0 && (
                                     <div className="absolute top-0 bottom-0 flex flex-col items-center pointer-events-none" style={{ left: `${Math.min(avanceInsp, 100)}%`, transform: 'translateX(-50%)' }} title={`Avance fisico segun inspecciones: ${avanceInsp}%`}>
@@ -2270,9 +2276,9 @@ const HeaderProyecto = ({ proy, garantiasProy, eeppResumen, kpis, avanceInsp = 0
                                 )}
                             </div>
                             <div className="grid grid-cols-3 gap-1 text-[10px]">
-                                <div><span className="text-green-600 font-semibold">Pagado</span><br/><span className="font-mono font-bold text-gray-700">{formatUF(pagado)}</span> <span className="text-gray-400">· {w(pagado)}%</span></div>
-                                <div><span className="text-yellow-600 font-semibold">Ingresado</span><br/><span className="font-mono font-bold text-gray-700">{formatUF(ingresado)}</span> <span className="text-gray-400">· {w(ingresado)}%</span></div>
-                                <div><span className="text-violet-600 font-semibold">Pendiente</span><br/><span className="font-mono font-bold text-gray-700">{formatUF(pendiente)}</span> <span className="text-gray-400">· {w(pendiente)}%</span></div>
+                                <div><span className="text-green-600 font-semibold">Pagado</span><br/><span className="font-mono font-bold text-gray-700">{formatUF(pagado)}</span> <span className="text-gray-400">· {wtxt(pagado)}</span></div>
+                                <div><span className="text-yellow-600 font-semibold">Ingresado</span><br/><span className="font-mono font-bold text-gray-700">{formatUF(ingresado)}</span> <span className="text-gray-400">· {wtxt(ingresado)}</span></div>
+                                <div><span className="text-violet-600 font-semibold">Pendiente</span><br/><span className="font-mono font-bold text-gray-700">{base > 0 ? formatUF(pendiente) : '—'}</span> <span className="text-gray-400">· {wtxt(pendiente)}</span></div>
                             </div>
                             {avanceInsp > 0 && <p className="text-[9px] text-red-500 mt-1 flex items-center gap-1"><span className="inline-block w-0.5 h-3 bg-red-600" />Avance físico (inspecciones): {avanceInsp}%</p>}
                         </div>
