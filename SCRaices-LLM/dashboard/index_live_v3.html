@@ -1012,13 +1012,18 @@ const ETAPAS_CONFIG_FULL = {
         updateLoading('Procesando garantías...', 92);
 
         // 9. GARANTIAS (controlBGB)
+        // La columna Tipo_linea marca si la fila es una garantia vigente.
+        // "Sin Garantia" = liberada / no vigente (ej. convenio marco vencido) -> se excluye.
+        // Vacio = dato antiguo sin clasificar -> se mantiene (no asumir que no es garantia).
         const bgbRaw = raw.controlBGB?.rows || [];
         GARANTIAS_DATA = bgbRaw
             .filter(g => idsProyActivos.has(String(g.ID_Proy || '')))
+            .filter(g => !/sin\s*garant/i.test(String(g.Tipo_linea || '')))
             .map(g => ({
                 ID_Proy: String(g.ID_Proy || ''),
                 tipo: String(g.Tipo || ''),
                 tipo1: String(g.Tipo1 || ''),
+                tipo_linea: String(g.Tipo_linea || ''),
                 num_bol: String(g.num_bol || ''),
                 banco: String(g.Banco || ''),
                 monto_uf: parseInt(g.Monto) || 0,
