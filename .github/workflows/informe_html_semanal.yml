@@ -1,0 +1,55 @@
+name: Informe HTML Multi Obras (Lunes 9:30)
+
+on:
+  schedule:
+    # 13:30 UTC = 9:30 AM Chile hora invierno (UTC-4)
+    # En verano chileno (oct-mar) ejecutará a las 10:30 AM local (UTC-3)
+    - cron: '30 13 * * 1'
+  workflow_dispatch:
+    inputs:
+      destinatario:
+        description: 'Correo destinatario (dejar vacío para usar el default)'
+        required: false
+        default: 'rlagos@scraices.cl'
+
+jobs:
+  generar-y-enviar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Instalar dependencias Python
+        run: pip install playwright
+
+      - name: Instalar Chromium (Playwright)
+        run: playwright install chromium --with-deps
+
+      - name: Generar y enviar informe
+        env:
+          GMAIL_EMAIL:        ${{ secrets.GMAIL_EMAIL }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          OUTPUT_DIR:         /tmp/informes_html
+          LOG_FILE:           /tmp/informe_html.log
+        run: |
+          DEST="${{ github.event.inputs.destinatario || 'rlagos@scraices.cl' }}"
+          python SCRaices-LLM/app/enviar_informe_html.py --para "$DEST"
+
+      - name: Subir HTML como artefacto (respaldo 7 días)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: informe-html-${{ github.run_id }}
+          path: /tmp/informes_html/*.html
+          retention-days: 7
+
+      - name: Mostrar log si hubo error
+        if: failure()
+        run: cat /tmp/informe_html.log || true
