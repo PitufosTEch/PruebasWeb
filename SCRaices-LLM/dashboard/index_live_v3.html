@@ -5881,6 +5881,7 @@ const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel, personal
     const [nuevoGrupoCapataz, setNuevoGrupoCapataz] = React.useState("");
     const [nuevoGrupoResidente, setNuevoGrupoResidente] = React.useState("");
     const [nuevoPersonal, setNuevoPersonal] = React.useState({ nombre: '', telefono: '', correo: '', rol: 'capataz' });
+    const [editandoPersonal, setEditandoPersonal] = React.useState(null); // { key, datos }
 
     React.useEffect(() => {
         // Solo resetear si no hay cambios pendientes del usuario
@@ -5947,7 +5948,17 @@ const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel, personal
     };
 
     const eliminarPersonal = (key) => {
+        if (!window.confirm('¿Eliminar este registro de personal?')) return;
         fbDB.ref(`personal_obra/${proyectoSel}/${key}`).remove();
+    };
+
+    const guardarEdicionPersonal = () => {
+        if (!editandoPersonal || !editandoPersonal.datos.nombre.trim()) return;
+        fbDB.ref(`personal_obra/${proyectoSel}/${editandoPersonal.key}`).set({
+            ...editandoPersonal.datos,
+            nombre: editandoPersonal.datos.nombre.trim()
+        });
+        setEditandoPersonal(null);
     };
 
     const personalProy = Object.entries((personalObra || {})[proyectoSel] || {});
@@ -6311,13 +6322,34 @@ const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel, personal
                                     {personalProy.filter(([,p]) => p.rol === rol).length === 0
                                         ? <p className="text-xs text-gray-400 italic">Sin {rol === 'capataz' ? 'capataces' : 'residentes'} registrados</p>
                                         : personalProy.filter(([,p]) => p.rol === rol).map(([key, p]) => (
-                                            <div key={key} className="flex items-start justify-between py-2 border-b border-gray-100 last:border-0">
-                                                <div>
-                                                    <div className="text-sm font-medium text-gray-700">{p.nombre}</div>
-                                                    {p.telefono && <div className="text-[10px] text-gray-400">📞 {p.telefono}</div>}
-                                                    {p.correo && <div className="text-[10px] text-gray-400">✉ {p.correo}</div>}
-                                                </div>
-                                                <button onClick={() => eliminarPersonal(key)} className="text-red-400 hover:text-red-600 text-xs px-1 ml-2 mt-0.5">×</button>
+                                            <div key={key} className="py-2 border-b border-gray-100 last:border-0">
+                                                {editandoPersonal && editandoPersonal.key === key ? (
+                                                    <div className="space-y-1.5">
+                                                        <input type="text" value={editandoPersonal.datos.nombre} onChange={e => setEditandoPersonal(ep => ({...ep, datos: {...ep.datos, nombre: e.target.value}}))} className="w-full border border-amber-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-amber-400" placeholder="Nombre" />
+                                                        <input type="text" value={editandoPersonal.datos.telefono || ''} onChange={e => setEditandoPersonal(ep => ({...ep, datos: {...ep.datos, telefono: e.target.value}}))} className="w-full border border-amber-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-amber-400" placeholder="Teléfono" />
+                                                        <input type="email" value={editandoPersonal.datos.correo || ''} onChange={e => setEditandoPersonal(ep => ({...ep, datos: {...ep.datos, correo: e.target.value}}))} className="w-full border border-amber-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-amber-400" placeholder="Correo" />
+                                                        <select value={editandoPersonal.datos.rol} onChange={e => setEditandoPersonal(ep => ({...ep, datos: {...ep.datos, rol: e.target.value}}))} className="w-full border border-amber-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-amber-400">
+                                                            <option value="capataz">Capataz</option>
+                                                            <option value="residente">Residente</option>
+                                                        </select>
+                                                        <div className="flex gap-1 pt-0.5">
+                                                            <button onClick={guardarEdicionPersonal} className="flex-1 px-2 py-1 bg-amber-500 text-white rounded text-xs font-medium hover:bg-amber-600">Guardar</button>
+                                                            <button onClick={() => setEditandoPersonal(null)} className="px-2 py-1 bg-gray-200 text-gray-600 rounded text-xs hover:bg-gray-300">Cancelar</button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex items-start justify-between">
+                                                        <div>
+                                                            <div className="text-sm font-medium text-gray-700">{p.nombre}</div>
+                                                            {p.telefono && <div className="text-[10px] text-gray-400">📞 {p.telefono}</div>}
+                                                            {p.correo && <div className="text-[10px] text-gray-400">✉ {p.correo}</div>}
+                                                        </div>
+                                                        <div className="flex items-center gap-1 ml-2 mt-0.5">
+                                                            <button onClick={() => setEditandoPersonal({ key, datos: {...p} })} className="text-amber-500 hover:text-amber-700 text-xs px-1" title="Editar">✎</button>
+                                                            <button onClick={() => eliminarPersonal(key)} className="text-red-400 hover:text-red-600 text-xs px-1" title="Eliminar">×</button>
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         ))
                                     }
