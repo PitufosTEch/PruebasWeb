@@ -35,7 +35,7 @@ GMAIL_CFG_FILE       = Path(r"C:\Users\rodri\.claude\gmail_config.json")
 OUTPUT_DIR           = Path(os.environ.get("OUTPUT_DIR", "/tmp/informes_html" if os.name != "nt" else r"C:\Users\rodri\.claude\informes_html"))
 LOG_FILE             = Path(os.environ.get("LOG_FILE",   "/tmp/informe_html.log" if os.name != "nt" else r"C:\Users\rodri\.claude\logs\informe_html.log"))
 
-DESTINATARIOS_DEFAULT = ["rlagos@scraices.cl", "aespinoza@scraices.cl"]
+DESTINATARIOS_DEFAULT = ["rlagos@scraices.cl", "aespinoza@scraices.cl", "mabuid@scraices.cl"]
 REMITENTE_NOMBRE     = "SG Raíces Control"
 TIMEOUT_CARGA        = 300   # segundos esperando que cargue el dashboard
 
