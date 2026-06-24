@@ -4402,16 +4402,20 @@ ${inf.footerHtml}
         const obrasConCurva = PROYECTOS_DATA.filter(p => (CURVAS_S_CONFIG[p.ID_proy] || []).length > 0);
         if (obrasConCurva.length === 0) { alert('No hay obras activas con curvas S configuradas.'); return; }
 
-        // Obtener datos de programa (fechas) y grupos (capataz) desde Firebase
-        let ganttRaw = {}, gruposRaw = {};
+        // Obtener datos de programa, grupos, observaciones y comentarios destacados desde Firebase
+        let ganttRaw = {}, gruposRaw = {}, obsRaw = {}, resumenComRaw = {};
         try {
-            const [rGantt, rGrupos] = await Promise.all([
+            const [rGantt, rGrupos, rObs, rResCom] = await Promise.all([
                 fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/gantt_programa.json'),
-                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/grupos.json')
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/grupos.json'),
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/observaciones.json'),
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/resumen_comentarios.json')
             ]);
-            ganttRaw  = (await rGantt.json())  || {};
-            gruposRaw = (await rGrupos.json()) || {};
-        } catch(e) { ganttRaw = {}; gruposRaw = {}; }
+            ganttRaw     = (await rGantt.json())   || {};
+            gruposRaw    = (await rGrupos.json())  || {};
+            obsRaw       = (await rObs.json())     || {};
+            resumenComRaw = (await rResCom.json()) || {};
+        } catch(e) { ganttRaw = {}; gruposRaw = {}; obsRaw = {}; resumenComRaw = {}; }
 
         // Devuelve el capataz para un label de curva (ej "Grupo 1 · El Maitén") y un proyecto
         const getCapataz = (idProy, curvaLabel) => {
@@ -4585,6 +4589,26 @@ ${inf.footerHtml}
 <div><div style="font-size:12px;font-weight:600;color:#333;margin-bottom:8px;">Ritmo Mano de Obra (ciclo 25-25)</div>${chartMO}</div>
 <div><div style="font-size:12px;font-weight:600;color:#333;margin-bottom:8px;">Ritmo Despachos (por mes)</div>${chartD}</div>
 </div>`;
+                // Comentarios destacados (con estrella) por beneficiario
+                const starredIds = new Set(Object.keys(resumenComRaw[obra.ID_proy] || {}));
+                let comHtml = '';
+                obra.viviendas.forEach(v => {
+                    const obsAll = obsRaw[v.ID_Benef] || [];
+                    const starred = obsAll.filter(o => starredIds.has(String(o.id)));
+                    if (starred.length === 0) return;
+                    const nombre = `${v.NOMBRES || ''} ${v.APELLIDOS || ''}`.trim();
+                    const items = starred.map(o => {
+                        const fch = (o.fecha || '').toString().substring(0, 10);
+                        return `<div style="padding:6px 12px;margin-bottom:5px;font-size:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;">
+<span style="font-size:10px;color:#94a3b8;">${fch}</span>
+<div style="color:#374151;margin-top:2px;">${o.texto || ''}</div></div>`;
+                    }).join('');
+                    comHtml += `<div style="margin-bottom:14px;"><div style="font-size:13px;font-weight:700;color:#1a1a2e;margin-bottom:6px;">${nombre}</div>${items}</div>`;
+                });
+                if (!comHtml) {
+                    comHtml = `<div style="color:#94a3b8;font-size:12px;padding:16px;text-align:center;border:1px dashed #e2e8f0;border-radius:8px;">Sin comentarios destacados (marcados con ★) en esta obra.</div>`;
+                }
+                h += `<h3 style="font-size:13px;color:#333;margin:20px 0 10px;display:flex;align-items:center;gap:6px;"><span style="color:#f59e0b;">★</span> Comentarios Destacados por Beneficiario</h3>${comHtml}`;
             } else if (tab === 'viviendas') {
                 h += `Detalle de Viviendas</div>
 <div class="table-container"><table>
@@ -4669,7 +4693,7 @@ function mostrar(t){document.querySelectorAll('.section').forEach(s=>s.classList
 <button class="tab-btn active" onclick="mostrar('resumen')">Resumen</button>
 <button class="tab-btn" onclick="mostrar('checkpoints')">Checkpoints</button>
 <button class="tab-btn" onclick="mostrar('curvas')">Curvas S</button>
-<button class="tab-btn" onclick="mostrar('ritmos')">Ritmos</button>
+<button class="tab-btn" onclick="mostrar('ritmos')">Ritmos y comentarios</button>
 <button class="tab-btn" onclick="mostrar('viviendas')">Viviendas</button>
 </div>`;
 
