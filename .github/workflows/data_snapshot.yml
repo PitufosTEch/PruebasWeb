@@ -1,0 +1,99 @@
+name: Data Snapshot (cada 15 min)
+
+# Genera un snapshot crudo de los datos del dashboard (mismas tablas que
+# fetchAllData en index_live_v3.html) y lo publica en la rama dedicada
+# `data-snapshot` con force-push (1 solo commit, sin inflar el historial ni
+# disparar redeploys de GitHub Pages). El dashboard lo lee via
+# raw.githubusercontent.com para el primer pintado instantaneo.
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'   # cada 15 minutos (best-effort en GitHub Actions)
+  workflow_dispatch: {}        # ejecucion manual
+
+permissions:
+  contents: write
+
+concurrency:
+  group: data-snapshot
+  cancel-in-progress: true
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repositorio
+        uses: actions/checkout@v4
+
+      - name: Descargar datos desde Apps Script
+        env:
+          APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbx_mSt3xEeXZYn7R2fkt5drp3Pfllxdj71tJo0-2iSqW28OAgwgpzoH_2NI_erM5yB-/exec"
+        run: |
+          set -euo pipefail
+
+          fetch() {
+            # $1 = lista de tablas, $2 = archivo de salida
+            curl -sSL --retry 3 --retry-delay 5 --max-time 240 \
+              -G "$APPS_SCRIPT_URL" --data-urlencode "tables=$1" -o "$2"
+          }
+
+          echo "Lote 1: Proyectos + Beneficiarios..."
+          fetch "Proyectos,Beneficiario,Tipologias,Maestros,controlBGB,controlEEPP,Seguimiento,Seguimiento Cierre de Obras,Seguimiento_Cierre,SeguimientoCierre,documentacion,Documentacion" b1.json
+
+          echo "Lote 2: Despachos..."
+          fetch "Despacho,soldepacho,Tabla_pago" b2.json
+
+          echo "Lote 3: Inspecciones + Pagos..."
+          fetch "Ejecucion,Solpago" b3.json
+
+          echo "Lote 4: Comentarios (no critico)..."
+          fetch "combenef" b4.json || echo '{"combenef":{"rows":[]}}' > b4.json
+
+          # Validar que cada lote sea JSON valido
+          for f in b1 b2 b3 b4; do
+            if ! jq empty "$f.json" 2>/dev/null; then
+              echo "ERROR: $f.json no es JSON valido"
+              head -c 500 "$f.json" || true
+              exit 1
+            fi
+            # Si Apps Script devolvio {"error": ...}
+            if jq -e '.error' "$f.json" >/dev/null 2>&1; then
+              echo "ERROR: Apps Script devolvio error en $f.json:"
+              jq -r '.error' "$f.json"
+              exit 1
+            fi
+          done
+
+          # Combinar los 4 lotes + timestamp (epoch segundos)
+          jq -s 'add + {_snapshot_ts: now}' b1.json b2.json b3.json b4.json > data_snapshot.json
+
+          # Sanity check: debe haber proyectos
+          N=$(jq '.Proyectos.rows | length' data_snapshot.json)
+          echo "Proyectos en snapshot: $N"
+          if [ "$N" -lt 1 ]; then
+            echo "ERROR: snapshot sin proyectos, abortando"
+            exit 1
+          fi
+
+          SIZE=$(du -h data_snapshot.json | cut -f1)
+          echo "Snapshot OK ($SIZE)"
+          # Guardar fuera del repo para sobrevivir al checkout --orphan
+          cp data_snapshot.json "$RUNNER_TEMP/data_snapshot.json"
+          echo "SNAP_SIZE=$SIZE" >> "$GITHUB_ENV"
+
+      - name: Publicar en rama data-snapshot (force-push, 1 commit)
+        run: |
+          set -euo pipefail
+          git config user.name  "snapshot-bot"
+          git config user.email "actions@users.noreply.github.com"
+
+          # Rama huerfana: sin historial, siempre 1 commit
+          git checkout --orphan data-snapshot
+          git rm -rf --cached . >/dev/null 2>&1 || true
+
+          cp "$RUNNER_TEMP/data_snapshot.json" data_snapshot.json
+          git add -f data_snapshot.json
+          git commit -m "data: snapshot $(date -u '+%Y-%m-%dT%H:%MZ') (${SNAP_SIZE:-?})"
+          git push -f origin data-snapshot
+          echo "Publicado en rama data-snapshot"

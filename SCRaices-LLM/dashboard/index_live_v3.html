@@ -234,6 +234,10 @@ const ETAPAS_CONFIG_FULL = {
     // ============================================================
     const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx_mSt3xEeXZYn7R2fkt5drp3Pfllxdj71tJo0-2iSqW28OAgwgpzoH_2NI_erM5yB-/exec";
     const TABLES_TO_FETCH = "Proyectos,Beneficiario,Despacho,soldepacho,Ejecucion,Solpago,Maestros,Tabla_pago,Tipologias,controlBGB,controlEEPP,Seguimiento";
+    // Snapshot crudo pre-generado cada 15 min por el workflow data_snapshot.yml.
+    // Se sirve desde el CDN de GitHub (rama dedicada data-snapshot) para el
+    // primer pintado instantaneo en cualquier dispositivo, antes del fetch en vivo.
+    const SNAPSHOT_URL = "https://raw.githubusercontent.com/PitufosTEch/PruebasWeb/data-snapshot/data_snapshot.json";
 
     // Mapeo columna real → short code + peso (28 partidas vivienda)
     const VIV_COLUMNS = {
@@ -375,6 +379,15 @@ const ETAPAS_CONFIG_FULL = {
 
         updateLoading('Combinando datos...', 30, 'Todos los lotes recibidos');
         return { ...r1, ...r2, ...r3, ...r4 };
+    }
+
+    // Descarga el snapshot crudo pre-generado (CDN GitHub). Mismo formato que
+    // fetchAllData, por lo que processRawData lo procesa igual. Trae _snapshot_ts
+    // (epoch segundos) para mostrar la antiguedad en el banner.
+    async function fetchSnapshot() {
+        const resp = await fetch(SNAPSHOT_URL + '?t=' + Date.now(), { cache: 'no-store' });
+        if (!resp.ok) throw new Error('Snapshot HTTP ' + resp.status);
+        return resp.json();
     }
 
     function processRawData(raw) {
@@ -1179,15 +1192,44 @@ const ETAPAS_CONFIG_FULL = {
                 }
             }
         } else {
-            // Sin cache: carga normal
+            // Sin cache local: intentar snapshot pre-generado (CDN, rapido)
             showLoadingScreen();
+            let snapshotOk = false;
+            try {
+                updateLoading('Cargando datos pre-cargados...', 15, 'Snapshot (CDN)');
+                const snap = await fetchSnapshot();
+                processRawData(snap);
+                saveProcessedCache();
+                renderApp();
+                snapshotOk = true;
+                const snapTs = snap._snapshot_ts ? snap._snapshot_ts * 1000 : Date.now();
+                showCacheBanner(snapTs);
+                console.log('[SNAPSHOT] Render desde snapshot (' + formatCacheAge(snapTs) + ')');
+            } catch (e) {
+                console.warn('[SNAPSHOT] No disponible, carga en vivo:', e.message);
+            }
+
+            // Fetch en vivo: en segundo plano si el snapshot pinto algo;
+            // bloqueante (con loading screen) si no hubo snapshot.
             try {
                 const raw = await fetchAllData();
                 processRawData(raw);
                 saveProcessedCache();
-                await new Promise(r => setTimeout(r, 300));
+                removeCacheBanner();
+                if (!snapshotOk) await new Promise(r => setTimeout(r, 300));
                 renderApp();
+                console.log('[LIVE] Datos en vivo cargados');
             } catch (err) {
+                if (snapshotOk) {
+                    // Ya hay datos en pantalla: solo avisar que no se actualizo
+                    const b = document.getElementById('cacheBanner');
+                    if (b) {
+                        b.style.background = '#fee2e2';
+                        b.style.color = '#991b1b';
+                        b.innerHTML = '<span>No se pudo actualizar en vivo: ' + err.message + '. Mostrando snapshot.</span><button onclick="location.reload()" style="margin-left:12px;padding:3px 12px;background:#991b1b;color:white;border:none;border-radius:4px;cursor:pointer;font-size:11px;">Reintentar</button>';
+                    }
+                    return;
+                }
                 document.getElementById('root').innerHTML = `
                     <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f3f4f6;font-family:'IBM Plex Sans',sans-serif;">
                         <div style="text-align:center;max-width:450px;padding:40px;">
