@@ -5794,6 +5794,22 @@ ${viewerCss}</style>
 };
 
 // ===== CONFIGURACIÓN (Grupos + Diagrama + Editor) =====
+const ROLES_PERSONAL = [
+    { key: 'capataz',      label: 'Capataz' },
+    { key: 'residente',    label: 'Residente' },
+    { key: 'gerente',      label: 'Gerente' },
+    { key: 'coordinador',  label: 'Coordinador' },
+    { key: 'logistica',    label: 'Logística' },
+    { key: 'rrhh',         label: 'Recursos Humanos' },
+];
+
+const INFORME_TIPOS = [
+    { key: 'curvas_s',       label: 'Reporte ejecutivo (Curvas S)' },
+    { key: 'obra_logistica', label: 'Reporte obra/logística' },
+    { key: 'por_capataz',    label: 'Reporte por Capataz' },
+    { key: 'html_navegable', label: 'HTML navegable' },
+];
+
 const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel, personalObra, personalObraRef }) => {
     const originalConfig = ETAPAS_CONFIG_FULL;
     const [config, setConfig] = React.useState(() => JSON.parse(JSON.stringify(originalConfig)));
@@ -5880,7 +5896,7 @@ const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel, personal
     const [nuevoGrupoNombre, setNuevoGrupoNombre] = React.useState("");
     const [nuevoGrupoCapataz, setNuevoGrupoCapataz] = React.useState("");
     const [nuevoGrupoResidente, setNuevoGrupoResidente] = React.useState("");
-    const [nuevoPersonal, setNuevoPersonal] = React.useState({ nombre: '', telefono: '', correo: '', rol: 'capataz' });
+    const [nuevoPersonal, setNuevoPersonal] = React.useState({ nombre: '', telefono: '', correo: '', rol: 'capataz', informes: [] });
     const [editandoPersonal, setEditandoPersonal] = React.useState(null); // { key, datos }
 
     React.useEffect(() => {
@@ -5944,7 +5960,7 @@ const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel, personal
         const entry = { ...nuevoPersonal, nombre: nuevoPersonal.nombre.trim() };
         const path = `personal_obra/${proyectoSel}/${key}`;
         fbDB.ref(path).set(entry);
-        setNuevoPersonal({ nombre: '', telefono: '', correo: '', rol: 'capataz' });
+        setNuevoPersonal({ nombre: '', telefono: '', correo: '', rol: 'capataz', informes: [] });
     };
 
     const eliminarPersonal = (key) => {
@@ -6305,56 +6321,82 @@ const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel, personal
                                 <label className="text-[10px] text-gray-500 font-medium">Correo</label>
                                 <input type="email" value={nuevoPersonal.correo} onChange={e => setNuevoPersonal(p => ({...p, correo: e.target.value}))} placeholder="correo@ejemplo.cl" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 mt-0.5" />
                             </div>
-                            <div className="w-32">
+                            <div className="w-40">
                                 <label className="text-[10px] text-gray-500 font-medium">Rol</label>
                                 <select value={nuevoPersonal.rol} onChange={e => setNuevoPersonal(p => ({...p, rol: e.target.value}))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 mt-0.5">
-                                    <option value="capataz">Capataz</option>
-                                    <option value="residente">Residente</option>
+                                    {ROLES_PERSONAL.map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
                                 </select>
                             </div>
                             <button onClick={agregarPersonal} className="px-4 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 transition-colors whitespace-nowrap">+ Agregar</button>
                         </div>
+                        <div className="mt-3">
+                            <label className="text-[10px] text-gray-500 font-medium">Informes a recibir por correo</label>
+                            <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-1.5">
+                                {INFORME_TIPOS.map(t => (
+                                    <label key={t.key} className="flex items-center gap-1.5 text-xs cursor-pointer text-gray-600 hover:text-gray-800">
+                                        <input type="checkbox" checked={(nuevoPersonal.informes || []).includes(t.key)} onChange={e => setNuevoPersonal(p => ({ ...p, informes: e.target.checked ? [...(p.informes||[]), t.key] : (p.informes||[]).filter(k => k !== t.key) }))} className="rounded border-gray-300 text-amber-500 focus:ring-amber-400" />
+                                        {t.label}
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
 
                         <div className="mt-4 grid grid-cols-2 gap-4">
-                            {['capataz','residente'].map(rol => (
-                                <div key={rol}>
-                                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">{rol === 'capataz' ? 'Capataces' : 'Residentes'}</div>
-                                    {personalProy.filter(([,p]) => p.rol === rol).length === 0
-                                        ? <p className="text-xs text-gray-400 italic">Sin {rol === 'capataz' ? 'capataces' : 'residentes'} registrados</p>
-                                        : personalProy.filter(([,p]) => p.rol === rol).map(([key, p]) => (
-                                            <div key={key} className="py-2 border-b border-gray-100 last:border-0">
-                                                {editandoPersonal && editandoPersonal.key === key ? (
-                                                    <div className="space-y-1.5">
-                                                        <input type="text" value={editandoPersonal.datos.nombre} onChange={e => setEditandoPersonal(ep => ({...ep, datos: {...ep.datos, nombre: e.target.value}}))} className="w-full border border-amber-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-amber-400" placeholder="Nombre" />
-                                                        <input type="text" value={editandoPersonal.datos.telefono || ''} onChange={e => setEditandoPersonal(ep => ({...ep, datos: {...ep.datos, telefono: e.target.value}}))} className="w-full border border-amber-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-amber-400" placeholder="Teléfono" />
-                                                        <input type="email" value={editandoPersonal.datos.correo || ''} onChange={e => setEditandoPersonal(ep => ({...ep, datos: {...ep.datos, correo: e.target.value}}))} className="w-full border border-amber-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-amber-400" placeholder="Correo" />
-                                                        <select value={editandoPersonal.datos.rol} onChange={e => setEditandoPersonal(ep => ({...ep, datos: {...ep.datos, rol: e.target.value}}))} className="w-full border border-amber-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-amber-400">
-                                                            <option value="capataz">Capataz</option>
-                                                            <option value="residente">Residente</option>
-                                                        </select>
-                                                        <div className="flex gap-1 pt-0.5">
-                                                            <button onClick={guardarEdicionPersonal} className="flex-1 px-2 py-1 bg-amber-500 text-white rounded text-xs font-medium hover:bg-amber-600">Guardar</button>
-                                                            <button onClick={() => setEditandoPersonal(null)} className="px-2 py-1 bg-gray-200 text-gray-600 rounded text-xs hover:bg-gray-300">Cancelar</button>
-                                                        </div>
+                            {ROLES_PERSONAL.filter(r => personalProy.some(([,p]) => p.rol === r.key)).map(rolObj => (
+                                <div key={rolObj.key}>
+                                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">{rolObj.label}s</div>
+                                    {personalProy.filter(([,p]) => p.rol === rolObj.key).map(([key, p]) => (
+                                        <div key={key} className="py-2 border-b border-gray-100 last:border-0">
+                                            {editandoPersonal && editandoPersonal.key === key ? (
+                                                <div className="space-y-1.5">
+                                                    <input type="text" value={editandoPersonal.datos.nombre} onChange={e => setEditandoPersonal(ep => ({...ep, datos: {...ep.datos, nombre: e.target.value}}))} className="w-full border border-amber-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-amber-400" placeholder="Nombre" />
+                                                    <input type="text" value={editandoPersonal.datos.telefono || ''} onChange={e => setEditandoPersonal(ep => ({...ep, datos: {...ep.datos, telefono: e.target.value}}))} className="w-full border border-amber-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-amber-400" placeholder="Teléfono" />
+                                                    <input type="email" value={editandoPersonal.datos.correo || ''} onChange={e => setEditandoPersonal(ep => ({...ep, datos: {...ep.datos, correo: e.target.value}}))} className="w-full border border-amber-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-amber-400" placeholder="Correo" />
+                                                    <select value={editandoPersonal.datos.rol} onChange={e => setEditandoPersonal(ep => ({...ep, datos: {...ep.datos, rol: e.target.value}}))} className="w-full border border-amber-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-amber-400">
+                                                        {ROLES_PERSONAL.map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
+                                                    </select>
+                                                    <div className="text-[10px] text-gray-500 font-medium mt-1">Informes a recibir:</div>
+                                                    <div className="flex flex-wrap gap-x-3 gap-y-1">
+                                                        {INFORME_TIPOS.map(t => (
+                                                            <label key={t.key} className="flex items-center gap-1 text-xs cursor-pointer text-gray-600">
+                                                                <input type="checkbox" checked={(editandoPersonal.datos.informes||[]).includes(t.key)} onChange={e => setEditandoPersonal(ep => ({ ...ep, datos: { ...ep.datos, informes: e.target.checked ? [...(ep.datos.informes||[]), t.key] : (ep.datos.informes||[]).filter(k => k !== t.key) } }))} className="rounded border-gray-300" />
+                                                                {t.label}
+                                                            </label>
+                                                        ))}
                                                     </div>
-                                                ) : (
-                                                    <div className="flex items-start justify-between">
-                                                        <div>
-                                                            <div className="text-sm font-medium text-gray-700">{p.nombre}</div>
-                                                            {p.telefono && <div className="text-[10px] text-gray-400">📞 {p.telefono}</div>}
-                                                            {p.correo && <div className="text-[10px] text-gray-400">✉ {p.correo}</div>}
-                                                        </div>
-                                                        <div className="flex items-center gap-1 ml-2 mt-0.5">
-                                                            <button onClick={() => setEditandoPersonal({ key, datos: {...p} })} className="text-amber-500 hover:text-amber-700 text-xs px-1" title="Editar">✎</button>
-                                                            <button onClick={() => eliminarPersonal(key)} className="text-red-400 hover:text-red-600 text-xs px-1" title="Eliminar">×</button>
-                                                        </div>
+                                                    <div className="flex gap-1 pt-0.5">
+                                                        <button onClick={guardarEdicionPersonal} className="flex-1 px-2 py-1 bg-amber-500 text-white rounded text-xs font-medium hover:bg-amber-600">Guardar</button>
+                                                        <button onClick={() => setEditandoPersonal(null)} className="px-2 py-1 bg-gray-200 text-gray-600 rounded text-xs hover:bg-gray-300">Cancelar</button>
                                                     </div>
-                                                )}
-                                            </div>
-                                        ))
-                                    }
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-start justify-between">
+                                                    <div>
+                                                        <div className="text-sm font-medium text-gray-700">{p.nombre}</div>
+                                                        {p.telefono && <div className="text-[10px] text-gray-400">📞 {p.telefono}</div>}
+                                                        {p.correo && <div className="text-[10px] text-gray-400">✉ {p.correo}</div>}
+                                                        {(p.informes || []).length > 0 && (
+                                                            <div className="flex flex-wrap gap-1 mt-1">
+                                                                {(p.informes || []).map(k => {
+                                                                    const t = INFORME_TIPOS.find(t => t.key === k);
+                                                                    return t ? <span key={k} className="text-[9px] bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full">{t.label}</span> : null;
+                                                                })}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex items-center gap-1 ml-2 mt-0.5 shrink-0">
+                                                        <button onClick={() => setEditandoPersonal({ key, datos: { informes: [], ...p } })} className="text-amber-500 hover:text-amber-700 text-xs px-1" title="Editar">✎</button>
+                                                        <button onClick={() => eliminarPersonal(key)} className="text-red-400 hover:text-red-600 text-xs px-1" title="Eliminar">×</button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
                                 </div>
                             ))}
+                            {personalProy.length === 0 && (
+                                <div className="col-span-2 text-xs text-gray-400 italic text-center py-2">Sin personal registrado</div>
+                            )}
                         </div>
                     </div>
 
