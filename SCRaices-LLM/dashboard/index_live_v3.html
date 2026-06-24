@@ -2230,20 +2230,32 @@ const HeaderProyecto = ({ proy, garantiasProy, eeppResumen, kpis }) => {
                     <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                     <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Estados de Pago</span>
                 </div>
-                {eeppResumen.total > 0 ? (
-                    <div>
-                        <div className="flex rounded-full h-5 overflow-hidden mb-2">
-                            {eeppResumen.pagado > 0 && <div className="bg-green-500 flex items-center justify-center text-[9px] font-bold text-white" style={{width:`${(eeppResumen.pagado/eeppResumen.total*100).toFixed(0)}%`}}>{(eeppResumen.pagado/eeppResumen.total*100).toFixed(0)}%</div>}
-                            {eeppResumen.ingresado > 0 && <div className="bg-yellow-400" style={{width:`${(eeppResumen.ingresado/eeppResumen.total*100).toFixed(0)}%`}}></div>}
-                            {eeppResumen.preparacion > 0 && <div className="bg-gray-300" style={{width:`${(eeppResumen.preparacion/eeppResumen.total*100).toFixed(0)}%`}}></div>}
+                {(() => {
+                    const epId = String((proy && proy.ID_proy) || '');
+                    const mp = MONTOS_PROY_DATA[epId];
+                    const montoProy = mp ? mp.total : 0;
+                    const base = montoProy > 0 ? montoProy : eeppResumen.total;     // denominador = Total Proyecto
+                    if (base === 0) return <p className="text-gray-400 text-xs">Sin EP registrados</p>;
+                    const porFacturar = montoProy > 0 ? Math.max(0, montoProy - eeppResumen.pagado) : 0;  // Total - Pagado
+                    const sinIniciar = montoProy > 0 ? Math.max(0, montoProy - eeppResumen.total) : 0;
+                    const w = (n) => (n / base * 100).toFixed(0);
+                    return (
+                        <div>
+                            <div className="flex rounded-full h-5 overflow-hidden mb-2 bg-gray-100">
+                                {eeppResumen.pagado > 0 && <div className="bg-green-500 flex items-center justify-center text-[9px] font-bold text-white" style={{width:`${w(eeppResumen.pagado)}%`}}>{w(eeppResumen.pagado)}%</div>}
+                                {eeppResumen.ingresado > 0 && <div className="bg-yellow-400" style={{width:`${w(eeppResumen.ingresado)}%`}}></div>}
+                                {eeppResumen.preparacion > 0 && <div className="bg-gray-300" style={{width:`${w(eeppResumen.preparacion)}%`}}></div>}
+                                {sinIniciar > 0 && <div className="bg-violet-100" style={{width:`${w(sinIniciar)}%`}}></div>}
+                            </div>
+                            <div className="grid grid-cols-3 gap-1 text-[10px]">
+                                <div><span className="text-green-600 font-semibold">Pagado</span><br/><span className="font-mono font-bold text-gray-700">{formatUF(eeppResumen.pagado)}</span></div>
+                                <div><span className="text-yellow-600 font-semibold">Ingresado</span><br/><span className="font-mono font-bold text-gray-700">{formatUF(eeppResumen.ingresado)}</span></div>
+                                <div><span className="text-violet-700 font-semibold">{montoProy > 0 ? 'Total Proyecto' : 'Total EP'}</span><br/><span className="font-mono font-bold text-violet-800">{formatUF(base)}</span></div>
+                            </div>
+                            {montoProy > 0 && <p className="text-[9px] text-gray-400 mt-1">Por facturar (Total − Pagado): <span className="font-mono font-semibold text-gray-600">{formatUF(porFacturar)}</span></p>}
                         </div>
-                        <div className="grid grid-cols-3 gap-1 text-[10px]">
-                            <div><span className="text-green-600 font-semibold">Pagado</span><br/><span className="font-mono font-bold text-gray-700">{formatUF(eeppResumen.pagado)}</span></div>
-                            <div><span className="text-yellow-600 font-semibold">Ingresado</span><br/><span className="font-mono font-bold text-gray-700">{formatUF(eeppResumen.ingresado)}</span></div>
-                            <div><span className="text-gray-500 font-semibold">Total</span><br/><span className="font-mono font-bold text-gray-700">{formatUF(eeppResumen.total)}</span></div>
-                        </div>
-                    </div>
-                ) : <p className="text-gray-400 text-xs">Sin EP registrados</p>}
+                    );
+                })()}
             </div>
         </div>
     );
@@ -3288,8 +3300,10 @@ const EstadosPagoTab = ({ viviendas }) => {
     const montoProyInfo = MONTOS_PROY_DATA[projId] || null;
     const montoProy = montoProyInfo ? montoProyInfo.total : 0;
     const vivProy = montoProyInfo ? montoProyInfo.viviendas : 0;
-    const facturado = montoTotal;                                  // EP cargados (pag+ing+prep)
-    const porFacturar = montoProy > 0 ? Math.max(0, montoProy - facturado) : 0;
+    const facturado = montoTotal;                                  // total de EP cargados (pag+ing+prep), informativo
+    const cobrado = montoPag;                                      // SOLO Pagado cuenta como facturado/cobrado
+    const porFacturar = montoProy > 0 ? Math.max(0, montoProy - cobrado) : 0;   // Total - Pagado (Ingresado aun NO se factura)
+    const sinIniciar = montoProy > 0 ? Math.max(0, montoProy - facturado) : 0;  // resto sin EP cargado
     const pct = (n, d) => (d > 0 ? (n / d * 100) : 0);
     const fmtPct = (n) => n.toFixed(1) + '%';
 
@@ -3304,17 +3318,17 @@ const EstadosPagoTab = ({ viviendas }) => {
                             <p className="text-[10px] text-gray-400 mt-1">{vivProy} viviendas · tabla Montos</p>
                         </div>
                         <div>
-                            <p className="text-gray-500 text-xs font-medium">Facturado (EP cargados)</p>
-                            <p className="text-2xl font-bold text-gray-800 mt-1 font-mono">{formatUF(facturado)}</p>
-                            <p className="text-[10px] text-gray-400 mt-1">{fmtPct(pct(facturado, montoProy))} del proyecto</p>
-                        </div>
-                        <div>
-                            <p className="text-green-600 text-xs font-medium">Pagado</p>
+                            <p className="text-green-600 text-xs font-medium">Pagado (cobrado)</p>
                             <p className="text-2xl font-bold text-green-700 mt-1 font-mono">{formatUF(montoPag)}</p>
                             <p className="text-[10px] text-gray-400 mt-1">{fmtPct(pct(montoPag, montoProy))} del proyecto</p>
                         </div>
                         <div>
-                            <p className="text-gray-500 text-xs font-medium">Por facturar</p>
+                            <p className="text-yellow-600 text-xs font-medium">Ingresado (en trámite)</p>
+                            <p className="text-2xl font-bold text-yellow-700 mt-1 font-mono">{formatUF(montoIng)}</p>
+                            <p className="text-[10px] text-gray-400 mt-1">aún no facturado · {fmtPct(pct(montoIng, montoProy))}</p>
+                        </div>
+                        <div>
+                            <p className="text-gray-500 text-xs font-medium">Por facturar (Total − Pagado)</p>
                             <p className="text-2xl font-bold text-gray-700 mt-1 font-mono">{formatUF(porFacturar)}</p>
                             <p className="text-[10px] text-gray-400 mt-1">{fmtPct(pct(porFacturar, montoProy))} del proyecto</p>
                         </div>
@@ -3350,23 +3364,23 @@ const EstadosPagoTab = ({ viviendas }) => {
                     const pctP = pct(montoPag, base).toFixed(1);
                     const pctI = pct(montoIng, base).toFixed(1);
                     const pctR = pct(montoPrep, base).toFixed(1);
-                    const pctF = montoProy > 0 ? pct(porFacturar, base).toFixed(1) : '0.0';
+                    const pctS = montoProy > 0 ? pct(sinIniciar, base).toFixed(1) : '0.0';
                     return (
                         <div>
                             <div className="flex rounded-full h-8 overflow-hidden mb-2 bg-gray-100">
                                 {montoPag > 0 && <div className="bg-green-500 flex items-center justify-center text-xs font-bold text-white" style={{ width: `${pctP}%` }}>{pctP}%</div>}
                                 {montoIng > 0 && <div className="bg-yellow-400 flex items-center justify-center text-xs font-bold text-yellow-900" style={{ width: `${pctI}%` }}>{pctI}%</div>}
                                 {montoPrep > 0 && <div className="bg-gray-300 flex items-center justify-center text-xs font-bold text-gray-600" style={{ width: `${pctR}%` }}>{pctR}%</div>}
-                                {montoProy > 0 && porFacturar > 0 && <div className="bg-violet-100 flex items-center justify-center text-[10px] font-semibold text-violet-500" style={{ width: `${pctF}%` }}>{pctF}%</div>}
+                                {montoProy > 0 && sinIniciar > 0 && <div className="bg-violet-100 flex items-center justify-center text-[10px] font-semibold text-violet-500" style={{ width: `${pctS}%` }}>{pctS}%</div>}
                             </div>
                             <div className="flex flex-wrap gap-4 text-xs text-gray-500">
-                                <span className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-green-500" />Pagado ({pctP}%)</span>
+                                <span className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-green-500" />Pagado / cobrado ({pctP}%)</span>
                                 <span className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-yellow-400" />Ingresado ({pctI}%)</span>
                                 <span className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-gray-300" />En Prep. ({pctR}%)</span>
-                                {montoProy > 0 && <span className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-violet-100 border border-violet-200" />Por facturar ({pctF}%)</span>}
+                                {montoProy > 0 && <span className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-violet-100 border border-violet-200" />Sin iniciar ({pctS}%)</span>}
                                 <span className="font-medium text-gray-700 ml-auto">
                                     {montoProy > 0
-                                        ? <>Facturado {formatUF(facturado)} / Total proyecto {formatUF(montoProy)}</>
+                                        ? <>Cobrado (pagado) {formatUF(montoPag)} / Total proyecto {formatUF(montoProy)} · Por facturar {formatUF(porFacturar)}</>
                                         : <>Total EP: {formatUF(montoTotal)}</>}
                                 </span>
                             </div>
@@ -3408,13 +3422,32 @@ const EstadosPagoTab = ({ viviendas }) => {
                         ))}
                     </tbody>
                     <tfoot>
-                        <tr className="border-t-2 border-gray-300 bg-gray-50 font-bold">
-                            <td className="py-2 px-4 text-gray-800">TOTAL</td>
-                            <td className="py-2 px-4"></td>
-                            <td className="py-2 px-4 text-center text-gray-600">{viviendas.length} benef.</td>
-                            <td className="py-2 px-4 text-right font-mono text-gray-800">{formatUF(montoTotal)}</td>
-                            <td className="py-2 px-4"></td>
+                        <tr className="border-t-2 border-gray-300 bg-gray-50">
+                            <td className="py-2 px-4 text-gray-600" colSpan={2}>Total EP cargados (Pag.+Ing.+Prep.)</td>
+                            <td className="py-2 px-4 text-center text-gray-500 text-xs">{viviendas.length} benef.</td>
+                            <td className="py-2 px-4 text-right font-mono text-gray-700">{formatUF(montoTotal)}</td>
+                            <td className="py-2 px-4 text-center text-[10px] text-gray-400">{montoProy > 0 ? fmtPct(pct(montoTotal, montoProy)) + ' del proy.' : ''}</td>
                         </tr>
+                        <tr className="bg-green-50/60 font-semibold">
+                            <td className="py-2 px-4 text-green-700" colSpan={3}>Pagado (cobrado)</td>
+                            <td className="py-2 px-4 text-right font-mono text-green-700">{formatUF(montoPag)}</td>
+                            <td className="py-2 px-4 text-center text-[10px] text-green-600">{montoProy > 0 ? fmtPct(pct(montoPag, montoProy)) : ''}</td>
+                        </tr>
+                        {montoProy > 0 && (
+                            <tr className="bg-gray-50">
+                                <td className="py-2 px-4 text-gray-600" colSpan={3}>Por facturar (Total − Pagado)</td>
+                                <td className="py-2 px-4 text-right font-mono text-gray-600">{formatUF(porFacturar)}</td>
+                                <td className="py-2 px-4 text-center text-[10px] text-gray-400">{fmtPct(pct(porFacturar, montoProy))}</td>
+                            </tr>
+                        )}
+                        {montoProy > 0 && (
+                            <tr className="border-t border-violet-200 bg-violet-50 font-bold">
+                                <td className="py-2 px-4 text-violet-800" colSpan={2}>TOTAL PROYECTO (por cobrar)</td>
+                                <td className="py-2 px-4 text-center text-violet-600 text-[10px]">{vivProy} viviendas</td>
+                                <td className="py-2 px-4 text-right font-mono text-violet-800">{formatUF(montoProy)}</td>
+                                <td className="py-2 px-4 text-center text-[10px] text-violet-500">100%</td>
+                            </tr>
+                        )}
                     </tfoot>
                 </table>
             </div>
