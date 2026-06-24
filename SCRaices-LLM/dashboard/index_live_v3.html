@@ -5609,7 +5609,7 @@ ${viewerCss}</style>
 };
 
 // ===== CONFIGURACIÓN (Grupos + Diagrama + Editor) =====
-const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel }) => {
+const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel, personalObra, personalObraRef }) => {
     const originalConfig = ETAPAS_CONFIG_FULL;
     const [config, setConfig] = React.useState(() => JSON.parse(JSON.stringify(originalConfig)));
     const [subTab, setSubTab] = React.useState('grupos');
@@ -5693,6 +5693,8 @@ const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel }) => {
     const [editingGrupos, setEditingGrupos] = React.useState(JSON.parse(JSON.stringify(grupos)));
     const [nuevoGrupoNombre, setNuevoGrupoNombre] = React.useState("");
     const [nuevoGrupoCapataz, setNuevoGrupoCapataz] = React.useState("");
+    const [nuevoGrupoResidente, setNuevoGrupoResidente] = React.useState("");
+    const [nuevoPersonal, setNuevoPersonal] = React.useState({ nombre: '', telefono: '', correo: '', rol: 'capataz' });
 
     React.useEffect(() => {
         setEditingGrupos(JSON.parse(JSON.stringify(grupos)));
@@ -5705,8 +5707,8 @@ const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel }) => {
     const agregarGrupo = () => {
         if (!nuevoGrupoNombre.trim()) return;
         const newId = "G" + (editingGrupos.length + 1);
-        setEditingGrupos([...editingGrupos, { id: newId, nombre: nuevoGrupoNombre.trim(), capataz: nuevoGrupoCapataz.trim(), beneficiarios: [] }]);
-        setNuevoGrupoNombre(""); setNuevoGrupoCapataz("");
+        setEditingGrupos([...editingGrupos, { id: newId, nombre: nuevoGrupoNombre.trim(), capataz: nuevoGrupoCapataz.trim(), residente: nuevoGrupoResidente.trim(), beneficiarios: [] }]);
+        setNuevoGrupoNombre(""); setNuevoGrupoCapataz(""); setNuevoGrupoResidente("");
     };
 
     const moverAGrupo = (benefId, grupoId) => {
@@ -5733,6 +5735,29 @@ const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel }) => {
             g.id === grupoId ? {...g, capataz: nuevoCapataz} : g
         ));
     };
+
+    const editarResidente = (grupoId, nuevoResidente) => {
+        setEditingGrupos(prev => prev.map(g =>
+            g.id === grupoId ? {...g, residente: nuevoResidente} : g
+        ));
+    };
+
+    const agregarPersonal = () => {
+        if (!nuevoPersonal.nombre.trim()) return;
+        const key = Date.now().toString();
+        const entry = { ...nuevoPersonal, nombre: nuevoPersonal.nombre.trim() };
+        const path = `personal_obra/${proyectoSel}/${key}`;
+        fbDB.ref(path).set(entry);
+        setNuevoPersonal({ nombre: '', telefono: '', correo: '', rol: 'capataz' });
+    };
+
+    const eliminarPersonal = (key) => {
+        fbDB.ref(`personal_obra/${proyectoSel}/${key}`).remove();
+    };
+
+    const personalProy = Object.entries((personalObra || {})[proyectoSel] || {});
+    const capatacesList = personalProy.filter(([,p]) => p.rol === 'capataz').map(([,p]) => p.nombre);
+    const residentesList = personalProy.filter(([,p]) => p.rol === 'residente').map(([,p]) => p.nombre);
 
     const aplicarCambios = () => {
         setGrupos(editingGrupos);
@@ -6052,16 +6077,79 @@ const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel }) => {
                         </p>
                     </div>
 
+                    {/* === PERSONAL DE OBRA === */}
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                        <h3 className="text-sm font-semibold text-amber-800 mb-1">Personal de Obra</h3>
+                        <p className="text-xs text-amber-700">Registra capataces y residentes para asignarlos a los grupos.</p>
+                    </div>
+
+                    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+                        <h4 className="text-sm font-semibold text-gray-700 mb-3">Agregar Personal</h4>
+                        <div className="flex items-end gap-2 flex-wrap">
+                            <div className="flex-1 min-w-[150px]">
+                                <label className="text-[10px] text-gray-500 font-medium">Nombre</label>
+                                <input type="text" value={nuevoPersonal.nombre} onChange={e => setNuevoPersonal(p => ({...p, nombre: e.target.value}))} placeholder="Nombre completo" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 mt-0.5" />
+                            </div>
+                            <div className="w-36">
+                                <label className="text-[10px] text-gray-500 font-medium">Teléfono</label>
+                                <input type="text" value={nuevoPersonal.telefono} onChange={e => setNuevoPersonal(p => ({...p, telefono: e.target.value}))} placeholder="+56 9..." className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 mt-0.5" />
+                            </div>
+                            <div className="flex-1 min-w-[150px]">
+                                <label className="text-[10px] text-gray-500 font-medium">Correo</label>
+                                <input type="email" value={nuevoPersonal.correo} onChange={e => setNuevoPersonal(p => ({...p, correo: e.target.value}))} placeholder="correo@ejemplo.cl" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 mt-0.5" />
+                            </div>
+                            <div className="w-32">
+                                <label className="text-[10px] text-gray-500 font-medium">Rol</label>
+                                <select value={nuevoPersonal.rol} onChange={e => setNuevoPersonal(p => ({...p, rol: e.target.value}))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 mt-0.5">
+                                    <option value="capataz">Capataz</option>
+                                    <option value="residente">Residente</option>
+                                </select>
+                            </div>
+                            <button onClick={agregarPersonal} className="px-4 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 transition-colors whitespace-nowrap">+ Agregar</button>
+                        </div>
+
+                        <div className="mt-4 grid grid-cols-2 gap-4">
+                            {['capataz','residente'].map(rol => (
+                                <div key={rol}>
+                                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">{rol === 'capataz' ? 'Capataces' : 'Residentes'}</div>
+                                    {personalProy.filter(([,p]) => p.rol === rol).length === 0
+                                        ? <p className="text-xs text-gray-400 italic">Sin {rol === 'capataz' ? 'capataces' : 'residentes'} registrados</p>
+                                        : personalProy.filter(([,p]) => p.rol === rol).map(([key, p]) => (
+                                            <div key={key} className="flex items-start justify-between py-2 border-b border-gray-100 last:border-0">
+                                                <div>
+                                                    <div className="text-sm font-medium text-gray-700">{p.nombre}</div>
+                                                    {p.telefono && <div className="text-[10px] text-gray-400">📞 {p.telefono}</div>}
+                                                    {p.correo && <div className="text-[10px] text-gray-400">✉ {p.correo}</div>}
+                                                </div>
+                                                <button onClick={() => eliminarPersonal(key)} className="text-red-400 hover:text-red-600 text-xs px-1 ml-2 mt-0.5">×</button>
+                                            </div>
+                                        ))
+                                    }
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
                     <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
                         <h4 className="text-sm font-semibold text-gray-700 mb-3">Crear Nuevo Grupo</h4>
-                        <div className="flex items-end gap-3">
-                            <div className="flex-1">
+                        <div className="flex items-end gap-3 flex-wrap">
+                            <div className="flex-1 min-w-[150px]">
                                 <label className="text-[10px] text-gray-500 font-medium">Nombre del Grupo</label>
                                 <input type="text" value={nuevoGrupoNombre} onChange={e => setNuevoGrupoNombre(e.target.value)} placeholder="Ej: Grupo 4" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 mt-0.5" />
                             </div>
-                            <div className="flex-1">
+                            <div className="flex-1 min-w-[150px]">
                                 <label className="text-[10px] text-gray-500 font-medium">Capataz</label>
-                                <input type="text" value={nuevoGrupoCapataz} onChange={e => setNuevoGrupoCapataz(e.target.value)} placeholder="Ej: Roberto Figueroa" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 mt-0.5" />
+                                <select value={nuevoGrupoCapataz} onChange={e => setNuevoGrupoCapataz(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 mt-0.5">
+                                    <option value="">— Sin capataz —</option>
+                                    {capatacesList.map(n => <option key={n} value={n}>{n}</option>)}
+                                </select>
+                            </div>
+                            <div className="flex-1 min-w-[150px]">
+                                <label className="text-[10px] text-gray-500 font-medium">Residente</label>
+                                <select value={nuevoGrupoResidente} onChange={e => setNuevoGrupoResidente(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 mt-0.5">
+                                    <option value="">— Sin residente —</option>
+                                    {residentesList.map(n => <option key={n} value={n}>{n}</option>)}
+                                </select>
                             </div>
                             <button onClick={agregarGrupo} className="px-4 py-2 bg-violet-600 text-white rounded-lg text-sm font-medium hover:bg-violet-700 transition-colors whitespace-nowrap">+ Crear Grupo</button>
                         </div>
@@ -6083,7 +6171,17 @@ const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel }) => {
                                                 <h4 className={`text-sm font-bold ${c.text}`}>{grupo.nombre}</h4>
                                                 <div className="flex items-center gap-1 mt-0.5">
                                                     <span className="text-[10px] text-gray-400">Capataz:</span>
-                                                    <input type="text" value={grupo.capataz || ""} onChange={e => editarCapataz(grupo.id, e.target.value)} placeholder="Asignar capataz..." className="text-[11px] text-gray-700 font-medium bg-transparent border-b border-dashed border-gray-300 focus:border-violet-500 focus:outline-none px-1 py-0 w-40" />
+                                                    <select value={grupo.capataz || ""} onChange={e => editarCapataz(grupo.id, e.target.value)} className="text-[11px] text-gray-700 font-medium bg-transparent border-b border-dashed border-gray-300 focus:border-violet-500 focus:outline-none text-sm">
+                                                        <option value="">— Sin asignar —</option>
+                                                        {capatacesList.map(n => <option key={n} value={n}>{n}</option>)}
+                                                    </select>
+                                                </div>
+                                                <div className="flex items-center gap-1 mt-0.5">
+                                                    <span className="text-[10px] text-gray-400">Residente:</span>
+                                                    <select value={grupo.residente || ""} onChange={e => editarResidente(grupo.id, e.target.value)} className="text-[11px] text-gray-700 font-medium bg-transparent border-b border-dashed border-gray-300 focus:border-violet-500 focus:outline-none text-sm">
+                                                        <option value="">— Sin asignar —</option>
+                                                        {residentesList.map(n => <option key={n} value={n}>{n}</option>)}
+                                                    </select>
                                                 </div>
                                             </div>
                                         </div>
@@ -6389,6 +6487,9 @@ const App = () => {
         ganttProgramaRef.current.once('value').then(snap => {
             setGanttPrograma(snap.val() || {});
         });
+        // Listener Firebase para Personal de Obra (capataces y residentes)
+        personalObraRef.current = fbDB.ref('personal_obra');
+        personalObraRef.current.on('value', snap => setPersonalObra(snap.val() || {}));
         return () => {
             if (gruposRef.current) gruposRef.current.off();
             if (obsRef.current) obsRef.current.off();
@@ -6401,6 +6502,7 @@ const App = () => {
             if (resumenRef.current) resumenRef.current.off();
             if (proyTermRef.current) proyTermRef.current.off();
             if (ganttProgramaRef.current) ganttProgramaRef.current.off();
+            if (personalObraRef.current) personalObraRef.current.off();
         };
     }, []);
 
@@ -6618,6 +6720,10 @@ const App = () => {
     // Resumen comentarios (Firebase) - para tick de incorporar al resumen
     const [resumenComentarios, setResumenComentarios] = React.useState({});
     const resumenRef = React.useRef(null);
+
+    // Personal de obra (capataces y residentes) — Firebase
+    const [personalObra, setPersonalObra] = React.useState({});
+    const personalObraRef = React.useRef(null);
 
     // Proyectos marcados como terminados manualmente (Firebase)
     const [proyTerminados, setProyTerminados] = React.useState({});
@@ -7523,7 +7629,7 @@ const App = () => {
                     {tab === "mano_obra" && <ManoDeObraTab viviendas={viviendas} />}
                     {tab === "estados_pago" && <EstadosPagoTab viviendas={viviendas} />}
                     {tab === "estado_general" && <EstadoGeneralTab viviendas={viviendas} observaciones={observaciones} grupos={grupos} resumenComentarios={resumenComentarios} proyectoSel={proyectoSel} proy={proy} garantiasProy={garantiasProy} muestrasProy={getMuestrasProy()} muestrasResumen={getMuestrasResumen()} kpis={kpis} />}
-                    {tab === "configuracion" && <ConfiguracionView grupos={grupos} setGrupos={setGruposForProy} viviendas={viviendas} proyectoSel={proyectoSel} />}
+                    {tab === "configuracion" && <ConfiguracionView grupos={grupos} setGrupos={setGruposForProy} viviendas={viviendas} proyectoSel={proyectoSel} personalObra={personalObra} personalObraRef={personalObraRef} />}
                 </div>
 
                 {/* Leyenda */}
