@@ -5876,13 +5876,17 @@ const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel, personal
 
     // ===== Grupos editor state =====
     const [editingGrupos, setEditingGrupos] = React.useState(JSON.parse(JSON.stringify(grupos)));
+    const [dirtyGrupos, setDirtyGrupos] = React.useState(false);
     const [nuevoGrupoNombre, setNuevoGrupoNombre] = React.useState("");
     const [nuevoGrupoCapataz, setNuevoGrupoCapataz] = React.useState("");
     const [nuevoGrupoResidente, setNuevoGrupoResidente] = React.useState("");
     const [nuevoPersonal, setNuevoPersonal] = React.useState({ nombre: '', telefono: '', correo: '', rol: 'capataz' });
 
     React.useEffect(() => {
-        setEditingGrupos(JSON.parse(JSON.stringify(grupos)));
+        // Solo resetear si no hay cambios pendientes del usuario
+        if (!dirtyGrupos) {
+            setEditingGrupos(JSON.parse(JSON.stringify(grupos)));
+        }
     }, [grupos]);
 
     const asignados = new Set();
@@ -5892,11 +5896,13 @@ const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel, personal
     const agregarGrupo = () => {
         if (!nuevoGrupoNombre.trim()) return;
         const newId = "G" + (editingGrupos.length + 1);
+        setDirtyGrupos(true);
         setEditingGrupos([...editingGrupos, { id: newId, nombre: nuevoGrupoNombre.trim(), capataz: nuevoGrupoCapataz.trim(), residente: nuevoGrupoResidente.trim(), beneficiarios: [] }]);
         setNuevoGrupoNombre(""); setNuevoGrupoCapataz(""); setNuevoGrupoResidente("");
     };
 
     const moverAGrupo = (benefId, grupoId) => {
+        setDirtyGrupos(true);
         setEditingGrupos(prev => prev.map(g => ({
             ...g,
             beneficiarios: g.id === grupoId
@@ -5906,22 +5912,26 @@ const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel, personal
     };
 
     const quitarDeGrupo = (benefId, grupoId) => {
+        setDirtyGrupos(true);
         setEditingGrupos(prev => prev.map(g =>
             g.id === grupoId ? {...g, beneficiarios: g.beneficiarios.filter(b => b !== benefId)} : g
         ));
     };
 
     const eliminarGrupo = (grupoId) => {
+        setDirtyGrupos(true);
         setEditingGrupos(prev => prev.filter(g => g.id !== grupoId));
     };
 
     const editarCapataz = (grupoId, nuevoCapataz) => {
+        setDirtyGrupos(true);
         setEditingGrupos(prev => prev.map(g =>
             g.id === grupoId ? {...g, capataz: nuevoCapataz} : g
         ));
     };
 
     const editarResidente = (grupoId, nuevoResidente) => {
+        setDirtyGrupos(true);
         setEditingGrupos(prev => prev.map(g =>
             g.id === grupoId ? {...g, residente: nuevoResidente} : g
         ));
@@ -5945,6 +5955,7 @@ const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel, personal
     const residentesList = personalProy.filter(([,p]) => p.rol === 'residente').map(([,p]) => p.nombre);
 
     const aplicarCambios = () => {
+        setDirtyGrupos(false);
         setGrupos(editingGrupos);
     };
 
@@ -6433,7 +6444,7 @@ const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel, personal
                     <div className="flex items-center justify-between bg-gray-50 rounded-xl border border-gray-200 p-4">
                         <p className="text-[10px] text-gray-400">Los cambios se reflejan en las pestañas Viviendas y Matriz al aplicar</p>
                         <div className="flex gap-2">
-                            <button onClick={() => setEditingGrupos(JSON.parse(JSON.stringify(grupos)))} className="px-3 py-1.5 text-xs bg-gray-200 text-gray-600 rounded-lg hover:bg-gray-300">Descartar</button>
+                            <button onClick={() => { setDirtyGrupos(false); setEditingGrupos(JSON.parse(JSON.stringify(grupos))); }} className="px-3 py-1.5 text-xs bg-gray-200 text-gray-600 rounded-lg hover:bg-gray-300">Descartar</button>
                             <button onClick={aplicarCambios} className="px-4 py-1.5 text-xs bg-violet-600 text-white rounded-lg hover:bg-violet-700 font-medium">Aplicar Grupos</button>
                         </div>
                     </div>
