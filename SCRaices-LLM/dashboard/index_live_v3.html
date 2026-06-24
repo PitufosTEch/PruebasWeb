@@ -4664,12 +4664,15 @@ body{font-family:'IBM Plex Sans',Arial,sans-serif;background:#f5f5f5;color:#1a1a
 .curvas-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-top:12px;}
 .curva-card{border:1px solid #e0e0e0;border-radius:6px;overflow:hidden;}
 .curva-header{background:#f0f0f0;padding:10px 12px;font-size:11px;font-weight:600;color:#333;border-bottom:1px solid #e0e0e0;}
-.table-container{overflow-x:auto;margin-top:12px;}
+.table-container{overflow:auto;max-height:520px;margin-top:12px;border:1px solid #e0e0e0;border-radius:6px;}
 table{width:100%;border-collapse:collapse;font-size:12px;}
 table thead{background:#f5f5f5;}
-table th{padding:10px;text-align:left;font-weight:600;color:#333;border-bottom:2px solid #ddd;}
+table th{padding:10px;text-align:left;font-weight:600;color:#333;border-bottom:2px solid #ddd;position:sticky;top:0;background:#f5f5f5;z-index:2;}
 table td{padding:10px;border-bottom:1px solid #e8e8e8;}
 table tr:hover{background:#fafafa;}
+table th:first-child,table td:first-child{position:sticky;left:0;background:white;z-index:1;border-right:1px solid #e0e0e0;min-width:180px;}
+table th:first-child{background:#f5f5f5;z-index:3;}
+table tr:hover td:first-child{background:#fafafa;}
 .footer{background:#fafafa;padding:14px 24px;border-top:1px solid #e0e0e0;display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;}
 .btn{padding:8px 14px;border:1px solid #ddd;border-radius:4px;background:white;cursor:pointer;font-size:12px;font-weight:600;}
 .btn:hover{background:#f0f0f0;border-color:#999;}
