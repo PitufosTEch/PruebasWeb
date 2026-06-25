@@ -5805,6 +5805,182 @@ ${viewerCss}</style>
 };
 
 // ===== CONFIGURACIÓN (Grupos + Diagrama + Editor) =====
+const ModalPersonalGlobal = ({ personalGlobal, fbDB, onClose }) => {
+    const [form, setForm] = React.useState({ nombre: '', telefono: '', correo: '', rol: 'capataz', informes: [] });
+    const [editKey, setEditKey] = React.useState(null);
+    const [informesOpenKey, setInformesOpenKey] = React.useState(null);
+    const lista = Object.entries(personalGlobal || {});
+
+    const guardar = () => {
+        if (!form.nombre.trim()) return;
+        const entry = { ...form, nombre: form.nombre.trim() };
+        if (editKey) {
+            fbDB.ref(`personal_global/${editKey}`).set(entry);
+            setEditKey(null);
+        } else {
+            fbDB.ref(`personal_global/${Date.now()}`).set(entry);
+        }
+        setForm({ nombre: '', telefono: '', correo: '', rol: 'capataz', informes: [] });
+    };
+
+    const eliminar = (key) => {
+        if (!window.confirm('¿Eliminar este registro?')) return;
+        fbDB.ref(`personal_global/${key}`).remove();
+    };
+
+    const iniciarEdicion = (key, p) => {
+        setEditKey(key);
+        setForm({ nombre: p.nombre || '', telefono: p.telefono || '', correo: p.correo || '', rol: p.rol || 'capataz', informes: p.informes || [] });
+        setInformesOpenKey(null);
+    };
+
+    const cancelarEdicion = () => {
+        setEditKey(null);
+        setForm({ nombre: '', telefono: '', correo: '', rol: 'capataz', informes: [] });
+    };
+
+    const toggleInforme = (key, informeKey, current, checked) => {
+        const nuevos = checked ? [...current, informeKey] : current.filter(k => k !== informeKey);
+        fbDB.ref(`personal_global/${key}/informes`).set(nuevos.length > 0 ? nuevos : null);
+    };
+
+    const ROLES_MAP = { capataz:'Capataz', residente:'Residente', gerente:'Gerente', coordinador:'Coordinador', logistica:'Logística', rrhh:'Recursos Humanos' };
+    const rolesPresentes = [...new Set(lista.map(([,p]) => p.rol))].sort();
+
+    return (
+        <div className="fixed inset-0 z-[70] bg-black/50 flex items-start justify-center pt-6 px-4 overflow-y-auto" onClick={e => e.target === e.currentTarget && onClose()}>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl mb-6">
+                {/* Header */}
+                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-violet-50 rounded-t-2xl">
+                    <div>
+                        <h2 className="text-base font-bold text-violet-800">Registro de Personal — Organización</h2>
+                        <p className="text-xs text-violet-600 mt-0.5">Agrega personas de la organización para asignarlas a proyectos y definir qué informes reciben.</p>
+                    </div>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl font-light leading-none p-1">×</button>
+                </div>
+
+                {/* Formulario */}
+                <div className="px-6 py-4 border-b border-gray-100">
+                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">{editKey ? '✎ Editando registro' : '+ Agregar persona'}</h3>
+                    <div className="flex flex-wrap gap-2">
+                        <div className="flex-1 min-w-[160px]">
+                            <label className="text-[10px] text-gray-500 font-medium">Nombre</label>
+                            <input type="text" value={form.nombre} onChange={e => setForm(f => ({...f, nombre: e.target.value}))} placeholder="Nombre completo" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 mt-0.5" />
+                        </div>
+                        <div className="w-36">
+                            <label className="text-[10px] text-gray-500 font-medium">Teléfono</label>
+                            <input type="text" value={form.telefono} onChange={e => setForm(f => ({...f, telefono: e.target.value}))} placeholder="+56 9..." className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 mt-0.5" />
+                        </div>
+                        <div className="flex-1 min-w-[160px]">
+                            <label className="text-[10px] text-gray-500 font-medium">Correo</label>
+                            <input type="email" value={form.correo} onChange={e => setForm(f => ({...f, correo: e.target.value}))} placeholder="correo@ejemplo.cl" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 mt-0.5" />
+                        </div>
+                        <div className="w-40">
+                            <label className="text-[10px] text-gray-500 font-medium">Rol</label>
+                            <select value={form.rol} onChange={e => setForm(f => ({...f, rol: e.target.value}))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 mt-0.5">
+                                {(typeof ROLES_PERSONAL !== 'undefined' ? ROLES_PERSONAL : [
+                                    {key:'capataz',label:'Capataz'},{key:'residente',label:'Residente'},
+                                    {key:'gerente',label:'Gerente'},{key:'coordinador',label:'Coordinador'},
+                                    {key:'logistica',label:'Logística'},{key:'rrhh',label:'Recursos Humanos'}
+                                ]).map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
+                            </select>
+                        </div>
+                    </div>
+                    <div className="mt-3">
+                        <label className="text-[10px] text-gray-500 font-medium">Informes a recibir por correo</label>
+                        <div className="flex flex-wrap gap-x-5 gap-y-1.5 mt-1.5">
+                            {(typeof INFORME_TIPOS !== 'undefined' ? INFORME_TIPOS : [
+                                {key:'curvas_s',label:'Reporte ejecutivo (Curvas S)'},
+                                {key:'obra_logistica',label:'Reporte obra/logística'},
+                                {key:'por_capataz',label:'Reporte por Capataz'},
+                                {key:'html_navegable',label:'HTML navegable'}
+                            ]).map(t => (
+                                <label key={t.key} className="flex items-center gap-1.5 text-xs cursor-pointer text-gray-600 hover:text-violet-700 select-none">
+                                    <input type="checkbox" checked={(form.informes||[]).includes(t.key)} onChange={e => setForm(f => ({ ...f, informes: e.target.checked ? [...(f.informes||[]), t.key] : (f.informes||[]).filter(k => k !== t.key) }))} className="rounded border-gray-300 text-violet-500 focus:ring-violet-400" />
+                                    {t.label}
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="flex gap-2 mt-3">
+                        <button onClick={guardar} disabled={!form.nombre.trim()} className="px-4 py-2 bg-violet-600 text-white rounded-lg text-sm font-medium hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                            {editKey ? 'Guardar cambios' : '+ Agregar'}
+                        </button>
+                        {editKey && <button onClick={cancelarEdicion} className="px-4 py-2 bg-gray-200 text-gray-600 rounded-lg text-sm hover:bg-gray-300 transition-colors">Cancelar</button>}
+                    </div>
+                </div>
+
+                {/* Lista */}
+                <div className="px-6 py-4 max-h-[420px] overflow-y-auto">
+                    {lista.length === 0 ? (
+                        <p className="text-sm text-gray-400 italic text-center py-6">Sin personal registrado. Agrega personas usando el formulario de arriba.</p>
+                    ) : (
+                        rolesPresentes.map(rol => {
+                            const grupo = lista.filter(([,p]) => p.rol === rol);
+                            if (grupo.length === 0) return null;
+                            const rolLabel = ROLES_MAP[rol] || rol;
+                            return (
+                                <div key={rol} className="mb-5">
+                                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2 border-b border-gray-100 pb-1">{rolLabel}s</div>
+                                    <div className="space-y-1">
+                                        {grupo.map(([key, p]) => (
+                                            <div key={key} className={`rounded-xl border px-3 py-2 transition-colors ${editKey === key ? 'border-violet-300 bg-violet-50' : 'border-gray-100 bg-gray-50 hover:bg-gray-100'}`}>
+                                                <div className="flex items-start justify-between">
+                                                    <div>
+                                                        <div className="text-sm font-semibold text-gray-700">{p.nombre}</div>
+                                                        <div className="flex gap-3 mt-0.5">
+                                                            {p.telefono && <span className="text-[10px] text-gray-400">📞 {p.telefono}</span>}
+                                                            {p.correo && <span className="text-[10px] text-gray-400">✉ {p.correo}</span>}
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-1 shrink-0 ml-2">
+                                                        <button
+                                                            onClick={() => setInformesOpenKey(informesOpenKey === key ? null : key)}
+                                                            className={`flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded border transition-colors ${(p.informes||[]).length > 0 ? 'bg-violet-100 text-violet-700 border-violet-300' : 'bg-gray-100 text-gray-400 border-gray-200 hover:bg-violet-50 hover:text-violet-500'}`}
+                                                            title="Gestionar informes"
+                                                        >
+                                                            📧 {(p.informes||[]).length > 0 ? (p.informes||[]).length : '—'}
+                                                        </button>
+                                                        <button onClick={() => iniciarEdicion(key, p)} className="text-violet-500 hover:text-violet-700 text-xs px-1.5" title="Editar">✎</button>
+                                                        <button onClick={() => eliminar(key)} className="text-red-400 hover:text-red-600 text-xs px-1" title="Eliminar">×</button>
+                                                    </div>
+                                                </div>
+                                                {informesOpenKey === key && (
+                                                    <div className="mt-2 p-2.5 bg-violet-50 rounded-lg border border-violet-200">
+                                                        <div className="text-[10px] text-violet-700 font-semibold mb-2 uppercase tracking-wide">Informes a recibir por correo</div>
+                                                        <div className="grid grid-cols-2 gap-1">
+                                                            {(typeof INFORME_TIPOS !== 'undefined' ? INFORME_TIPOS : [
+                                                                {key:'curvas_s',label:'Reporte ejecutivo (Curvas S)'},
+                                                                {key:'obra_logistica',label:'Reporte obra/logística'},
+                                                                {key:'por_capataz',label:'Reporte por Capataz'},
+                                                                {key:'html_navegable',label:'HTML navegable'}
+                                                            ]).map(t => (
+                                                                <label key={t.key} className="flex items-center gap-2 text-xs cursor-pointer text-gray-600 hover:text-violet-700 select-none">
+                                                                    <input type="checkbox" checked={(p.informes||[]).includes(t.key)} onChange={e => toggleInforme(key, t.key, p.informes||[], e.target.checked)} className="rounded border-gray-300 text-violet-500" />
+                                                                    {t.label}
+                                                                </label>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            );
+                        })
+                    )}
+                </div>
+
+                <div className="px-6 py-3 border-t border-gray-100 flex justify-between items-center bg-gray-50 rounded-b-2xl">
+                    <span className="text-xs text-gray-400">{lista.length} persona{lista.length !== 1 ? 's' : ''} registrada{lista.length !== 1 ? 's' : ''}</span>
+                    <button onClick={onClose} className="px-4 py-1.5 bg-gray-200 text-gray-600 rounded-lg text-sm hover:bg-gray-300 transition-colors">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const ROLES_PERSONAL = [
     { key: 'capataz',      label: 'Capataz' },
     { key: 'residente',    label: 'Residente' },
@@ -6787,6 +6963,9 @@ const App = () => {
         // Listener Firebase para Personal de Obra (capataces y residentes)
         personalObraRef.current = fbDB.ref('personal_obra');
         personalObraRef.current.on('value', snap => setPersonalObra(snap.val() || {}));
+        // Listener Firebase para Registro Global de Personal
+        personalGlobalRef.current = fbDB.ref('personal_global');
+        personalGlobalRef.current.on('value', snap => setPersonalGlobal(snap.val() || {}));
         return () => {
             if (gruposRef.current) gruposRef.current.off();
             if (obsRef.current) obsRef.current.off();
@@ -6800,6 +6979,7 @@ const App = () => {
             if (proyTermRef.current) proyTermRef.current.off();
             if (ganttProgramaRef.current) ganttProgramaRef.current.off();
             if (personalObraRef.current) personalObraRef.current.off();
+            if (personalGlobalRef.current) personalGlobalRef.current.off();
         };
     }, []);
 
@@ -7021,6 +7201,9 @@ const App = () => {
     // Personal de obra (capataces y residentes) — Firebase
     const [personalObra, setPersonalObra] = React.useState({});
     const personalObraRef = React.useRef(null);
+    const [personalGlobal, setPersonalGlobal] = React.useState({});
+    const personalGlobalRef = React.useRef(null);
+    const [showModalPersonal, setShowModalPersonal] = React.useState(false);
 
     // Proyectos marcados como terminados manualmente (Firebase)
     const [proyTerminados, setProyTerminados] = React.useState({});
@@ -7592,6 +7775,10 @@ const App = () => {
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                             </button>
                         )}
+                        <button type="button" onClick={() => setShowModalPersonal(true)} title="Registro global de personal de la organización" className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-violet-700 bg-violet-50 border border-violet-300 hover:bg-violet-100 transition-colors">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+                            <span className="hidden md:inline">Personal</span>
+                        </button>
                         <button type="button" onClick={(e) => { exportarSolpagoEnCurso(e.currentTarget); }} title="Descargar Excel: Solicitudes de pago M.O. aprobadas pero NO pagadas (en curso)" className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-300 hover:bg-emerald-100 transition-colors">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M12 3v12m0 0l-4-4m4 4l4-4"/></svg>
                             <span className="hidden md:inline">Pagos en curso</span>
@@ -7942,6 +8129,12 @@ const App = () => {
                 </div>
                 <p className="text-center text-[10px] text-gray-300 mt-4 mb-8">SCRaices v3 — Vista Unificada + Grupos — {new Date().toLocaleString('es-CL')}</p>
             </div>
+
+            {/* MODAL PERSONAL GLOBAL */}
+            {showModalPersonal && React.createElement(ModalPersonalGlobal, {
+                personalGlobal, fbDB,
+                onClose: () => setShowModalPersonal(false)
+            })}
 
             {/* MODAL SUGERENCIAS */}
             {showSugerencias && (
