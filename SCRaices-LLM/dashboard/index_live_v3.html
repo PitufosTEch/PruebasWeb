@@ -6795,7 +6795,7 @@ const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel, personal
                         <div className="mt-4 grid grid-cols-2 gap-4">
                             {ROLES_PERSONAL.filter(r => personalProy.some(([,p]) => p.rol === r.key)).map(rolObj => (
                                 <div key={rolObj.key}>
-                                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">{rolObj.label}s</div>
+                                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">{rolObj.label}</div>
                                     {personalProy.filter(([,p]) => p.rol === rolObj.key).map(([key, p]) => (
                                         <div key={key} className="py-2 border-b border-gray-100 last:border-0">
                                             {editandoPersonal && editandoPersonal.key === key ? (
