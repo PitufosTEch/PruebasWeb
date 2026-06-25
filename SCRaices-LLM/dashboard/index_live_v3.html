@@ -4594,6 +4594,263 @@ ${inf.footerHtml}
         else alert('Por favor permite ventanas emergentes para generar el PDF.');
     };
 
+    const generarInformeAdquisicionesHTML = async () => {
+        const obrasConCurva = PROYECTOS_DATA.filter(p => (CURVAS_S_CONFIG[p.ID_proy] || []).length > 0);
+        if (obrasConCurva.length === 0) { alert('No hay obras activas con curvas S configuradas.'); return; }
+
+        let ganttRaw = {}, gruposRaw = {}, obsRaw = {};
+        try {
+            const [rGantt, rGrupos, rObs] = await Promise.all([
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/gantt_programa.json'),
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/grupos.json'),
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/observaciones.json')
+            ]);
+            ganttRaw  = (await rGantt.json())  || {};
+            gruposRaw = (await rGrupos.json()) || {};
+            obsRaw    = (await rObs.json())    || {};
+        } catch(e) { ganttRaw = {}; gruposRaw = {}; obsRaw = {}; }
+
+        const getCapataz = (idProy, curvaLabel) => {
+            const gList = gruposRaw[idProy] || [];
+            const grupoNombre = curvaLabel.split(' · ')[0].trim().toLowerCase();
+            const found = gList.find(g => (g.nombre || '').toLowerCase() === grupoNombre);
+            return found && found.capataz ? found.capataz : null;
+        };
+        const fmtFecha = (iso) => { if (!iso) return '—'; const p = String(iso).substring(0,10).split('-'); return p.length===3 ? `${p[2]}/${p[1]}/${p[0]}` : String(iso); };
+        const getFlags = (v) => {
+            const seg = SEGUIMIENTO_DATA[String(v.ID_Benef)] || { _has: {} };
+            return { hpc:!!v.habil, te1:!!v.has_te1, visita_as:!!seg._has.visita_as, resol_as:!!seg._has.resol_as, visita_f1:!!seg._has.visita_f1, fecha_f1:!!seg._has.fecha_f1, artefactado:!!seg._has.artefactado, empalme:!!seg._has.empalme, visita_dom:!!seg._has.visita_dom, recepcion_dom:!!seg._has.recepcion_dom, fecha_recep:!!(v.fecha_recepcion||seg._has.fecha_recep) };
+        };
+
+        const obrasData = obrasConCurva.map(proy => {
+            const vivs = BENEFICIARIOS_DATA.filter(b => String(b.ID_Proy) === String(proy.ID_proy));
+            return { ID_proy: proy.ID_proy, nombre: proy.NOMBRE_PROYECTO, viviendas: vivs };
+        });
+
+        // Checkpoints para adquisiciones (excluir los 4 de inspección in-situ)
+        const CP_KEYS_EXCL = new Set(['visita_as','visita_f1','visita_dom','recepcion_dom']);
+        const CPS_ADQ = [
+            {key:'hpc',label:'HPC'}, {key:'te1',label:'TE1'},
+            {key:'resol_as',label:'R.AS'}, {key:'fecha_f1',label:'F1'},
+            {key:'artefactado',label:'Artef.'}, {key:'empalme',label:'Empalme'}
+        ];
+
+        const renderTabAdq = (idx, tab) => {
+            const obra = obrasData[idx];
+            let h = `<div class="breadcrumb">Obra <strong>${obra.nombre}</strong> · `;
+
+            if (tab === 'resumen') {
+                const tot = obra.viviendas.length;
+                const av = tot ? Math.round(obra.viviendas.reduce((s,v) => { const insp = getInspeccion(v.ID_Benef); return s + (insp ? insp.pct_total : 0); }, 0) / tot) : 0;
+                const conInsp = obra.viviendas.filter(v => getInspeccion(v.ID_Benef) !== null).length;
+                const term = obra.viviendas.filter(v => v.fecha_recepcion).length;
+                h += `Estado General</div>
+<div class="summary-grid">
+  <div class="summary-card"><div class="summary-card-label">Avance Real</div><div class="summary-card-value" style="color:${av>=80?'#16a34a':av>=50?'#2563eb':'#dc2626'};">${av}%</div><div class="summary-card-detail">${conInsp}/${tot} inspeccionadas</div></div>
+  <div class="summary-card"><div class="summary-card-label">Viviendas</div><div class="summary-card-value">${tot}</div><div class="summary-card-detail">Beneficiarios</div></div>
+  <div class="summary-card"><div class="summary-card-label">Terminadas</div><div class="summary-card-value" style="color:#16a34a;">${term}</div><div class="summary-card-detail">Con recepción</div></div>
+  <div class="summary-card"><div class="summary-card-label">En Proceso</div><div class="summary-card-value" style="color:#2563eb;">${tot - term}</div><div class="summary-card-detail">Sin recepción</div></div>
+</div>`;
+                // Programa de Obra (gantt_programa)
+                const pg = ganttRaw[obra.ID_proy] || null;
+                if (pg && pg.inicio && pg.finProg) {
+                    const diasR = Math.floor((new Date(pg.finProg) - new Date()) / 86400000);
+                    const estadoTxt = diasR < 0 ? `Vencido (${Math.abs(diasR)}d)` : `${diasR}d restantes`;
+                    const estadoCol = diasR < 0 ? '#dc2626' : diasR < 30 ? '#b45309' : '#16a34a';
+                    const pctTr = pg.plazo > 0 ? Math.min(100, Math.round((pg.plazo - Math.max(0,diasR)) / pg.plazo * 100)) : 0;
+                    const barCol = pctTr>=100?'#ef4444':pctTr>=80?'#f59e0b':pctTr>=50?'#3b82f6':'#22c55e';
+                    h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📋 Programa de Obra</h3>
+<div class="summary-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));">
+  <div class="summary-card"><div class="summary-card-label">Inicio</div><div style="font-size:14px;font-weight:700;">${fmtFecha(pg.inicio)}</div></div>
+  <div class="summary-card"><div class="summary-card-label">Término</div><div style="font-size:14px;font-weight:700;">${fmtFecha(pg.finProg)}</div></div>
+  <div class="summary-card"><div class="summary-card-label">Plazo</div><div style="font-size:14px;font-weight:700;">${pg.plazo} días</div></div>
+  <div class="summary-card"><div class="summary-card-label">Estado</div><div style="font-size:13px;font-weight:700;color:${estadoCol};">${estadoTxt}</div></div>
+</div>
+<div style="margin:10px 0 4px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;"><span>${fmtFecha(pg.inicio)}</span><span style="font-weight:600;">${pctTr}% transcurrido</span><span>${fmtFecha(pg.finProg)}</span></div>
+<div style="height:10px;background:#e5e7eb;border-radius:6px;overflow:hidden;"><div style="height:100%;width:${pctTr}%;background:${barCol};border-radius:6px;"></div></div>`;
+                } else {
+                    h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📋 Programa de Obra</h3><p style="color:#94a3b8;font-size:12px;">Sin datos de programa disponibles.</p>`;
+                }
+                const avBarCol = av>=80?'#16a34a':av>=50?'#3b82f6':av>=25?'#f59e0b':'#ef4444';
+                h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📊 Avance real a la fecha</h3>
+<div style="height:14px;background:#e5e7eb;border-radius:6px;overflow:hidden;margin-bottom:4px;"><div style="height:100%;width:${av}%;background:${avBarCol};border-radius:6px;"></div></div>
+<div style="display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;"><span>0%</span><span style="font-weight:600;color:${avBarCol};">${av}% completado</span><span>100%</span></div>`;
+            } else if (tab === 'checkpoints') {
+                const tot = obra.viviendas.length;
+                h += `Checkpoints (${CPS_ADQ.length} indicadores)</div><div class="summary-grid" style="grid-template-columns:repeat(auto-fit,minmax(90px,1fr));">`;
+                CPS_ADQ.forEach(cp => {
+                    const n = obra.viviendas.filter(v => getFlags(v)[cp.key]).length;
+                    const pct = tot ? Math.round(n/tot*100) : 0;
+                    const col = n===tot?'#16a34a':n>0?'#2563eb':'#6b7280';
+                    h += `<div class="summary-card"><div class="summary-card-label">${cp.label}</div><div class="summary-card-value" style="color:${col};">${n}</div><div class="summary-card-detail">/ ${tot} · ${pct}%</div></div>`;
+                });
+                h += `</div>`;
+            } else if (tab === 'curvas') {
+                const curvas = CURVAS_S_CONFIG[obra.ID_proy] || [];
+                h += `Curvas S de Control</div><div class="curvas-grid">`;
+                curvas.forEach(c => {
+                    const cap = getCapataz(obra.ID_proy, c.label);
+                    const capHtml = cap ? `<div style="font-size:10px;color:#64748b;margin-top:2px;">👷 ${cap}</div>` : '';
+                    h += `<div class="curva-card"><div class="curva-header">${c.label}${capHtml}</div><img src="https://drive.google.com/thumbnail?id=${c.id}&sz=w800" style="width:100%;display:block;" alt="${c.label}" loading="lazy"/></div>`;
+                });
+                h += `</div>`;
+            } else if (tab === 'ritmos') {
+                h += `Ritmos M.O. y Despachos</div>`;
+                const fmtCortoR = (n) => n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(0)+'k':String(n);
+                const fmtMesR = (ym) => { if (!ym||ym.length<7) return ym; const [y,m]=ym.split('-'); const ms=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']; return `${ms[parseInt(m,10)-1]}'${y.slice(2)}`; };
+                const bMO = {};
+                obra.viviendas.forEach(v => {
+                    getSolpago(v.ID_Benef).forEach(p => {
+                        if (!p.fecha) return;
+                        const m2 = p.fecha.match(/^(\d{4})-(\d{2})-(\d{2})/); if (!m2) return;
+                        let yr=parseInt(m2[1]),mo=parseInt(m2[2]),dy=parseInt(m2[3]);
+                        if (dy>=25){mo+=1;if(mo>12){mo=1;yr+=1;}}
+                        const ym=`${yr}-${String(mo).padStart(2,'0')}`;
+                        bMO[ym]=(bMO[ym]||0)+p.monto;
+                    });
+                });
+                const oMO = Object.keys(bMO).sort().slice(-12);
+                const chartMO = svgLineChartString({ meses:oMO, valores:oMO.map(k=>bMO[k]), color:'#c2410c', fillColor:'rgba(194,65,12,0.10)', fmtMes:fmtMesR, fmtV:fmtCortoR });
+                const bD = {};
+                obra.viviendas.forEach(v => {
+                    DESPACHOS_DATA.filter(x => String(x.ID_Benef)===String(v.ID_Benef)).forEach(x => {
+                        if (!x.Fecha) return;
+                        const ym=x.Fecha.substring(0,7);
+                        bD[ym]=(bD[ym]||0)+1;
+                    });
+                });
+                const oD = Object.keys(bD).sort().slice(-12);
+                const chartD = svgLineChartString({ meses:oD, valores:oD.map(k=>bD[k]), color:'#10b981', fillColor:'rgba(16,185,129,0.10)', fmtMes:fmtMesR, fmtV:(v)=>String(v) });
+                h += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px;">
+<div><div style="font-size:12px;font-weight:600;color:#333;margin-bottom:8px;">Ritmo Mano de Obra (ciclo 25-25)</div>${chartMO}</div>
+<div><div style="font-size:12px;font-weight:600;color:#333;margin-bottom:8px;">Ritmo Despachos (por mes)</div>${chartD}</div>
+</div>`;
+            } else if (tab === 'viviendas') {
+                h += `Detalle de Viviendas</div>
+<div class="table-container"><table>
+<thead><tr><th>Beneficiario</th><th>Avance</th><th>HPC</th><th>TE1</th><th>R.AS</th><th>F1</th><th>Artef.</th><th>Empalme</th></tr></thead><tbody>`;
+                obra.viviendas.forEach(v => {
+                    const insp = getInspeccion(v.ID_Benef);
+                    const pct = insp ? insp.pct_total : null;
+                    const fl = getFlags(v);
+                    const pctTxt = pct!==null?`${pct}%`:'—';
+                    const pctCol = pct===null?'#94a3b8':pct>=80?'#16a34a':pct>=50?'#2563eb':'#dc2626';
+                    const ck = (ok) => ok ? `<span style="color:#16a34a;font-weight:700;">✓</span>` : `<span style="color:#e5e7eb;">—</span>`;
+                    h += `<tr><td>${v.NOMBRES||''} ${v.APELLIDOS||''}</td><td style="font-weight:700;color:${pctCol};">${pctTxt}</td><td>${ck(fl.hpc)}</td><td>${ck(fl.te1)}</td><td>${ck(fl.resol_as)}</td><td>${ck(fl.fecha_f1)}</td><td>${ck(fl.artefactado)}</td><td>${ck(fl.empalme)}</td></tr>`;
+                });
+                h += `</tbody></table></div>`;
+            }
+            return h;
+        };
+
+        const allSectionsAdq = {};
+        obrasData.forEach((o, idx) => {
+            allSectionsAdq[idx] = {
+                resumen:     renderTabAdq(idx, 'resumen'),
+                checkpoints: renderTabAdq(idx, 'checkpoints'),
+                curvas:      renderTabAdq(idx, 'curvas'),
+                ritmos:      renderTabAdq(idx, 'ritmos'),
+                viviendas:   renderTabAdq(idx, 'viviendas')
+            };
+        });
+
+        const cssAdq = `<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'IBM Plex Sans',Arial,sans-serif;background:#f5f5f5;color:#1a1a2e;}
+.multi-container{max-width:1000px;margin:0 auto;background:white;box-shadow:0 2px 8px rgba(0,0,0,.1);}
+.header{background:linear-gradient(135deg,#431407 0%,#7c2d12 100%);color:white;padding:20px 24px;border-bottom:3px solid #c2410c;}
+.header h1{font-size:22px;margin-bottom:14px;}
+.header-controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
+.header-controls label{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;}
+.header-controls select{padding:8px 12px;border:2px solid #c2410c;border-radius:4px;background:white;color:#1a1a2e;font-weight:600;cursor:pointer;min-width:280px;}
+.tabs{display:flex;gap:0;border-bottom:1px solid #e0e0e0;background:#fafafa;padding:0 24px;overflow-x:auto;}
+.tabs button{padding:12px 14px;border:none;background:transparent;cursor:pointer;font-size:12px;font-weight:600;color:#666;border-bottom:3px solid transparent;white-space:nowrap;}
+.tabs button:hover{color:#1a1a2e;background:#f0f0f0;}
+.tabs button.active{color:#c2410c;border-bottom-color:#c2410c;background:white;}
+.content{padding:24px;min-height:500px;}
+.section{display:none;}
+.section.active{display:block;animation:fadeIn 0.3s;}
+@keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px;}
+.summary-card{background:#f8f8f8;border:1px solid #e0e0e0;border-radius:6px;padding:14px;text-align:center;}
+.summary-card-label{font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;font-weight:600;}
+.summary-card-value{font-size:26px;font-weight:700;color:#c2410c;}
+.summary-card-detail{font-size:10px;color:#999;margin-top:3px;}
+.curvas-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-top:12px;}
+.curva-card{border:1px solid #e0e0e0;border-radius:6px;overflow:hidden;}
+.curva-header{background:#fff7ed;padding:10px 12px;font-size:11px;font-weight:600;color:#7c2d12;border-bottom:1px solid #fed7aa;}
+.table-container{overflow:auto;max-height:520px;margin-top:12px;border:1px solid #e0e0e0;border-radius:6px;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+table thead{background:#fff7ed;}
+table th{padding:10px;text-align:left;font-weight:600;color:#7c2d12;border-bottom:2px solid #fed7aa;position:sticky;top:0;background:#fff7ed;z-index:2;}
+table td{padding:10px;border-bottom:1px solid #e8e8e8;}
+table tr:hover{background:#fff7ed;}
+table th:first-child,table td:first-child{position:sticky;left:0;background:white;z-index:1;border-right:1px solid #e0e0e0;min-width:180px;}
+table th:first-child{background:#fff7ed;z-index:3;}
+table tr:hover td:first-child{background:#fff7ed;}
+.footer{background:#fafafa;padding:14px 24px;border-top:1px solid #e0e0e0;display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;}
+.btn{padding:8px 14px;border:1px solid #ddd;border-radius:4px;background:white;cursor:pointer;font-size:12px;font-weight:600;}
+.btn:hover{background:#f0f0f0;border-color:#999;}
+.btn-pdf{background:#c2410c;color:white;border-color:#c2410c;}
+.btn-pdf:hover{background:#9a3412;}
+.breadcrumb{font-size:12px;color:#999;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid #e8e8e8;}
+.breadcrumb strong{color:#1a1a2e;}
+@media print{.footer{display:none;}.section{display:block !important;page-break-after:always;}}
+</style>`;
+
+        const jsOpen2 = '<scr' + 'ipt>';
+        const jsClose2 = '</scr' + 'ipt>';
+        const js2 = jsOpen2 + `
+const secciones=${JSON.stringify(allSectionsAdq)};
+let idx=0;
+function cambiar(i){idx=Math.max(0,Math.min(${obrasData.length-1},i));document.getElementById('obra-sel').value=idx;mostrar('resumen');}
+function mostrar(t){document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.tabs button').forEach(b=>b.classList.remove('active'));document.getElementById('sec-'+t).classList.add('active');event.target.classList.add('active');document.getElementById('sec-'+t).innerHTML=secciones[idx][t];}
+` + jsClose2;
+
+        const tabsAdq = `<div class="tabs">
+<button class="tab-btn active" onclick="mostrar('resumen')">Resumen</button>
+<button class="tab-btn" onclick="mostrar('checkpoints')">Checkpoints</button>
+<button class="tab-btn" onclick="mostrar('curvas')">Curvas S</button>
+<button class="tab-btn" onclick="mostrar('ritmos')">Ritmos</button>
+<button class="tab-btn" onclick="mostrar('viviendas')">Viviendas</button>
+</div>`;
+
+        const secsAdq = ['resumen','checkpoints','curvas','ritmos','viviendas'].map(t =>
+            `<div class="section${t==='resumen'?' active':''}" id="sec-${t}">${allSectionsAdq[0][t]}</div>`
+        ).join('');
+
+        const optsAdq = obrasData.map((o,i) => `<option value="${i}">✓ ${o.ID_proy} · ${o.nombre} (${o.viviendas.length} viv.)</option>`).join('');
+
+        const htmlAdq = `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Reporte Adquisiciones — Multi Obras</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+${cssAdq}</head><body>
+<div class="multi-container">
+  <div class="header"><h1>📦 Reporte Adquisiciones — Multi Obras</h1>
+  <div class="header-controls"><label>Seleccionar obra:</label>
+  <select id="obra-sel" onchange="cambiar(parseInt(this.value))">${optsAdq}</select></div></div>
+  ${tabsAdq}
+  <div class="content">${secsAdq}</div>
+  <div class="footer">
+  <button class="btn" onclick="cambiar(idx-1);">← Anterior</button>
+  <button class="btn" onclick="cambiar(idx+1);">Siguiente →</button>
+  <button class="btn btn-pdf" onclick="window.print();">📄 Imprimir/PDF</button></div>
+</div>
+${js2}</body></html>`;
+
+        const fname = `Reporte_Adquisiciones_${new Date().toISOString().substring(0,10)}.html`;
+        const blob = new Blob([htmlAdq], {type:'text/html;charset=utf-8'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href=url; a.download=fname;
+        document.body.appendChild(a); a.click(); a.remove();
+        const w = window.open(url, '_blank');
+        if (!w) alert('Archivo descargado: ' + fname);
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+    };
+
     const generarTodosReportesCapataz = async () => {
         if (!capataces || capataces.length === 0) {
             alert('No hay capataces registrados en este proyecto.');
@@ -5313,6 +5570,14 @@ ${viewerCss}</style>
                     >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
                         Reporte adquisiciones
+                    </button>
+                    <button
+                        onClick={generarInformeAdquisicionesHTML}
+                        className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors"
+                        title="Descarga HTML navegable multi-obras con datos de adquisiciones: checkpoints, curvas S y ritmos (sin inspecciones in-situ)"
+                    >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                        Reporte adquisiciones HTML
                     </button>
                     <button
                         onClick={generarTodosReportesCapataz}
