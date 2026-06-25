@@ -4917,7 +4917,7 @@ ${js2}</body></html>`;
 
         const obrasData = obrasConCurva.map(proy => {
             const vivs = BENEFICIARIOS_DATA.filter(b => String(b.ID_Proy) === String(proy.ID_proy));
-            return { ID_proy: proy.ID_proy, nombre: proy.NOMBRE_PROYECTO, viviendas: vivs };
+            return { ID_proy: proy.ID_proy, nombre: proy.NOMBRE_PROYECTO, viviendas: vivs, grupos: gruposRaw[proy.ID_proy] || [] };
         });
 
         const CPS = [
@@ -5074,19 +5074,28 @@ ${js2}</body></html>`;
                 }
                 h += `<h3 style="font-size:13px;color:#333;margin:20px 0 10px;display:flex;align-items:center;gap:6px;"><span style="color:#f59e0b;">★</span> Comentarios Destacados por Beneficiario</h3>${comHtml}`;
             } else if (tab === 'viviendas') {
-                h += `Detalle de Viviendas</div>
+                h += `Detalle de Viviendas</div>`;
+                const gruposObra = agruparViviendas(obra.viviendas, obra.grupos);
+                const ck = (ok) => ok ? `<span style="color:#16a34a;font-weight:700;">✓</span>` : `<span style="color:#e5e7eb;">—</span>`;
+                gruposObra.forEach(grupo => {
+                    const tituloGrupo = grupo.nombre || 'Sin asignar';
+                    const capLabel = grupo.capataz ? ` &nbsp;·&nbsp; <span style="font-weight:400;color:#64748b;">Capataz: ${grupo.capataz}</span>` : '';
+                    h += `<div style="margin-bottom:24px;">
+<div style="font-size:12px;font-weight:700;color:#1a1a2e;background:#f1f5f9;border:1px solid #e2e8f0;padding:7px 12px;border-radius:7px;margin-bottom:8px;">
+  ${tituloGrupo}${capLabel} &nbsp;<span style="font-weight:400;color:#94a3b8;">(${grupo.viviendas.length} viv.)</span>
+</div>
 <div class="table-container"><table>
 <thead><tr><th>Beneficiario</th><th>Avance</th><th>HPC</th><th>TE1</th><th>F1</th><th>Empalme</th><th>Recep.</th></tr></thead><tbody>`;
-                obra.viviendas.forEach(v => {
-                    const insp = getInspeccion(v.ID_Benef);
-                    const pct = insp ? insp.pct_total : null;
-                    const fl = getFlags(v);
-                    const pctTxt = pct !== null ? `${pct}%` : '—';
-                    const pctCol = pct === null ? '#94a3b8' : pct >= 80 ? '#16a34a' : pct >= 50 ? '#2563eb' : '#dc2626';
-                    const ck = (ok) => ok ? `<span style="color:#16a34a;font-weight:700;">✓</span>` : `<span style="color:#e5e7eb;">—</span>`;
-                    h += `<tr><td>${v.NOMBRES||''} ${v.APELLIDOS||''}</td><td style="font-weight:700;color:${pctCol};">${pctTxt}</td><td>${ck(fl.hpc)}</td><td>${ck(fl.te1)}</td><td>${ck(fl.fecha_f1)}</td><td>${ck(fl.empalme)}</td><td>${ck(fl.fecha_recep)}</td></tr>`;
+                    grupo.viviendas.forEach(v => {
+                        const insp = getInspeccion(v.ID_Benef);
+                        const pct = insp ? insp.pct_total : null;
+                        const fl = getFlags(v);
+                        const pctTxt = pct !== null ? `${pct}%` : '—';
+                        const pctCol = pct === null ? '#94a3b8' : pct >= 80 ? '#16a34a' : pct >= 50 ? '#2563eb' : '#dc2626';
+                        h += `<tr><td>${v.NOMBRES||''} ${v.APELLIDOS||''}</td><td style="font-weight:700;color:${pctCol};">${pctTxt}</td><td>${ck(fl.hpc)}</td><td>${ck(fl.te1)}</td><td>${ck(fl.fecha_f1)}</td><td>${ck(fl.empalme)}</td><td>${ck(fl.fecha_recep)}</td></tr>`;
+                    });
+                    h += `</tbody></table></div></div>`;
                 });
-                h += `</tbody></table></div>`;
             } else if (tab === 'pagos') {
                 const fmtUF = (v) => v != null ? v.toLocaleString('es-CL',{minimumFractionDigits:2,maximumFractionDigits:2})+' UF' : '—';
                 const fmtFch = (iso) => { if(!iso) return '—'; const p=String(iso).substring(0,10).split('-'); return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:iso; };
