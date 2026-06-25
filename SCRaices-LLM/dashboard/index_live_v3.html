@@ -4624,7 +4624,7 @@ ${inf.footerHtml}
 
         const obrasData = obrasConCurva.map(proy => {
             const vivs = BENEFICIARIOS_DATA.filter(b => String(b.ID_Proy) === String(proy.ID_proy));
-            return { ID_proy: proy.ID_proy, nombre: proy.NOMBRE_PROYECTO, viviendas: vivs };
+            return { ID_proy: proy.ID_proy, nombre: proy.NOMBRE_PROYECTO, viviendas: vivs, grupos: gruposRaw[proy.ID_proy] || [] };
         });
 
         // Checkpoints para adquisiciones (excluir los 4 de inspección in-situ)
@@ -4694,51 +4694,27 @@ ${inf.footerHtml}
                     h += `<div class="curva-card"><div class="curva-header">${c.label}${capHtml}</div><img src="https://drive.google.com/thumbnail?id=${c.id}&sz=w800" style="width:100%;display:block;" alt="${c.label}" loading="lazy"/></div>`;
                 });
                 h += `</div>`;
-            } else if (tab === 'ritmos') {
-                h += `Ritmos M.O. y Despachos</div>`;
-                const fmtCortoR = (n) => n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(0)+'k':String(n);
-                const fmtMesR = (ym) => { if (!ym||ym.length<7) return ym; const [y,m]=ym.split('-'); const ms=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']; return `${ms[parseInt(m,10)-1]}'${y.slice(2)}`; };
-                const bMO = {};
-                obra.viviendas.forEach(v => {
-                    getSolpago(v.ID_Benef).forEach(p => {
-                        if (!p.fecha) return;
-                        const m2 = p.fecha.match(/^(\d{4})-(\d{2})-(\d{2})/); if (!m2) return;
-                        let yr=parseInt(m2[1]),mo=parseInt(m2[2]),dy=parseInt(m2[3]);
-                        if (dy>=25){mo+=1;if(mo>12){mo=1;yr+=1;}}
-                        const ym=`${yr}-${String(mo).padStart(2,'0')}`;
-                        bMO[ym]=(bMO[ym]||0)+p.monto;
-                    });
-                });
-                const oMO = Object.keys(bMO).sort().slice(-12);
-                const chartMO = svgLineChartString({ meses:oMO, valores:oMO.map(k=>bMO[k]), color:'#c2410c', fillColor:'rgba(194,65,12,0.10)', fmtMes:fmtMesR, fmtV:fmtCortoR });
-                const bD = {};
-                obra.viviendas.forEach(v => {
-                    DESPACHOS_DATA.filter(x => String(x.ID_Benef)===String(v.ID_Benef)).forEach(x => {
-                        if (!x.Fecha) return;
-                        const ym=x.Fecha.substring(0,7);
-                        bD[ym]=(bD[ym]||0)+1;
-                    });
-                });
-                const oD = Object.keys(bD).sort().slice(-12);
-                const chartD = svgLineChartString({ meses:oD, valores:oD.map(k=>bD[k]), color:'#10b981', fillColor:'rgba(16,185,129,0.10)', fmtMes:fmtMesR, fmtV:(v)=>String(v) });
-                h += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px;">
-<div><div style="font-size:12px;font-weight:600;color:#333;margin-bottom:8px;">Ritmo Mano de Obra (ciclo 25-25)</div>${chartMO}</div>
-<div><div style="font-size:12px;font-weight:600;color:#333;margin-bottom:8px;">Ritmo Despachos (por mes)</div>${chartD}</div>
-</div>`;
             } else if (tab === 'viviendas') {
-                h += `Detalle de Viviendas</div>
+                h += `Detalle de Viviendas</div>`;
+                const ck = (ok) => ok ? `<span style="color:#16a34a;font-weight:700;">✓</span>` : `<span style="color:#e5e7eb;">—</span>`;
+                const gruposObra = agruparViviendas(obra.viviendas, obra.grupos);
+                gruposObra.forEach(grupo => {
+                    const tituloGrupo = grupo.nombre || 'Sin asignar';
+                    const capLabel = grupo.capataz ? ` &nbsp;·&nbsp; <span style="font-size:10px;color:#7c2d12;">👷 ${grupo.capataz}</span>` : '';
+                    h += `<div style="margin-bottom:24px;">
+<div style="background:#fff7ed;border-left:4px solid #c2410c;padding:8px 12px;font-size:12px;font-weight:700;color:#7c2d12;margin-bottom:8px;">${tituloGrupo}${capLabel} <span style="font-weight:400;color:#94a3b8;">(${grupo.viviendas.length} viv.)</span></div>
 <div class="table-container"><table>
 <thead><tr><th>Beneficiario</th><th>Avance</th><th>HPC</th><th>TE1</th><th>R.AS</th><th>F1</th><th>Artef.</th><th>Empalme</th></tr></thead><tbody>`;
-                obra.viviendas.forEach(v => {
-                    const insp = getInspeccion(v.ID_Benef);
-                    const pct = insp ? insp.pct_total : null;
-                    const fl = getFlags(v);
-                    const pctTxt = pct!==null?`${pct}%`:'—';
-                    const pctCol = pct===null?'#94a3b8':pct>=80?'#16a34a':pct>=50?'#2563eb':'#dc2626';
-                    const ck = (ok) => ok ? `<span style="color:#16a34a;font-weight:700;">✓</span>` : `<span style="color:#e5e7eb;">—</span>`;
-                    h += `<tr><td>${v.NOMBRES||''} ${v.APELLIDOS||''}</td><td style="font-weight:700;color:${pctCol};">${pctTxt}</td><td>${ck(fl.hpc)}</td><td>${ck(fl.te1)}</td><td>${ck(fl.resol_as)}</td><td>${ck(fl.fecha_f1)}</td><td>${ck(fl.artefactado)}</td><td>${ck(fl.empalme)}</td></tr>`;
+                    grupo.viviendas.forEach(v => {
+                        const insp = getInspeccion(v.ID_Benef);
+                        const pct = insp ? insp.pct_total : null;
+                        const fl = getFlags(v);
+                        const pctTxt = pct!==null?`${pct}%`:'—';
+                        const pctCol = pct===null?'#94a3b8':pct>=80?'#16a34a':pct>=50?'#2563eb':'#dc2626';
+                        h += `<tr><td>${v.NOMBRES||''} ${v.APELLIDOS||''}</td><td style="font-weight:700;color:${pctCol};">${pctTxt}</td><td>${ck(fl.hpc)}</td><td>${ck(fl.te1)}</td><td>${ck(fl.resol_as)}</td><td>${ck(fl.fecha_f1)}</td><td>${ck(fl.artefactado)}</td><td>${ck(fl.empalme)}</td></tr>`;
+                    });
+                    h += `</tbody></table></div></div>`;
                 });
-                h += `</tbody></table></div>`;
             }
             return h;
         };
@@ -4749,7 +4725,6 @@ ${inf.footerHtml}
                 resumen:     renderTabAdq(idx, 'resumen'),
                 checkpoints: renderTabAdq(idx, 'checkpoints'),
                 curvas:      renderTabAdq(idx, 'curvas'),
-                ritmos:      renderTabAdq(idx, 'ritmos'),
                 viviendas:   renderTabAdq(idx, 'viviendas')
             };
         });
@@ -4811,11 +4786,10 @@ function mostrar(t){document.querySelectorAll('.section').forEach(s=>s.classList
 <button class="tab-btn active" onclick="mostrar('resumen')">Resumen</button>
 <button class="tab-btn" onclick="mostrar('checkpoints')">Checkpoints</button>
 <button class="tab-btn" onclick="mostrar('curvas')">Curvas S</button>
-<button class="tab-btn" onclick="mostrar('ritmos')">Ritmos</button>
 <button class="tab-btn" onclick="mostrar('viviendas')">Viviendas</button>
 </div>`;
 
-        const secsAdq = ['resumen','checkpoints','curvas','ritmos','viviendas'].map(t =>
+        const secsAdq = ['resumen','checkpoints','curvas','viviendas'].map(t =>
             `<div class="section${t==='resumen'?' active':''}" id="sec-${t}">${allSectionsAdq[0][t]}</div>`
         ).join('');
 
