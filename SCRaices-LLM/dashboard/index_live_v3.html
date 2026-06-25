@@ -6153,17 +6153,25 @@ const ModalPersonalGlobal = ({ personalGlobal, fbDB, onClose }) => {
                         <label className="text-[10px] text-gray-500 font-medium">Informes a recibir por correo</label>
                         <div className="flex flex-wrap gap-x-5 gap-y-1.5 mt-1.5">
                             {(typeof INFORME_TIPOS !== 'undefined' ? INFORME_TIPOS : [
-                                {key:'curvas_s',label:'Reporte ejecutivo (Curvas S)'},
-                                {key:'obra_logistica',label:'Reporte obra/logística'},
-                                {key:'por_capataz',label:'Reporte por Capataz'},
-                                {key:'html_navegable',label:'HTML navegable'}
+                                {key:'curvas_s',label:'Reporte ejecutivo (Curvas S)',esHtml:false},
+                                {key:'residente',label:'Reporte residente',esHtml:false},
+                                {key:'adquisiciones',label:'Reporte adquisiciones',esHtml:false},
+                                {key:'por_capataz',label:'Reporte Capataz',esHtml:false},
+                                {key:'adquisiciones_html',label:'Reporte adquisiciones HTML',esHtml:true},
+                                {key:'html_navegable',label:'Reporte Ejecutivo HTML',esHtml:true}
                             ]).map(t => (
                                 <label key={t.key} className="flex items-center gap-1.5 text-xs cursor-pointer text-gray-600 hover:text-violet-700 select-none">
                                     <input type="checkbox" checked={(form.informes||[]).includes(t.key)} onChange={e => setForm(f => ({ ...f, informes: e.target.checked ? [...(f.informes||[]), t.key] : (f.informes||[]).filter(k => k !== t.key) }))} className="rounded border-gray-300 text-violet-500 focus:ring-violet-400" />
                                     {t.label}
+                                    {t.esHtml && <span className="text-[9px] text-violet-500 font-semibold uppercase tracking-wide ml-0.5" title="Este informe incluye todas las obras y se envía en un solo correo">· multi-obra</span>}
                                 </label>
                             ))}
                         </div>
+                        {(form.informes||[]).some(k => ['adquisiciones_html','html_navegable'].includes(k)) && (
+                            <div className="mt-1.5 text-[10px] text-violet-600 bg-violet-50 border border-violet-200 rounded px-2 py-1">
+                                ℹ️ Los reportes HTML incluyen todas las obras y se envían en un <strong>único correo</strong>, independiente de cuántos proyectos tenga asignados.
+                            </div>
+                        )}
                     </div>
                     <div className="flex gap-2 mt-3">
                         <button onClick={guardar} disabled={!form.nombre.trim()} className="px-4 py-2 bg-violet-600 text-white rounded-lg text-sm font-medium hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
@@ -6213,14 +6221,17 @@ const ModalPersonalGlobal = ({ personalGlobal, fbDB, onClose }) => {
                                                         <div className="text-[10px] text-violet-700 font-semibold mb-2 uppercase tracking-wide">Informes a recibir por correo</div>
                                                         <div className="grid grid-cols-2 gap-1">
                                                             {(typeof INFORME_TIPOS !== 'undefined' ? INFORME_TIPOS : [
-                                                                {key:'curvas_s',label:'Reporte ejecutivo (Curvas S)'},
-                                                                {key:'obra_logistica',label:'Reporte obra/logística'},
-                                                                {key:'por_capataz',label:'Reporte por Capataz'},
-                                                                {key:'html_navegable',label:'HTML navegable'}
+                                                                {key:'curvas_s',label:'Reporte ejecutivo (Curvas S)',esHtml:false},
+                                                                {key:'residente',label:'Reporte residente',esHtml:false},
+                                                                {key:'adquisiciones',label:'Reporte adquisiciones',esHtml:false},
+                                                                {key:'por_capataz',label:'Reporte Capataz',esHtml:false},
+                                                                {key:'adquisiciones_html',label:'Reporte adquisiciones HTML',esHtml:true},
+                                                                {key:'html_navegable',label:'Reporte Ejecutivo HTML',esHtml:true}
                                                             ]).map(t => (
                                                                 <label key={t.key} className="flex items-center gap-2 text-xs cursor-pointer text-gray-600 hover:text-violet-700 select-none">
                                                                     <input type="checkbox" checked={(p.informes||[]).includes(t.key)} onChange={e => toggleInforme(key, t.key, p.informes||[], e.target.checked)} className="rounded border-gray-300 text-violet-500" />
                                                                     {t.label}
+                                                                    {t.esHtml && <span className="text-[9px] text-violet-400 font-semibold" title="Multi-obra — se envía en un solo correo">· multi-obra</span>}
                                                                 </label>
                                                             ))}
                                                         </div>
@@ -6254,10 +6265,12 @@ const ROLES_PERSONAL = [
 ];
 
 const INFORME_TIPOS = [
-    { key: 'curvas_s',       label: 'Reporte ejecutivo (Curvas S)' },
-    { key: 'obra_logistica', label: 'Reporte obra/logística' },
-    { key: 'por_capataz',    label: 'Reporte por Capataz' },
-    { key: 'html_navegable', label: 'HTML navegable' },
+    { key: 'curvas_s',           label: 'Reporte ejecutivo (Curvas S)',  esHtml: false },
+    { key: 'residente',          label: 'Reporte residente',             esHtml: false },
+    { key: 'adquisiciones',      label: 'Reporte adquisiciones',         esHtml: false },
+    { key: 'por_capataz',        label: 'Reporte Capataz',               esHtml: false },
+    { key: 'adquisiciones_html', label: 'Reporte adquisiciones HTML',    esHtml: true  },
+    { key: 'html_navegable',     label: 'Reporte Ejecutivo HTML',        esHtml: true  },
 ];
 
 const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel, personalObra, personalObraRef, personalGlobal }) => {
