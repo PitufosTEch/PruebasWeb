@@ -5997,7 +5997,7 @@ const INFORME_TIPOS = [
     { key: 'html_navegable', label: 'HTML navegable' },
 ];
 
-const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel, personalObra, personalObraRef }) => {
+const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel, personalObra, personalObraRef, personalGlobal }) => {
     const originalConfig = ETAPAS_CONFIG_FULL;
     const [config, setConfig] = React.useState(() => JSON.parse(JSON.stringify(originalConfig)));
     const [subTab, setSubTab] = React.useState('grupos');
@@ -6086,6 +6086,7 @@ const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel, personal
     const [nuevoPersonal, setNuevoPersonal] = React.useState({ nombre: '', telefono: '', correo: '', rol: 'capataz', informes: [] });
     const [editandoPersonal, setEditandoPersonal] = React.useState(null); // { key, datos }
     const [informesOpenKey, setInformesOpenKey] = React.useState(null);
+    const [selectedPersonalGlobal, setSelectedPersonalGlobal] = React.useState('');
 
     React.useEffect(() => {
         // Solo resetear si no hay cambios pendientes del usuario
@@ -6149,6 +6150,14 @@ const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel, personal
         const path = `personal_obra/${proyectoSel}/${key}`;
         fbDB.ref(path).set(entry);
         setNuevoPersonal({ nombre: '', telefono: '', correo: '', rol: 'capataz', informes: [] });
+    };
+
+    const agregarDesdeGlobal = () => {
+        if (!selectedPersonalGlobal || !(personalGlobal||{})[selectedPersonalGlobal]) return;
+        const persona = (personalGlobal||{})[selectedPersonalGlobal];
+        const key = Date.now().toString();
+        fbDB.ref(`personal_obra/${proyectoSel}/${key}`).set({ ...persona, global_key: selectedPersonalGlobal });
+        setSelectedPersonalGlobal('');
     };
 
     const eliminarPersonal = (key) => {
@@ -6502,28 +6511,27 @@ const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel, personal
                     </div>
 
                     <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-                        <h4 className="text-sm font-semibold text-gray-700 mb-3">Agregar Personal</h4>
-                        <div className="flex items-end gap-2 flex-wrap">
-                            <div className="flex-1 min-w-[150px]">
-                                <label className="text-[10px] text-gray-500 font-medium">Nombre</label>
-                                <input type="text" value={nuevoPersonal.nombre} onChange={e => setNuevoPersonal(p => ({...p, nombre: e.target.value}))} placeholder="Nombre completo" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 mt-0.5" />
+                        <h4 className="text-sm font-semibold text-gray-700 mb-3">Asignar Personal al Proyecto</h4>
+                        {Object.keys(personalGlobal || {}).length === 0 ? (
+                            <p className="text-xs text-gray-400 italic">No hay personal registrado. Usa el botón <strong>Personal</strong> en la barra superior para agregar personas a la organización.</p>
+                        ) : (
+                            <div className="flex items-end gap-3">
+                                <div className="flex-1">
+                                    <label className="text-[10px] text-gray-500 font-medium">Seleccionar persona</label>
+                                    <select value={selectedPersonalGlobal} onChange={e => setSelectedPersonalGlobal(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 mt-0.5">
+                                        <option value="">— Seleccionar —</option>
+                                        {Object.entries(personalGlobal || {})
+                                            .filter(([gk]) => !personalProy.some(([,p]) => p.global_key === gk))
+                                            .map(([gk, persona]) => {
+                                                const rolLabel = (ROLES_PERSONAL.find(r => r.key === persona.rol) || {}).label || persona.rol;
+                                                return <option key={gk} value={gk}>{persona.nombre} ({rolLabel})</option>;
+                                            })
+                                        }
+                                    </select>
+                                </div>
+                                <button onClick={agregarDesdeGlobal} disabled={!selectedPersonalGlobal} className="px-4 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors whitespace-nowrap">+ Asignar</button>
                             </div>
-                            <div className="w-36">
-                                <label className="text-[10px] text-gray-500 font-medium">Teléfono</label>
-                                <input type="text" value={nuevoPersonal.telefono} onChange={e => setNuevoPersonal(p => ({...p, telefono: e.target.value}))} placeholder="+56 9..." className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 mt-0.5" />
-                            </div>
-                            <div className="flex-1 min-w-[150px]">
-                                <label className="text-[10px] text-gray-500 font-medium">Correo</label>
-                                <input type="email" value={nuevoPersonal.correo} onChange={e => setNuevoPersonal(p => ({...p, correo: e.target.value}))} placeholder="correo@ejemplo.cl" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 mt-0.5" />
-                            </div>
-                            <div className="w-40">
-                                <label className="text-[10px] text-gray-500 font-medium">Rol</label>
-                                <select value={nuevoPersonal.rol} onChange={e => setNuevoPersonal(p => ({...p, rol: e.target.value}))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 mt-0.5">
-                                    {ROLES_PERSONAL.map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
-                                </select>
-                            </div>
-                            <button onClick={agregarPersonal} className="px-4 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 transition-colors whitespace-nowrap">+ Agregar</button>
-                        </div>
+                        )}
 
                         <div className="mt-4 grid grid-cols-2 gap-4">
                             {ROLES_PERSONAL.filter(r => personalProy.some(([,p]) => p.rol === r.key)).map(rolObj => (
@@ -6554,44 +6562,65 @@ const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel, personal
                                                     </div>
                                                 </div>
                                             ) : (
-                                                <div>
-                                                    <div className="flex items-start justify-between">
-                                                        <div>
-                                                            <div className="text-sm font-medium text-gray-700">{p.nombre}</div>
-                                                            {p.telefono && <div className="text-[10px] text-gray-400">📞 {p.telefono}</div>}
-                                                            {p.correo && <div className="text-[10px] text-gray-400">✉ {p.correo}</div>}
-                                                        </div>
-                                                        <div className="flex items-center gap-1 ml-2 mt-0.5 shrink-0">
-                                                            <button
-                                                                onClick={() => setInformesOpenKey(informesOpenKey === key ? null : key)}
-                                                                title="Gestionar informes"
-                                                                className={`flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded border transition-colors ${(p.informes||[]).length > 0 ? 'bg-amber-100 text-amber-700 border-amber-300 hover:bg-amber-200' : 'bg-gray-100 text-gray-400 border-gray-200 hover:bg-amber-50 hover:text-amber-500 hover:border-amber-200'}`}
-                                                            >
-                                                                📧 {(p.informes||[]).length > 0 ? (p.informes||[]).length : '—'}
-                                                            </button>
-                                                            <button onClick={() => setEditandoPersonal({ key, datos: { informes: [], ...p } })} className="text-amber-500 hover:text-amber-700 text-xs px-1" title="Editar">✎</button>
-                                                            <button onClick={() => eliminarPersonal(key)} className="text-red-400 hover:text-red-600 text-xs px-1" title="Eliminar">×</button>
-                                                        </div>
-                                                    </div>
-                                                    {informesOpenKey === key && (
-                                                        <div className="mt-2 p-2.5 bg-amber-50 rounded-lg border border-amber-200">
-                                                            <div className="text-[10px] text-amber-700 font-semibold mb-2 uppercase tracking-wide">Informes a recibir por correo</div>
-                                                            <div className="space-y-1.5">
-                                                                {INFORME_TIPOS.map(t => (
-                                                                    <label key={t.key} className="flex items-center gap-2 text-xs cursor-pointer text-gray-600 hover:text-amber-700 select-none">
-                                                                        <input
-                                                                            type="checkbox"
-                                                                            checked={(p.informes||[]).includes(t.key)}
-                                                                            onChange={e => toggleInformePersonal(key, t.key, p.informes||[], e.target.checked)}
-                                                                            className="rounded border-gray-300 text-amber-500 focus:ring-amber-400"
-                                                                        />
-                                                                        {t.label}
-                                                                    </label>
-                                                                ))}
+                                                (() => {
+                                                    const globalRec = p.global_key && (personalGlobal||{})[p.global_key];
+                                                    const informesLocked = globalRec && (globalRec.informes||[]).length > 0;
+                                                    const informesActivos = informesLocked ? (globalRec.informes||[]) : (p.informes||[]);
+                                                    return (
+                                                    <div>
+                                                        <div className="flex items-start justify-between">
+                                                            <div>
+                                                                <div className="text-sm font-medium text-gray-700">{p.nombre}</div>
+                                                                {p.telefono && <div className="text-[10px] text-gray-400">📞 {p.telefono}</div>}
+                                                                {p.correo && <div className="text-[10px] text-gray-400">✉ {p.correo}</div>}
+                                                            </div>
+                                                            <div className="flex items-center gap-1 ml-2 mt-0.5 shrink-0">
+                                                                {informesLocked ? (
+                                                                    <span title="Informes definidos en registro global" className={`flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded border ${informesActivos.length > 0 ? 'bg-amber-100 text-amber-700 border-amber-300' : 'bg-gray-100 text-gray-400 border-gray-200'}`}>
+                                                                        📧 {informesActivos.length > 0 ? informesActivos.length : '—'} 🔒
+                                                                    </span>
+                                                                ) : (
+                                                                    <button
+                                                                        onClick={() => setInformesOpenKey(informesOpenKey === key ? null : key)}
+                                                                        title="Gestionar informes"
+                                                                        className={`flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded border transition-colors ${informesActivos.length > 0 ? 'bg-amber-100 text-amber-700 border-amber-300 hover:bg-amber-200' : 'bg-gray-100 text-gray-400 border-gray-200 hover:bg-amber-50 hover:text-amber-500 hover:border-amber-200'}`}
+                                                                    >
+                                                                        📧 {informesActivos.length > 0 ? informesActivos.length : '—'}
+                                                                    </button>
+                                                                )}
+                                                                {!p.global_key && <button onClick={() => setEditandoPersonal({ key, datos: { informes: [], ...p } })} className="text-amber-500 hover:text-amber-700 text-xs px-1" title="Editar">✎</button>}
+                                                                <button onClick={() => eliminarPersonal(key)} className="text-red-400 hover:text-red-600 text-xs px-1" title="Quitar de obra">×</button>
                                                             </div>
                                                         </div>
-                                                    )}
-                                                </div>
+                                                        {informesLocked && informesActivos.length > 0 && (
+                                                            <div className="mt-1.5 flex flex-wrap gap-1">
+                                                                {informesActivos.map(ik => {
+                                                                    const t = INFORME_TIPOS.find(x => x.key === ik);
+                                                                    return t ? <span key={ik} className="text-[10px] px-1.5 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-full">{t.label}</span> : null;
+                                                                })}
+                                                            </div>
+                                                        )}
+                                                        {!informesLocked && informesOpenKey === key && (
+                                                            <div className="mt-2 p-2.5 bg-amber-50 rounded-lg border border-amber-200">
+                                                                <div className="text-[10px] text-amber-700 font-semibold mb-2 uppercase tracking-wide">Informes a recibir por correo</div>
+                                                                <div className="space-y-1.5">
+                                                                    {INFORME_TIPOS.map(t => (
+                                                                        <label key={t.key} className="flex items-center gap-2 text-xs cursor-pointer text-gray-600 hover:text-amber-700 select-none">
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                checked={informesActivos.includes(t.key)}
+                                                                                onChange={e => toggleInformePersonal(key, t.key, informesActivos, e.target.checked)}
+                                                                                className="rounded border-gray-300 text-amber-500 focus:ring-amber-400"
+                                                                            />
+                                                                            {t.label}
+                                                                        </label>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    );
+                                                })()
                                             )}
                                         </div>
                                     ))}
@@ -8118,7 +8147,7 @@ const App = () => {
                     {tab === "mano_obra" && <ManoDeObraTab viviendas={viviendas} />}
                     {tab === "estados_pago" && <EstadosPagoTab viviendas={viviendas} />}
                     {tab === "estado_general" && <EstadoGeneralTab viviendas={viviendas} observaciones={observaciones} grupos={grupos} resumenComentarios={resumenComentarios} proyectoSel={proyectoSel} proy={proy} garantiasProy={garantiasProy} muestrasProy={getMuestrasProy()} muestrasResumen={getMuestrasResumen()} kpis={kpis} />}
-                    {tab === "configuracion" && <ConfiguracionView grupos={grupos} setGrupos={setGruposForProy} viviendas={viviendas} proyectoSel={proyectoSel} personalObra={personalObra} personalObraRef={personalObraRef} />}
+                    {tab === "configuracion" && <ConfiguracionView grupos={grupos} setGrupos={setGruposForProy} viviendas={viviendas} proyectoSel={proyectoSel} personalObra={personalObra} personalObraRef={personalObraRef} personalGlobal={personalGlobal} />}
                 </div>
 
                 {/* Leyenda */}
