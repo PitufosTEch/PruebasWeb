@@ -6067,6 +6067,25 @@ ${viewerCss}</style>
     );
 };
 
+// ===== CONSTANTES GLOBALES DE PERSONAL E INFORMES =====
+const ROLES_PERSONAL = [
+    { key: 'capataz',      label: 'Capataz' },
+    { key: 'residente',    label: 'Residente' },
+    { key: 'gerente',      label: 'Gerente' },
+    { key: 'coordinador',  label: 'Coordinador' },
+    { key: 'logistica',    label: 'Logística' },
+    { key: 'rrhh',         label: 'Recursos Humanos' },
+];
+
+const INFORME_TIPOS = [
+    { key: 'curvas_s',           label: 'Reporte ejecutivo (Curvas S)',  esHtml: false },
+    { key: 'residente',          label: 'Reporte residente',             esHtml: false },
+    { key: 'adquisiciones',      label: 'Reporte adquisiciones',         esHtml: false },
+    { key: 'por_capataz',        label: 'Reporte Capataz',               esHtml: false },
+    { key: 'adquisiciones_html', label: 'Reporte adquisiciones HTML',    esHtml: true  },
+    { key: 'html_navegable',     label: 'Reporte Ejecutivo HTML',        esHtml: true  },
+];
+
 // ===== CONFIGURACIÓN (Grupos + Diagrama + Editor) =====
 const ModalPersonalGlobal = ({ personalGlobal, fbDB, onClose }) => {
     const [form, setForm] = React.useState({ nombre: '', telefono: '', correo: '', rol: 'capataz', informes: [] });
@@ -6141,25 +6160,14 @@ const ModalPersonalGlobal = ({ personalGlobal, fbDB, onClose }) => {
                         <div className="w-40">
                             <label className="text-[10px] text-gray-500 font-medium">Rol</label>
                             <select value={form.rol} onChange={e => setForm(f => ({...f, rol: e.target.value}))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 mt-0.5">
-                                {(typeof ROLES_PERSONAL !== 'undefined' ? ROLES_PERSONAL : [
-                                    {key:'capataz',label:'Capataz'},{key:'residente',label:'Residente'},
-                                    {key:'gerente',label:'Gerente'},{key:'coordinador',label:'Coordinador'},
-                                    {key:'logistica',label:'Logística'},{key:'rrhh',label:'Recursos Humanos'}
-                                ]).map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
+                                {ROLES_PERSONAL.map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
                             </select>
                         </div>
                     </div>
                     <div className="mt-3">
                         <label className="text-[10px] text-gray-500 font-medium">Informes a recibir por correo</label>
                         <div className="flex flex-wrap gap-x-5 gap-y-1.5 mt-1.5">
-                            {(typeof INFORME_TIPOS !== 'undefined' ? INFORME_TIPOS : [
-                                {key:'curvas_s',label:'Reporte ejecutivo (Curvas S)',esHtml:false},
-                                {key:'residente',label:'Reporte residente',esHtml:false},
-                                {key:'adquisiciones',label:'Reporte adquisiciones',esHtml:false},
-                                {key:'por_capataz',label:'Reporte Capataz',esHtml:false},
-                                {key:'adquisiciones_html',label:'Reporte adquisiciones HTML',esHtml:true},
-                                {key:'html_navegable',label:'Reporte Ejecutivo HTML',esHtml:true}
-                            ]).map(t => (
+                            {INFORME_TIPOS.map(t => (
                                 <label key={t.key} className="flex items-center gap-1.5 text-xs cursor-pointer text-gray-600 hover:text-violet-700 select-none">
                                     <input type="checkbox" checked={(form.informes||[]).includes(t.key)} onChange={e => setForm(f => ({ ...f, informes: e.target.checked ? [...(f.informes||[]), t.key] : (f.informes||[]).filter(k => k !== t.key) }))} className="rounded border-gray-300 text-violet-500 focus:ring-violet-400" />
                                     {t.label}
@@ -6220,14 +6228,7 @@ const ModalPersonalGlobal = ({ personalGlobal, fbDB, onClose }) => {
                                                     <div className="mt-2 p-2.5 bg-violet-50 rounded-lg border border-violet-200">
                                                         <div className="text-[10px] text-violet-700 font-semibold mb-2 uppercase tracking-wide">Informes a recibir por correo</div>
                                                         <div className="grid grid-cols-2 gap-1">
-                                                            {(typeof INFORME_TIPOS !== 'undefined' ? INFORME_TIPOS : [
-                                                                {key:'curvas_s',label:'Reporte ejecutivo (Curvas S)',esHtml:false},
-                                                                {key:'residente',label:'Reporte residente',esHtml:false},
-                                                                {key:'adquisiciones',label:'Reporte adquisiciones',esHtml:false},
-                                                                {key:'por_capataz',label:'Reporte Capataz',esHtml:false},
-                                                                {key:'adquisiciones_html',label:'Reporte adquisiciones HTML',esHtml:true},
-                                                                {key:'html_navegable',label:'Reporte Ejecutivo HTML',esHtml:true}
-                                                            ]).map(t => (
+                                                            {INFORME_TIPOS.map(t => (
                                                                 <label key={t.key} className="flex items-center gap-2 text-xs cursor-pointer text-gray-600 hover:text-violet-700 select-none">
                                                                     <input type="checkbox" checked={(p.informes||[]).includes(t.key)} onChange={e => toggleInforme(key, t.key, p.informes||[], e.target.checked)} className="rounded border-gray-300 text-violet-500" />
                                                                     {t.label}
@@ -6254,24 +6255,6 @@ const ModalPersonalGlobal = ({ personalGlobal, fbDB, onClose }) => {
         </div>
     );
 };
-
-const ROLES_PERSONAL = [
-    { key: 'capataz',      label: 'Capataz' },
-    { key: 'residente',    label: 'Residente' },
-    { key: 'gerente',      label: 'Gerente' },
-    { key: 'coordinador',  label: 'Coordinador' },
-    { key: 'logistica',    label: 'Logística' },
-    { key: 'rrhh',         label: 'Recursos Humanos' },
-];
-
-const INFORME_TIPOS = [
-    { key: 'curvas_s',           label: 'Reporte ejecutivo (Curvas S)',  esHtml: false },
-    { key: 'residente',          label: 'Reporte residente',             esHtml: false },
-    { key: 'adquisiciones',      label: 'Reporte adquisiciones',         esHtml: false },
-    { key: 'por_capataz',        label: 'Reporte Capataz',               esHtml: false },
-    { key: 'adquisiciones_html', label: 'Reporte adquisiciones HTML',    esHtml: true  },
-    { key: 'html_navegable',     label: 'Reporte Ejecutivo HTML',        esHtml: true  },
-];
 
 const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel, personalObra, personalObraRef, personalGlobal }) => {
     const originalConfig = ETAPAS_CONFIG_FULL;
