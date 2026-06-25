@@ -6860,6 +6860,51 @@ const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel, personal
                         <p className="text-xs text-amber-700">Registra capataces y residentes para asignarlos a los grupos.</p>
                     </div>
 
+                    {/* === ROLES GLOBALES (sin requisito de asignación a obra) === */}
+                    {(() => {
+                        const ROLES_GLOB_KEYS = ['gerente','coordinador','logistica','rrhh'];
+                        const globales = Object.entries(personalGlobal || {}).filter(([,p]) => ROLES_GLOB_KEYS.includes(p.rol));
+                        if (globales.length === 0) return null;
+                        return (
+                            <div className="bg-violet-50 border border-violet-200 rounded-xl p-4">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <span className="text-sm font-semibold text-violet-800">Roles Globales</span>
+                                    <span className="text-[10px] bg-violet-200 text-violet-700 px-2 py-0.5 rounded-full font-medium">Reciben informes de todas las obras</span>
+                                </div>
+                                <p className="text-[11px] text-violet-600 mb-3">Estas personas reciben sus informes configurados sin necesitar asignación a una obra específica.</p>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {globales.map(([gk, persona]) => {
+                                        const rolLabel = (ROLES_PERSONAL.find(r => r.key === persona.rol) || {}).label || persona.rol;
+                                        const infs = persona.informes || [];
+                                        return (
+                                            <div key={gk} className="bg-white border border-violet-100 rounded-lg p-2.5">
+                                                <div className="flex items-start justify-between gap-1">
+                                                    <div className="min-w-0">
+                                                        <div className="text-xs font-semibold text-gray-700 truncate">{persona.nombre}</div>
+                                                        <div className="text-[10px] text-violet-500 font-medium">{rolLabel}</div>
+                                                        {persona.correo && <div className="text-[10px] text-gray-400 truncate">✉ {persona.correo}</div>}
+                                                    </div>
+                                                    <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded border font-medium ${infs.length > 0 ? 'bg-violet-100 text-violet-700 border-violet-300' : 'bg-gray-100 text-gray-400 border-gray-200'}`}>
+                                                        📧 {infs.length > 0 ? infs.length : '—'}
+                                                    </span>
+                                                </div>
+                                                {infs.length > 0 && (
+                                                    <div className="flex flex-wrap gap-1 mt-1.5">
+                                                        {infs.map(k => {
+                                                            const t = INFORME_TIPOS.find(x => x.key === k);
+                                                            return t ? <span key={k} className="text-[9px] bg-violet-50 text-violet-600 border border-violet-200 rounded px-1 py-0.5">{t.label}</span> : null;
+                                                        })}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                                <p className="text-[10px] text-violet-400 mt-2">Gestiona sus informes desde el botón <strong>Personal</strong> en la barra superior.</p>
+                            </div>
+                        );
+                    })()}
+
                     <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
                         <h4 className="text-sm font-semibold text-gray-700 mb-3">Asignar Personal al Proyecto</h4>
                         {Object.keys(personalGlobal || {}).length === 0 ? (
@@ -6867,11 +6912,15 @@ const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel, personal
                         ) : (
                             <div className="flex items-end gap-3">
                                 <div className="flex-1">
-                                    <label className="text-[10px] text-gray-500 font-medium">Seleccionar persona</label>
+                                    <label className="text-[10px] text-gray-500 font-medium">Seleccionar persona (roles capataz / residente)</label>
                                     <select value={selectedPersonalGlobal} onChange={e => setSelectedPersonalGlobal(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 mt-0.5">
                                         <option value="">— Seleccionar —</option>
                                         {Object.entries(personalGlobal || {})
-                                            .filter(([gk]) => !personalProy.some(([,p]) => p.global_key === gk))
+                                            .filter(([gk, persona]) => {
+                                                const ROLES_GLOB_KEYS = ['gerente','coordinador','logistica','rrhh'];
+                                                if (ROLES_GLOB_KEYS.includes(persona.rol)) return false; // globales no necesitan asignación
+                                                return !personalProy.some(([,p]) => p.global_key === gk);
+                                            })
                                             .map(([gk, persona]) => {
                                                 const rolLabel = (ROLES_PERSONAL.find(r => r.key === persona.rol) || {}).label || persona.rol;
                                                 return <option key={gk} value={gk}>{persona.nombre} ({rolLabel})</option>;
