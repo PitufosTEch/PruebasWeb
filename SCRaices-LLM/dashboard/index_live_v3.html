@@ -7351,6 +7351,230 @@ async function exportarSolpagoEnCurso(btn) {
     }
 }
 
+// ===== ALERTAS GLOBALES (vista gerencia) =====
+const ALERTA_CFG = {
+    garantiaDias: 60,      // garantia "por vencer" si vence en < N dias
+    contratoDias: 30,      // contrato "por vencer" si vence en < N dias
+    cobroGapPts: 15,       // cobro atrasado si (avance% - cobrado%) > N puntos
+    recepcionAvance: 90,   // obra "terminada" sin recepcion si avance >= N%
+    ritmoMinMensual: 10,   // avance lento si gana < N puntos/mes (promedio 2 meses)
+    ritmoMeses: 2
+};
+const ALERTA_META = {
+    garantia:  { icon: '🛡️', label: 'Garantía',  color: '#0891b2' },
+    contrato:  { icon: '📅', label: 'Contrato',  color: '#9333ea' },
+    cobro:     { icon: '💰', label: 'Cobro vs avance', color: '#16a34a' },
+    recepcion: { icon: '🏠', label: 'Recepción', color: '#2563eb' },
+    ritmo:     { icon: '🐢', label: 'Avance lento', color: '#ea580c' }
+};
+const _padN = (n) => String(n).padStart(2, '0');
+const _hoyISO = () => { const d = new Date(); return `${d.getFullYear()}-${_padN(d.getMonth() + 1)}-${_padN(d.getDate())}`; };
+const _diasEntre = (aISO, bISO) => Math.round((new Date(bISO + 'T00:00:00') - new Date(aISO + 'T00:00:00')) / 86400000);
+const _sumarDias = (iso, n) => { const d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${_padN(d.getMonth() + 1)}-${_padN(d.getDate())}`; };
+const _mesMenos = (mk, n) => { let [y, m] = mk.split('-').map(Number); m -= n; while (m < 1) { m += 12; y--; } return `${y}-${_padN(m)}`; };
+const _avanceEnMes = (serie, mk) => { let v = 0; for (const s of serie) { if (s.mes <= mk) v = s.avance; else break; } return v; };
+const _sevColor = (sev) => sev >= 3 ? { bg: 'bg-red-50', txt: 'text-red-700', bd: 'border-red-200', dot: 'bg-red-500' }
+    : sev === 2 ? { bg: 'bg-orange-50', txt: 'text-orange-700', bd: 'border-orange-200', dot: 'bg-orange-500' }
+    : { bg: 'bg-amber-50', txt: 'text-amber-700', bd: 'border-amber-200', dot: 'bg-amber-400' };
+
+const SparklineS = ({ serie, w = 96, h = 26, color = '#7c3aed' }) => {
+    if (!serie || serie.length < 2) return <span className="text-gray-300 text-[10px]">sin datos</span>;
+    const n = serie.length;
+    const pts = serie.map((s, i) => { const x = (i / (n - 1)) * w; const y = h - (Math.min(100, Math.max(0, s.avance)) / 100) * h; return `${x.toFixed(1)},${y.toFixed(1)}`; }).join(' ');
+    const last = serie[n - 1];
+    const ly = h - (Math.min(100, Math.max(0, last.avance)) / 100) * h;
+    return (
+        <svg width={w} height={h} style={{ overflow: 'visible' }}>
+            <line x1="0" y1={h} x2={w} y2={h} stroke="#e5e7eb" strokeWidth="1" />
+            <polyline points={pts} fill="none" stroke={color} strokeWidth="1.6" strokeLinejoin="round" />
+            <circle cx={w} cy={ly} r="2.5" fill={color} />
+        </svg>
+    );
+};
+
+function buildAlertasGlobales() {
+    const cfg = ALERTA_CFG;
+    const hoy = _hoyISO();
+    const mesActual = hoy.substring(0, 7);
+    // pre-agrupaciones
+    const benefByProy = {};
+    BENEFICIARIOS_DATA.forEach(b => { const p = String(b.ID_Proy || ''); if (p) (benefByProy[p] = benefByProy[p] || []).push(b); });
+    const pagadoByProy = {};
+    EEPP_DATA.forEach(e => { if (String(e.Estado || '').includes('Pagado')) { const p = String(e.ID_Proy || ''); pagadoByProy[p] = (pagadoByProy[p] || 0) + (e.Monto || 0); } });
+    const garByProy = {};
+    GARANTIAS_DATA.forEach(g => { const p = String(g.ID_Proy || ''); (garByProy[p] = garByProy[p] || []).push(g); });
+
+    return PROYECTOS_DATA.map(p => {
+        const pid = p.ID_proy;
+        const finalizado = p.estado === 'finalizado';
+        const vivs = benefByProy[pid] || [];
+        const nViv = vivs.length;
+        const av = AVANCE_MENSUAL_DATA[pid] || null;
+        const avance = av ? av.avanceActual : 0;
+        const serie = av ? av.serie : [];
+        const montoProy = (MONTOS_PROY_DATA[pid] || {}).total || 0;
+        const pagado = pagadoByProy[pid] || 0;
+        const pctCobrado = montoProy > 0 ? (pagado / montoProy * 100) : null;
+        const recep = vivs.filter(v => v.fecha_recepcion).length;
+        // ritmo (promedio puntos/mes en los ultimos N meses calendario hasta hoy)
+        let ritmo = null;
+        if (av && serie.length) {
+            const aHoy = _avanceEnMes(serie, mesActual);
+            const aAntes = _avanceEnMes(serie, _mesMenos(mesActual, cfg.ritmoMeses));
+            ritmo = Math.round((aHoy - aAntes) / cfg.ritmoMeses * 10) / 10;
+        }
+        // contrato
+        let contratoDias = null;
+        if (p.fecha_inicio && p.duracion) contratoDias = _diasEntre(hoy, _sumarDias(p.fecha_inicio, p.duracion));
+        // garantias
+        const gars = garByProy[pid] || [];
+        let garDiasMin = null;
+        gars.forEach(g => { if (g.fecha_vcmto) { const d = _diasEntre(hoy, g.fecha_vcmto); if (garDiasMin === null || d < garDiasMin) garDiasMin = d; } });
+
+        const alertas = [];
+        // 1) Garantias
+        if (garDiasMin !== null) {
+            if (garDiasMin < 0) alertas.push({ tipo: 'garantia', sev: 3, label: 'Garantía vencida', detalle: `hace ${Math.abs(garDiasMin)}d` });
+            else if (garDiasMin < cfg.garantiaDias) alertas.push({ tipo: 'garantia', sev: garDiasMin < 15 ? 2 : 1, label: 'Garantía por vencer', detalle: `en ${garDiasMin}d` });
+        }
+        // 2) Contrato (solo obras no finalizadas)
+        if (!finalizado && contratoDias !== null) {
+            if (contratoDias < 0) alertas.push({ tipo: 'contrato', sev: 3, label: 'Contrato vencido', detalle: `hace ${Math.abs(contratoDias)}d` });
+            else if (contratoDias < cfg.contratoDias) alertas.push({ tipo: 'contrato', sev: 2, label: 'Contrato por vencer', detalle: `en ${contratoDias}d` });
+        }
+        // 3) Cobro atrasado vs avance (no finalizado, con Montos)
+        if (!finalizado && pctCobrado !== null) {
+            const gap = avance - pctCobrado;
+            if (gap > cfg.cobroGapPts) alertas.push({ tipo: 'cobro', sev: gap > 30 ? 2 : 1, label: 'Cobro atrasado', detalle: `avance ${Math.round(avance)}% vs cobrado ${Math.round(pctCobrado)}%` });
+        }
+        // 4) Obra >=90% sin recepcion total
+        if (avance >= cfg.recepcionAvance && recep < nViv) {
+            alertas.push({ tipo: 'recepcion', sev: 2, label: 'Obra avanzada sin recepción', detalle: `${recep}/${nViv} recepcionadas` });
+        }
+        // 5) Avance mensual lento (no finalizado, iniciada y no casi terminada)
+        if (!finalizado && ritmo !== null && avance > 2 && avance < 95) {
+            if (ritmo < cfg.ritmoMinMensual) alertas.push({ tipo: 'ritmo', sev: ritmo < 5 ? 2 : 1, label: 'Avance lento', detalle: `+${ritmo} pts/mes` });
+        }
+        const sev = alertas.reduce((m, a) => Math.max(m, a.sev), 0);
+        return { pid, nombre: p.NOMBRE_PROYECTO, comuna: p.COMUNA, finalizado, avance, serie, ritmo, pctCobrado, recep, nViv, contratoDias, garDiasMin, alertas, sev };
+    });
+}
+
+const AlertasGlobales = ({ onClose, onSelectProyecto }) => {
+    const data = React.useMemo(() => buildAlertasGlobales(), []);
+    const [filtro, setFiltro] = React.useState('todas'); // todas | critica | <tipo>
+    const conAlertas = data.filter(d => d.alertas.length > 0);
+    // resumen
+    const resumen = React.useMemo(() => {
+        const r = { obras: conAlertas.length, criticas: data.filter(d => d.sev >= 3).length, porTipo: {} };
+        Object.keys(ALERTA_META).forEach(t => r.porTipo[t] = data.filter(d => d.alertas.some(a => a.tipo === t)).length);
+        return r;
+    }, [data]);
+    const fmtUF = (v) => v == null ? '—' : v.toLocaleString('es-CL', { maximumFractionDigits: 0 });
+    let filtradas = conAlertas;
+    if (filtro === 'critica') filtradas = conAlertas.filter(d => d.sev >= 3);
+    else if (filtro !== 'todas') filtradas = conAlertas.filter(d => d.alertas.some(a => a.tipo === filtro));
+    filtradas = [...filtradas].sort((a, b) => b.sev - a.sev || b.alertas.length - a.alertas.length || a.nombre.localeCompare(b.nombre));
+
+    const KpiCard = ({ label, value, color, active, onClick }) => (
+        <button onClick={onClick} className={`flex-1 min-w-[120px] text-left rounded-xl border p-3 transition-all ${active ? 'ring-2 ring-offset-1' : ''}`} style={{ background: color + '14', borderColor: color + '40', ['--tw-ring-color']: color }}>
+            <p className="text-2xl font-bold font-mono" style={{ color }}>{value}</p>
+            <p className="text-[11px] text-gray-500 mt-0.5">{label}</p>
+        </button>
+    );
+
+    return (
+        <div className="fixed inset-0 z-[70] bg-black/50 flex items-start justify-center pt-4 px-3 overflow-y-auto" onClick={(e) => e.target === e.currentTarget && onClose()}>
+            <div className="bg-gray-50 rounded-xl shadow-2xl w-full max-w-7xl mb-10">
+                {/* Header */}
+                <div className="sticky top-0 z-10 bg-white border-b border-gray-200 rounded-t-xl px-5 py-3 flex items-center justify-between">
+                    <div>
+                        <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2"><span>🚨</span> Alertas — Vista Gerencia</h2>
+                        <p className="text-[11px] text-gray-400">{resumen.obras} obras con pendientes · {resumen.criticas} críticas · actualizado {_hoyISO()}</p>
+                    </div>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl font-bold w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100">×</button>
+                </div>
+
+                <div className="p-5 space-y-4">
+                    {/* KPIs */}
+                    <div className="flex flex-wrap gap-2">
+                        <KpiCard label="Obras con alertas" value={resumen.obras} color="#475569" active={filtro === 'todas'} onClick={() => setFiltro('todas')} />
+                        <KpiCard label="Críticas" value={resumen.criticas} color="#dc2626" active={filtro === 'critica'} onClick={() => setFiltro('critica')} />
+                        {Object.entries(ALERTA_META).map(([t, m]) => (
+                            <KpiCard key={t} label={m.label} value={resumen.porTipo[t]} color={m.color} active={filtro === t} onClick={() => setFiltro(filtro === t ? 'todas' : t)} />
+                        ))}
+                    </div>
+
+                    {/* Tabla */}
+                    {filtradas.length === 0 ? (
+                        <div className="bg-white border border-gray-200 rounded-xl p-10 text-center text-gray-400 text-sm">Sin alertas en este filtro 🎉</div>
+                    ) : (
+                        <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="text-left text-gray-500 border-b border-gray-200 bg-gray-50 text-xs">
+                                            <th className="py-2 px-3">Proyecto</th>
+                                            <th className="py-2 px-3 text-center">Avance</th>
+                                            <th className="py-2 px-3 text-center">Ritmo/mes</th>
+                                            <th className="py-2 px-3 text-center">Cobro vs avance</th>
+                                            <th className="py-2 px-3 text-center">Garantía</th>
+                                            <th className="py-2 px-3 text-center">Contrato</th>
+                                            <th className="py-2 px-3 text-center">Recep.</th>
+                                            <th className="py-2 px-3">Alertas</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {filtradas.map(d => {
+                                            const sc = _sevColor(d.sev);
+                                            const ritmoCol = d.ritmo == null ? 'text-gray-300' : d.ritmo < 5 ? 'text-red-600' : d.ritmo < 10 ? 'text-amber-600' : 'text-green-600';
+                                            return (
+                                                <tr key={d.pid} className="border-b border-gray-100 hover:bg-violet-50/40 cursor-pointer" onClick={() => onSelectProyecto(d.pid)}>
+                                                    <td className="py-2 px-3">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className={`inline-block w-1.5 h-8 rounded ${sc.dot}`}></span>
+                                                            <div>
+                                                                <p className="font-semibold text-gray-800 leading-tight">{d.nombre}</p>
+                                                                <p className="text-[10px] text-gray-400">{d.pid} · {d.comuna}{d.finalizado ? ' · finalizado' : ''}</p>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="py-2 px-3">
+                                                        <div className="flex flex-col items-center">
+                                                            <SparklineS serie={d.serie} />
+                                                            <span className="text-[11px] font-mono font-bold text-gray-700">{Math.round(d.avance)}%</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className={`py-2 px-3 text-center font-mono font-bold ${ritmoCol}`}>{d.ritmo == null ? '—' : (d.ritmo >= 0 ? '+' : '') + d.ritmo}</td>
+                                                    <td className="py-2 px-3 text-center text-xs">
+                                                        {d.pctCobrado == null ? <span className="text-gray-300">sin Montos</span>
+                                                            : <span><span className="font-mono font-semibold text-green-700">{Math.round(d.pctCobrado)}%</span> <span className="text-gray-400">vs {Math.round(d.avance)}%</span></span>}
+                                                    </td>
+                                                    <td className="py-2 px-3 text-center text-xs">{d.garDiasMin == null ? <span className="text-gray-300">—</span> : d.garDiasMin < 0 ? <span className="text-red-600 font-semibold">vencida</span> : <span className={d.garDiasMin < 60 ? 'text-amber-600 font-semibold' : 'text-gray-500'}>{d.garDiasMin}d</span>}</td>
+                                                    <td className="py-2 px-3 text-center text-xs">{d.contratoDias == null ? <span className="text-gray-300">—</span> : d.contratoDias < 0 ? <span className="text-red-600 font-semibold">vencido</span> : <span className={d.contratoDias < 30 ? 'text-amber-600 font-semibold' : 'text-gray-500'}>{d.contratoDias}d</span>}</td>
+                                                    <td className="py-2 px-3 text-center text-xs font-mono text-gray-600">{d.recep}/{d.nViv}</td>
+                                                    <td className="py-2 px-3">
+                                                        <div className="flex flex-wrap gap-1">
+                                                            {d.alertas.map((a, i) => { const ac = _sevColor(a.sev); return (
+                                                                <span key={i} title={a.detalle} className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border ${ac.bg} ${ac.txt} ${ac.bd}`}>{ALERTA_META[a.tipo].icon} {a.label}</span>
+                                                            ); })}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+                    <p className="text-[10px] text-gray-400 text-center">Umbrales: garantía &lt;{ALERTA_CFG.garantiaDias}d · contrato &lt;{ALERTA_CFG.contratoDias}d · cobro atrasado &gt;{ALERTA_CFG.cobroGapPts} pts · avance lento &lt;{ALERTA_CFG.ritmoMinMensual} pts/mes. Clic en una fila para abrir el proyecto.</p>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const App = () => {
     const defaultProy = [...PROYECTOS_DATA].sort((a, b) => (b.fecha_inicio || '').localeCompare(a.fecha_inicio || ''))[0]?.ID_proy || "";
     const [proyectoSel, setProyectoSel] = React.useState(defaultProy);
@@ -7480,6 +7704,9 @@ const App = () => {
     const [observaciones, setObservaciones] = React.useState({});
     const [showResumenObs, setShowResumenObs] = React.useState(false);
     const [showValidacion, setShowValidacion] = React.useState(false);
+    const [showAlertas, setShowAlertas] = React.useState(false);
+    // Total de obras con alertas (para el badge del boton global)
+    const obrasConAlertas = React.useMemo(() => { try { return buildAlertasGlobales().filter(d => d.alertas.length > 0).length; } catch (_) { return 0; } }, []);
     const [showTE1, setShowTE1] = React.useState(false);
     const [te1Data, setTe1Data] = React.useState(null);
     const [te1Loading, setTe1Loading] = React.useState(false);
@@ -8340,8 +8567,14 @@ const App = () => {
                     <div className="bg-white rounded-xl p-3 border border-amber-200 shadow-sm"><p className="text-[10px] text-amber-600">TE1</p><p className="text-xl font-bold font-mono text-amber-700">{kpis.conTE1}<span className="text-sm text-gray-400 font-normal"> de {kpis.total}</span></p></div>
                 </div>
 
+                {/* ALERTAS GLOBALES (gerencia) - Botón + Modal */}
+                <button onClick={() => setShowAlertas(true)} className={`mb-3 mr-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${obrasConAlertas > 0 ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100' : 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'}`}>
+                    <span>🚨</span>
+                    {obrasConAlertas > 0 ? `${obrasConAlertas} obra${obrasConAlertas !== 1 ? 's' : ''} con alertas` : 'Sin alertas globales'}
+                    <span className="text-[10px] font-normal opacity-70">(gerencia)</span>
+                </button>
                 {/* VALIDACION CRUZADA - Botón + Modal */}
-                <button onClick={() => setShowValidacion(true)} className={`mb-3 flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${totalHallazgos > 0 ? 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100' : 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'}`}>
+                <button onClick={() => setShowValidacion(true)} className={`mb-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${totalHallazgos > 0 ? 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100' : 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'}`}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         {totalHallazgos > 0
                             ? <><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></>
@@ -8540,6 +8773,12 @@ const App = () => {
                         </div>
                     </div>;
                 })()}
+                {showAlertas && (
+                    <AlertasGlobales
+                        onClose={() => setShowAlertas(false)}
+                        onSelectProyecto={(pid) => { setProyectoSel(pid); setShowAlertas(false); setTab('estado_general'); }}
+                    />
+                )}
                 {showValidacion && (
                     <div className="fixed inset-0 z-[60] bg-black/40 flex items-start justify-center pt-12 px-4" onClick={(e) => e.target === e.currentTarget && setShowValidacion(false)}>
                         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
