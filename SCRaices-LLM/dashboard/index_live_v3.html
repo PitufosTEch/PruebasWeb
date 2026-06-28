@@ -1093,17 +1093,30 @@ const ETAPAS_CONFIG_FULL = {
         GARANTIAS_DATA = bgbRaw
             .filter(g => idsProyActivos.has(String(g.ID_Proy || '')))
             .filter(g => !/sin\s*garant/i.test(String(g.Tipo_linea || '')))
-            .map(g => ({
-                ID_Proy: String(g.ID_Proy || ''),
-                tipo: String(g.Tipo || ''),
-                tipo1: String(g.Tipo1 || ''),
-                tipo_linea: String(g.Tipo_linea || ''),
-                num_bol: String(g.num_bol || ''),
-                banco: String(g.Banco || ''),
-                monto_uf: parseInt(g.Monto) || 0,
-                fecha_inicio: parseDate(g.Fecha_inic) || '',
-                fecha_vcmto: parseDate(g.Fecha_vcmto) || ''
-            }));
+            .map(g => {
+                const tipoTxt = String(g.Tipo || '').toLowerCase();
+                // Marco = garantia del convenio/asistencia tecnica SEREMI<->EGR (no del contrato de obra)
+                const esMarco = /convenio\s*marco/.test(tipoTxt);
+                // Entidad responsable: ATPK (EGR en proyectos recientes) vs Raices.
+                // Se infiere de la columna empresa + el texto de la glosa.
+                const entTxt = (String(g.empresa || '') + ' ' + String(g.Glosa || '')).toLowerCase();
+                const entidad = /atpk/.test(entTxt) ? 'ATPK' : 'Raíces';
+                const tipoCorto = esMarco ? 'Marco' : (/buena/.test(tipoTxt) ? 'Buena Ejec.' : (/fiel/.test(tipoTxt) ? 'Contrato' : String(g.Tipo || '')));
+                return {
+                    ID_Proy: String(g.ID_Proy || ''),
+                    tipo: String(g.Tipo || ''),
+                    tipo1: String(g.Tipo1 || ''),
+                    tipo_linea: String(g.Tipo_linea || ''),
+                    esMarco,
+                    entidad,
+                    tipoCorto,
+                    num_bol: String(g.num_bol || ''),
+                    banco: String(g.Banco || ''),
+                    monto_uf: parseInt(g.Monto) || 0,
+                    fecha_inicio: parseDate(g.Fecha_inic) || '',
+                    fecha_vcmto: parseDate(g.Fecha_vcmto) || ''
+                };
+            });
 
         updateLoading('Procesando estados de pago...', 95);
 
@@ -2295,15 +2308,16 @@ const HeaderProyecto = ({ proy, garantiasProy, eeppResumen, kpis, avanceInsp = 0
                         {garantiasProy.map((g, i) => {
                             const esV = g.diasVcmto !== null && g.diasVcmto < 0;
                             const porV = g.diasVcmto !== null && g.diasVcmto >= 0 && g.diasVcmto < 60;
-                            const tipoCorto = g.tipo.includes("Fiel") ? "Fiel Cumpl." : g.tipo.includes("Buena") ? "Buena Ejec." : g.tipo;
                             return (
                                 <div key={i} className={`flex items-center justify-between text-xs px-2 py-1 rounded ${esV ? "bg-red-50 text-red-700" : porV ? "bg-yellow-50 text-yellow-700" : "bg-gray-50 text-gray-600"}`}>
-                                    <div className="flex items-center gap-2">
-                                        <span className="font-medium">{tipoCorto}</span>
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className="font-semibold">{g.tipoCorto}</span>
+                                        {g.esMarco && <span className="px-1 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-700 border border-amber-200" title="Garantía del convenio marco SEREMI–EGR, no del contrato de obra">MARCO</span>}
+                                        <span className={`px-1 py-0.5 rounded text-[9px] font-bold border ${g.entidad === 'ATPK' ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`} title="Entidad responsable de la garantía">{g.entidad}</span>
                                         <span className="text-gray-400">{g.tipo1} #{g.num_bol}</span>
                                         {g.monto_uf > 0 && <span className="text-gray-400">UF {g.monto_uf.toLocaleString()}</span>}
                                     </div>
-                                    <div className="font-semibold">
+                                    <div className="font-semibold whitespace-nowrap">
                                         {g.diasVcmto === null ? "Sin fecha" : esV ? `VENCIDA (${Math.abs(g.diasVcmto)}d)` : porV ? `${g.diasVcmto}d` : formatFecha(g.fecha_vcmto)}
                                     </div>
                                 </div>
@@ -4215,11 +4229,14 @@ const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios
             ? garantiasProy.map(g => {
                 const esV = g.diasVcmto !== null && g.diasVcmto < 0;
                 const porV = g.diasVcmto !== null && g.diasVcmto >= 0 && g.diasVcmto < 60;
-                const tipoCorto = g.tipo && g.tipo.includes('Fiel') ? 'Fiel Cumpl.' : g.tipo && g.tipo.includes('Buena') ? 'Buena Ejec.' : (g.tipo || '—');
+                const tipoCorto = g.tipoCorto || (g.tipo && g.tipo.includes('Fiel') ? 'Fiel Cumpl.' : g.tipo && g.tipo.includes('Buena') ? 'Buena Ejec.' : (g.tipo || '—'));
                 const right = g.diasVcmto === null ? 'Sin fecha' : esV ? `Vencida (${Math.abs(g.diasVcmto)}d)` : porV ? `${g.diasVcmto}d` : fmtFechaInf(g.fecha_vcmto);
                 const col = esV ? '#dc2626' : porV ? '#b45309' : '#475569';
                 const bg = esV ? '#fef2f2' : porV ? '#fffbeb' : '#f8fafc';
-                return `<div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;padding:5px 8px;border-radius:6px;background:${bg};margin-bottom:4px;"><span><strong>${escapeHtmlBasic(tipoCorto)}</strong> <span style="color:#94a3b8;">${escapeHtmlBasic(g.tipo1 || '')} #${escapeHtmlBasic(g.num_bol || '')}</span>${g.monto_uf > 0 ? ` <span style="color:#94a3b8;">UF ${Number(g.monto_uf).toLocaleString('es-CL')}</span>` : ''}</span><span style="font-weight:600;color:${col};white-space:nowrap;">${escapeHtmlBasic(right)}</span></div>`;
+                const marcoTag = g.esMarco ? ` <span style="font-size:9px;font-weight:700;color:#b45309;background:#fef3c7;border:1px solid #fde68a;border-radius:4px;padding:1px 4px;">MARCO</span>` : '';
+                const entCol = g.entidad === 'ATPK' ? { c: '#4338ca', b: '#e0e7ff', bd: '#c7d2fe' } : { c: '#475569', b: '#f1f5f9', bd: '#e2e8f0' };
+                const entTag = g.entidad ? ` <span style="font-size:9px;font-weight:700;color:${entCol.c};background:${entCol.b};border:1px solid ${entCol.bd};border-radius:4px;padding:1px 4px;">${escapeHtmlBasic(g.entidad)}</span>` : '';
+                return `<div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;padding:5px 8px;border-radius:6px;background:${bg};margin-bottom:4px;"><span><strong>${escapeHtmlBasic(tipoCorto)}</strong>${marcoTag}${entTag} <span style="color:#94a3b8;">${escapeHtmlBasic(g.tipo1 || '')} #${escapeHtmlBasic(g.num_bol || '')}</span>${g.monto_uf > 0 ? ` <span style="color:#94a3b8;">UF ${Number(g.monto_uf).toLocaleString('es-CL')}</span>` : ''}</span><span style="font-weight:600;color:${col};white-space:nowrap;">${escapeHtmlBasic(right)}</span></div>`;
             }).join('')
             : '<div style="color:#94a3b8;font-size:11px;padding:8px 0;">Sin garantías registradas.</div>';
         const garantiasCard = `<div class="rc-card"><div class="rc-h">Garantías</div>${garantiasItems}</div>`;
