@@ -7463,18 +7463,29 @@ function buildAlertasGlobales() {
 const AlertasGlobales = ({ onClose, onSelectProyecto }) => {
     const data = React.useMemo(() => buildAlertasGlobales(), []);
     const [filtro, setFiltro] = React.useState('todas'); // todas | critica | <tipo>
-    const conAlertas = data.filter(d => d.alertas.length > 0);
-    // resumen
+    const [ocultarTerminados, setOcultarTerminados] = React.useState(true);
+    const [orden, setOrden] = React.useState('urgencia');
+    // base segun "ocultar terminados"; los KPI y la tabla respetan este filtro
+    const base = ocultarTerminados ? data.filter(d => !d.finalizado) : data;
+    const conAlertas = base.filter(d => d.alertas.length > 0);
     const resumen = React.useMemo(() => {
-        const r = { obras: conAlertas.length, criticas: data.filter(d => d.sev >= 3).length, porTipo: {} };
-        Object.keys(ALERTA_META).forEach(t => r.porTipo[t] = data.filter(d => d.alertas.some(a => a.tipo === t)).length);
+        const r = { obras: conAlertas.length, criticas: conAlertas.filter(d => d.sev >= 3).length, porTipo: {} };
+        Object.keys(ALERTA_META).forEach(t => r.porTipo[t] = conAlertas.filter(d => d.alertas.some(a => a.tipo === t)).length);
         return r;
-    }, [data]);
-    const fmtUF = (v) => v == null ? '—' : v.toLocaleString('es-CL', { maximumFractionDigits: 0 });
+    }, [base]);
     let filtradas = conAlertas;
     if (filtro === 'critica') filtradas = conAlertas.filter(d => d.sev >= 3);
     else if (filtro !== 'todas') filtradas = conAlertas.filter(d => d.alertas.some(a => a.tipo === filtro));
-    filtradas = [...filtradas].sort((a, b) => b.sev - a.sev || b.alertas.length - a.alertas.length || a.nombre.localeCompare(b.nombre));
+    const _ritmoVal = (d) => d.ritmo == null ? 999 : d.ritmo;
+    const _gapVal = (d) => d.pctCobrado == null ? -1 : (d.avance - d.pctCobrado);
+    const COMPARADORES = {
+        urgencia: (a, b) => b.sev - a.sev || b.alertas.length - a.alertas.length || a.nombre.localeCompare(b.nombre),
+        ritmo:    (a, b) => _ritmoVal(a) - _ritmoVal(b) || a.nombre.localeCompare(b.nombre),
+        avance:   (a, b) => a.avance - b.avance || a.nombre.localeCompare(b.nombre),
+        cobro:    (a, b) => _gapVal(b) - _gapVal(a) || a.nombre.localeCompare(b.nombre),
+        nombre:   (a, b) => a.nombre.localeCompare(b.nombre)
+    };
+    filtradas = [...filtradas].sort(COMPARADORES[orden] || COMPARADORES.urgencia);
 
     const KpiCard = ({ label, value, color, active, onClick }) => (
         <button onClick={onClick} className={`flex-1 min-w-[120px] text-left rounded-xl border p-3 transition-all ${active ? 'ring-2 ring-offset-1' : ''}`} style={{ background: color + '14', borderColor: color + '40', ['--tw-ring-color']: color }}>
@@ -7503,6 +7514,31 @@ const AlertasGlobales = ({ onClose, onSelectProyecto }) => {
                         {Object.entries(ALERTA_META).map(([t, m]) => (
                             <KpiCard key={t} label={m.label} value={resumen.porTipo[t]} color={m.color} active={filtro === t} onClick={() => setFiltro(filtro === t ? 'todas' : t)} />
                         ))}
+                    </div>
+
+                    {/* Controles: filtro tipo (chip activo), ordenar, ocultar terminados */}
+                    <div className="flex flex-wrap items-center gap-3 text-xs">
+                        <span className="text-gray-400">Filtro:</span>
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-violet-50 text-violet-700 border border-violet-200 font-medium">
+                            {filtro === 'todas' ? 'Todas' : filtro === 'critica' ? 'Críticas' : ALERTA_META[filtro].label}
+                            {filtro !== 'todas' && <button onClick={() => setFiltro('todas')} className="ml-1 text-violet-400 hover:text-violet-700 font-bold">×</button>}
+                        </span>
+                        <span className="text-gray-300">·</span>
+                        <label className="flex items-center gap-1.5 text-gray-600">
+                            <span>Ordenar por:</span>
+                            <select value={orden} onChange={e => setOrden(e.target.value)} className="border border-gray-300 rounded-lg px-2 py-1 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-violet-400">
+                                <option value="urgencia">Urgencia</option>
+                                <option value="ritmo">Menor ritmo/mes</option>
+                                <option value="avance">Menor avance</option>
+                                <option value="cobro">Mayor brecha de cobro</option>
+                                <option value="nombre">Nombre</option>
+                            </select>
+                        </label>
+                        <label className="flex items-center gap-1.5 text-gray-600 cursor-pointer select-none ml-auto">
+                            <input type="checkbox" checked={ocultarTerminados} onChange={e => setOcultarTerminados(e.target.checked)} className="accent-violet-600" />
+                            <span>Ocultar terminados</span>
+                        </label>
+                        <span className="text-gray-400">{filtradas.length} obra{filtradas.length !== 1 ? 's' : ''}</span>
                     </div>
 
                     {/* Tabla */}
@@ -7705,8 +7741,9 @@ const App = () => {
     const [showResumenObs, setShowResumenObs] = React.useState(false);
     const [showValidacion, setShowValidacion] = React.useState(false);
     const [showAlertas, setShowAlertas] = React.useState(false);
-    // Total de obras con alertas (para el badge del boton global)
-    const obrasConAlertas = React.useMemo(() => { try { return buildAlertasGlobales().filter(d => d.alertas.length > 0).length; } catch (_) { return 0; } }, []);
+    // Total de obras NO terminadas con alertas (para el badge del boton global,
+    // consistente con el panel que por defecto oculta terminados)
+    const obrasConAlertas = React.useMemo(() => { try { return buildAlertasGlobales().filter(d => !d.finalizado && d.alertas.length > 0).length; } catch (_) { return 0; } }, []);
     const [showTE1, setShowTE1] = React.useState(false);
     const [te1Data, setTe1Data] = React.useState(null);
     const [te1Loading, setTe1Loading] = React.useState(false);
