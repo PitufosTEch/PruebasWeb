@@ -506,6 +506,34 @@ def _generar_despachos_por_idx(proyectos: dict) -> dict:
     return resultado
 
 
+FIREBASE_DESP_HTML_URL = "https://scraices-dashboard-default-rtdb.firebaseio.com/despachos_html.json"
+
+
+def escribir_despachos_firebase() -> bool:
+    """
+    Descarga el Excel de Drive, genera el HTML de despachos por proyecto
+    y lo escribe en Firebase RTDB bajo /despachos_html/{pid}.
+    Debe ejecutarse ANTES de que Playwright capture los informes para que
+    generarInformeAdquisicionesHTML() pueda leer los datos del dashboard en vivo.
+    """
+    import requests
+    proyectos = _cargar_datos_proyectos()
+    if proyectos is None:
+        return False
+    despachos_por_idx = _generar_despachos_por_idx(proyectos)
+    pid_to_html = {IDX_TO_PID[k]: v for k, v in despachos_por_idx.items() if k in IDX_TO_PID}
+    try:
+        resp = requests.put(FIREBASE_DESP_HTML_URL, json=pid_to_html, timeout=30)
+        if resp.status_code == 200:
+            print(f"  [Despachos] Firebase /despachos_html actualizado: {len(pid_to_html)} proyectos")
+            return True
+        print(f"  [Despachos] ERROR Firebase: {resp.status_code}")
+        return False
+    except Exception as e:
+        print(f"  [Despachos] ERROR Firebase: {e}")
+        return False
+
+
 # ── API pública ───────────────────────────────────────────────────────────────
 
 def inyectar_resumen_despachos(pdf_dir: Path, fecha: str) -> bool:

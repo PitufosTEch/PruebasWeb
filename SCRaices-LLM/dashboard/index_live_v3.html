@@ -4705,19 +4705,21 @@ ${inf.footerHtml}
         const obrasConCurva = PROYECTOS_DATA.filter(p => (CURVAS_S_CONFIG[p.ID_proy] || []).length > 0);
         if (obrasConCurva.length === 0) { alert('No hay obras activas con curvas S configuradas.'); return; }
 
-        let ganttRaw = {}, gruposRaw = {}, obsRaw = {}, avanceGanttRaw = {};
+        let ganttRaw = {}, gruposRaw = {}, obsRaw = {}, avanceGanttRaw = {}, despachosHtmlRaw = {};
         try {
-            const [rGantt, rGrupos, rObs, rAvGantt] = await Promise.all([
+            const [rGantt, rGrupos, rObs, rAvGantt, rDesp] = await Promise.all([
                 fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/gantt_programa.json'),
                 fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/grupos.json'),
                 fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/observaciones.json'),
-                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/avance_gantt.json')
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/avance_gantt.json'),
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/despachos_html.json')
             ]);
-            ganttRaw       = (await rGantt.json())   || {};
-            gruposRaw      = (await rGrupos.json())  || {};
-            obsRaw         = (await rObs.json())     || {};
-            avanceGanttRaw = (await rAvGantt.json()) || {};
-        } catch(e) { ganttRaw = {}; gruposRaw = {}; obsRaw = {}; avanceGanttRaw = {}; }
+            ganttRaw        = (await rGantt.json())  || {};
+            gruposRaw       = (await rGrupos.json()) || {};
+            obsRaw          = (await rObs.json())    || {};
+            avanceGanttRaw  = (await rAvGantt.json())|| {};
+            despachosHtmlRaw= (await rDesp.json())   || {};
+        } catch(e) { ganttRaw = {}; gruposRaw = {}; obsRaw = {}; avanceGanttRaw = {}; despachosHtmlRaw = {}; }
 
         const getCapataz = (idProy, curvaLabel) => {
             const gList = gruposRaw[idProy] || [];
@@ -4838,7 +4840,8 @@ ${inf.footerHtml}
                 resumen:     renderTabAdq(idx, 'resumen'),
                 checkpoints: renderTabAdq(idx, 'checkpoints'),
                 curvas:      renderTabAdq(idx, 'curvas'),
-                viviendas:   renderTabAdq(idx, 'viviendas')
+                viviendas:   renderTabAdq(idx, 'viviendas'),
+                despachos:   despachosHtmlRaw[o.ID_proy] || '<p style="padding:32px;text-align:center;color:#94a3b8;font-size:14px;">Sin datos de despachos disponibles</p>'
             };
         });
 
@@ -4903,8 +4906,8 @@ function mostrar(t){document.querySelectorAll('.section').forEach(s=>s.classList
 <button class="tab-btn" onclick="mostrar('despachos')">Despachos</button>
 </div>`;
 
-        const secsAdq = ['resumen','checkpoints','curvas','viviendas'].map(t =>
-            `<div class="section${t==='resumen'?' active':''}" id="sec-${t}">${allSectionsAdq[0][t]}</div>`
+        const secsAdq = ['resumen','checkpoints','curvas','viviendas','despachos'].map(t =>
+            `<div class="section${t==='resumen'?' active':''}" id="sec-${t}">${allSectionsAdq[0][t] || ''}</div>`
         ).join('');
 
         const optsAdq = obrasData.map((o,i) => `<option value="${i}">✓ ${o.ID_proy} · ${o.nombre} (${o.viviendas.length} viv.)</option>`).join('');

@@ -270,8 +270,16 @@ def main():
     print(f"Modo: {'CAPTURA + ENVÍO' if enviar else 'CAPTURA DIARIA'}")
     print(f"{'='*60}\n")
 
+    # ── 0. Escribir datos de despachos en Firebase (ANTES del capture) ────
+    print("► Paso 0: Publicar despachos en Firebase")
+    try:
+        from inyectar_despachos import escribir_despachos_firebase
+        escribir_despachos_firebase()
+    except Exception as e:
+        print(f"  [Despachos] ERROR en Paso 0: {e} — continuando sin despachos en Firebase")
+
     # ── 1. Capturar reportes ───────────────────────────────────────────────
-    print("► Paso 1: Capturar reportes del dashboard")
+    print("\n► Paso 1: Capturar reportes del dashboard")
     from capturar_informes_dashboard import main as capturar
     pdf_dir = capturar()
 
