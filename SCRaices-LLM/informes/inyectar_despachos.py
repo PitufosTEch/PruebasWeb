@@ -468,7 +468,13 @@ def _aplicar_inyeccion(html: str, despachos_por_idx: dict) -> str:
             flags=re.DOTALL,
         )
     else:
-        html = html.replace("</body></html>", bloque + "</body></html>", 1)
+        # rfind desde el final: evita coincidir con </body></html> dentro de
+        # template literals JS (que aparecen en las funciones de generación de reportes)
+        for closing in ("</body>\n</html>", "</body>\r\n</html>", "</body></html>"):
+            idx = html.rfind(closing)
+            if idx != -1:
+                html = html[:idx] + bloque + closing
+                break
 
     return html
 
