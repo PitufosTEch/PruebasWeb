@@ -6,22 +6,26 @@
  * 2. Nuevo proyecto → pegar este codigo
  * 3. Implementar → Nueva implementacion → App web
  *    - Ejecutar como: Yo
- *    - Quien tiene acceso: Cualquier persona
+ *    - Quien tiene acceso: Cualquier usuario
  * 4. Autorizar cuando pregunte (necesita acceso a Sheets)
  * 5. Copiar la URL generada
  *
- * ENDPOINT:
- *   GET {URL}?tables=Proyectos,Beneficiario,Despacho,soldepacho,Ejecucion,Solpago,Maestros,Tabla_pago,Tipologias,controlBGB,controlEEPP
- *   GET {URL}?tables=Proyectos  (una sola tabla)
- *   GET {URL}?sheetId=XXXX&tables=Hoja1  (leer otro spreadsheet)
+ * ENDPOINT (JSON directo):
+ *   GET {URL}?tables=Proyectos,Beneficiario,...
+ *
+ * ENDPOINT (JSONP - sin restriccion CORS):
+ *   GET {URL}?tables=Proyectos,...&callback=miFuncion
+ *   → responde: miFuncion({"Proyectos":{...}})
  */
 
 var SPREADSHEET_ID = "1JAxxP9W6LJzns5rmGIo7mfk227qMLwsq-gFMCvHU0Zk";
 
 function doGet(e) {
+  var callback = null;
   try {
-    var action = e.parameter.action || '';
-    var sheetId = e.parameter.sheetId || SPREADSHEET_ID;
+    callback = (e && e.parameter && e.parameter.callback) ? String(e.parameter.callback) : null;
+    var action = (e && e.parameter && e.parameter.action) ? e.parameter.action : '';
+    var sheetId = (e && e.parameter && e.parameter.sheetId) ? e.parameter.sheetId : SPREADSHEET_ID;
     var ss = SpreadsheetApp.openById(sheetId);
 
     // Manifest: returns row counts per table (lightweight, for smart sync)
@@ -31,15 +35,15 @@ function doGet(e) {
       for (var s = 0; s < allSheets.length; s++) {
         var sheet = allSheets[s];
         var name = sheet.getName();
-        tables[name] = sheet.getLastRow() - 1; // minus header
+        tables[name] = sheet.getLastRow() - 1;
       }
-      return jsonResponse({ tables: tables, timestamp: new Date().toISOString() });
+      return respond({ tables: tables, timestamp: new Date().toISOString() }, callback);
     }
 
-    var tablesParam = e.parameter.tables || '';
+    var tablesParam = (e && e.parameter && e.parameter.tables) ? e.parameter.tables : '';
 
     if (!tablesParam) {
-      return jsonResponse({ error: 'Parametro "tables" requerido. Ej: ?tables=Proyectos,Beneficiario' });
+      return respond({ error: 'Parametro "tables" requerido. Ej: ?tables=Proyectos,Beneficiario' }, callback);
     }
 
     var tableNames = tablesParam.split(',').map(function(t) { return t.trim(); });
@@ -67,7 +71,6 @@ function doGet(e) {
           var row = {};
           for (var c = 0; c < headers.length; c++) {
             var val = data[r][c];
-            // Convertir fechas a string ISO
             if (val instanceof Date) {
               val = Utilities.formatDate(val, ss.getSpreadsheetTimeZone(), "yyyy-MM-dd'T'HH:mm:ss");
             }
@@ -83,15 +86,23 @@ function doGet(e) {
       }
     }
 
-    return jsonResponse(result);
+    return respond(result, callback);
 
   } catch (err) {
-    return jsonResponse({ error: err.message });
+    return respond({ error: err.message }, callback);
   }
 }
 
-function jsonResponse(data) {
+// Responde en JSON o JSONP segun si hay callback
+function respond(data, callback) {
+  var json = JSON.stringify(data);
+  if (callback) {
+    // JSONP: el browser ejecuta el script sin restriccion CORS
+    return ContentService
+      .createTextOutput(callback + '(' + json + ')')
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
   return ContentService
-    .createTextOutput(JSON.stringify(data))
+    .createTextOutput(json)
     .setMimeType(ContentService.MimeType.JSON);
 }
