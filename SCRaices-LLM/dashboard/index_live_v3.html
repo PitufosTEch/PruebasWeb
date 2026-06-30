@@ -5426,6 +5426,218 @@ ${js}</body></html>`;
         setTimeout(() => URL.revokeObjectURL(url), 60000);
     };
 
+    // ================================================================
+    // ESTADOS DE PAGO HTML — informe financiero multi-obra
+    // ================================================================
+    const generarEstadosPagoHTML = () => {
+        const obras = PROYECTOS_DATA.filter(p => p.estado === 'ejecucion');
+        if (!obras.length) { alert('Sin obras en ejecución.'); return; }
+
+        const fmtUF = (v) => (Math.round((v||0) * 100) / 100).toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' UF';
+        const fmtCLP = (v) => (Math.round(v||0)).toLocaleString('es-CL') + ' $';
+        const fmtFecha = (d) => {
+            if (!d) return '—';
+            const s = String(d).substring(0, 10);
+            if (!s || s === '—') return '—';
+            const parts = s.split('-');
+            if (parts.length !== 3) return s;
+            return `${parts[2]}/${parts[1]}/${parts[0]}`;
+        };
+
+        const obrasSections = obras.map((proy, idx) => {
+            const pid = proy.ID_proy;
+            const nombre = proy.NOMBRE_PROYECTO || pid;
+            const comuna = proy.COMUNA || '';
+
+            const montos = MONTOS_PROY_DATA[pid] || { total: 0, viviendas: 0 };
+            const eps = EEPP_DATA.filter(ep => ep.ID_Proy === pid);
+            const benefIds = new Set(BENEFICIARIOS_DATA.filter(b => b.ID_Proy === pid).map(b => b.ID_Benef));
+            const pagos = SOLPAGO_DATA.filter(s => benefIds.has(s.ID_Benef));
+            const gars = GARANTIAS_DATA.filter(g => g.ID_Proy === pid);
+
+            const sumByEstado = (...estados) => eps.filter(e => estados.some(st => e.Estado.toLowerCase().includes(st))).reduce((a, e) => a + e.Monto, 0);
+            const totalPagado   = sumByEstado('pagado');
+            const totalIngresado= sumByEstado('ingresado');
+            const totalAprobado = sumByEstado('aprobado');
+            const totalEP       = eps.reduce((a, e) => a + e.Monto, 0);
+            const totalPorCobrar= montos.total;
+            const pctAvance     = totalPorCobrar > 0 ? Math.min(100, Math.round(totalPagado / totalPorCobrar * 1000) / 10) : 0;
+            const totalGarUF    = gars.reduce((a, g) => a + g.monto_uf, 0);
+            const totalMO       = pagos.reduce((a, s) => a + s.monto, 0);
+
+            // TAB RESUMEN
+            const tabResumen = `
+<div class="kpi-grid">
+  <div class="kpi-card kpi-total"><div class="kpi-lbl">Total por cobrar</div><div class="kpi-val">${fmtUF(totalPorCobrar)}</div><div class="kpi-sub">${montos.viviendas} viviendas</div></div>
+  <div class="kpi-card kpi-pagado"><div class="kpi-lbl">Pagado</div><div class="kpi-val">${fmtUF(totalPagado)}</div><div class="kpi-sub">${pctAvance}% del total</div></div>
+  <div class="kpi-card kpi-ingresado"><div class="kpi-lbl">En tramitación</div><div class="kpi-val">${fmtUF(totalIngresado + totalAprobado)}</div><div class="kpi-sub">${eps.filter(e => !e.Estado.toLowerCase().includes('pagado')).length} EP pendientes</div></div>
+  <div class="kpi-card kpi-pendiente"><div class="kpi-lbl">Por facturar</div><div class="kpi-val">${fmtUF(Math.max(0, totalPorCobrar - totalEP))}</div><div class="kpi-sub">${eps.length} EP emitidos</div></div>
+</div>
+<div class="prog-wrap"><div class="prog-bar" style="width:${pctAvance}%"></div><span class="prog-label">${pctAvance}%</span></div>
+<div class="gar-summary">
+  <span class="gar-item">Garantías vigentes: <strong>${gars.length}</strong> · <strong>${fmtUF(totalGarUF)}</strong></span>
+  <span class="gar-item sep">|</span>
+  <span class="gar-item">Pagos M.O.: <strong>${fmtCLP(totalMO)}</strong></span>
+</div>`;
+
+            // TAB EP
+            const epByNum = {};
+            eps.forEach(ep => {
+                const k = String(ep.Num_EP || '—');
+                if (!epByNum[k]) epByNum[k] = { num: k, items: [] };
+                epByNum[k].items.push(ep);
+            });
+            const epRows = Object.values(epByNum)
+                .sort((a, b) => { const na = parseFloat(a.num)||0, nb = parseFloat(b.num)||0; return na - nb; })
+                .map(g => {
+                    const tot = g.items.reduce((a, e) => a + e.Monto, 0);
+                    const est = g.items[0].Estado;
+                    const fecha = g.items.map(e => e.Fecha).filter(Boolean).sort().slice(-1)[0] || '';
+                    const estLower = est.toLowerCase();
+                    const estClass = estLower.includes('pagado') ? 'est-pagado' : estLower.includes('ingresado') ? 'est-ingresado' : 'est-otro';
+                    return `<tr><td class="td-ep">EP ${g.num}</td><td class="tc">${g.items.length}</td><td class="td-monto">${fmtUF(tot)}</td><td class="${estClass} tc">${est}</td><td class="tc">${fmtFecha(fecha)}</td></tr>`;
+                }).join('');
+            const tabEP = eps.length ? `
+<table class="dt">
+  <thead><tr><th>EP</th><th class="tc">Benef.</th><th>Monto UF</th><th class="tc">Estado</th><th class="tc">Fecha</th></tr></thead>
+  <tbody>${epRows}</tbody>
+  <tfoot><tr><td colspan="2"><strong>Total</strong></td><td class="td-monto"><strong>${fmtUF(totalEP)}</strong></td><td colspan="2"></td></tr></tfoot>
+</table>` : '<p class="no-data">Sin estados de pago registrados.</p>';
+
+            // TAB PAGOS M.O.
+            const moRows = pagos.slice().sort((a, b) => (b.fecha||'').localeCompare(a.fecha||'')).map(s => {
+                const b = BENEFICIARIOS_DATA.find(x => x.ID_Benef === s.ID_Benef);
+                const benNom = b ? `${b.NOMBRES} ${b.APELLIDOS}`.trim() || s.ID_Benef : s.ID_Benef;
+                return `<tr><td>${benNom}</td><td>${s.Familia_pago||'—'}</td><td>${s.Tipo_pago||'—'}</td><td class="td-monto">${fmtCLP(s.monto)}</td><td class="tc">${fmtFecha(s.fecha)}</td></tr>`;
+            }).join('');
+            const tabMO = pagos.length ? `
+<div class="mo-total">Total pagado M.O.: <strong>${fmtCLP(totalMO)}</strong> · ${pagos.length} registros</div>
+<table class="dt">
+  <thead><tr><th>Beneficiario</th><th>Familia</th><th>Tipo</th><th>Monto</th><th class="tc">Fecha</th></tr></thead>
+  <tbody>${moRows}</tbody>
+</table>` : '<p class="no-data">Sin pagos M.O. registrados.</p>';
+
+            // TAB GARANTÍAS
+            const garRows = gars.map(g => {
+                const venc = g.fecha_vcmto ? new Date(g.fecha_vcmto) : null;
+                const vencida = venc && venc < new Date();
+                return `<tr class="${vencida ? 'gar-vencida' : ''}"><td>${g.tipoCorto||g.tipo}</td><td>${g.num_bol||'—'}</td><td>${g.banco||'—'}</td><td class="td-monto">${fmtUF(g.monto_uf)}</td><td class="tc">${g.entidad||'—'}</td><td class="tc${vencida ? ' est-vencida' : ''}">${fmtFecha(g.fecha_vcmto)}${vencida ? ' ⚠' : ''}</td></tr>`;
+            }).join('');
+            const tabGar = gars.length ? `
+<table class="dt">
+  <thead><tr><th>Tipo</th><th>Nº Boleta</th><th>Banco</th><th>Monto UF</th><th class="tc">Entidad</th><th class="tc">Vencimiento</th></tr></thead>
+  <tbody>${garRows}</tbody>
+  <tfoot><tr><td colspan="3"><strong>Total garantías</strong></td><td class="td-monto"><strong>${fmtUF(totalGarUF)}</strong></td><td colspan="2"></td></tr></tfoot>
+</table>` : '<p class="no-data">Sin garantías vigentes.</p>';
+
+            return { idx, pid, nombre, comuna, tabResumen, tabEP, tabMO, tabGar };
+        });
+
+        const obraOptions = obrasSections.map(o => `<option value="${o.idx}">${o.nombre}${o.comuna ? ' — ' + o.comuna : ''}</option>`).join('');
+
+        const allContent = obrasSections.map(o => `
+<div class="obra-block" id="ob-${o.idx}" style="display:${o.idx===0?'block':'none'}">
+  <div class="obra-header"><span class="obra-pid">${o.pid}</span> ${o.nombre}${o.comuna ? '<span class="obra-comuna"> · '+o.comuna+'</span>' : ''}</div>
+  <div class="tabs-bar">
+    <button class="tab-btn active" onclick="switchTab(${o.idx},'resumen',this)">Resumen</button>
+    <button class="tab-btn" onclick="switchTab(${o.idx},'ep',this)">Estados de Pago</button>
+    <button class="tab-btn" onclick="switchTab(${o.idx},'mo',this)">Pagos M.O.</button>
+    <button class="tab-btn" onclick="switchTab(${o.idx},'gar',this)">Garantías</button>
+  </div>
+  <div class="tab-content">
+    <div class="tab-panel active" id="ob-${o.idx}-resumen">${o.tabResumen}</div>
+    <div class="tab-panel" id="ob-${o.idx}-ep">${o.tabEP}</div>
+    <div class="tab-panel" id="ob-${o.idx}-mo">${o.tabMO}</div>
+    <div class="tab-panel" id="ob-${o.idx}-gar">${o.tabGar}</div>
+  </div>
+</div>`).join('');
+
+        const css = `<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f4f8;color:#1e293b;min-height:100vh;}
+.top-bar{background:#0f172a;color:#fff;padding:12px 24px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;position:sticky;top:0;z-index:100;box-shadow:0 2px 10px rgba(0,0,0,.4);}
+.top-bar h1{font-size:15px;font-weight:700;letter-spacing:.3px;white-space:nowrap;}
+.top-bar select{background:#1e293b;color:#fff;border:1px solid #334155;border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;max-width:420px;}
+.top-bar .meta{font-size:10px;color:#64748b;margin-left:auto;white-space:nowrap;}
+.main{max-width:980px;margin:24px auto;padding:0 16px 60px;}
+.obra-block{background:#fff;border-radius:12px;box-shadow:0 2px 14px rgba(0,0,0,.08);overflow:hidden;}
+.obra-header{background:#1e293b;color:#fff;padding:12px 20px;font-size:14px;font-weight:700;}
+.obra-pid{display:inline-block;background:#3b82f6;color:#fff;font-size:10px;font-weight:800;padding:2px 7px;border-radius:4px;margin-right:8px;letter-spacing:.5px;}
+.obra-comuna{color:#94a3b8;font-weight:400;font-size:12px;}
+.tabs-bar{display:flex;background:#0f172a;padding:0 16px;gap:2px;}
+.tab-btn{background:none;border:none;color:#94a3b8;font-size:12px;font-weight:600;padding:11px 16px;cursor:pointer;border-bottom:3px solid transparent;transition:all .15s;}
+.tab-btn.active{color:#fff;border-bottom-color:#3b82f6;}
+.tab-btn:hover:not(.active){color:#e2e8f0;}
+.tab-content{padding:0;}
+.tab-panel{display:none;padding:22px;}
+.tab-panel.active{display:block;}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:18px;}
+.kpi-card{padding:14px 16px;border-radius:10px;border:1px solid #e2e8f0;}
+.kpi-total{background:#eff6ff;border-color:#bfdbfe;}
+.kpi-pagado{background:#f0fdf4;border-color:#bbf7d0;}
+.kpi-ingresado{background:#fefce8;border-color:#fde68a;}
+.kpi-pendiente{background:#fff1f2;border-color:#fecdd3;}
+.kpi-lbl{font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;}
+.kpi-val{font-size:17px;font-weight:700;color:#0f172a;font-family:monospace;margin-bottom:3px;}
+.kpi-sub{font-size:10px;color:#94a3b8;}
+.prog-wrap{background:#e2e8f0;border-radius:99px;height:8px;margin-bottom:14px;position:relative;}
+.prog-bar{background:linear-gradient(90deg,#16a34a,#4ade80);height:100%;border-radius:99px;}
+.prog-label{position:absolute;right:0;top:-17px;font-size:10px;font-weight:700;color:#16a34a;}
+.gar-summary{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-top:14px;border-top:1px solid #f1f5f9;}
+.gar-item{font-size:12px;color:#475569;}
+.gar-item.sep{color:#cbd5e1;}
+.dt{width:100%;border-collapse:collapse;font-size:12px;}
+.dt th{background:#f8fafc;color:#475569;font-weight:700;padding:8px 11px;text-align:left;border-bottom:2px solid #e2e8f0;font-size:10px;text-transform:uppercase;letter-spacing:.4px;}
+.dt td{padding:7px 11px;border-bottom:1px solid #f1f5f9;color:#334155;}
+.dt tr:hover td{background:#f8fafc;}
+.dt tfoot td{background:#f1f5f9;border-top:2px solid #e2e8f0;font-size:12px;}
+.td-monto{text-align:right;font-family:monospace;font-size:11px;}
+.td-ep{font-weight:700;color:#1e40af;}
+.tc{text-align:center;}
+.est-pagado{color:#15803d;font-weight:700;}
+.est-ingresado{color:#b45309;font-weight:600;}
+.est-otro{color:#4f46e5;font-weight:600;}
+.est-vencida{color:#dc2626;font-weight:700;}
+.gar-vencida td{background:#fff1f2!important;}
+.mo-total{font-size:12px;margin-bottom:12px;padding:9px 13px;background:#f8fafc;border-radius:7px;border:1px solid #e2e8f0;color:#1e293b;}
+.no-data{color:#94a3b8;font-size:13px;text-align:center;padding:48px;font-style:italic;}
+</style>`;
+
+        const js = `<script>
+function switchObra(idx){
+  document.querySelectorAll('.obra-block').forEach((el,i)=>{el.style.display=i===idx?'block':'none';});
+}
+function switchTab(obraIdx,tab,btn){
+  var panels=document.querySelectorAll('#ob-'+obraIdx+' .tab-panel');
+  var btns=document.querySelectorAll('#ob-'+obraIdx+' .tab-btn');
+  var ids=['resumen','ep','mo','gar'];
+  ids.forEach(function(t,i){
+    panels[i].classList.toggle('active',t===tab);
+    btns[i].classList.toggle('active',t===tab);
+  });
+}
+<\/script>`;
+
+        const fecha = new Date().toLocaleDateString('es-CL');
+        const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Estados de Pago — Multi Obras</title>${css}</head><body>
+<div class="top-bar">
+  <h1>&#128196; Estados de Pago — Multi Obras</h1>
+  <select onchange="switchObra(parseInt(this.value))">${obraOptions}</select>
+  <span class="meta">${obras.length} obras &middot; ${fecha}</span>
+</div>
+<div class="main">${allContent}</div>
+${js}</body></html>`;
+
+        const fname = `EstadosPago_MultiObras_${new Date().toISOString().substring(0,10)}.html`;
+        const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = fname;
+        document.body.appendChild(a); a.click(); a.remove();
+        const w = window.open(url, '_blank');
+        if (!w) alert('Archivo descargado: ' + fname);
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+    };
+
     // Version HTML autocontenida con menu inferior para navegar entre paginas (portada + 1 por grupo)
     const generarInformeNavegable = () => {
         const inf = construirInforme();
@@ -5820,6 +6032,14 @@ ${viewerCss}</style>
                     >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
                         Reporte Ejecutivo HTML
+                    </button>
+                    <button
+                        onClick={generarEstadosPagoHTML}
+                        className="flex items-center gap-2 px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors"
+                        title="Descarga HTML con todos los estados de pago, garantías y pagos M.O. por obra (selector de obra + tabs)"
+                    >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                        Estados de Pago HTML
                     </button>
                 </div>
             </div>
