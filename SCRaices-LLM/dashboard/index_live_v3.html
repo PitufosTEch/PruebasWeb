@@ -6295,12 +6295,13 @@ ${viewerCss}</style>
 
 // ===== CONSTANTES GLOBALES DE PERSONAL E INFORMES =====
 const ROLES_PERSONAL = [
-    { key: 'capataz',      label: 'Capataz' },
-    { key: 'residente',    label: 'Residente' },
-    { key: 'gerente',      label: 'Gerente' },
-    { key: 'coordinador',  label: 'Coordinador' },
-    { key: 'logistica',    label: 'Logística' },
-    { key: 'rrhh',         label: 'Recursos Humanos' },
+    { key: 'capataz',            label: 'Capataz' },
+    { key: 'residente',          label: 'Residente' },
+    { key: 'gerente',            label: 'Gerente' },
+    { key: 'coordinador',        label: 'Coordinador' },
+    { key: 'coordinador_pagos',  label: 'Coordinador de pagos' },
+    { key: 'logistica',          label: 'Logística' },
+    { key: 'rrhh',               label: 'Recursos Humanos' },
 ];
 
 const INFORME_TIPOS = [
@@ -6352,7 +6353,7 @@ const ModalPersonalGlobal = ({ personalGlobal, fbDB, onClose }) => {
         fbDB.ref(`personal_global/${key}/informes`).set(nuevos.length > 0 ? nuevos : null);
     };
 
-    const ROLES_MAP = { capataz:'Capataz', residente:'Residente', gerente:'Gerente', coordinador:'Coordinador', logistica:'Logística', rrhh:'Recursos Humanos' };
+    const ROLES_MAP = { capataz:'Capataz', residente:'Residente', gerente:'Gerente', coordinador:'Coordinador', coordinador_pagos:'Coordinador de pagos', logistica:'Logística', rrhh:'Recursos Humanos' };
     const rolesPresentes = [...new Set(lista.map(([,p]) => p.rol))].sort();
 
     return (
@@ -6997,7 +6998,7 @@ const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel, personal
 
                     {/* === ROLES GLOBALES (sin requisito de asignación a obra) === */}
                     {(() => {
-                        const ROLES_GLOB_KEYS = ['gerente','coordinador','logistica','rrhh'];
+                        const ROLES_GLOB_KEYS = ['gerente','coordinador','coordinador_pagos','logistica','rrhh'];
                         const globales = Object.entries(personalGlobal || {}).filter(([,p]) => ROLES_GLOB_KEYS.includes(p.rol));
                         if (globales.length === 0) return null;
                         return (
@@ -7052,7 +7053,7 @@ const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel, personal
                                         <option value="">— Seleccionar —</option>
                                         {Object.entries(personalGlobal || {})
                                             .filter(([gk, persona]) => {
-                                                const ROLES_GLOB_KEYS = ['gerente','coordinador','logistica','rrhh'];
+                                                const ROLES_GLOB_KEYS = ['gerente','coordinador','coordinador_pagos','logistica','rrhh'];
                                                 if (ROLES_GLOB_KEYS.includes(persona.rol)) return false; // globales no necesitan asignación
                                                 return !personalProy.some(([,p]) => p.global_key === gk);
                                             })
