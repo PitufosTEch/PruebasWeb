@@ -5434,53 +5434,61 @@ ${js}</body></html>`;
         if (!obras.length) { alert('Sin obras en ejecución.'); return; }
 
         const fmtUF = (v) => (Math.round((v||0) * 100) / 100).toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' UF';
-        const fmtCLP = (v) => (Math.round(v||0)).toLocaleString('es-CL') + ' $';
         const fmtFecha = (d) => {
             if (!d) return '—';
             const s = String(d).substring(0, 10);
-            if (!s || s === '—') return '—';
             const parts = s.split('-');
-            if (parts.length !== 3) return s;
-            return `${parts[2]}/${parts[1]}/${parts[0]}`;
+            return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : s;
         };
 
-        const obrasSections = obras.map((proy, idx) => {
+        // Pre-generar todo el contenido de tabs por obra (sin DOM queries en tiempo de render)
+        const allSections = obras.map(proy => {
             const pid = proy.ID_proy;
             const nombre = proy.NOMBRE_PROYECTO || pid;
             const comuna = proy.COMUNA || '';
 
-            const montos = MONTOS_PROY_DATA[pid] || { total: 0, viviendas: 0 };
-            const eps = EEPP_DATA.filter(ep => ep.ID_Proy === pid);
-            const benefIds = new Set(BENEFICIARIOS_DATA.filter(b => b.ID_Proy === pid).map(b => b.ID_Benef));
-            const pagos = SOLPAGO_DATA.filter(s => benefIds.has(s.ID_Benef));
-            const gars = GARANTIAS_DATA.filter(g => g.ID_Proy === pid);
+            const montos    = MONTOS_PROY_DATA[pid] || { total: 0, viviendas: 0 };
+            const eps       = EEPP_DATA.filter(ep => ep.ID_Proy === pid);
+            const gars      = GARANTIAS_DATA.filter(g => g.ID_Proy === pid);
 
-            const sumByEstado = (...estados) => eps.filter(e => estados.some(st => e.Estado.toLowerCase().includes(st))).reduce((a, e) => a + e.Monto, 0);
-            const totalPagado   = sumByEstado('pagado');
-            const totalIngresado= sumByEstado('ingresado');
-            const totalAprobado = sumByEstado('aprobado');
-            const totalEP       = eps.reduce((a, e) => a + e.Monto, 0);
-            const totalPorCobrar= montos.total;
-            const pctAvance     = totalPorCobrar > 0 ? Math.min(100, Math.round(totalPagado / totalPorCobrar * 1000) / 10) : 0;
-            const totalGarUF    = gars.reduce((a, g) => a + g.monto_uf, 0);
-            const totalMO       = pagos.reduce((a, s) => a + s.monto, 0);
+            const sumByEstado = (...kw) => eps.filter(e => kw.some(k => e.Estado.toLowerCase().includes(k))).reduce((a,e) => a + e.Monto, 0);
+            const totalPagado    = sumByEstado('pagado');
+            const totalIngresado = sumByEstado('ingresado');
+            const totalAprobado  = sumByEstado('aprobado');
+            const totalEP        = eps.reduce((a,e) => a + e.Monto, 0);
+            const totalContrato  = montos.total;
+            const pctCobrado     = totalContrato > 0 ? Math.min(100, Math.round(totalPagado / totalContrato * 1000) / 10) : 0;
+            const pctEmitido     = totalContrato > 0 ? Math.min(100, Math.round(totalEP / totalContrato * 1000) / 10) : 0;
+            const totalGarUF     = gars.reduce((a,g) => a + g.monto_uf, 0);
+            const epPendientes   = eps.filter(e => !e.Estado.toLowerCase().includes('pagado')).length;
 
-            // TAB RESUMEN
-            const tabResumen = `
-<div class="kpi-grid">
-  <div class="kpi-card kpi-total"><div class="kpi-lbl">Total por cobrar</div><div class="kpi-val">${fmtUF(totalPorCobrar)}</div><div class="kpi-sub">${montos.viviendas} viviendas</div></div>
-  <div class="kpi-card kpi-pagado"><div class="kpi-lbl">Pagado</div><div class="kpi-val">${fmtUF(totalPagado)}</div><div class="kpi-sub">${pctAvance}% del total</div></div>
-  <div class="kpi-card kpi-ingresado"><div class="kpi-lbl">En tramitación</div><div class="kpi-val">${fmtUF(totalIngresado + totalAprobado)}</div><div class="kpi-sub">${eps.filter(e => !e.Estado.toLowerCase().includes('pagado')).length} EP pendientes</div></div>
-  <div class="kpi-card kpi-pendiente"><div class="kpi-lbl">Por facturar</div><div class="kpi-val">${fmtUF(Math.max(0, totalPorCobrar - totalEP))}</div><div class="kpi-sub">${eps.length} EP emitidos</div></div>
+            // ── TAB RESUMEN ──────────────────────────────────────────────────
+            // Siempre muestra datos del contrato aunque no haya EP ejecutado
+            const barCol = pctCobrado >= 80 ? '#16a34a' : pctCobrado >= 40 ? '#2563eb' : pctCobrado > 0 ? '#f59e0b' : '#94a3b8';
+            const resumen = `
+<div class="breadcrumb">Obra <strong>${nombre}</strong>${comuna ? ' · ' + comuna : ''} · Estado General</div>
+<h3 class="sec-h3">&#128209; Datos del Contrato</h3>
+<div class="summary-grid">
+  <div class="summary-card sc-blue"><div class="summary-card-label">Total Contrato</div><div class="summary-card-value">${fmtUF(totalContrato)}</div><div class="summary-card-detail">${montos.viviendas} viviendas</div></div>
+  <div class="summary-card sc-green"><div class="summary-card-label">Cobrado (Pagado)</div><div class="summary-card-value" style="color:${barCol};">${fmtUF(totalPagado)}</div><div class="summary-card-detail">${pctCobrado}% del contrato</div></div>
+  <div class="summary-card sc-yellow"><div class="summary-card-label">En tramitación</div><div class="summary-card-value">${fmtUF(totalIngresado + totalAprobado)}</div><div class="summary-card-detail">${epPendientes} EP pendientes</div></div>
+  <div class="summary-card sc-red"><div class="summary-card-label">Por facturar</div><div class="summary-card-value">${fmtUF(Math.max(0, totalContrato - totalEP))}</div><div class="summary-card-detail">${eps.length} EP emitidos · ${pctEmitido}% del total</div></div>
 </div>
-<div class="prog-wrap"><div class="prog-bar" style="width:${pctAvance}%"></div><span class="prog-label">${pctAvance}%</span></div>
-<div class="gar-summary">
-  <span class="gar-item">Garantías vigentes: <strong>${gars.length}</strong> · <strong>${fmtUF(totalGarUF)}</strong></span>
-  <span class="gar-item sep">|</span>
-  <span class="gar-item">Pagos M.O.: <strong>${fmtCLP(totalMO)}</strong></span>
-</div>`;
+<div style="margin:4px 0 6px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;"><span>0%</span><span style="font-weight:700;color:${barCol};">${pctCobrado}% cobrado</span><span>100%</span></div>
+<div style="background:#e5e7eb;border-radius:6px;height:12px;overflow:hidden;margin-bottom:18px;">
+  <div style="height:100%;width:${pctEmitido}%;background:#bfdbfe;border-radius:6px;position:relative;">
+    <div style="height:100%;width:${totalEP>0?Math.round(totalPagado/totalEP*100):0}%;background:${barCol};border-radius:6px;"></div>
+  </div>
+</div>
+<h3 class="sec-h3">&#128274; Garantías del Proyecto</h3>
+${gars.length ? `<div class="summary-grid">${gars.map(g => {
+  const venc = g.fecha_vcmto ? new Date(g.fecha_vcmto) : null;
+  const vencida = venc && venc < new Date();
+  return `<div class="summary-card${vencida ? ' sc-vencida' : ''}"><div class="summary-card-label">${g.tipoCorto||g.tipo} · ${g.entidad}</div><div class="summary-card-value" style="font-size:14px;">${fmtUF(g.monto_uf)}</div><div class="summary-card-detail">${g.banco||'—'} · Vcto: ${fmtFecha(g.fecha_vcmto)}${vencida?' ⚠':''}</div></div>`;
+}).join('')}</div>
+<div style="font-size:11px;color:#475569;margin-top:6px;">Total garantías: <strong>${fmtUF(totalGarUF)}</strong> · ${gars.length} boleta${gars.length!==1?'s':''}</div>` : '<p style="color:#94a3b8;font-size:12px;font-style:italic;padding:10px 0;">Sin garantías vigentes registradas.</p>'}`;
 
-            // TAB EP
+            // ── TAB ESTADOS DE PAGO ──────────────────────────────────────────
             const epByNum = {};
             eps.forEach(ep => {
                 const k = String(ep.Num_EP || '—');
@@ -5488,109 +5496,80 @@ ${js}</body></html>`;
                 epByNum[k].items.push(ep);
             });
             const epRows = Object.values(epByNum)
-                .sort((a, b) => { const na = parseFloat(a.num)||0, nb = parseFloat(b.num)||0; return na - nb; })
+                .sort((a,b) => (parseFloat(a.num)||0) - (parseFloat(b.num)||0))
                 .map(g => {
-                    const tot = g.items.reduce((a, e) => a + e.Monto, 0);
+                    const tot = g.items.reduce((a,e) => a + e.Monto, 0);
                     const est = g.items[0].Estado;
                     const fecha = g.items.map(e => e.Fecha).filter(Boolean).sort().slice(-1)[0] || '';
-                    const estLower = est.toLowerCase();
-                    const estClass = estLower.includes('pagado') ? 'est-pagado' : estLower.includes('ingresado') ? 'est-ingresado' : 'est-otro';
-                    return `<tr><td class="td-ep">EP ${g.num}</td><td class="tc">${g.items.length}</td><td class="td-monto">${fmtUF(tot)}</td><td class="${estClass} tc">${est}</td><td class="tc">${fmtFecha(fecha)}</td></tr>`;
+                    const estL = est.toLowerCase();
+                    const ecls = estL.includes('pagado') ? 'est-pagado' : estL.includes('ingresado') ? 'est-ingresado' : 'est-otro';
+                    return `<tr><td class="td-ep">EP ${g.num}</td><td class="tc">${g.items.length}</td><td class="td-monto">${fmtUF(tot)}</td><td class="${ecls} tc">${est}</td><td class="tc">${fmtFecha(fecha)}</td></tr>`;
                 }).join('');
-            const tabEP = eps.length ? `
-<table class="dt">
-  <thead><tr><th>EP</th><th class="tc">Benef.</th><th>Monto UF</th><th class="tc">Estado</th><th class="tc">Fecha</th></tr></thead>
-  <tbody>${epRows}</tbody>
-  <tfoot><tr><td colspan="2"><strong>Total</strong></td><td class="td-monto"><strong>${fmtUF(totalEP)}</strong></td><td colspan="2"></td></tr></tfoot>
-</table>` : '<p class="no-data">Sin estados de pago registrados.</p>';
+            const ep = eps.length
+                ? `<div class="breadcrumb">Obra <strong>${nombre}</strong> · Estados de Pago (${eps.length} EP · ${fmtUF(totalEP)} total)</div>
+<table class="dt"><thead><tr><th>EP</th><th class="tc">Benef.</th><th>Monto UF</th><th class="tc">Estado</th><th class="tc">Fecha</th></tr></thead>
+<tbody>${epRows}</tbody>
+<tfoot><tr><td colspan="2"><strong>Total emitido</strong></td><td class="td-monto"><strong>${fmtUF(totalEP)}</strong></td><td class="tc est-pagado"><strong>${fmtUF(totalPagado)}</strong></td><td class="tc" style="font-size:10px;color:#94a3b8;">pagado</td></tr></tfoot></table>`
+                : `<div class="breadcrumb">Obra <strong>${nombre}</strong> · Estados de Pago</div><p class="no-data">Sin estados de pago emitidos.<br><small>Contrato total: ${fmtUF(totalContrato)} · ${montos.viviendas} viviendas</small></p>`;
 
-            // TAB PAGOS M.O.
-            const moRows = pagos.slice().sort((a, b) => (b.fecha||'').localeCompare(a.fecha||'')).map(s => {
-                const b = BENEFICIARIOS_DATA.find(x => x.ID_Benef === s.ID_Benef);
-                const benNom = b ? `${b.NOMBRES} ${b.APELLIDOS}`.trim() || s.ID_Benef : s.ID_Benef;
-                return `<tr><td>${benNom}</td><td>${s.Familia_pago||'—'}</td><td>${s.Tipo_pago||'—'}</td><td class="td-monto">${fmtCLP(s.monto)}</td><td class="tc">${fmtFecha(s.fecha)}</td></tr>`;
-            }).join('');
-            const tabMO = pagos.length ? `
-<div class="mo-total">Total pagado M.O.: <strong>${fmtCLP(totalMO)}</strong> · ${pagos.length} registros</div>
-<table class="dt">
-  <thead><tr><th>Beneficiario</th><th>Familia</th><th>Tipo</th><th>Monto</th><th class="tc">Fecha</th></tr></thead>
-  <tbody>${moRows}</tbody>
-</table>` : '<p class="no-data">Sin pagos M.O. registrados.</p>';
-
-            // TAB GARANTÍAS
+            // ── TAB GARANTÍAS ────────────────────────────────────────────────
             const garRows = gars.map(g => {
                 const venc = g.fecha_vcmto ? new Date(g.fecha_vcmto) : null;
                 const vencida = venc && venc < new Date();
-                return `<tr class="${vencida ? 'gar-vencida' : ''}"><td>${g.tipoCorto||g.tipo}</td><td>${g.num_bol||'—'}</td><td>${g.banco||'—'}</td><td class="td-monto">${fmtUF(g.monto_uf)}</td><td class="tc">${g.entidad||'—'}</td><td class="tc${vencida ? ' est-vencida' : ''}">${fmtFecha(g.fecha_vcmto)}${vencida ? ' ⚠' : ''}</td></tr>`;
+                return `<tr class="${vencida?'gar-vencida':''}"><td>${g.tipoCorto||g.tipo}</td><td>${g.num_bol||'—'}</td><td>${g.banco||'—'}</td><td class="td-monto">${fmtUF(g.monto_uf)}</td><td class="tc">${g.entidad||'—'}</td><td class="tc${vencida?' est-vencida':''}">${fmtFecha(g.fecha_vcmto)}${vencida?' ⚠':''}</td></tr>`;
             }).join('');
-            const tabGar = gars.length ? `
-<table class="dt">
-  <thead><tr><th>Tipo</th><th>Nº Boleta</th><th>Banco</th><th>Monto UF</th><th class="tc">Entidad</th><th class="tc">Vencimiento</th></tr></thead>
-  <tbody>${garRows}</tbody>
-  <tfoot><tr><td colspan="3"><strong>Total garantías</strong></td><td class="td-monto"><strong>${fmtUF(totalGarUF)}</strong></td><td colspan="2"></td></tr></tfoot>
-</table>` : '<p class="no-data">Sin garantías vigentes.</p>';
+            const gar = gars.length
+                ? `<div class="breadcrumb">Obra <strong>${nombre}</strong> · Garantías vigentes (${gars.length} boletas · ${fmtUF(totalGarUF)})</div>
+<table class="dt"><thead><tr><th>Tipo</th><th>Nº Boleta</th><th>Banco</th><th>Monto UF</th><th class="tc">Entidad</th><th class="tc">Vencimiento</th></tr></thead>
+<tbody>${garRows}</tbody>
+<tfoot><tr><td colspan="3"><strong>Total garantías</strong></td><td class="td-monto"><strong>${fmtUF(totalGarUF)}</strong></td><td colspan="2"></td></tr></tfoot></table>`
+                : `<div class="breadcrumb">Obra <strong>${nombre}</strong> · Garantías</div><p class="no-data">Sin garantías vigentes.</p>`;
 
-            return { idx, pid, nombre, comuna, tabResumen, tabEP, tabMO, tabGar };
+            return { resumen, ep, gar };
         });
 
-        const obraOptions = obrasSections.map(o => `<option value="${o.idx}">${o.nombre}${o.comuna ? ' — ' + o.comuna : ''}</option>`).join('');
+        const opts = obras.map((o,i) => `<option value="${i}">${o.ID_proy} · ${o.NOMBRE_PROYECTO}${o.COMUNA?' — '+o.COMUNA:''}</option>`).join('');
 
-        const allContent = obrasSections.map(o => `
-<div class="obra-block" id="ob-${o.idx}" style="display:${o.idx===0?'block':'none'}">
-  <div class="obra-header"><span class="obra-pid">${o.pid}</span> ${o.nombre}${o.comuna ? '<span class="obra-comuna"> · '+o.comuna+'</span>' : ''}</div>
-  <div class="tabs-bar">
-    <button class="tab-btn active" onclick="switchTab(${o.idx},'resumen',this)">Resumen</button>
-    <button class="tab-btn" onclick="switchTab(${o.idx},'ep',this)">Estados de Pago</button>
-    <button class="tab-btn" onclick="switchTab(${o.idx},'mo',this)">Pagos M.O.</button>
-    <button class="tab-btn" onclick="switchTab(${o.idx},'gar',this)">Garantías</button>
-  </div>
-  <div class="tab-content">
-    <div class="tab-panel active" id="ob-${o.idx}-resumen">${o.tabResumen}</div>
-    <div class="tab-panel" id="ob-${o.idx}-ep">${o.tabEP}</div>
-    <div class="tab-panel" id="ob-${o.idx}-mo">${o.tabMO}</div>
-    <div class="tab-panel" id="ob-${o.idx}-gar">${o.tabGar}</div>
-  </div>
-</div>`).join('');
-
-        const css = `<style>
+        const cssEP = `<style>
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f4f8;color:#1e293b;min-height:100vh;}
-.top-bar{background:#0f172a;color:#fff;padding:12px 24px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;position:sticky;top:0;z-index:100;box-shadow:0 2px 10px rgba(0,0,0,.4);}
-.top-bar h1{font-size:15px;font-weight:700;letter-spacing:.3px;white-space:nowrap;}
-.top-bar select{background:#1e293b;color:#fff;border:1px solid #334155;border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;max-width:420px;}
-.top-bar .meta{font-size:10px;color:#64748b;margin-left:auto;white-space:nowrap;}
-.main{max-width:980px;margin:24px auto;padding:0 16px 60px;}
-.obra-block{background:#fff;border-radius:12px;box-shadow:0 2px 14px rgba(0,0,0,.08);overflow:hidden;}
-.obra-header{background:#1e293b;color:#fff;padding:12px 20px;font-size:14px;font-weight:700;}
-.obra-pid{display:inline-block;background:#3b82f6;color:#fff;font-size:10px;font-weight:800;padding:2px 7px;border-radius:4px;margin-right:8px;letter-spacing:.5px;}
-.obra-comuna{color:#94a3b8;font-weight:400;font-size:12px;}
-.tabs-bar{display:flex;background:#0f172a;padding:0 16px;gap:2px;}
-.tab-btn{background:none;border:none;color:#94a3b8;font-size:12px;font-weight:600;padding:11px 16px;cursor:pointer;border-bottom:3px solid transparent;transition:all .15s;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f4f8;color:#1a1a2e;font-size:14px;}
+.multi-container{max-width:980px;margin:0 auto;padding:0 0 40px;}
+.header{background:#0f172a;color:#fff;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+.header h1{font-size:16px;font-weight:700;}
+.header-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.header-controls label{font-size:12px;color:#94a3b8;}
+.header-controls select{background:#1e293b;color:#fff;border:1px solid #334155;border-radius:6px;padding:6px 10px;font-size:12px;cursor:pointer;max-width:380px;}
+.tabs{background:#1e293b;display:flex;padding:0 24px;gap:2px;}
+.tab-btn{background:none;border:none;color:#94a3b8;font-size:12px;font-weight:600;padding:11px 18px;cursor:pointer;border-bottom:3px solid transparent;}
 .tab-btn.active{color:#fff;border-bottom-color:#3b82f6;}
 .tab-btn:hover:not(.active){color:#e2e8f0;}
-.tab-content{padding:0;}
-.tab-panel{display:none;padding:22px;}
-.tab-panel.active{display:block;}
-.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:18px;}
-.kpi-card{padding:14px 16px;border-radius:10px;border:1px solid #e2e8f0;}
-.kpi-total{background:#eff6ff;border-color:#bfdbfe;}
-.kpi-pagado{background:#f0fdf4;border-color:#bbf7d0;}
-.kpi-ingresado{background:#fefce8;border-color:#fde68a;}
-.kpi-pendiente{background:#fff1f2;border-color:#fecdd3;}
-.kpi-lbl{font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;}
-.kpi-val{font-size:17px;font-weight:700;color:#0f172a;font-family:monospace;margin-bottom:3px;}
-.kpi-sub{font-size:10px;color:#94a3b8;}
-.prog-wrap{background:#e2e8f0;border-radius:99px;height:8px;margin-bottom:14px;position:relative;}
-.prog-bar{background:linear-gradient(90deg,#16a34a,#4ade80);height:100%;border-radius:99px;}
-.prog-label{position:absolute;right:0;top:-17px;font-size:10px;font-weight:700;color:#16a34a;}
-.gar-summary{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-top:14px;border-top:1px solid #f1f5f9;}
-.gar-item{font-size:12px;color:#475569;}
-.gar-item.sep{color:#cbd5e1;}
+.content{background:#fff;min-height:380px;}
+.section{display:none;padding:24px;}
+.section.active{display:block;}
+.footer{background:#f8fafc;border-top:1px solid #e2e8f0;padding:12px 24px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;}
+.btn{padding:8px 14px;border:1px solid #d1d5db;border-radius:6px;background:#fff;cursor:pointer;font-size:12px;font-weight:600;color:#374151;}
+.btn:hover{background:#f3f4f6;}
+.btn-pdf{background:#0f172a;color:#fff;border-color:#0f172a;}
+.btn-pdf:hover{background:#1e293b;}
+.breadcrumb{font-size:12px;color:#94a3b8;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid #e8e8e8;}
+.breadcrumb strong{color:#0f172a;}
+.sec-h3{font-size:13px;font-weight:700;color:#1e293b;margin:20px 0 10px;padding-bottom:6px;border-bottom:1px solid #e2e8f0;}
+.sec-h3:first-child{margin-top:0;}
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:14px;}
+.summary-card{padding:13px 15px;border-radius:8px;border:1px solid #e2e8f0;background:#f8fafc;}
+.sc-blue{background:#eff6ff;border-color:#bfdbfe;}
+.sc-green{background:#f0fdf4;border-color:#bbf7d0;}
+.sc-yellow{background:#fefce8;border-color:#fde68a;}
+.sc-red{background:#fff1f2;border-color:#fecdd3;}
+.sc-vencida{background:#fff1f2;border-color:#fca5a5;}
+.summary-card-label{font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;}
+.summary-card-value{font-size:16px;font-weight:700;color:#0f172a;font-family:monospace;margin-bottom:3px;}
+.summary-card-detail{font-size:10px;color:#94a3b8;}
 .dt{width:100%;border-collapse:collapse;font-size:12px;}
-.dt th{background:#f8fafc;color:#475569;font-weight:700;padding:8px 11px;text-align:left;border-bottom:2px solid #e2e8f0;font-size:10px;text-transform:uppercase;letter-spacing:.4px;}
-.dt td{padding:7px 11px;border-bottom:1px solid #f1f5f9;color:#334155;}
+.dt th{background:#f8fafc;color:#475569;font-weight:700;padding:9px 11px;text-align:left;border-bottom:2px solid #e2e8f0;font-size:10px;text-transform:uppercase;position:sticky;top:0;}
+.dt td{padding:8px 11px;border-bottom:1px solid #f1f5f9;color:#334155;}
 .dt tr:hover td{background:#f8fafc;}
-.dt tfoot td{background:#f1f5f9;border-top:2px solid #e2e8f0;font-size:12px;}
+.dt tfoot td{background:#f1f5f9;border-top:2px solid #e2e8f0;font-weight:600;}
 .td-monto{text-align:right;font-family:monospace;font-size:11px;}
 .td-ep{font-weight:700;color:#1e40af;}
 .tc{text-align:center;}
@@ -5599,37 +5578,52 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .est-otro{color:#4f46e5;font-weight:600;}
 .est-vencida{color:#dc2626;font-weight:700;}
 .gar-vencida td{background:#fff1f2!important;}
-.mo-total{font-size:12px;margin-bottom:12px;padding:9px 13px;background:#f8fafc;border-radius:7px;border:1px solid #e2e8f0;color:#1e293b;}
-.no-data{color:#94a3b8;font-size:13px;text-align:center;padding:48px;font-style:italic;}
+.no-data{color:#94a3b8;font-size:13px;text-align:center;padding:48px;font-style:italic;line-height:1.8;}
+@media print{.footer{display:none;}.section{display:block!important;page-break-after:always;}}
 </style>`;
 
-        const js = `<script>
-function switchObra(idx){
-  document.querySelectorAll('.obra-block').forEach((el,i)=>{el.style.display=i===idx?'block':'none';});
-}
-function switchTab(obraIdx,tab,btn){
-  var panels=document.querySelectorAll('#ob-'+obraIdx+' .tab-panel');
-  var btns=document.querySelectorAll('#ob-'+obraIdx+' .tab-btn');
-  var ids=['resumen','ep','mo','gar'];
-  ids.forEach(function(t,i){
-    panels[i].classList.toggle('active',t===tab);
-    btns[i].classList.toggle('active',t===tab);
-  });
-}
-<\/script>`;
+        const jsOpen = '<scr'+'ipt>';
+        const jsClose = '<\/scr'+'ipt>';
+        const jsEP = jsOpen + `
+const secs=${JSON.stringify(allSections)};
+let idx=0;
+function cambiar(i){idx=Math.max(0,Math.min(${obras.length-1},i));document.getElementById('obra-sel').value=idx;mostrar('resumen');}
+function mostrar(t){document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.tabs .tab-btn').forEach(b=>b.classList.remove('active'));document.getElementById('sec-'+t).classList.add('active');event.target.classList.add('active');document.getElementById('sec-'+t).innerHTML=secs[idx][t];}
+` + jsClose;
 
-        const fecha = new Date().toLocaleDateString('es-CL');
-        const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Estados de Pago — Multi Obras</title>${css}</head><body>
-<div class="top-bar">
-  <h1>&#128196; Estados de Pago — Multi Obras</h1>
-  <select onchange="switchObra(parseInt(this.value))">${obraOptions}</select>
-  <span class="meta">${obras.length} obras &middot; ${fecha}</span>
+        const secsHTML = ['resumen','ep','gar'].map(t =>
+            `<div class="section${t==='resumen'?' active':''}" id="sec-${t}">${allSections[0][t]||''}</div>`
+        ).join('');
+
+        const htmlEP = `<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Estados de Pago — Multi Obras</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+${cssEP}</head><body>
+<div class="multi-container">
+  <div class="header">
+    <h1>&#128200; Estados de Pago — Multi Obras</h1>
+    <div class="header-controls">
+      <label>Seleccionar obra:</label>
+      <select id="obra-sel" onchange="cambiar(parseInt(this.value))">${opts}</select>
+    </div>
+  </div>
+  <div class="tabs">
+    <button class="tab-btn active" onclick="mostrar('resumen')">Resumen</button>
+    <button class="tab-btn" onclick="mostrar('ep')">Estados de Pago</button>
+    <button class="tab-btn" onclick="mostrar('gar')">Garantías</button>
+  </div>
+  <div class="content">${secsHTML}</div>
+  <div class="footer">
+    <button class="btn" onclick="cambiar(idx-1)">&#8592; Anterior</button>
+    <button class="btn" onclick="cambiar(idx+1)">Siguiente &#8594;</button>
+    <button class="btn btn-pdf" onclick="window.print()">&#128196; Imprimir / PDF</button>
+  </div>
 </div>
-<div class="main">${allContent}</div>
-${js}</body></html>`;
+${jsEP}</body></html>`;
 
         const fname = `EstadosPago_MultiObras_${new Date().toISOString().substring(0,10)}.html`;
-        const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+        const blob = new Blob([htmlEP], { type: 'text/html;charset=utf-8' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a'); a.href = url; a.download = fname;
         document.body.appendChild(a); a.click(); a.remove();
