@@ -4023,6 +4023,11 @@ const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios
     const [filtro, setFiltro] = React.useState("todas"); // todas | pendientes | recepcionadas
     const [grupoColapsado, setGrupoColapsado] = React.useState({}); // {grupoId: true/false}
     const [showCapatazMenu, setShowCapatazMenu] = React.useState(false);
+    const [avanceGanttData, setAvanceGanttData] = React.useState({});
+    React.useEffect(() => {
+        fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/avance_gantt.json')
+            .then(r => r.json()).then(d => setAvanceGanttData(d || {})).catch(() => {});
+    }, []);
 
     // ── Generador de Informe PDF Semanal ─────────────────────────────────────
     // Computa todas las piezas del informe (compartido por el PDF y la version HTML navegable)
@@ -4044,6 +4049,10 @@ const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios
         // Terminada = tiene Recepcion Definitiva (RF), no por % de avance/inspeccion.
         const terminadas = viviendas.filter(v => !!v.fecha_recepcion).length;
         const criticos  = viviendas.filter(v => v.estadoGeneral === "critico").length;
+        // Avance Gantt: dato del nodo avance_gantt/{pid} en Firebase
+        const _ag      = avanceGanttData[proyectoSel] || null;
+        const agPct    = _ag ? _ag.pct : null;
+        const agColor  = agPct == null ? '#94a3b8' : agPct >= 80 ? '#16a34a' : agPct >= 50 ? '#2563eb' : '#dc2626';
 
         // Datos por grupo (usa 'datos' procesado: trae flags de checkpoints, obsPublicas y comentario)
         const gruposData = agruparViviendas(datos, grupos);
@@ -4329,6 +4338,7 @@ ${muestrasHtml}
 
 <div class="sec-title">Estado del Proyecto</div>
 <div class="kpis">
+  <div class="kpi" style="border-left:3px solid ${agColor};"><div class="kpi-v" style="color:${agColor};">${agPct != null ? agPct + '%' : '—'}</div><div class="kpi-l">Avance Real<br><span style="font-size:8px;color:#94a3b8;">${_ag ? _ag.n + '/' + _ag.total + ' benef. · Datos Control' : 'Sin datos Gantt'}</span></div></div>
   <div class="kpi"><div class="kpi-v" style="color:${avColor};">${avanceReal}%</div><div class="kpi-l">Avance Real (Insp.)<br><span style="font-size:8px;color:#94a3b8;">${conInsp.length}/${viviendas.length} con insp. · sin insp = 0%</span></div></div>
   <div class="kpi"><div class="kpi-v" style="color:#1e3a5f;">${viviendas.length}</div><div class="kpi-l">Beneficiarios</div></div>
   <div class="kpi"><div class="kpi-v" style="color:#16a34a;">${terminadas}</div><div class="kpi-l">Terminadas</div></div>
@@ -4559,6 +4569,9 @@ ${inf.footerHtml}
         const terminadas = vivCap.filter(v => !!v.fecha_recepcion).length;
         const criticos = vivCap.filter(v => v.estadoGeneral === 'critico').length;
         const avColor = avanceReal >= 80 ? '#16a34a' : avanceReal >= 50 ? '#2563eb' : '#dc2626';
+        const _agCap  = avanceGanttData[proyectoSel] || null;
+        const agPctCap = _agCap ? _agCap.pct : null;
+        const agColCap = agPctCap == null ? '#94a3b8' : agPctCap >= 80 ? '#16a34a' : agPctCap >= 50 ? '#2563eb' : '#dc2626';
 
         // Checkpoints (excluir mismos 4 que en Obra)
         const CP_EXCL = ['V.AS', 'V.F1', 'F.V.DOM', 'F.Recep'];
@@ -4624,6 +4637,7 @@ ${inf.footerHtml}
 ${inf.muestrasHtml ? '<div class="sec-title">Muestras de Hormigón</div>' + inf.muestrasHtml : ''}
 <div class="sec-title">Estado del Proyecto</div>
 <div class="kpis">
+  <div class="kpi" style="border-left:3px solid ${agColCap};"><div class="kpi-v" style="color:${agColCap};">${agPctCap != null ? agPctCap + '%' : '—'}</div><div class="kpi-l">Avance Real<br><span style="font-size:8px;color:#94a3b8;">${_agCap ? _agCap.n + '/' + _agCap.total + ' benef. · Datos Control' : 'Sin datos Gantt'}</span></div></div>
   <div class="kpi"><div class="kpi-v" style="color:${avColor};">${avanceReal}%</div><div class="kpi-l">Avance Real (Insp.)<br><span style="font-size:8px;color:#94a3b8;">${conInsp}/${vivCap.length} con insp. · sin insp = 0%</span></div></div>
   <div class="kpi"><div class="kpi-v" style="color:#1e3a5f;">${vivCap.length}</div><div class="kpi-l">Beneficiarios</div></div>
   <div class="kpi"><div class="kpi-v" style="color:#16a34a;">${terminadas}</div><div class="kpi-l">Terminadas</div></div>
@@ -4691,17 +4705,19 @@ ${inf.footerHtml}
         const obrasConCurva = PROYECTOS_DATA.filter(p => (CURVAS_S_CONFIG[p.ID_proy] || []).length > 0);
         if (obrasConCurva.length === 0) { alert('No hay obras activas con curvas S configuradas.'); return; }
 
-        let ganttRaw = {}, gruposRaw = {}, obsRaw = {};
+        let ganttRaw = {}, gruposRaw = {}, obsRaw = {}, avanceGanttRaw = {};
         try {
-            const [rGantt, rGrupos, rObs] = await Promise.all([
+            const [rGantt, rGrupos, rObs, rAvGantt] = await Promise.all([
                 fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/gantt_programa.json'),
                 fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/grupos.json'),
-                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/observaciones.json')
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/observaciones.json'),
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/avance_gantt.json')
             ]);
-            ganttRaw  = (await rGantt.json())  || {};
-            gruposRaw = (await rGrupos.json()) || {};
-            obsRaw    = (await rObs.json())    || {};
-        } catch(e) { ganttRaw = {}; gruposRaw = {}; obsRaw = {}; }
+            ganttRaw       = (await rGantt.json())   || {};
+            gruposRaw      = (await rGrupos.json())  || {};
+            obsRaw         = (await rObs.json())     || {};
+            avanceGanttRaw = (await rAvGantt.json()) || {};
+        } catch(e) { ganttRaw = {}; gruposRaw = {}; obsRaw = {}; avanceGanttRaw = {}; }
 
         const getCapataz = (idProy, curvaLabel) => {
             const gList = gruposRaw[idProy] || [];
@@ -4737,9 +4753,13 @@ ${inf.footerHtml}
                 const av = tot ? Math.round(obra.viviendas.reduce((s,v) => { const insp = getInspeccion(v.ID_Benef); return s + (insp ? insp.pct_total : 0); }, 0) / tot) : 0;
                 const conInsp = obra.viviendas.filter(v => getInspeccion(v.ID_Benef) !== null).length;
                 const term = obra.viviendas.filter(v => v.fecha_recepcion).length;
+                const _ag = avanceGanttRaw[obra.ID_proy];
+                const agPct = _ag ? _ag.pct : null;
+                const agCol = agPct == null ? '#94a3b8' : agPct >= 80 ? '#16a34a' : agPct >= 50 ? '#2563eb' : '#dc2626';
                 h += `Estado General</div>
 <div class="summary-grid">
-  <div class="summary-card"><div class="summary-card-label">Avance Real</div><div class="summary-card-value" style="color:${av>=80?'#16a34a':av>=50?'#2563eb':'#dc2626'};">${av}%</div><div class="summary-card-detail">${conInsp}/${tot} inspeccionadas</div></div>
+  <div class="summary-card" style="border-left:3px solid ${agCol};"><div class="summary-card-label">Avance Real</div><div class="summary-card-value" style="color:${agCol};">${agPct != null ? agPct + '%' : '—'}</div><div class="summary-card-detail">${_ag ? _ag.n + '/' + _ag.total + ' con avance' : 'Sin datos Gantt'}</div></div>
+  <div class="summary-card"><div class="summary-card-label">Avance Real (Insp.)</div><div class="summary-card-value" style="color:${av>=80?'#16a34a':av>=50?'#2563eb':'#dc2626'};">${av}%</div><div class="summary-card-detail">${conInsp}/${tot} inspeccionadas</div></div>
   <div class="summary-card"><div class="summary-card-label">Viviendas</div><div class="summary-card-value">${tot}</div><div class="summary-card-detail">Beneficiarios</div></div>
   <div class="summary-card"><div class="summary-card-label">Terminadas</div><div class="summary-card-value" style="color:#16a34a;">${term}</div><div class="summary-card-detail">Con recepción</div></div>
   <div class="summary-card"><div class="summary-card-label">En Proceso</div><div class="summary-card-value" style="color:#2563eb;">${tot - term}</div><div class="summary-card-detail">Sin recepción</div></div>
@@ -4934,19 +4954,21 @@ ${js2}</body></html>`;
         if (obrasConCurva.length === 0) { alert('No hay obras activas con curvas S configuradas.'); return; }
 
         // Obtener datos de programa, grupos, observaciones y comentarios destacados desde Firebase
-        let ganttRaw = {}, gruposRaw = {}, obsRaw = {}, resumenComRaw = {};
+        let ganttRaw = {}, gruposRaw = {}, obsRaw = {}, resumenComRaw = {}, avanceGanttRaw = {};
         try {
-            const [rGantt, rGrupos, rObs, rResCom] = await Promise.all([
+            const [rGantt, rGrupos, rObs, rResCom, rAvGantt] = await Promise.all([
                 fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/gantt_programa.json'),
                 fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/grupos.json'),
                 fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/observaciones.json'),
-                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/resumen_comentarios.json')
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/resumen_comentarios.json'),
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/avance_gantt.json')
             ]);
-            ganttRaw     = (await rGantt.json())   || {};
-            gruposRaw    = (await rGrupos.json())  || {};
-            obsRaw       = (await rObs.json())     || {};
-            resumenComRaw = (await rResCom.json()) || {};
-        } catch(e) { ganttRaw = {}; gruposRaw = {}; obsRaw = {}; resumenComRaw = {}; }
+            ganttRaw      = (await rGantt.json())   || {};
+            gruposRaw     = (await rGrupos.json())  || {};
+            obsRaw        = (await rObs.json())     || {};
+            resumenComRaw = (await rResCom.json())  || {};
+            avanceGanttRaw = (await rAvGantt.json()) || {};
+        } catch(e) { ganttRaw = {}; gruposRaw = {}; obsRaw = {}; resumenComRaw = {}; avanceGanttRaw = {}; }
 
         // Devuelve el capataz para un label de curva (ej "Grupo 1 · El Maitén") y un proyecto
         const getCapataz = (idProy, curvaLabel) => {
@@ -5008,9 +5030,13 @@ ${js2}</body></html>`;
                 const conInsp = obra.viviendas.filter(v => getInspeccion(v.ID_Benef) !== null).length;
                 const term = obra.viviendas.filter(v => v.fecha_recepcion).length;
                 const crit = obra.viviendas.filter(v => getFlags(v).fecha_f1 && !v.fecha_recepcion && av < 50).length;
+                const _ag = avanceGanttRaw[obra.ID_proy];
+                const agPct = _ag ? _ag.pct : null;
+                const agCol = agPct == null ? '#94a3b8' : agPct >= 80 ? '#16a34a' : agPct >= 50 ? '#2563eb' : '#dc2626';
                 h += `Estado General</div>
 <div class="summary-grid">
-  <div class="summary-card"><div class="summary-card-label">Avance Real</div><div class="summary-card-value" style="color:${av>=80?'#16a34a':av>=50?'#2563eb':'#dc2626'};">${av}%</div><div class="summary-card-detail">${conInsp}/${tot} inspeccionadas</div></div>
+  <div class="summary-card" style="border-left:3px solid ${agCol};"><div class="summary-card-label">Avance Real</div><div class="summary-card-value" style="color:${agCol};">${agPct != null ? agPct + '%' : '—'}</div><div class="summary-card-detail">${_ag ? _ag.n + '/' + _ag.total + ' con avance' : 'Sin datos Gantt'}</div></div>
+  <div class="summary-card"><div class="summary-card-label">Avance Real (Insp.)</div><div class="summary-card-value" style="color:${av>=80?'#16a34a':av>=50?'#2563eb':'#dc2626'};">${av}%</div><div class="summary-card-detail">${conInsp}/${tot} inspeccionadas</div></div>
   <div class="summary-card"><div class="summary-card-label">Viviendas</div><div class="summary-card-value">${tot}</div><div class="summary-card-detail">Beneficiarios</div></div>
   <div class="summary-card"><div class="summary-card-label">Terminadas</div><div class="summary-card-value" style="color:#16a34a;">${term}</div><div class="summary-card-detail">Con recepción</div></div>
   <div class="summary-card"><div class="summary-card-label">En Proceso</div><div class="summary-card-value" style="color:#2563eb;">${tot - term}</div><div class="summary-card-detail">Sin recepción</div></div>

@@ -1,0 +1,73 @@
+name: Actualización Curvas S Semanal
+
+# Equivalente cloud de ejecutar_curvas_semanal.bat
+# Se ejecuta cada lunes a las 12:00 UTC (09:00 hora Chile)
+# También puede ejecutarse manualmente desde la pestaña Actions de GitHub.
+
+on:
+  schedule:
+    - cron: '0 12 * * 1'   # Lunes 12:00 UTC = 09:00 Chile (sin horario verano)
+  workflow_dispatch: {}      # Ejecución manual desde GitHub Actions
+
+permissions:
+  contents: write            # Para push al dashboard (sincronizar_dashboard.py)
+
+concurrency:
+  group: curvas-semanal
+  cancel-in-progress: false  # No cancelar si ya hay una ejecución en curso
+
+jobs:
+  update-curvas:
+    name: Generar y subir Curvas S
+    runs-on: ubuntu-latest
+    timeout-minutes: 90      # 10 proyectos x ~5 min promedio + margen
+
+    steps:
+      # ── 1. Código ────────────────────────────────────────────────────────────
+      - name: Checkout repositorio
+        uses: actions/checkout@v4
+
+      # ── 2. Python ─────────────────────────────────────────────────────────────
+      - name: Configurar Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # ── 3. Cache de paquetes pip ──────────────────────────────────────────────
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: curvas-pip-${{ hashFiles('SCRaices-LLM/curvas_s/requirements.txt') }}
+          restore-keys: curvas-pip-
+
+      # ── 4. Dependencias ───────────────────────────────────────────────────────
+      - name: Instalar dependencias Python
+        run: |
+          pip install --upgrade pip
+          pip install \
+            matplotlib \
+            scipy \
+            Pillow \
+            numpy \
+            requests \
+            google-auth \
+            google-auth-httplib2 \
+            google-api-python-client
+
+      # ── 5. Ejecutar orquestador ───────────────────────────────────────────────
+      - name: Ejecutar curvas S (todos los proyectos)
+        working-directory: SCRaices-LLM/curvas_s
+        env:
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          GOOGLE_CLIENT_ID:     ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GITHUB_TOKEN:         ${{ secrets.GITHUB_TOKEN }}
+          FIREBASE_URL:         https://scraices-dashboard-default-rtdb.firebaseio.com
+        run: python ejecutar_curvas_cloud.py
+
+      # ── 6. Log de resumen en caso de fallo ────────────────────────────────────
+      - name: Resumen en caso de error
+        if: failure()
+        run: |
+          echo "::error::El orquestador de Curvas S falló. Revisa el log completo arriba."

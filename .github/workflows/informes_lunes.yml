@@ -1,0 +1,86 @@
+name: Envío Semanal de Informes (Lunes)
+
+# Se dispara automáticamente al completar el workflow de Curvas S del lunes.
+# Captura todos los reportes del dashboard y los envía por correo a cada
+# destinatario según su rol y proyectos asignados (configurado en Firebase).
+
+on:
+  workflow_run:
+    workflows: ["Actualización Curvas S Semanal"]
+    types: [completed]
+  workflow_dispatch: {}       # Ejecución manual desde GitHub Actions
+
+permissions:
+  contents: write
+
+concurrency:
+  group: informes-lunes
+  cancel-in-progress: false
+
+jobs:
+  enviar-informes:
+    name: Capturar y enviar informes semanales
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    # Solo ejecutar si las curvas completaron exitosamente (o si es manual)
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+
+    steps:
+      - name: Checkout repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: informes-pip-${{ hashFiles('SCRaices-LLM/informes/requirements.txt') }}
+          restore-keys: informes-pip-
+
+      - name: Instalar dependencias Python
+        run: |
+          pip install --upgrade pip
+          pip install -r SCRaices-LLM/informes/requirements.txt
+
+      - name: Instalar Playwright Chromium
+        run: playwright install chromium --with-deps
+
+      - name: Capturar informes y enviar correos
+        working-directory: SCRaices-LLM/informes
+        env:
+          GOOGLE_REFRESH_TOKEN:      ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          GOOGLE_CLIENT_ID:          ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET:      ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GMAIL_EMAIL:               ${{ secrets.GMAIL_EMAIL }}
+          GMAIL_APP_PASSWORD:        ${{ secrets.GMAIL_APP_PASSWORD }}
+          FIREBASE_URL:              https://scraices-dashboard-default-rtdb.firebaseio.com
+          DRIVE_FOLDER_INFORMES_ID:  ${{ secrets.DRIVE_FOLDER_INFORMES_ID }}
+          ENVIAR_CORREOS:            "1"
+        run: python ejecutar_informes_cloud.py
+
+      - name: Subir archivos como artefacto (respaldo 30 días)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: informes-lunes-${{ github.run_id }}
+          path: /tmp/informes_*
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Publicar dashboard actualizado
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add SCRaices-LLM/dashboard/index_live_v3.html
+          git diff --staged --quiet || git commit -m "auto: actualizar tab Despachos en dashboard [skip ci]"
+          git push
+
+      - name: Resumen en caso de error
+        if: failure()
+        run: echo "::error::El envío de informes semanales falló. Revisa el log completo arriba."

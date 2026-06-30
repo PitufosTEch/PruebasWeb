@@ -1,0 +1,31 @@
+name: Re-habilitar Envío Informes (una vez)
+
+on:
+  schedule:
+    - cron: '0 8 6 7 1'   # Lunes 06/07/2026 08:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  rehabilitar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Re-habilitar workflow de envío semanal
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow enable "Envío Semanal de Informes (Lunes)" \
+            --repo rodrigolagoslira/PruebasWeb
+          echo "Workflow de envío re-habilitado OK"
+          gh workflow list --repo rodrigolagoslira/PruebasWeb
+
+      - name: Auto-eliminar este workflow temporal
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow disable "Re-habilitar Envío Informes (una vez)" \
+            --repo rodrigolagoslira/PruebasWeb
+          echo "Workflow temporal deshabilitado"
