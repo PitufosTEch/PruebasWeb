@@ -4490,6 +4490,12 @@ ${inf.footerHtml}
                 '<div class="sec-title">Resumen por Grupo</div>',
                 `<div class="sec-title">Proyección de Despachos</div>${despachosSecHtml}\n\n<div class="sec-title">Resumen por Grupo</div>`
             );
+
+            // (1.6) Eliminar "Comentarios Destacados" — no aplica al informe de adquisiciones
+            portadaObraHtml = portadaObraHtml.replace(
+                /<div class="sec-title">Comentarios Destacados<\/div>[\s\S]*/,
+                ''
+            );
         }
 
         // (2) Eliminar KPIs de checkpoints excluidos de la sección "Checkpoints del Proyecto"
@@ -4507,6 +4513,11 @@ ${inf.footerHtml}
                 /<div class="sec-title">Comentarios Recientes por Beneficiario<\/div>[\s\S]*/,
                 ''
             );
+
+            // (3.5) Eliminar "Nota del coordinador" en informe Adquisiciones
+            if (tipo === 'adquisiciones') {
+                contenido = contenido.replace(/<div class="gp-nota">[\s\S]*?<\/div>\s*<\/div>/g, '');
+            }
 
             // (4) Procesar chips y actualizar conteo X/12 → X'/8 por beneficiario
             //     Cada beneficiario tiene 2 <tr>: datos (con X/12) + chips (colspan="5")
