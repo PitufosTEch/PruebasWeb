@@ -4475,6 +4475,23 @@ ${inf.footerHtml}
         };
         portadaObraHtml = _rmRcCard(portadaObraHtml, 'Garantías');
 
+        // (1.5) Insertar sección "Proyección de Despachos" (solo informe Adquisiciones)
+        //       Usa el mismo HTML que ya se muestra en el tab Despachos del Reporte
+        //       Adquisiciones HTML (multi-obras), generado desde Proyeccion_Despachos_2026.xlsx
+        //       y publicado en Firebase /despachos_html/{ID_proy}.
+        if (tipo === 'adquisiciones') {
+            let despachosSecHtml = '<p style="padding:20px;text-align:center;color:#94a3b8;font-size:12px;">Sin datos de despachos disponibles</p>';
+            try {
+                const _rDesp = await fetch(`https://scraices-dashboard-default-rtdb.firebaseio.com/despachos_html/${proyectoSel}.json`);
+                const _despData = await _rDesp.json();
+                if (_despData) despachosSecHtml = _despData;
+            } catch (_e) { /* mantiene fallback */ }
+            portadaObraHtml = portadaObraHtml.replace(
+                '<div class="sec-title">Resumen por Grupo</div>',
+                `<div class="sec-title">Proyección de Despachos</div>${despachosSecHtml}\n\n<div class="sec-title">Resumen por Grupo</div>`
+            );
+        }
+
         // (2) Eliminar KPIs de checkpoints excluidos de la sección "Checkpoints del Proyecto"
         portadaObraHtml = portadaObraHtml.replace(
             /<div style="border:1px solid [^;]+;border-radius:8px;padding:7px 3px[^"]*"><div style="font-size:8\.5px;font-weight:600;color:#64748b;">(V\.AS|V\.F1|F\.V\.DOM|F\.Recep)<\/div><div style="[^"]*">\d+<\/div><div style="[^"]*">\/\s*\d+<\/div><\/div>/g,
