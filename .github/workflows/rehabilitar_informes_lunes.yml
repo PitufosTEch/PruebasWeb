@@ -18,14 +18,14 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh workflow enable "Envío Semanal de Informes (Lunes)" \
-            --repo rodrigolagoslira/PruebasWeb
+            --repo ${{ github.repository }}
           echo "Workflow de envío re-habilitado OK"
-          gh workflow list --repo rodrigolagoslira/PruebasWeb
+          gh workflow list --repo ${{ github.repository }}
 
       - name: Auto-eliminar este workflow temporal
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh workflow disable "Re-habilitar Envío Informes (una vez)" \
-            --repo rodrigolagoslira/PruebasWeb
+            --repo ${{ github.repository }}
           echo "Workflow temporal deshabilitado"

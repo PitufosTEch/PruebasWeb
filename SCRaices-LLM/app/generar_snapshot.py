@@ -62,14 +62,15 @@ def main() -> int:
                       f"data={'si' if raw else 'no'}, live={'si' if live_done else 'no'})")
             time.sleep(3)
 
-        # Fallback: si el live no logueo a tiempo pero ya hay payload, usarlo
+        # NO hay fallback silencioso: si la carga EN VIVO no confirmo con su
+        # log [LIVE], `window.__SNAPSHOT__` contiene el snapshot ANTERIOR que el
+        # dashboard descargo para el primer pintado. Re-publicarlo solo cambia
+        # el timestamp y CONGELA los datos ocultando la caida de la fuente en
+        # vivo (Apps Script). Preferimos fallar en rojo para que se note.
         if payload is None:
-            raw = page.evaluate(GET_SNAPSHOT_JS)
-            if raw:
-                print("WARN: usando payload sin confirmacion de log [LIVE]")
-                payload = json.loads(raw)
-
-        if payload is None:
+            print("ERROR: la carga EN VIVO no completo (no aparecio log [LIVE]).")
+            print("       La fuente de datos (Apps Script) probablemente esta caida")
+            print("       o el deployment perdio el acceso publico. Snapshot NO actualizado.")
             print("--- ultimos logs de consola del dashboard ---")
             for line in logs[-40:]:
                 print("  ", line)
@@ -77,7 +78,7 @@ def main() -> int:
         browser.close()
 
     if not payload:
-        print("ERROR: no se obtuvo cache procesado del dashboard")
+        print("ERROR: no se obtuvo cache procesado FRESCO del dashboard")
         return 1
 
     n_proy = len(payload.get("PROYECTOS_DATA", []))
