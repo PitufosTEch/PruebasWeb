@@ -30,6 +30,8 @@ def generar():
             continue
         pid = str(pr['ID_proy'])
         nombre = str(pr['NOMBRE_PROYECTO'])
+        if 'prueba' in nombre.lower():
+            continue
         comuna = str(pr.get('COMUNA', ''))
         estado = str(pr.get('estado_general', ''))
         dur = 0

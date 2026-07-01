@@ -414,7 +414,9 @@ const ETAPAS_CONFIG_FULL = {
         PROYECTOS_DATA = proyectosRaw
             .filter(p => {
                 const est = (p.estado_general || '').toLowerCase();
-                return est.includes('ejecuci') || est.includes('finalizado');
+                if (!est.includes('ejecuci') && !est.includes('finalizado')) return false;
+                if (/prueba/i.test(p.NOMBRE_PROYECTO || '')) return false;
+                return true;
             })
             .map(p => {
                 const est = (p.estado_general || '').toLowerCase();

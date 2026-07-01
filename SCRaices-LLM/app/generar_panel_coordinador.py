@@ -120,6 +120,8 @@ def generar_panel():
 
     # Filtrar proyectos en ejecucion (misma regla que dashboard v3)
     proyectos_ej_raw = proyectos[proyectos['estado_general'].str.lower().str.contains('ejecuci', na=False)].copy()
+    # Excluir proyectos de prueba
+    proyectos_ej_raw = proyectos_ej_raw[~proyectos_ej_raw['NOMBRE_PROYECTO'].str.lower().str.contains('prueba', na=False)]
     print(f"Proyectos en ejecucion (tabla): {len(proyectos_ej_raw)}")
 
     # Excluir finalizados por recepciones completas (F_R_dom)
