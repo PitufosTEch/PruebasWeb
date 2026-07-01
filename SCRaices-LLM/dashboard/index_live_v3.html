@@ -5458,6 +5458,30 @@ ${js}</body></html>`;
             return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : s;
         };
 
+        // Generador de gráfico SVG sin librerías externas
+        const svgChart = (labels, series, yHint) => {
+            if (!labels.length) return '<p style="color:#94a3b8;font-size:12px;text-align:center;padding:40px 0;">Sin datos históricos suficientes para graficar.</p>';
+            const W=900,H=260,pL=88,pR=16,pT=16,pB=52,cW=W-pL-pR,cH=H-pT-pB;
+            const allV=series.flatMap(s=>s.data.filter(v=>v!=null&&v>0));
+            const yMax=allV.length?Math.max(...allV)*1.08:(yHint||1);
+            const xp=i=>pL+(labels.length>1?i/(labels.length-1)*cW:cW/2);
+            const yp=v=>pT+cH-Math.min(1,v/yMax)*cH;
+            let out=`<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;">`;
+            for(let i=0;i<=5;i++){const v=yMax*i/5,y=yp(v).toFixed(1);out+=`<line x1="${pL}" y1="${y}" x2="${W-pR}" y2="${y}" stroke="#e5e7eb" stroke-width="1"/><text x="${pL-5}" y="${(+y+3.5).toFixed(1)}" text-anchor="end" font-size="9" fill="#94a3b8">${Math.round(v).toLocaleString('es-CL')}</text>`;}
+            const step=Math.max(1,Math.floor(labels.length/9));
+            labels.forEach((l,i)=>{if(i%step===0||i===labels.length-1){const x=xp(i).toFixed(1);out+=`<text x="${x}" y="${H-pB+13}" text-anchor="end" font-size="9" fill="#94a3b8" transform="rotate(-35,${x},${H-pB+13})">${l}</text>`;}});
+            series.forEach(s=>{
+                if(!s.data.some(v=>v!=null))return;
+                let d='',mv=true;
+                s.data.forEach((v,i)=>{if(v==null){mv=true;return;}d+=(mv?'M':'L')+xp(i).toFixed(1)+','+yp(v).toFixed(1)+' ';mv=false;});
+                out+=`<path d="${d.trim()}" fill="none" stroke="${s.color}" stroke-width="2.5" ${s.dash?`stroke-dasharray="${s.dash}"`:''}  stroke-linecap="round" stroke-linejoin="round"/>`;
+                s.data.forEach((v,i)=>{if(v!=null)out+=`<circle cx="${xp(i).toFixed(1)}" cy="${yp(v).toFixed(1)}" r="3.5" fill="${s.color}" stroke="#fff" stroke-width="1.5"/>`;});
+            });
+            out+=`<line x1="${pL}" y1="${pT}" x2="${pL}" y2="${pT+cH}" stroke="#94a3b8" stroke-width="1"/><line x1="${pL}" y1="${pT+cH}" x2="${W-pR}" y2="${pT+cH}" stroke="#94a3b8" stroke-width="1"/>`;
+            out+='</svg>';
+            return out;
+        };
+
         // Pre-generar todo el contenido de tabs por obra (sin DOM queries en tiempo de render)
         const allSections = obras.map(proy => {
             const pid = proy.ID_proy;
@@ -5599,20 +5623,24 @@ ${gars.length ? `<div class="summary-grid">${gars.map(g => {
             const dPrograma = (pctPrograma != null && chartMeses.length > 0)
                 ? chartMeses.map((_,i) => Math.round((i+1)/chartMeses.length*(pctPrograma/100*totalContrato)*100)/100)
                 : [];
-            const chartId   = 'ch' + String(pid).replace(/[^a-zA-Z0-9]/g,'');
-            const chartData = { id: chartId, labels: chartMeses, cobrado: dCobrado, emitido: dEmitido, avReal: dAvReal, programa: dPrograma };
+            const chartSeries = [
+                { color:'#16a34a', data:dCobrado,  dash:null },
+                { color:'#2563eb', data:dEmitido,  dash:'6,3' },
+                { color:'#ea580c', data:dAvReal,   dash:'9,4' },
+                ...(dPrograma.length ? [{ color:'#7c3aed', data:dPrograma, dash:'3,5' }] : [])
+            ];
             const curvaHtml = `<div class="obra-block">
 <div class="breadcrumb">Obra <strong>${nombre}</strong>${comuna?' · '+comuna:''} · Curva Cobros/Pagos · Contrato: ${fmtUF(totalContrato)}</div>
 <div class="ch-legend">
   <span class="ch-dot" style="background:#16a34a;"></span><span>Cobrado real</span>
-  <span class="ch-dot" style="background:#2563eb;"></span><span>Por contrato (emitido)</span>
+  <span class="ch-dot ch-dashed" style="border-color:#2563eb;"></span><span>Por contrato (emitido)</span>
   <span class="ch-dot ch-dashed" style="border-color:#ea580c;"></span><span>Por avance real</span>
   ${pctPrograma!=null?'<span class="ch-dot ch-dashed" style="border-color:#7c3aed;"></span><span>Por programa</span>':''}
 </div>
-<div class="ch-wrap"><canvas id="${chartId}"></canvas></div>
+${svgChart(chartMeses, chartSeries, totalContrato)}
 </div>`;
 
-            return { resumen, ep, gar, curvaHtml, chartData };
+            return { resumen, ep, gar, curvaHtml };
         });
 
         // Totales globales para barra resumen pestaña EP
@@ -5694,41 +5722,23 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
         const jsOpen = '<scr'+'ipt>';
         const jsClose = '<\/scr'+'ipt>';
         const jsEP = jsOpen + `
-const __cd=${JSON.stringify(allChartData)};
-const __charts={};
 function mostrar(t,btn){
   document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
   document.querySelectorAll('.tabs .tab-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('sec-'+t).classList.add('active');
   btn.classList.add('active');
-  if(t==='curva') setTimeout(initCharts,60);
-}
-function initCharts(){
-  if(typeof Chart==='undefined') return;
-  __cd.forEach(d=>{
-    const c=document.getElementById(d.id);
-    if(!c||__charts[d.id]) return;
-    const ds=[];
-    if(d.cobrado.length) ds.push({label:'Cobrado real',data:d.cobrado,borderColor:'#16a34a',backgroundColor:'rgba(22,163,74,.1)',tension:.4,fill:true,pointRadius:3,pointHoverRadius:5});
-    if(d.emitido.length) ds.push({label:'Por contrato (emitido)',data:d.emitido,borderColor:'#2563eb',backgroundColor:'transparent',tension:.4,borderDash:[5,3],pointRadius:2,pointHoverRadius:4});
-    if(d.avReal.some(v=>v!=null)) ds.push({label:'Por avance real',data:d.avReal,borderColor:'#ea580c',backgroundColor:'transparent',tension:.4,borderDash:[8,3],pointRadius:2,pointHoverRadius:4,spanGaps:true});
-    if(d.programa.length) ds.push({label:'Por programa',data:d.programa,borderColor:'#7c3aed',backgroundColor:'transparent',tension:.4,borderDash:[2,5],pointRadius:2,pointHoverRadius:4});
-    __charts[d.id]=new Chart(c,{type:'line',data:{labels:d.labels,datasets:ds},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+ctx.parsed.y.toLocaleString('es-CL',{minimumFractionDigits:2,maximumFractionDigits:2})+' UF'}}},scales:{x:{grid:{color:'#f1f5f9'},ticks:{font:{size:9},maxRotation:45}},y:{grid:{color:'#f1f5f9'},ticks:{font:{size:9},callback:v=>v.toLocaleString('es-CL',{maximumFractionDigits:0})+' UF'},beginAtZero:true}}}});
-  });
 }
 ` + jsClose;
 
-        const tabResumen   = allSections.map(s => `<div class="obra-block">${s.resumen}</div>`).join('');
-        const tabEP        = epSummaryBar + allSections.map(s => `<div class="obra-block">${s.ep}</div>`).join('');
-        const tabGar       = allSections.map(s => `<div class="obra-block">${s.gar}</div>`).join('');
-        const tabCurva     = allSections.map(s => s.curvaHtml).join('');
-        const allChartData = allSections.map(s => s.chartData);
+        const tabResumen = allSections.map(s => `<div class="obra-block">${s.resumen}</div>`).join('');
+        const tabEP      = epSummaryBar + allSections.map(s => `<div class="obra-block">${s.ep}</div>`).join('');
+        const tabGar     = allSections.map(s => `<div class="obra-block">${s.gar}</div>`).join('');
+        const tabCurva   = allSections.map(s => s.curvaHtml).join('');
 
         const htmlEP = `<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Estados de Pago — Multi Obras</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"><\/script>
 ${cssEP}</head><body>
 <div class="multi-container">
   <div class="header">
