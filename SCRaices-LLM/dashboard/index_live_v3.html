@@ -5454,9 +5454,16 @@ ${js}</body></html>`;
     // ================================================================
     // ESTADOS DE PAGO HTML — informe financiero multi-obra
     // ================================================================
-    const generarEstadosPagoHTML = () => {
+    const generarEstadosPagoHTML = async () => {
         const obras = PROYECTOS_DATA.filter(p => p.estado === 'ejecucion');
         if (!obras.length) { alert('Sin obras en ejecución.'); return; }
+
+        // Fetch avance de programa desde Firebase
+        let avanceGanttRaw = {};
+        try {
+            const rAG = await fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/avance_gantt.json');
+            avanceGanttRaw = (await rAG.json()) || {};
+        } catch (_) {}
 
         const fmtUF = (v) => (Math.round((v||0) * 100) / 100).toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' UF';
         const fmtFecha = (d) => {
@@ -5486,6 +5493,10 @@ ${js}</body></html>`;
             const pctEmitido     = totalContrato > 0 ? Math.min(100, Math.round(totalEP / totalContrato * 1000) / 10) : 0;
             const totalGarUF     = gars.reduce((a,g) => a + g.monto_uf, 0);
             const epPendientes   = eps.filter(e => !e.Estado.toLowerCase().includes('pagado')).length;
+            const agNode         = avanceGanttRaw[pid];
+            const pctPrograma    = (agNode != null && agNode.pct != null) ? Math.min(100, Math.round(agNode.pct * 10) / 10) : null;
+            const avMensual      = AVANCE_MENSUAL_DATA[pid];
+            const pctReal        = (avMensual != null && avMensual.avanceActual != null) ? Math.min(100, Math.round(avMensual.avanceActual * 10) / 10) : null;
 
             // ── TAB RESUMEN ──────────────────────────────────────────────────
             // Siempre muestra datos del contrato aunque no haya EP ejecutado
@@ -5499,17 +5510,33 @@ ${js}</body></html>`;
   <div class="summary-card sc-yellow"><div class="summary-card-label">En tramitación</div><div class="summary-card-value">${fmtUF(totalIngresado + totalAprobado)}</div><div class="summary-card-detail">${epPendientes} EP pendientes</div></div>
   <div class="summary-card sc-red"><div class="summary-card-label">Por facturar</div><div class="summary-card-value">${fmtUF(Math.max(0, totalContrato - totalEP))}</div><div class="summary-card-detail">${eps.length} EP emitidos · ${pctEmitido}% del total</div></div>
 </div>
-<div style="margin:4px 0 6px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;"><span>0%</span><span style="font-weight:700;color:${barCol};">${pctCobrado}% cobrado</span><span>100%</span></div>
-<div style="background:#e5e7eb;border-radius:6px;height:12px;overflow:hidden;margin-bottom:18px;">
-  <div style="height:100%;width:${pctEmitido}%;background:#bfdbfe;border-radius:6px;position:relative;">
-    <div style="height:100%;width:${totalEP>0?Math.round(totalPagado/totalEP*100):0}%;background:${barCol};border-radius:6px;"></div>
+<div style="margin:18px 0 4px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;"><span style="font-size:10px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.5px;">% Cobrado</span><span style="font-size:11px;font-weight:700;color:${barCol};">${pctCobrado}%</span></div>
+  <div style="background:#e5e7eb;border-radius:6px;height:9px;overflow:hidden;margin-bottom:9px;">
+    <div style="height:100%;width:${pctEmitido}%;background:#bfdbfe;border-radius:6px;position:relative;"><div style="height:100%;width:${totalEP>0?Math.round(totalPagado/totalEP*100):0}%;background:${barCol};border-radius:6px;"></div></div>
+  </div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;"><span style="font-size:10px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.5px;">% Avance de contrato</span><span style="font-size:11px;font-weight:700;color:#2563eb;">${pctEmitido}%</span></div>
+  <div style="background:#e5e7eb;border-radius:6px;height:9px;overflow:hidden;margin-bottom:9px;">
+    <div style="height:100%;width:${pctEmitido}%;background:#2563eb;border-radius:6px;"></div>
+  </div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;"><span style="font-size:10px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.5px;">% Avance de programa</span><span style="font-size:11px;font-weight:700;color:#7c3aed;">${pctPrograma != null ? pctPrograma + '%' : '—'}</span></div>
+  <div style="background:#e5e7eb;border-radius:6px;height:9px;overflow:hidden;margin-bottom:9px;">
+    <div style="height:100%;width:${pctPrograma != null ? pctPrograma : 0}%;background:#7c3aed;border-radius:6px;"></div>
+  </div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;"><span style="font-size:10px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.5px;">% Avance real</span><span style="font-size:11px;font-weight:700;color:#ea580c;">${pctReal != null ? pctReal + '%' : '—'}</span></div>
+  <div style="background:#e5e7eb;border-radius:6px;height:9px;overflow:hidden;margin-bottom:16px;">
+    <div style="height:100%;width:${pctReal != null ? pctReal : 0}%;background:#ea580c;border-radius:6px;"></div>
   </div>
 </div>
 <h3 class="sec-h3">&#128274; Garantías del Proyecto</h3>
 ${gars.length ? `<div class="summary-grid">${gars.map(g => {
   const venc = g.fecha_vcmto ? new Date(g.fecha_vcmto) : null;
-  const vencida = venc && venc < new Date();
-  return `<div class="summary-card${vencida ? ' sc-vencida' : ''}"><div class="summary-card-label">${g.tipoCorto||g.tipo} · ${g.entidad}</div><div class="summary-card-value" style="font-size:14px;">${fmtUF(g.monto_uf)}</div><div class="summary-card-detail">${g.banco||'—'} · Vcto: ${fmtFecha(g.fecha_vcmto)}${vencida?' ⚠':''}</div></div>`;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const diasRestantes = venc ? Math.round((venc - today) / 86400000) : null;
+  const vencida = diasRestantes != null && diasRestantes < 0;
+  const badgeCls = vencida || diasRestantes <= 59 ? 'gar-badge-red' : diasRestantes <= 89 ? 'gar-badge-yellow' : 'gar-badge-green';
+  const badgeTxt = vencida ? 'VENCIDA' : diasRestantes != null ? diasRestantes + 'd' : '—';
+  return `<div class="summary-card${vencida ? ' sc-vencida' : ''}"><div style="display:flex;justify-content:space-between;align-items:flex-start;"><div class="summary-card-label">${g.tipoCorto||g.tipo} · ${g.entidad}</div>${diasRestantes != null ? `<span class="${badgeCls}">${badgeTxt}</span>` : ''}</div><div class="summary-card-value" style="font-size:14px;">${fmtUF(g.monto_uf)}</div><div class="summary-card-detail">${g.banco||'—'} · Vcto: ${fmtFecha(g.fecha_vcmto)}</div></div>`;
 }).join('')}</div>
 <div style="font-size:11px;color:#475569;margin-top:6px;">Total garantías: <strong>${fmtUF(totalGarUF)}</strong> · ${gars.length} boleta${gars.length!==1?'s':''}</div>` : '<p style="color:#94a3b8;font-size:12px;font-style:italic;padding:10px 0;">Sin garantías vigentes registradas.</p>'}`;
 
@@ -5540,14 +5567,18 @@ ${gars.length ? `<div class="summary-grid">${gars.map(g => {
             // ── TAB GARANTÍAS ────────────────────────────────────────────────
             const garRows = gars.map(g => {
                 const venc = g.fecha_vcmto ? new Date(g.fecha_vcmto) : null;
-                const vencida = venc && venc < new Date();
-                return `<tr class="${vencida?'gar-vencida':''}"><td>${g.tipoCorto||g.tipo}</td><td>${g.num_bol||'—'}</td><td>${g.banco||'—'}</td><td class="td-monto">${fmtUF(g.monto_uf)}</td><td class="tc">${g.entidad||'—'}</td><td class="tc${vencida?' est-vencida':''}">${fmtFecha(g.fecha_vcmto)}${vencida?' ⚠':''}</td></tr>`;
+                const today2 = new Date(); today2.setHours(0,0,0,0);
+                const dias = venc ? Math.round((venc - today2) / 86400000) : null;
+                const vencida = dias != null && dias < 0;
+                const badgeCls = vencida || dias <= 59 ? 'gar-badge-red' : dias <= 89 ? 'gar-badge-yellow' : 'gar-badge-green';
+                const badgeTxt = vencida ? 'VENCIDA' : dias != null ? dias + ' días' : '—';
+                return `<tr class="${vencida?'gar-vencida':''}"><td>${g.tipoCorto||g.tipo}</td><td>${g.num_bol||'—'}</td><td>${g.banco||'—'}</td><td class="td-monto">${fmtUF(g.monto_uf)}</td><td class="tc">${g.entidad||'—'}</td><td class="tc">${fmtFecha(g.fecha_vcmto)}</td><td class="tc">${dias != null ? `<span class="${badgeCls}">${badgeTxt}</span>` : '—'}</td></tr>`;
             }).join('');
             const gar = gars.length
                 ? `<div class="breadcrumb">Obra <strong>${nombre}</strong> · Garantías vigentes (${gars.length} boletas · ${fmtUF(totalGarUF)})</div>
-<table class="dt"><thead><tr><th>Tipo</th><th>Nº Boleta</th><th>Banco</th><th>Monto UF</th><th class="tc">Entidad</th><th class="tc">Vencimiento</th></tr></thead>
+<table class="dt"><thead><tr><th>Tipo</th><th>Nº Boleta</th><th>Banco</th><th>Monto UF</th><th class="tc">Entidad</th><th class="tc">Vencimiento</th><th class="tc">Plazo</th></tr></thead>
 <tbody>${garRows}</tbody>
-<tfoot><tr><td colspan="3"><strong>Total garantías</strong></td><td class="td-monto"><strong>${fmtUF(totalGarUF)}</strong></td><td colspan="2"></td></tr></tfoot></table>`
+<tfoot><tr><td colspan="3"><strong>Total garantías</strong></td><td class="td-monto"><strong>${fmtUF(totalGarUF)}</strong></td><td colspan="3"></td></tr></tfoot></table>`
                 : `<div class="breadcrumb">Obra <strong>${nombre}</strong> · Garantías</div><p class="no-data">Sin garantías vigentes.</p>`;
 
             return { resumen, ep, gar };
@@ -5604,6 +5635,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .est-vencida{color:#dc2626;font-weight:700;}
 .gar-vencida td{background:#fff1f2!important;}
 .no-data{color:#94a3b8;font-size:13px;text-align:center;padding:48px;font-style:italic;line-height:1.8;}
+.gar-badge-green{display:inline-block;padding:2px 7px;border-radius:12px;font-size:10px;font-weight:700;background:#dcfce7;color:#15803d;border:1px solid #86efac;white-space:nowrap;}
+.gar-badge-yellow{display:inline-block;padding:2px 7px;border-radius:12px;font-size:10px;font-weight:700;background:#fef9c3;color:#a16207;border:1px solid #fde047;white-space:nowrap;}
+.gar-badge-red{display:inline-block;padding:2px 7px;border-radius:12px;font-size:10px;font-weight:700;background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;white-space:nowrap;}
 @media print{.footer{display:none;}.section{display:block!important;page-break-after:always;}}
 </style>`;
 
