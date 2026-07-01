@@ -5477,7 +5477,9 @@ ${js}</body></html>`;
             const pctCobrado     = totalContrato > 0 ? Math.min(100, Math.round(totalPagado / totalContrato * 1000) / 10) : 0;
             const pctEmitido     = totalContrato > 0 ? Math.min(100, Math.round(totalEP / totalContrato * 1000) / 10) : 0;
             const totalGarUF     = gars.reduce((a,g) => a + g.monto_uf, 0);
-            const epPendientes   = eps.filter(e => !e.Estado.toLowerCase().includes('pagado')).length;
+            const epNums         = [...new Set(eps.map(e => e.Num_EP))];
+            const epNumsEmitidos = epNums.length;
+            const epPendientes   = epNums.filter(n => eps.filter(e => e.Num_EP === n).some(e => !e.Estado.toLowerCase().includes('pagado'))).length;
             const agNode         = avanceGanttRaw[pid];
             const pctPrograma    = (agNode != null && agNode.pct != null) ? Math.min(100, Math.round(agNode.pct * 10) / 10) : null;
             const avMensual      = AVANCE_MENSUAL_DATA[pid];
@@ -5493,7 +5495,7 @@ ${js}</body></html>`;
   <div class="summary-card sc-blue"><div class="summary-card-label">Total Contrato</div><div class="summary-card-value">${fmtUF(totalContrato)}</div><div class="summary-card-detail">${montos.viviendas} viviendas</div></div>
   <div class="summary-card sc-green"><div class="summary-card-label">Cobrado (Pagado)</div><div class="summary-card-value" style="color:${barCol};">${fmtUF(totalPagado)}</div><div class="summary-card-detail">${pctCobrado}% del contrato</div></div>
   <div class="summary-card sc-yellow"><div class="summary-card-label">En tramitación</div><div class="summary-card-value">${fmtUF(totalIngresado + totalAprobado)}</div><div class="summary-card-detail">${epPendientes} EP pendientes</div></div>
-  <div class="summary-card sc-red"><div class="summary-card-label">Por facturar</div><div class="summary-card-value">${fmtUF(Math.max(0, totalContrato - totalEP))}</div><div class="summary-card-detail">${eps.length} EP emitidos · ${pctEmitido}% del total</div></div>
+  <div class="summary-card sc-red"><div class="summary-card-label">Por facturar</div><div class="summary-card-value">${fmtUF(Math.max(0, totalContrato - totalEP))}</div><div class="summary-card-detail">${epNumsEmitidos} EP emitidos · ${pctEmitido}% del total</div></div>
 </div>
 <div style="margin:18px 0 4px;">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;"><span style="font-size:10px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.5px;">% Cobrado</span><span style="font-size:11px;font-weight:700;color:${barCol};">${pctCobrado}%</span></div>
