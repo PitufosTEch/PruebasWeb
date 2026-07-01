@@ -5545,7 +5545,7 @@ ${gars.length ? `<div class="summary-grid">${gars.map(g => {
                     return `<tr><td class="td-ep">EP ${g.num}</td><td class="tc">${g.items.length}</td><td class="td-monto">${fmtUF(tot)}</td><td class="${ecls} tc">${est}</td><td class="tc">${fmtFecha(fecha)}</td></tr>`;
                 }).join('');
             const ep = eps.length
-                ? `<div class="breadcrumb">Obra <strong>${nombre}</strong> · Estados de Pago (${eps.length} EP · ${fmtUF(totalEP)} total)</div>
+                ? `<div class="breadcrumb">Obra <strong>${nombre}</strong> · Estados de Pago (${epNumsEmitidos} EP · ${fmtUF(totalEP)} total)</div>
 <table class="dt"><thead><tr><th>EP</th><th class="tc">Benef.</th><th>Monto UF</th><th class="tc">Estado</th><th class="tc">Fecha</th></tr></thead>
 <tbody>${epRows}</tbody>
 <tfoot><tr><td colspan="2"><strong>Total emitido</strong></td><td class="td-monto"><strong>${fmtUF(totalEP)}</strong></td><td class="tc est-pagado"><strong>${fmtUF(totalPagado)}</strong></td><td class="tc" style="font-size:10px;color:#94a3b8;">pagado</td></tr></tfoot></table>`
