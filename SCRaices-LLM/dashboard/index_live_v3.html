@@ -5534,6 +5534,7 @@ ${gars.length ? `<div class="summary-grid">${gars.map(g => {
                 if (!epByNum[k]) epByNum[k] = { num: k, items: [] };
                 epByNum[k].items.push(ep);
             });
+            let cumPagado = 0;
             const epRows = Object.values(epByNum)
                 .sort((a,b) => (parseFloat(a.num)||0) - (parseFloat(b.num)||0))
                 .map(g => {
@@ -5542,14 +5543,20 @@ ${gars.length ? `<div class="summary-grid">${gars.map(g => {
                     const fecha = g.items.map(e => e.Fecha).filter(Boolean).sort().slice(-1)[0] || '';
                     const estL = est.toLowerCase();
                     const ecls = estL.includes('pagado') ? 'est-pagado' : estL.includes('ingresado') ? 'est-ingresado' : 'est-otro';
-                    return `<tr><td class="td-ep">EP ${g.num}</td><td class="tc">${g.items.length}</td><td class="td-monto">${fmtUF(tot)}</td><td class="${ecls} tc">${est}</td><td class="tc">${fmtFecha(fecha)}</td></tr>`;
+                    let saldoCell = '<td></td>';
+                    if (estL.includes('pagado')) {
+                        cumPagado += tot;
+                        const saldo = Math.max(0, totalContrato - cumPagado);
+                        saldoCell = `<td class="td-monto td-saldo">Saldo: ${fmtUF(saldo)}</td>`;
+                    }
+                    return `<tr><td class="td-ep">EP ${g.num}</td><td class="tc">${g.items.length}</td><td class="td-monto">${fmtUF(tot)}</td><td class="${ecls} tc">${est}</td><td class="tc">${fmtFecha(fecha)}</td>${saldoCell}</tr>`;
                 }).join('');
             const ep = eps.length
-                ? `<div class="breadcrumb">Obra <strong>${nombre}</strong> · Estados de Pago (${epNumsEmitidos} EP · ${fmtUF(totalEP)} total)</div>
-<table class="dt"><thead><tr><th>EP</th><th class="tc">Benef.</th><th>Monto UF</th><th class="tc">Estado</th><th class="tc">Fecha</th></tr></thead>
+                ? `<div class="breadcrumb">Obra <strong>${nombre}</strong> · Estados de Pago · ${epNumsEmitidos} EP emitidos · <span style="color:#0f172a;font-weight:700;">Contrato: ${fmtUF(totalContrato)}</span></div>
+<table class="dt"><thead><tr><th>EP</th><th class="tc">Benef.</th><th>Monto UF</th><th class="tc">Estado</th><th class="tc">Fecha</th><th>Saldo contrato</th></tr></thead>
 <tbody>${epRows}</tbody>
-<tfoot><tr><td colspan="2"><strong>Total emitido</strong></td><td class="td-monto"><strong>${fmtUF(totalEP)}</strong></td><td class="tc est-pagado"><strong>${fmtUF(totalPagado)}</strong></td><td class="tc" style="font-size:10px;color:#94a3b8;">pagado</td></tr></tfoot></table>`
-                : `<div class="breadcrumb">Obra <strong>${nombre}</strong> · Estados de Pago</div><p class="no-data">Sin estados de pago emitidos.<br><small>Contrato total: ${fmtUF(totalContrato)} · ${montos.viviendas} viviendas</small></p>`;
+<tfoot><tr><td colspan="2"><strong>Total emitido</strong></td><td class="td-monto"><strong>${fmtUF(totalEP)}</strong></td><td class="tc est-pagado"><strong>${fmtUF(totalPagado)}</strong></td><td class="tc" style="font-size:10px;color:#94a3b8;">pagado</td><td class="td-monto td-saldo"><strong>Saldo: ${fmtUF(Math.max(0,totalContrato-totalPagado))}</strong></td></tr></tfoot></table>`
+                : `<div class="breadcrumb">Obra <strong>${nombre}</strong> · Estados de Pago · <span style="color:#0f172a;font-weight:700;">Contrato: ${fmtUF(totalContrato)}</span></div><p class="no-data">Sin estados de pago emitidos.<br><small>${montos.viviendas} viviendas</small></p>`;
 
             // ── TAB GARANTÍAS ────────────────────────────────────────────────
             const garRows = gars.map(g => {
@@ -5570,6 +5577,18 @@ ${gars.length ? `<div class="summary-grid">${gars.map(g => {
 
             return { resumen, ep, gar };
         });
+
+        // Totales globales para barra resumen pestaña EP
+        const grandContrato = obras.reduce((s,p) => s + (MONTOS_PROY_DATA[p.ID_proy]?.total||0), 0);
+        const grandCobrado  = obras.reduce((s,p) => s + EEPP_DATA.filter(e => e.ID_Proy === p.ID_proy && e.Estado.toLowerCase().includes('pagado')).reduce((a,e) => a + e.Monto, 0), 0);
+        const grandSaldo    = Math.max(0, grandContrato - grandCobrado);
+        const epSummaryBar  = `<div class="ep-sumbar">
+  <div class="ep-sumbar-item"><span class="ep-sumbar-label">Total contratos</span><span class="ep-sumbar-val">${fmtUF(grandContrato)}</span></div>
+  <div class="ep-sumbar-sep"></div>
+  <div class="ep-sumbar-item"><span class="ep-sumbar-label">Total cobrado</span><span class="ep-sumbar-val" style="color:#16a34a;">${fmtUF(grandCobrado)}</span></div>
+  <div class="ep-sumbar-sep"></div>
+  <div class="ep-sumbar-item"><span class="ep-sumbar-label">Saldo por cobrar</span><span class="ep-sumbar-val" style="color:#dc2626;">${fmtUF(grandSaldo)}</span></div>
+</div>`;
 
         const cssEP = `<style>
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -5622,7 +5641,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .gar-badge-green{display:inline-block;padding:2px 7px;border-radius:12px;font-size:10px;font-weight:700;background:#dcfce7;color:#15803d;border:1px solid #86efac;white-space:nowrap;}
 .gar-badge-yellow{display:inline-block;padding:2px 7px;border-radius:12px;font-size:10px;font-weight:700;background:#fef9c3;color:#a16207;border:1px solid #fde047;white-space:nowrap;}
 .gar-badge-red{display:inline-block;padding:2px 7px;border-radius:12px;font-size:10px;font-weight:700;background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;white-space:nowrap;}
-@media print{.footer{display:none;}.tabs{display:none;}.section{display:block!important;}.obra-block{page-break-after:always;border:none;border-bottom:2px solid #e2e8f0;border-radius:0;margin:0;}}
+.td-saldo{font-size:10px;color:#64748b;}
+.ep-sumbar{position:sticky;top:89px;z-index:98;background:#0f172a;display:flex;align-items:center;gap:0;padding:10px 24px;border-bottom:1px solid #1e293b;}
+.ep-sumbar-item{display:flex;flex-direction:column;gap:2px;padding:0 20px;}
+.ep-sumbar-label{font-size:9px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;}
+.ep-sumbar-val{font-size:13px;font-weight:700;color:#fff;font-family:monospace;}
+.ep-sumbar-sep{width:1px;height:32px;background:#334155;}
+@media print{.footer{display:none;}.tabs{display:none;}.ep-sumbar{display:none;}.section{display:block!important;}.obra-block{page-break-after:always;border:none;border-bottom:2px solid #e2e8f0;border-radius:0;margin:0;}}
 </style>`;
 
         const jsOpen = '<scr'+'ipt>';
@@ -5632,7 +5657,7 @@ function mostrar(t,btn){document.querySelectorAll('.section').forEach(s=>s.class
 ` + jsClose;
 
         const tabResumen = allSections.map(s => `<div class="obra-block">${s.resumen}</div>`).join('');
-        const tabEP      = allSections.map(s => `<div class="obra-block">${s.ep}</div>`).join('');
+        const tabEP      = epSummaryBar + allSections.map(s => `<div class="obra-block">${s.ep}</div>`).join('');
         const tabGar     = allSections.map(s => `<div class="obra-block">${s.gar}</div>`).join('');
 
         const htmlEP = `<!DOCTYPE html>
