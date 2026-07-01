@@ -5584,24 +5584,21 @@ ${gars.length ? `<div class="summary-grid">${gars.map(g => {
             return { resumen, ep, gar };
         });
 
-        const opts = obras.map((o,i) => `<option value="${i}">${o.ID_proy} · ${o.NOMBRE_PROYECTO}${o.COMUNA?' — '+o.COMUNA:''}</option>`).join('');
-
         const cssEP = `<style>
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f4f8;color:#1a1a2e;font-size:14px;}
 .multi-container{max-width:980px;margin:0 auto;padding:0 0 40px;}
-.header{background:#0f172a;color:#fff;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+.header{background:#0f172a;color:#fff;padding:14px 24px;display:flex;align-items:center;gap:16px;}
 .header h1{font-size:16px;font-weight:700;}
-.header-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
-.header-controls label{font-size:12px;color:#94a3b8;}
-.header-controls select{background:#1e293b;color:#fff;border:1px solid #334155;border-radius:6px;padding:6px 10px;font-size:12px;cursor:pointer;max-width:380px;}
+.header-sub{font-size:11px;color:#94a3b8;margin-left:auto;}
 .tabs{background:#1e293b;display:flex;padding:0 24px;gap:2px;}
 .tab-btn{background:none;border:none;color:#94a3b8;font-size:12px;font-weight:600;padding:11px 18px;cursor:pointer;border-bottom:3px solid transparent;}
 .tab-btn.active{color:#fff;border-bottom-color:#3b82f6;}
 .tab-btn:hover:not(.active){color:#e2e8f0;}
-.content{background:#fff;min-height:380px;}
-.section{display:none;padding:24px;}
+.content{background:#f0f4f8;min-height:380px;}
+.section{display:none;}
 .section.active{display:block;}
+.obra-block{background:#fff;margin:12px;border-radius:10px;padding:24px;border:1px solid #e2e8f0;}
 .footer{background:#f8fafc;border-top:1px solid #e2e8f0;padding:12px 24px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;}
 .btn{padding:8px 14px;border:1px solid #d1d5db;border-radius:6px;background:#fff;cursor:pointer;font-size:12px;font-weight:600;color:#374151;}
 .btn:hover{background:#f3f4f6;}
@@ -5622,7 +5619,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .summary-card-value{font-size:16px;font-weight:700;color:#0f172a;font-family:monospace;margin-bottom:3px;}
 .summary-card-detail{font-size:10px;color:#94a3b8;}
 .dt{width:100%;border-collapse:collapse;font-size:12px;}
-.dt th{background:#f8fafc;color:#475569;font-weight:700;padding:9px 11px;text-align:left;border-bottom:2px solid #e2e8f0;font-size:10px;text-transform:uppercase;position:sticky;top:0;}
+.dt th{background:#f8fafc;color:#475569;font-weight:700;padding:9px 11px;text-align:left;border-bottom:2px solid #e2e8f0;font-size:10px;text-transform:uppercase;}
 .dt td{padding:8px 11px;border-bottom:1px solid #f1f5f9;color:#334155;}
 .dt tr:hover td{background:#f8fafc;}
 .dt tfoot td{background:#f1f5f9;border-top:2px solid #e2e8f0;font-weight:600;}
@@ -5638,21 +5635,18 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .gar-badge-green{display:inline-block;padding:2px 7px;border-radius:12px;font-size:10px;font-weight:700;background:#dcfce7;color:#15803d;border:1px solid #86efac;white-space:nowrap;}
 .gar-badge-yellow{display:inline-block;padding:2px 7px;border-radius:12px;font-size:10px;font-weight:700;background:#fef9c3;color:#a16207;border:1px solid #fde047;white-space:nowrap;}
 .gar-badge-red{display:inline-block;padding:2px 7px;border-radius:12px;font-size:10px;font-weight:700;background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;white-space:nowrap;}
-@media print{.footer{display:none;}.section{display:block!important;page-break-after:always;}}
+@media print{.footer{display:none;}.tabs{display:none;}.section{display:block!important;}.obra-block{page-break-after:always;border:none;border-bottom:2px solid #e2e8f0;border-radius:0;margin:0;}}
 </style>`;
 
         const jsOpen = '<scr'+'ipt>';
         const jsClose = '<\/scr'+'ipt>';
         const jsEP = jsOpen + `
-const secs=${JSON.stringify(allSections)};
-let idx=0;
-function cambiar(i){idx=Math.max(0,Math.min(${obras.length-1},i));document.getElementById('obra-sel').value=idx;mostrar('resumen');}
-function mostrar(t){document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.tabs .tab-btn').forEach(b=>b.classList.remove('active'));document.getElementById('sec-'+t).classList.add('active');event.target.classList.add('active');document.getElementById('sec-'+t).innerHTML=secs[idx][t];}
+function mostrar(t,btn){document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.tabs .tab-btn').forEach(b=>b.classList.remove('active'));document.getElementById('sec-'+t).classList.add('active');btn.classList.add('active');}
 ` + jsClose;
 
-        const secsHTML = ['resumen','ep','gar'].map(t =>
-            `<div class="section${t==='resumen'?' active':''}" id="sec-${t}">${allSections[0][t]||''}</div>`
-        ).join('');
+        const tabResumen = allSections.map(s => `<div class="obra-block">${s.resumen}</div>`).join('');
+        const tabEP      = allSections.map(s => `<div class="obra-block">${s.ep}</div>`).join('');
+        const tabGar     = allSections.map(s => `<div class="obra-block">${s.gar}</div>`).join('');
 
         const htmlEP = `<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
@@ -5662,20 +5656,19 @@ ${cssEP}</head><body>
 <div class="multi-container">
   <div class="header">
     <h1>&#128200; Estados de Pago — Multi Obras</h1>
-    <div class="header-controls">
-      <label>Seleccionar obra:</label>
-      <select id="obra-sel" onchange="cambiar(parseInt(this.value))">${opts}</select>
-    </div>
+    <span class="header-sub">${obras.length} obras en ejecución · ${new Date().toLocaleDateString('es-CL')}</span>
   </div>
   <div class="tabs">
-    <button class="tab-btn active" onclick="mostrar('resumen')">Resumen</button>
-    <button class="tab-btn" onclick="mostrar('ep')">Estados de Pago</button>
-    <button class="tab-btn" onclick="mostrar('gar')">Garantías</button>
+    <button class="tab-btn active" onclick="mostrar('resumen',this)">Resumen</button>
+    <button class="tab-btn" onclick="mostrar('ep',this)">Estados de Pago</button>
+    <button class="tab-btn" onclick="mostrar('gar',this)">Garantías</button>
   </div>
-  <div class="content">${secsHTML}</div>
+  <div class="content">
+    <div class="section active" id="sec-resumen">${tabResumen}</div>
+    <div class="section" id="sec-ep">${tabEP}</div>
+    <div class="section" id="sec-gar">${tabGar}</div>
+  </div>
   <div class="footer">
-    <button class="btn" onclick="cambiar(idx-1)">&#8592; Anterior</button>
-    <button class="btn" onclick="cambiar(idx+1)">Siguiente &#8594;</button>
     <button class="btn btn-pdf" onclick="window.print()">&#128196; Imprimir / PDF</button>
   </div>
 </div>
