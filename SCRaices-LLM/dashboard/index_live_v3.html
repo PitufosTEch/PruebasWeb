@@ -359,9 +359,15 @@ const ETAPAS_CONFIG_FULL = {
             console.log('[LIVE] OK:', label);
             return data;
         } catch (err) {
-            if (retry < 2) {
-                console.warn(`[LIVE] Retry ${retry+1} para ${label}:`, err.message);
-                await new Promise(r => setTimeout(r, 2000));
+            const MAX_RETRY = 5;
+            if (retry < MAX_RETRY) {
+                // Backoff exponencial + jitter. El endpoint Apps Script (cuenta
+                // consumer, cuota limitada) devuelve 404 / "Failed to fetch"
+                // transitorios en horario laboral cuando dashboard + informes +
+                // snapshot lo saturan. Reintentar espaciado los recupera.
+                const backoff = Math.min(20000, 1500 * Math.pow(2, retry)) + Math.floor(Math.random() * 1000);
+                console.warn(`[LIVE] Retry ${retry+1}/${MAX_RETRY} para ${label} en ${backoff}ms:`, err.message);
+                await new Promise(r => setTimeout(r, backoff));
                 return fetchBatch(tables, label, retry + 1);
             }
             throw err;
