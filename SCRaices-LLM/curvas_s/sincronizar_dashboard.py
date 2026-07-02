@@ -61,6 +61,7 @@ PROYECTOS_META = {
     "P116": {"nombre": "Sonia Quilaleo",      "json": "drive_ids_quilaleo.json",  "id": "P116"},
     "P31":  {"nombre": "Trovolhue",           "json": "drive_ids_trovolhue.json", "id": "P31"},
     "P131": {"nombre": "Raíces de Melipeuco", "json": "drive_ids_melipeuco.json", "id": "P131"},
+    "P28":  {"nombre": "Elsa Pinchulaf",      "json": "drive_ids_pinchulaf.json", "id": "P28"},
 }
 
 # Orden de aparición preferido: TOTAL primero, luego Todos_Grupos, luego grupos individuales
@@ -113,6 +114,7 @@ _FIREBASE_NOMBRE = {
     "P116": "quilaleo",
     "P31":  "trovolhue",
     "P131": "melipeuco",
+    "P28":  "pinchulaf",
 }
 
 

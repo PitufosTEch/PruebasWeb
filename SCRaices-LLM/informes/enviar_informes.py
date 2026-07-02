@@ -56,6 +56,7 @@ PROYECTOS = [
     ("P38",  "Aliwen"),
     ("P31",  "Trovolhue"),
     ("P131", "Raices_Melipeuco"),
+    ("P28",  "Elsa_Pinchulaf"),
 ]
 PROY_IDS = [p for p, _ in PROYECTOS]
 
@@ -234,7 +235,7 @@ Generado automáticamente — Panel de Control v3 SG Raíces.
         server.sendmail(remitente, [correo_dest], msg.as_string())
 
 
-def main(pdf_dir: Path = None, fecha: str = None):
+def main(pdf_dir: Path = None, fecha: str = None, solo_para: str = None):
     if pdf_dir is None:
         pdf_dir = _LOCAL_PDF_DIR
     pdf_dir = Path(pdf_dir)
@@ -252,6 +253,13 @@ def main(pdf_dir: Path = None, fecha: str = None):
 
     print("Leyendo asignaciones desde Firebase...")
     plan = construir_plan_envio(pdf_dir, fecha_str)
+
+    if solo_para:
+        plan = {k: v for k, v in plan.items() if k.lower() == solo_para.lower()}
+        if not plan:
+            print(f"No se encontró '{solo_para}' en el plan de envío. ¿Está registrado en Firebase con informes asignados?")
+            sys.exit(1)
+        print(f"[PRUEBA] Enviando SOLO a: {solo_para}")
 
     if not plan:
         print(f"No se encontraron archivos del {fecha_str} o destinatarios configurados.")
@@ -286,12 +294,17 @@ def main(pdf_dir: Path = None, fecha: str = None):
 
 
 if __name__ == "__main__":
-    pdf_dir_arg = None
+    pdf_dir_arg  = None
+    solo_para_arg = None
     if "--pdf-dir" in sys.argv:
         idx = sys.argv.index("--pdf-dir")
         if idx + 1 < len(sys.argv):
             pdf_dir_arg = Path(sys.argv[idx + 1])
-    result = main(pdf_dir_arg)
+    if "--solo-para" in sys.argv:
+        idx = sys.argv.index("--solo-para")
+        if idx + 1 < len(sys.argv):
+            solo_para_arg = sys.argv[idx + 1]
+    result = main(pdf_dir_arg, solo_para=solo_para_arg)
     if result:
         _, errores = result
         if errores:

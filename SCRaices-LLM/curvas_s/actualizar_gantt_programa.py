@@ -50,6 +50,7 @@ PROYECTOS = {
     "P116": "1z9kNq9uo363NrWqCojGfGpP326FDj3V60irWxtMMbU8",
     "P119": "1t_1j62f_3l1nrlufmvhnV-o1WTplv0OnQL_JdVaWgKA",
     "P131": "1n5F-P5cy8Wj5BujllzdnwCrKwGsfIkdvHxcyd6YwscU",
+    "P28":  "18XkRb7RAF52Aqj4immGebME-d9sODY0HgxIKWcBGrlg",
 }
 
 # ─────────────────────────────────────────────────────────────────────────────

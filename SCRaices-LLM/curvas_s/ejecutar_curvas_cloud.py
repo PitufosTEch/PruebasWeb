@@ -59,6 +59,7 @@ SCRIPTS_EN_ORDEN = [
     ("P131 - Raíces Melipeuco","curvas_automatico_melipeuco"),
     ("P116 - Sonia Quilaleo",  "curvas_automatico_quilaleo"),
     ("P31  - Trovolhue",       "curvas_automatico_trovolhue"),
+    ("P28  - Elsa Pinchulaf",  "curvas_automatico_pinchulaf"),
 ]
 
 POST_SCRIPTS = [

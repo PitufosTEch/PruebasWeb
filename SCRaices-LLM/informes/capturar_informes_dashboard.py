@@ -44,6 +44,7 @@ PROYECTOS = [
     ("P38",  "Aliwen"),
     ("P31",  "Trovolhue"),
     ("P131", "Raices_Melipeuco"),
+    ("P28",  "Elsa_Pinchulaf"),
 ]
 
 # Informes PDF estándar por proyecto (sin capataz — se maneja aparte)
