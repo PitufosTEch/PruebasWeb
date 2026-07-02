@@ -5481,17 +5481,23 @@ ${js}</body></html>`;
                 let pts=[],segs=[];
                 s.data.forEach((v,i)=>{if(v==null){if(pts.length)segs.push(pts);pts=[];return;}pts.push([xp(i),yp(v)]);});
                 if(pts.length)segs.push(pts);
-                // Catmull-Rom → bezier cúbica (tension 0.25); clipPath impide salir bajo el eje X
-                const clampY=y=>Math.min(yBaseline,Math.max(pT,y));
+                // Interpolación cúbica monotónica Fritsch-Carlson: no genera picos/valles falsos entre puntos
                 segs.forEach(pts=>{
                     if(pts.length<2)return;
-                    const t=0.25;
+                    const n=pts.length;
+                    const del=[];
+                    for(let i=0;i<n-1;i++) del.push((pts[i+1][1]-pts[i][1])/(pts[i+1][0]-pts[i][0]));
+                    const m=new Array(n);
+                    m[0]=del[0]; m[n-1]=del[n-2];
+                    for(let i=1;i<n-1;i++) m[i]=(del[i-1]*del[i]<=0)?0:(del[i-1]+del[i])/2;
+                    for(let i=0;i<n-1;i++){
+                        if(Math.abs(del[i])<1e-10){m[i]=0;m[i+1]=0;}
+                        else{const a=m[i]/del[i],b=m[i+1]/del[i],r=a*a+b*b;if(r>9){const t=3/Math.sqrt(r);m[i]=t*a*del[i];m[i+1]=t*b*del[i];}}
+                    }
                     let d=`M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
-                    for(let i=0;i<pts.length-1;i++){
-                        const p0=pts[Math.max(0,i-1)],p1=pts[i],p2=pts[i+1],p3=pts[Math.min(pts.length-1,i+2)];
-                        const cp1x=p1[0]+(p2[0]-p0[0])*t, cp1y=clampY(p1[1]+(p2[1]-p0[1])*t);
-                        const cp2x=p2[0]-(p3[0]-p1[0])*t, cp2y=clampY(p2[1]-(p3[1]-p1[1])*t);
-                        d+=` C${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+                    for(let i=0;i<n-1;i++){
+                        const dx=pts[i+1][0]-pts[i][0];
+                        d+=` C${(pts[i][0]+dx/3).toFixed(1)},${(pts[i][1]+m[i]*dx/3).toFixed(1)} ${(pts[i+1][0]-dx/3).toFixed(1)},${(pts[i+1][1]-m[i+1]*dx/3).toFixed(1)} ${pts[i+1][0].toFixed(1)},${pts[i+1][1].toFixed(1)}`;
                     }
                     out+=`<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2.5" clip-path="url(#cgc)" ${s.dash?`stroke-dasharray="${s.dash}"`:''}  stroke-linecap="round" stroke-linejoin="round"/>`;
                 });
@@ -5640,14 +5646,6 @@ ${gars.length ? `<div class="summary-grid">${gars.map(g => {
                 const rp = serieAvReal.find(s=>s.mes===mes);
                 dAvReal.push(rp != null ? Math.round(rp.avance/100*totalContrato*100)/100 : null);
             });
-            // Cobrado real es acumulado: no puede disminuir
-            for (let i = 1; i < dCobrado.length; i++) {
-                if (dCobrado[i] < dCobrado[i-1]) dCobrado[i] = dCobrado[i-1];
-            }
-            // Emitido tampoco puede disminuir
-            for (let i = 1; i < dEmitido.length; i++) {
-                if (dEmitido[i] < dEmitido[i-1]) dEmitido[i] = dEmitido[i-1];
-            }
             const dPrograma = (pctPrograma != null && chartMeses.length > 0)
                 ? chartMeses.map((_,i) => Math.round((i+1)/chartMeses.length*(pctPrograma/100*totalContrato)*100)/100)
                 : [];
