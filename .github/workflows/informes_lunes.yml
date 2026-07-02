@@ -22,10 +22,13 @@ jobs:
     name: Capturar y enviar informes semanales
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    # Solo ejecutar si las curvas completaron exitosamente (o si es manual)
+    # Solo ejecutar si:
+    # - Se fuerza manualmente este workflow (workflow_dispatch explícito)
+    # - Las curvas completaron exitosamente Y corrieron por su cron del lunes (no por ejecución manual)
     if: >
       github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion == 'success'
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'schedule')
 
     steps:
       - name: Checkout repositorio
