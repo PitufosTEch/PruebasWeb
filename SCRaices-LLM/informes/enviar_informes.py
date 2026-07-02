@@ -71,6 +71,7 @@ TIPO_ARCHIVO = {
     "residente":         ("Informe_Residente",     ".pdf",  False, False),
     "por_capataz":       ("Informe_Capataz",       ".pdf",  False, True),
     "adquisiciones_html":("Informe_Adquisiciones", ".html", True,  False),
+    "estados_pago_html": ("Informe_EstadosPago",   ".html", True,  False),
 }
 
 

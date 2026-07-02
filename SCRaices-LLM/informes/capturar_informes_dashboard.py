@@ -56,6 +56,7 @@ INFORMES_PDF = [
 INFORMES_HTML = [
     ("EjecutivoHTML", "Reporte Ejecutivo HTML"),
     ("Adquisiciones", "Reporte adquisiciones HTML"),
+    ("EstadosPago",   "Estados de Pago HTML"),
 ]
 
 
