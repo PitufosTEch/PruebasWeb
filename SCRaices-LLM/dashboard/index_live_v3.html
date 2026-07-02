@@ -6221,6 +6221,7 @@ ${viewerCss}</style>
                     {proy && <span className="text-xs text-gray-400 font-normal">— {proy.ID_proy} · {proy.NOMBRE_PROYECTO}</span>}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
+                    {/* ── PDF ── */}
                     <button
                         onClick={generarInformePDF}
                         className="flex items-center gap-2 px-4 py-2 bg-raices-red hover:bg-red-800 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors"
@@ -6246,20 +6247,23 @@ ${viewerCss}</style>
                         Reporte adquisiciones
                     </button>
                     <button
-                        onClick={generarInformeAdquisicionesHTML}
-                        className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors"
-                        title="Descarga HTML navegable multi-obras con datos de adquisiciones: checkpoints, curvas S y ritmos (sin inspecciones in-situ)"
-                    >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-                        Reporte adquisiciones HTML
-                    </button>
-                    <button
                         onClick={generarTodosReportesCapataz}
                         className="flex items-center gap-2 px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors"
                         title="Genera automáticamente un informe por cada capataz del proyecto (una ventana por capataz)"
                     >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
                         Reporte Capataz
+                    </button>
+                    {/* ── separador PDF / HTML ── */}
+                    <span className="w-px h-6 bg-gray-300 mx-1 self-center" />
+                    {/* ── HTML ── */}
+                    <button
+                        onClick={generarInformeAdquisicionesHTML}
+                        className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors"
+                        title="Descarga HTML navegable multi-obras con datos de adquisiciones: checkpoints, curvas S y ritmos (sin inspecciones in-situ)"
+                    >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                        Reporte adquisiciones HTML
                     </button>
                     <button
                         onClick={generarInformeMultiObras}
