@@ -5802,7 +5802,7 @@ ${cssEP}</head><body>
     <button class="tab-btn" onclick="mostrar('curva',this)">Curva Cobros/Pagos</button>
     <select class="obra-jumper" onchange="jumpToObra(this.value);this.value=''">
       <option value="">&#128269; Ir a obra...</option>
-      ${obras.map((p,i)=>`<option value="${i}">${p.NOMBRE_PROYECTO}</option>`).join('')}
+      ${obras.map((p,i)=>`<option value="${i}">${p.ID_proy} · ${p.NOMBRE_PROYECTO}</option>`).join('')}
     </select>
   </div>
   <div class="content">
