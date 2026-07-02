@@ -5757,6 +5757,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .ch-dot{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:4px;vertical-align:middle;}
 .ch-dashed{width:18px;height:0;border-radius:0;border-top:3px dashed;background:transparent;vertical-align:middle;}
 .ch-wrap{position:relative;height:260px;margin-top:8px;}
+.obra-jumper{margin-left:auto;align-self:center;background:#0f172a;color:#cbd5e1;border:1px solid #334155;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer;outline:none;max-width:220px;}
+.obra-jumper:focus{border-color:#3b82f6;}
+.obra-jumper option{background:#1e293b;color:#e2e8f0;}
 @media print{.footer{display:none;}.tabs{display:none;}.ep-sumbar{display:none;}.section{display:block!important;}.obra-block{page-break-after:always;border:none;border-bottom:2px solid #e2e8f0;border-radius:0;margin:0;}}
 </style>`;
 
@@ -5769,12 +5772,18 @@ function mostrar(t,btn){
   document.getElementById('sec-'+t).classList.add('active');
   btn.classList.add('active');
 }
+function jumpToObra(idx){
+  if(idx==='')return;
+  const sec=document.querySelector('.section.active');
+  const block=sec&&sec.querySelector('.obra-block[data-obra="'+idx+'"]');
+  if(block)block.scrollIntoView({behavior:'smooth',block:'start'});
+}
 ` + jsClose;
 
-        const tabResumen = allSections.map(s => `<div class="obra-block">${s.resumen}</div>`).join('');
-        const tabEP      = epSummaryBar + allSections.map(s => `<div class="obra-block">${s.ep}</div>`).join('');
-        const tabGar     = allSections.map(s => `<div class="obra-block">${s.gar}</div>`).join('');
-        const tabCurva   = allSections.map(s => s.curvaHtml).join('');
+        const tabResumen = allSections.map((s,i) => `<div class="obra-block" data-obra="${i}">${s.resumen}</div>`).join('');
+        const tabEP      = epSummaryBar + allSections.map((s,i) => `<div class="obra-block" data-obra="${i}">${s.ep}</div>`).join('');
+        const tabGar     = allSections.map((s,i) => `<div class="obra-block" data-obra="${i}">${s.gar}</div>`).join('');
+        const tabCurva   = allSections.map((s,i) => s.curvaHtml.replace('class="obra-block"',`class="obra-block" data-obra="${i}"`)).join('');
 
         const htmlEP = `<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
@@ -5791,6 +5800,10 @@ ${cssEP}</head><body>
     <button class="tab-btn" onclick="mostrar('ep',this)">Estados de Pago</button>
     <button class="tab-btn" onclick="mostrar('gar',this)">Garantías</button>
     <button class="tab-btn" onclick="mostrar('curva',this)">Curva Cobros/Pagos</button>
+    <select class="obra-jumper" onchange="jumpToObra(this.value);this.value=''">
+      <option value="">&#128269; Ir a obra...</option>
+      ${obras.map((p,i)=>`<option value="${i}">${p.NOMBRE_PROYECTO}</option>`).join('')}
+    </select>
   </div>
   <div class="content">
     <div class="section active" id="sec-resumen">${tabResumen}</div>
