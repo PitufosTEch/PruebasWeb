@@ -5474,9 +5474,23 @@ ${js}</body></html>`;
             labels.forEach((l,i)=>{if(i%step===0||i===labels.length-1){const x=xp(i).toFixed(1);out+=`<text x="${x}" y="${H-pB+13}" text-anchor="end" font-size="9" fill="#94a3b8" transform="rotate(-35,${x},${H-pB+13})">${l}</text>`;}});
             series.forEach(s=>{
                 if(!s.data.some(v=>v!=null))return;
-                let d='',mv=true;
-                s.data.forEach((v,i)=>{if(v==null){mv=true;return;}d+=(mv?'M':'L')+xp(i).toFixed(1)+','+yp(v).toFixed(1)+' ';mv=false;});
-                out+=`<path d="${d.trim()}" fill="none" stroke="${s.color}" stroke-width="2.5" ${s.dash?`stroke-dasharray="${s.dash}"`:''}  stroke-linecap="round" stroke-linejoin="round"/>`;
+                // Agrupar puntos no-nulos en segmentos contiguos
+                let pts=[],segs=[];
+                s.data.forEach((v,i)=>{if(v==null){if(pts.length)segs.push(pts);pts=[];return;}pts.push([xp(i),yp(v)]);});
+                if(pts.length)segs.push(pts);
+                // Trazar cada segmento con Catmull-Rom → bezier cúbica (tension 0.25)
+                segs.forEach(pts=>{
+                    if(pts.length<2)return;
+                    const t=0.25;
+                    let d=`M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
+                    for(let i=0;i<pts.length-1;i++){
+                        const p0=pts[Math.max(0,i-1)],p1=pts[i],p2=pts[i+1],p3=pts[Math.min(pts.length-1,i+2)];
+                        const cp1x=p1[0]+(p2[0]-p0[0])*t, cp1y=p1[1]+(p2[1]-p0[1])*t;
+                        const cp2x=p2[0]-(p3[0]-p1[0])*t, cp2y=p2[1]-(p3[1]-p1[1])*t;
+                        d+=` C${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+                    }
+                    out+=`<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2.5" ${s.dash?`stroke-dasharray="${s.dash}"`:''}  stroke-linecap="round" stroke-linejoin="round"/>`;
+                });
                 s.data.forEach((v,i)=>{if(v!=null)out+=`<circle cx="${xp(i).toFixed(1)}" cy="${yp(v).toFixed(1)}" r="3.5" fill="${s.color}" stroke="#fff" stroke-width="1.5"/>`;});
             });
             out+=`<line x1="${pL}" y1="${pT}" x2="${pL}" y2="${pT+cH}" stroke="#94a3b8" stroke-width="1"/><line x1="${pL}" y1="${pT+cH}" x2="${W-pR}" y2="${pT+cH}" stroke="#94a3b8" stroke-width="1"/>`;
