@@ -5640,6 +5640,14 @@ ${gars.length ? `<div class="summary-grid">${gars.map(g => {
                 const rp = serieAvReal.find(s=>s.mes===mes);
                 dAvReal.push(rp != null ? Math.round(rp.avance/100*totalContrato*100)/100 : null);
             });
+            // Cobrado real es acumulado: no puede disminuir
+            for (let i = 1; i < dCobrado.length; i++) {
+                if (dCobrado[i] < dCobrado[i-1]) dCobrado[i] = dCobrado[i-1];
+            }
+            // Emitido tampoco puede disminuir
+            for (let i = 1; i < dEmitido.length; i++) {
+                if (dEmitido[i] < dEmitido[i-1]) dEmitido[i] = dEmitido[i-1];
+            }
             const dPrograma = (pctPrograma != null && chartMeses.length > 0)
                 ? chartMeses.map((_,i) => Math.round((i+1)/chartMeses.length*(pctPrograma/100*totalContrato)*100)/100)
                 : [];
