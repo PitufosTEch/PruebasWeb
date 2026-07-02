@@ -94,15 +94,15 @@ def capturar_html() -> Path:
         page.wait_for_timeout(2000)
 
         try:
-            page.wait_for_selector("button:has-text('HTML navegable')", state="visible", timeout=30_000)
+            page.wait_for_selector("button:has-text('Reporte Ejecutivo HTML')", state="visible", timeout=30_000)
         except PlaywrightTimeout:
-            log.error("Timeout: botón 'HTML navegable' no apareció.")
+            log.error("Timeout: botón 'Reporte Ejecutivo HTML' no apareció.")
             browser.close()
             raise
 
-        log.info("Haciendo click en 'HTML navegable'...")
+        log.info("Haciendo click en 'Reporte Ejecutivo HTML'...")
         with page.expect_download(timeout=60_000) as dl_info:
-            page.click("button:has-text('HTML navegable')")
+            page.click("button:has-text('Reporte Ejecutivo HTML')")
 
         download = dl_info.value
         fname = download.suggested_filename or f"Informes_MultiObras_{datetime.now().strftime('%Y%m%d')}.html"
