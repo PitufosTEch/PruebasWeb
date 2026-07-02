@@ -5646,7 +5646,7 @@ ${gars.length ? `<div class="summary-grid">${gars.map(g => {
             const chartSeries = [
                 { color:'#16a34a', data:dCobrado,  dash:null    },   // verde sólido  — Cobrado real
                 { color:'#2563eb', data:dEmitido,  dash:'10,4'  },   // azul  — Por contrato (emitido)
-                { color:'#ea580c', data:dAvReal,   dash:'6,2'   },   // naranja — Por avance real
+                { color:'#ca8a04', data:dAvReal,   dash:'6,2'   },   // amarillo — Por avance real
                 ...(dPrograma.length ? [{ color:'#dc2626', data:dPrograma, dash:'2,4' }] : [])  // rojo — Por programa
             ];
             const curvaHtml = `<div class="obra-block">
@@ -5654,7 +5654,7 @@ ${gars.length ? `<div class="summary-grid">${gars.map(g => {
 <div class="ch-legend">
   <span class="ch-dot" style="background:#16a34a;"></span><span>Cobrado real</span>
   <span class="ch-dot ch-dashed" style="border-color:#2563eb;"></span><span>Por contrato (emitido)</span>
-  <span class="ch-dot ch-dashed" style="border-color:#ea580c;"></span><span>Por avance real</span>
+  <span class="ch-dot ch-dashed" style="border-color:#ca8a04;"></span><span>Por avance real</span>
   ${pctPrograma!=null?'<span class="ch-dot ch-dashed" style="border-color:#dc2626;"></span><span>Por programa</span>':''}
 </div>
 ${svgChart(chartMeses, chartSeries, totalContrato)}
