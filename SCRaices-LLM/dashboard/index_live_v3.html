@@ -5646,6 +5646,21 @@ ${gars.length ? `<div class="summary-grid">${gars.map(g => {
                 const rp = serieAvReal.find(s=>s.mes===mes);
                 dAvReal.push(rp != null ? Math.round(rp.avance/100*totalContrato*100)/100 : null);
             });
+            // Interpolar linealmente los meses sin dato en dAvReal
+            for (let i = 0; i < dAvReal.length; i++) {
+                if (dAvReal[i] !== null) continue;
+                const prev = i > 0 ? i - 1 : null;
+                let next = null;
+                for (let j = i + 1; j < dAvReal.length; j++) { if (dAvReal[j] !== null) { next = j; break; } }
+                if (prev !== null && next !== null) {
+                    // interpolación lineal entre los dos extremos conocidos
+                    const span = next - prev;
+                    for (let k = prev + 1; k < next; k++) {
+                        dAvReal[k] = Math.round((dAvReal[prev] + (dAvReal[next] - dAvReal[prev]) * (k - prev) / span) * 100) / 100;
+                    }
+                    i = next - 1; // saltar los meses ya rellenados
+                }
+            }
             const dPrograma = (pctPrograma != null && chartMeses.length > 0)
                 ? chartMeses.map((_,i) => Math.round((i+1)/chartMeses.length*(pctPrograma/100*totalContrato)*100)/100)
                 : [];
