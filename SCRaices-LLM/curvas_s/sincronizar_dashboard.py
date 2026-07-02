@@ -160,14 +160,23 @@ def build_expected_config():
 # 2. DESCARGAR HTML desde GitHub
 # ─────────────────────────────────────────────────────────────────────────────
 def download_html(token):
+    import base64
     url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{GITHUB_FILE}?ref={GITHUB_BRANCH}"
     headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
     r = requests.get(url, headers=headers, timeout=30)
     r.raise_for_status()
     data = r.json()
-    import base64
-    content = base64.b64decode(data["content"]).decode("utf-8")
     sha = data["sha"]
+    # Archivos >1MB: GitHub no incluye 'content', usa download_url en su lugar
+    if data.get("content"):
+        content = base64.b64decode(data["content"]).decode("utf-8")
+    elif data.get("download_url"):
+        log.info("Archivo >1MB, descargando via download_url...")
+        r2 = requests.get(data["download_url"], headers={"Authorization": f"token {token}"}, timeout=60)
+        r2.raise_for_status()
+        content = r2.text
+    else:
+        raise RuntimeError("No se pudo descargar el HTML: respuesta sin 'content' ni 'download_url'.")
     return content, sha
 
 # ─────────────────────────────────────────────────────────────────────────────
