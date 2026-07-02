@@ -4790,7 +4790,7 @@ ${inf.footerHtml}
 
         const renderTabAdq = (idx, tab) => {
             const obra = obrasData[idx];
-            let h = `<div class="breadcrumb">Obra <strong>${obra.nombre}</strong> · `;
+            let h = `<div class="breadcrumb">Obra <strong>${obra.ID_proy} · ${obra.nombre}</strong> · `;
 
             if (tab === 'resumen') {
                 const tot = obra.viviendas.length;
@@ -5066,7 +5066,7 @@ ${js2}
 
         const renderTab = (idx, tab) => {
             const obra = obrasData[idx];
-            let h = `<div class="breadcrumb">Obra <strong>${obra.nombre}</strong> · `;
+            let h = `<div class="breadcrumb">Obra <strong>${obra.ID_proy} · ${obra.nombre}</strong> · `;
 
             if (tab === 'resumen') {
                 const tot = obra.viviendas.length;
@@ -5511,7 +5511,7 @@ ${js}</body></html>`;
         // Pre-generar todo el contenido de tabs por obra (sin DOM queries en tiempo de render)
         const allSections = obras.map(proy => {
             const pid = proy.ID_proy;
-            const nombre = proy.NOMBRE_PROYECTO || pid;
+            const nombre = `${pid} · ${proy.NOMBRE_PROYECTO || pid}`;
             const comuna = proy.COMUNA || '';
 
             const montos    = MONTOS_PROY_DATA[pid] || { total: 0, viviendas: 0 };
