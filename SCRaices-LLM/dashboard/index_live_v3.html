@@ -1110,8 +1110,10 @@ const ETAPAS_CONFIG_FULL = {
                 // Marco = garantia del convenio/asistencia tecnica SEREMI<->EGR (no del contrato de obra)
                 const esMarco = /convenio\s*marco/.test(tipoTxt);
                 // Entidad responsable: ATPK (EGR en proyectos recientes) vs Raices.
-                // Se infiere de la columna empresa + el texto de la glosa.
-                const entTxt = (String(g.empresa || '') + ' ' + String(g.Glosa || '')).toLowerCase();
+                // Se infiere solo de la columna empresa (la Glosa es texto legal boilerplate
+                // que casi siempre menciona a la Entidad de Gestion Rural ATPK aunque la
+                // garantia sea de Raices, por lo que no sirve para clasificar).
+                const entTxt = String(g.empresa || '').toLowerCase();
                 const entidad = /atpk/.test(entTxt) ? 'ATPK' : 'Raíces';
                 const tipoCorto = esMarco ? 'Marco' : (/buena/.test(tipoTxt) ? 'Buena Ejec.' : (/fiel/.test(tipoTxt) ? 'Contrato' : String(g.Tipo || '')));
                 return {
