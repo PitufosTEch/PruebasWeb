@@ -38,7 +38,10 @@ def main() -> int:
     payload = None
 
     with sync_playwright() as p:
-        browser = p.chromium.launch()
+        # --disable-dev-shm-usage: en CI /dev/shm es de solo 64MB; al descargar
+        # tablas grandes (~55MB) Chrome lo agota y el fetch falla con "Failed to
+        # fetch". Con este flag usa /tmp (disco) y soporta respuestas grandes.
+        browser = p.chromium.launch(args=["--disable-dev-shm-usage", "--no-sandbox"])
         page = browser.new_context().new_page()
         page.on("console", lambda m: logs.append(m.text))
         page.on("pageerror", lambda e: logs.append(f"PAGEERROR: {e}"))

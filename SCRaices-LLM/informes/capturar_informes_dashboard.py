@@ -260,7 +260,9 @@ def main(output_dir: Path = None) -> Path:
     capataces_por_proy = {pid: _grupos_capataces(pid) for pid, _ in PROYECTOS}
 
     with sync_playwright() as pw:
-        browser = pw.chromium.launch(headless=True, args=["--no-sandbox"])
+        # --disable-dev-shm-usage: evita "Failed to fetch" al descargar tablas
+        # grandes (~55MB) en CI, donde /dev/shm es de solo 64MB.
+        browser = pw.chromium.launch(headless=True, args=["--no-sandbox", "--disable-dev-shm-usage"])
         context = browser.new_context(viewport={"width": 1280, "height": 900})
         page    = context.new_page()
 
