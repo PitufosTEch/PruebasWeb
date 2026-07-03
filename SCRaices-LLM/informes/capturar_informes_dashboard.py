@@ -258,6 +258,24 @@ def main(output_dir: Path = None) -> Path:
     total_ok  = 0
     total_err = 0
 
+    # Pre-cargar datos de despacho (mes1 = período actual) para inyectar en Residente y Capataz
+    _despachos: dict = {}
+    _gen_residente = lambda d: ""
+    _gen_capataz   = lambda d, c: ""
+    try:
+        sys.path.insert(0, str(Path(__file__).parent))
+        from inyectar_despachos import (
+            cargar_proyectos       as _cargar_proyectos,
+            generar_seccion_residente as _gen_res,
+            generar_seccion_capataz   as _gen_cap,
+        )
+        _despachos     = _cargar_proyectos([p for p, _ in PROYECTOS]) or {}
+        _gen_residente = _gen_res
+        _gen_capataz   = _gen_cap
+        print(f"  [Despachos] Pre-cargados: {sum(1 for v in _despachos.values() if v)} proyectos con datos")
+    except Exception as _e:
+        print(f"  [Despachos] No disponibles para inyección: {_e}")
+
     # Pre-cargar capataces por proyecto desde Firebase
     capataces_por_proy = {pid: _grupos_capataces(pid) for pid, _ in PROYECTOS}
 
@@ -326,6 +344,13 @@ def main(output_dir: Path = None) -> Path:
                         total_err += 1
                         continue
                     print(f"    HTML: {len(html):,} chars")
+                    # Inyectar despachos del período actual en Informe Residente
+                    if sufijo == "Residente" and _despachos.get(pid):
+                        seccion = _gen_residente(_despachos[pid])
+                        if seccion:
+                            pos = html.rfind("</body>")
+                            html = (html[:pos] + seccion + html[pos:]) if pos != -1 else html + seccion
+                            print(f"    [Despachos] Sección despachos inyectada en Residente {pid}")
                     html_a_pdf(context, html, pdf_path)
                     print(f"    PDF: {pdf_path.name} ({pdf_path.stat().st_size:,} bytes)")
                     total_ok += 1
@@ -346,6 +371,13 @@ def main(output_dir: Path = None) -> Path:
                                 print("  [Capataz] ADVERTENCIA: no se pudo extraer nombre del capataz")
                                 total_err += 1
                                 continue
+                            # Inyectar despachos del período actual filtrados por este capataz
+                            if _despachos.get(pid):
+                                seccion = _gen_capataz(_despachos[pid], nombre_cap)
+                                if seccion:
+                                    pos = html_cap.rfind("</body>")
+                                    html_cap = (html_cap[:pos] + seccion + html_cap[pos:]) if pos != -1 else html_cap + seccion
+                                    print(f"    [Despachos] Sección despachos inyectada → {nombre_cap}")
                             slug = _slug(nombre_cap)
                             pdf_path = output_dir / f"Informe_Capataz_{pid}_{nombre}_{slug}_{fecha}.pdf"
                             html_a_pdf(context, html_cap, pdf_path)

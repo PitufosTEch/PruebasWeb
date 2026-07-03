@@ -585,3 +585,146 @@ def inyectar_en_dashboard() -> bool:
     dash.write_text(html_nuevo, encoding="utf-8")
     print(f"  [Dashboard] index_live_v3.html actualizado ({dash.stat().st_size:,} bytes)")
     return True
+
+
+# ── API para Residente y Capataz ──────────────────────────────────────────────
+
+def _normalizar(s: str) -> str:
+    """Normaliza nombre para comparación: minúsculas, sin acentos, sin espacios extra."""
+    import unicodedata
+    nfd = unicodedata.normalize("NFD", s or "")
+    return nfd.encode("ascii", "ignore").decode("ascii").lower().strip()
+
+
+def _generar_seccion_semana(bens: list, meses: list, titulo: str,
+                             mostrar_capataz: bool = True) -> str:
+    """
+    Genera sección HTML compacta con despachos del período actual (mes1).
+    Solo incluye beneficiarios con alguna etapa en mes1.
+    """
+    nombre_mes = meses[0] if meses else "Período actual"
+    con_desp = [b for b in bens if b.get("mes1") and b["mes1"] not in ("—", "")]
+    if not con_desp:
+        return ""
+
+    col_cap_th = (
+        '<th style="padding:7px 8px;background:#334155;color:#cbd5e1;font-size:10px;'
+        'text-align:center;white-space:nowrap;">Capataz</th>'
+        if mostrar_capataz else ""
+    )
+
+    filas = ""
+    for i, b in enumerate(con_desp):
+        bg = "#ffffff" if i % 2 == 0 else "#f8fafc"
+        cel_cap = (
+            f'<td style="padding:5px 8px;font-size:10px;color:#6b7280;'
+            f'border-bottom:1px solid #e2e8f0;white-space:nowrap;">{b["capataz"]}</td>'
+            if mostrar_capataz else ""
+        )
+        filas += (
+            f'<tr style="background:{bg};">'
+            f'<td style="padding:5px 12px;font-size:11px;color:#111827;'
+            f'border-bottom:1px solid #e2e8f0;">{b["nombre"]}</td>'
+            + cel_cap +
+            f'<td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;">'
+            f'{_formatear_etapas(b["mes1"])}</td>'
+            f'</tr>'
+        )
+
+    return (
+        '<div style="margin-top:24px;page-break-inside:avoid;">'
+        '<div style="background:#1e293b;border-radius:8px 8px 0 0;padding:10px 16px;">'
+        f'<div style="font-size:12px;font-weight:700;color:#f1f5f9;">{titulo}</div>'
+        f'<div style="font-size:11px;color:#94a3b8;margin-top:2px;">'
+        f'Período: {nombre_mes} · {len(con_desp)} beneficiario(s) con despacho planificado'
+        f'</div></div>'
+        '<div style="overflow-x:auto;border:1px solid #e2e8f0;border-radius:0 0 8px 8px;">'
+        '<table style="border-collapse:collapse;width:100%;">'
+        '<thead><tr>'
+        '<th style="padding:7px 12px;background:#334155;color:#cbd5e1;'
+        'font-size:10px;text-align:left;min-width:160px;">Beneficiario</th>'
+        + col_cap_th +
+        '<th style="padding:7px 8px;background:#334155;color:#cbd5e1;'
+        'font-size:10px;text-align:left;">Etapas a despachar</th>'
+        '</tr></thead>'
+        f'<tbody>{filas}</tbody></table>'
+        '<div style="padding:8px 12px;background:#f8fafc;border-top:1px solid #e2e8f0;'
+        'font-size:10px;color:#6b7280;display:flex;gap:12px;flex-wrap:wrap;">'
+        '<span><span style="background:#ccfbf1;color:#0f766e;border-radius:3px;'
+        'padding:1px 5px;font-weight:600;">[SOL]</span> Solicitud confirmada</span>'
+        '<span><span style="background:#fef3c7;color:#92400e;border-radius:3px;'
+        'padding:1px 5px;font-weight:600;">[MC]</span> Proyección Monte Carlo</span>'
+        '</div></div></div>'
+    )
+
+
+def generar_seccion_residente(datos: dict) -> str:
+    """
+    Retorna HTML con despachos del período actual (mes1) para todos los beneficiarios.
+    Para inyectar al final del Informe_Residente antes de convertir a PDF.
+    Retorna "" si no hay datos o ningún beneficiario tiene despachos en mes1.
+    """
+    if not datos or not datos.get("beneficiarios"):
+        return ""
+    return _generar_seccion_semana(
+        datos["beneficiarios"],
+        datos.get("meses", []),
+        f"Despachos planificados — {datos.get('titulo', '')}",
+        mostrar_capataz=True,
+    )
+
+
+def generar_seccion_capataz(datos: dict, nombre_capataz: str) -> str:
+    """
+    Retorna HTML con despachos del período actual filtrado por capataz.
+    Para inyectar al final del Informe_Capataz antes de convertir a PDF.
+    Usa comparación normalizada (sin acentos, minúsculas) para tolerar diferencias de formato.
+    Retorna "" si no hay datos o el capataz no tiene despachos en mes1.
+    """
+    if not datos or not datos.get("beneficiarios"):
+        return ""
+    nc = _normalizar(nombre_capataz)
+    bens = [b for b in datos["beneficiarios"]
+            if _normalizar(b.get("capataz", "")) == nc]
+    if not bens:
+        # Coincidencia parcial como fallback
+        bens = [b for b in datos["beneficiarios"]
+                if nc in _normalizar(b.get("capataz", ""))
+                or _normalizar(b.get("capataz", "")) in nc]
+    if not bens:
+        return ""
+    return _generar_seccion_semana(
+        bens,
+        datos.get("meses", []),
+        f"Despachos planificados — Capataz: {nombre_capataz}",
+        mostrar_capataz=False,
+    )
+
+
+def cargar_proyectos(pids: list = None) -> dict | None:
+    """
+    Descarga el Excel de Drive y retorna {pid: datos_proyecto}.
+    pids: lista adicional de PIDs a leer (además de los de IDX_TO_PID).
+    Retorna None si falla la descarga.
+    """
+    import openpyxl
+    print("  [Despachos] Descargando Excel de Drive...")
+    try:
+        data = _descargar_excel()
+    except Exception as e:
+        print(f"  [Despachos] ERROR descargando Excel: {e}")
+        return None
+    try:
+        wb = openpyxl.load_workbook(io.BytesIO(data), data_only=True)
+        todos = set(IDX_TO_PID.values())
+        if pids:
+            todos.update(pids)
+        resultado = {}
+        for pid in todos:
+            resultado[pid] = _leer_proyecto(wb[pid]) if pid in wb.sheetnames else None
+        n_ok = sum(1 for v in resultado.values() if v)
+        print(f"  [Despachos] {n_ok}/{len(resultado)} pestañas leídas del Excel")
+        return resultado
+    except Exception as e:
+        print(f"  [Despachos] ERROR leyendo Excel: {e}")
+        return None
