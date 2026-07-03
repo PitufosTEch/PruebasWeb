@@ -1,38 +1,72 @@
 name: Actualización Curvas S Semanal
 
-# Corre diariamente para mantener las Curvas S actualizadas con datos de AppSheet.
-# El envío de correos solo ocurre los lunes (controlado en informes_lunes.yml).
+# Cada proyecto corre en un runner paralelo independiente (matrix strategy).
+# Tiempo estimado: ~10-15 min (el proyecto más lento) en vez de 60-90 min en serie.
+# Post-proceso (sincronizar_dashboard, gantt, avance) corre al terminar todos.
 
 on:
   schedule:
     - cron: '0 12 * * 1-5'   # Lunes a viernes 12:00 UTC (09:00 Chile)
-  workflow_dispatch: {}        # Ejecución manual desde GitHub Actions
+  workflow_dispatch: {}
 
 permissions:
-  contents: write              # Para push al dashboard (sincronizar_dashboard.py)
+  contents: write
 
 concurrency:
   group: curvas-semanal
   cancel-in-progress: false
 
+# ── Pasos compartidos como ancla YAML ────────────────────────────────────────
+x-setup: &setup
+  - uses: actions/checkout@v4
+
+  - uses: actions/setup-python@v5
+    with:
+      python-version: '3.12'
+
+  - name: Cache pip
+    uses: actions/cache@v4
+    with:
+      path: ~/.cache/pip
+      key: curvas-pip-${{ hashFiles('SCRaices-LLM/curvas_s/requirements.txt') }}
+      restore-keys: curvas-pip-
+
+  - name: Instalar dependencias Python
+    run: |
+      pip install --upgrade pip
+      pip install \
+        matplotlib scipy Pillow numpy requests psutil \
+        google-auth google-auth-httplib2 google-api-python-client
+
 jobs:
-  update-curvas:
-    name: Generar y subir Curvas S
+  # ── Job 1: Un runner por proyecto, todos en paralelo ─────────────────────
+  curvas-proyecto:
+    name: "Curvas — ${{ matrix.label }}"
     runs-on: ubuntu-latest
-    timeout-minutes: 90        # 10 proyectos x ~5 min promedio + margen
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false      # Si un proyecto falla, los demás siguen
+      matrix:
+        include:
+          - { label: "P119 Ñuke Mapu",        script: curvas_automatico }
+          - { label: "P38  Aliwen",            script: curvas_automatico_aliwen }
+          - { label: "P39  El Coihue",         script: curvas_automatico_coihue }
+          - { label: "P127 Nuevo Cunco",       script: curvas_automatico_cunco }
+          - { label: "P12  Juan Huilcan",      script: curvas_automatico_huilcan }
+          - { label: "P14  Com. Madihue",      script: curvas_automatico_madihue }
+          - { label: "P126 El Maitén",         script: curvas_automatico_maiten }
+          - { label: "P131 Raíces Melipeuco",  script: curvas_automatico_melipeuco }
+          - { label: "P116 Sonia Quilaleo",    script: curvas_automatico_quilaleo }
+          - { label: "P31  Trovolhue",         script: curvas_automatico_trovolhue }
+          - { label: "P28  Elsa Pinchulaf",    script: curvas_automatico_pinchulaf }
 
     steps:
-      # ── 1. Código ────────────────────────────────────────────────────────────
-      - name: Checkout repositorio
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      # ── 2. Python ─────────────────────────────────────────────────────────────
-      - name: Configurar Python 3.12
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      # ── 3. Cache pip ──────────────────────────────────────────────────────────
       - name: Cache pip
         uses: actions/cache@v4
         with:
@@ -40,41 +74,95 @@ jobs:
           key: curvas-pip-${{ hashFiles('SCRaices-LLM/curvas_s/requirements.txt') }}
           restore-keys: curvas-pip-
 
-      # ── 4. Dependencias Python ────────────────────────────────────────────────
       - name: Instalar dependencias Python
         run: |
           pip install --upgrade pip
           pip install \
-            matplotlib \
-            scipy \
-            Pillow \
-            numpy \
-            requests \
-            psutil \
-            google-auth \
-            google-auth-httplib2 \
-            google-api-python-client
+            matplotlib scipy Pillow numpy requests psutil \
+            google-auth google-auth-httplib2 google-api-python-client
 
-      # ── 5. Playwright (para leer AppSheet con cookies guardadas) ──────────────
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}
+          restore-keys: playwright-chromium-
+
       - name: Instalar Playwright + Chromium
-        run: |
-          pip install playwright
-          playwright install chromium --with-deps
+        run: pip install playwright && playwright install chromium --with-deps
 
-      # ── 6. Ejecutar orquestador ───────────────────────────────────────────────
-      - name: Ejecutar curvas S (todos los proyectos)
+      - name: "Ejecutar Curvas S — ${{ matrix.label }}"
         working-directory: SCRaices-LLM/curvas_s
         env:
-          GOOGLE_REFRESH_TOKEN:   ${{ secrets.GOOGLE_REFRESH_TOKEN }}
-          GOOGLE_CLIENT_ID:       ${{ secrets.GOOGLE_CLIENT_ID }}
-          GOOGLE_CLIENT_SECRET:   ${{ secrets.GOOGLE_CLIENT_SECRET }}
-          GITHUB_TOKEN:           ${{ secrets.GITHUB_TOKEN }}
-          FIREBASE_URL:           https://scraices-dashboard-default-rtdb.firebaseio.com
-          APPSHEET_COOKIES_B64:   ${{ secrets.APPSHEET_COOKIES_B64 }}
-        run: python ejecutar_curvas_cloud.py
+          GOOGLE_REFRESH_TOKEN:  ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          GOOGLE_CLIENT_ID:      ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET:  ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GITHUB_TOKEN:          ${{ secrets.GITHUB_TOKEN }}
+          FIREBASE_URL:          https://scraices-dashboard-default-rtdb.firebaseio.com
+          APPSHEET_COOKIES_B64:  ${{ secrets.APPSHEET_COOKIES_B64 }}
+        run: python ${{ matrix.script }}.py
 
-      # ── 7. Log de resumen en caso de fallo ────────────────────────────────────
       - name: Resumen en caso de error
         if: failure()
+        run: echo "::error::Curvas S fallaron para ${{ matrix.label }}. Revisa el log."
+
+  # ── Job 2: Post-proceso — corre cuando TODOS los proyectos terminan ───────
+  post-proceso:
+    name: Sincronizar Dashboard y Firebase
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: curvas-proyecto
+    if: always()    # Corre aunque algún proyecto haya fallado
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: curvas-pip-${{ hashFiles('SCRaices-LLM/curvas_s/requirements.txt') }}
+          restore-keys: curvas-pip-
+
+      - name: Instalar dependencias Python
         run: |
-          echo "::error::El orquestador de Curvas S falló. Revisa el log completo arriba."
+          pip install --upgrade pip
+          pip install \
+            matplotlib scipy Pillow numpy requests psutil \
+            google-auth google-auth-httplib2 google-api-python-client
+
+      - name: Sincronizar dashboard (CURVAS_S_CONFIG → GitHub Pages)
+        working-directory: SCRaices-LLM/curvas_s
+        env:
+          GOOGLE_REFRESH_TOKEN:  ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          GOOGLE_CLIENT_ID:      ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET:  ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GITHUB_TOKEN:          ${{ secrets.GITHUB_TOKEN }}
+          FIREBASE_URL:          https://scraices-dashboard-default-rtdb.firebaseio.com
+        run: python sincronizar_dashboard.py
+
+      - name: Actualizar programa Gantt en Firebase
+        working-directory: SCRaices-LLM/curvas_s
+        env:
+          GOOGLE_REFRESH_TOKEN:  ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          GOOGLE_CLIENT_ID:      ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET:  ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          FIREBASE_URL:          https://scraices-dashboard-default-rtdb.firebaseio.com
+        run: python actualizar_gantt_programa.py
+
+      - name: Calcular avance Gantt en Firebase
+        working-directory: SCRaices-LLM/curvas_s
+        env:
+          GOOGLE_REFRESH_TOKEN:  ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          GOOGLE_CLIENT_ID:      ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET:  ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          FIREBASE_URL:          https://scraices-dashboard-default-rtdb.firebaseio.com
+        run: python calcular_avance_gantt.py
+
+      - name: Resumen en caso de error
+        if: failure()
+        run: echo "::error::Post-proceso falló. Revisa el log completo."
