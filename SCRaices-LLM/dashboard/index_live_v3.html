@@ -4569,14 +4569,14 @@ ${inf.footerHtml}
             );
         }
 
-        // (1.7) Insertar sección despachos del período actual — Reporte Residente
+        // (1.7) Cargar sección despachos del período actual — Reporte Residente (se inserta al final)
+        let _despachosResidenteHtml = '';
         if (tipo === 'residente') {
             try {
                 const _rDesp2 = await fetch(`https://scraices-dashboard-default-rtdb.firebaseio.com/despachos_data/${proyectoSel}.json`);
                 const _despData2 = await _rDesp2.json();
                 if (_despData2 && _despData2.beneficiarios && _despData2.beneficiarios.length) {
-                    const _secDesp = _generarSeccionDespachos(_despData2, null);
-                    if (_secDesp) portadaObraHtml += _secDesp;
+                    _despachosResidenteHtml = _generarSeccionDespachos(_despData2, null) || '';
                 }
             } catch (_e) { /* sin despachos disponibles */ }
         }
@@ -4637,6 +4637,7 @@ ${inf.footerHtml}
 ${inf.headerHtml}
 ${portadaObraHtml}
 ${gruposHtml}
+${_despachosResidenteHtml}
 ${inf.footerHtml}
 </body>
 </html>`;
@@ -4790,13 +4791,13 @@ ${inf.muestrasHtml ? '<div class="sec-title">Muestras de Hormigón</div>' + inf.
             return '<div class="grupo-page page-break">'+contenido+'</div>';
         }).join('');
 
-        // Insertar sección despachos del período actual — filtrado por capataz
+        // Cargar sección despachos del período actual — filtrado por capataz (se inserta al final)
+        let _despachosCapatazHtml = '';
         try {
             const _rDespCap = await fetch(`https://scraices-dashboard-default-rtdb.firebaseio.com/despachos_data/${proyectoSel}.json`);
             const _despDataCap = await _rDespCap.json();
             if (_despDataCap && _despDataCap.beneficiarios && _despDataCap.beneficiarios.length) {
-                const _secDespCap = _generarSeccionDespachos(_despDataCap, capatazFiltro);
-                if (_secDespCap) portadaCapatazHtml += _secDespCap;
+                _despachosCapatazHtml = _generarSeccionDespachos(_despDataCap, capatazFiltro) || '';
             }
         } catch (_e) { /* sin despachos disponibles */ }
 
@@ -4814,6 +4815,7 @@ ${inf.muestrasHtml ? '<div class="sec-title">Muestras de Hormigón</div>' + inf.
 ${inf.headerHtml}
 ${portadaCapatazHtml}
 ${gruposHtmlCap}
+${_despachosCapatazHtml}
 ${inf.footerHtml}
 </body>
 </html>`;
