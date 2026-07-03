@@ -16,28 +16,6 @@ concurrency:
   group: curvas-semanal
   cancel-in-progress: false
 
-# ── Pasos compartidos como ancla YAML ────────────────────────────────────────
-x-setup: &setup
-  - uses: actions/checkout@v4
-
-  - uses: actions/setup-python@v5
-    with:
-      python-version: '3.12'
-
-  - name: Cache pip
-    uses: actions/cache@v4
-    with:
-      path: ~/.cache/pip
-      key: curvas-pip-${{ hashFiles('SCRaices-LLM/curvas_s/requirements.txt') }}
-      restore-keys: curvas-pip-
-
-  - name: Instalar dependencias Python
-    run: |
-      pip install --upgrade pip
-      pip install \
-        matplotlib scipy Pillow numpy requests psutil \
-        google-auth google-auth-httplib2 google-api-python-client
-
 jobs:
   # ── Job 1: Un runner por proyecto, todos en paralelo ─────────────────────
   curvas-proyecto:
