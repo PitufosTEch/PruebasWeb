@@ -701,6 +701,49 @@ def generar_seccion_capataz(datos: dict, nombre_capataz: str) -> str:
     )
 
 
+FIREBASE_DESP_DATA_URL = "https://scraices-dashboard-default-rtdb.firebaseio.com/despachos_data.json"
+
+
+def escribir_despachos_data_firebase() -> bool:
+    """
+    Escribe datos estructurados de despachos en Firebase /despachos_data/{pid}
+    para que el dashboard JS pueda renderizarlos en Reporte Residente y Capataz.
+    Formato por proyecto: {titulo, meses:[str], beneficiarios:[{nombre, capataz, mes1}]}
+    Solo incluye beneficiarios con mes1 no vacío.
+    """
+    import requests
+    proyectos = _cargar_datos_proyectos()
+    if proyectos is None:
+        return False
+
+    payload = {}
+    for pid, datos in proyectos.items():
+        if datos is None:
+            continue
+        bens_con_desp = [
+            {"nombre": b["nombre"], "capataz": b["capataz"], "mes1": b["mes1"]}
+            for b in datos.get("beneficiarios", [])
+            if b.get("mes1") and b["mes1"] not in ("—", "")
+        ]
+        payload[pid] = {
+            "titulo":        datos.get("titulo", pid),
+            "meses":         datos.get("meses", []),
+            "beneficiarios": bens_con_desp,
+        }
+
+    try:
+        resp = requests.put(FIREBASE_DESP_DATA_URL, json=payload, timeout=30)
+        if resp.status_code == 200:
+            n_bens = sum(len(v["beneficiarios"]) for v in payload.values())
+            print(f"  [Despachos] Firebase /despachos_data actualizado: {len(payload)} proyectos, {n_bens} beneficiarios")
+            return True
+        print(f"  [Despachos] ERROR Firebase /despachos_data: {resp.status_code}")
+        return False
+    except Exception as e:
+        print(f"  [Despachos] ERROR Firebase /despachos_data: {e}")
+        return False
+
+
 def cargar_proyectos(pids: list = None) -> dict | None:
     """
     Descarga el Excel de Drive y retorna {pid: datos_proyecto}.

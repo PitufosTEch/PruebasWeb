@@ -273,8 +273,9 @@ def main():
     # ── 0. Escribir datos de despachos en Firebase (ANTES del capture) ────
     print("► Paso 0: Publicar despachos en Firebase")
     try:
-        from inyectar_despachos import escribir_despachos_firebase
-        escribir_despachos_firebase()
+        from inyectar_despachos import escribir_despachos_firebase, escribir_despachos_data_firebase
+        escribir_despachos_firebase()         # /despachos_html → Adquisiciones
+        escribir_despachos_data_firebase()    # /despachos_data → Residente + Capataz live
     except Exception as e:
         print(f"  [Despachos] ERROR en Paso 0: {e} — continuando sin despachos en Firebase")
 

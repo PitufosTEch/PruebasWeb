@@ -539,7 +539,7 @@ const ETAPAS_CONFIG_FULL = {
         //   1) Set pre-calculado BENEF_CON_TE1 (de hoja TE1 separada)
         //   2) Columna(s) con 'te1' en el perfil Beneficiario (PDF cargado)
         //   3) Columna te1 en Seguimiento (resuelto despues, ver L~720)
-        const normTE1 = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+        const normTE1 = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '');
         // Scan raw Beneficiario rows para columnas que contengan 'te1' (pero no te10, te11, te12)
         const benefTE1FromProfile = new Set();
         if (benRaw.length > 0) {
@@ -814,7 +814,7 @@ const ETAPAS_CONFIG_FULL = {
         // Resolucion robusta: normaliza nombre de columna (lower, sin tildes/espacios/puntos)
         // y matchea cuando TODOS los keywords aparecen Y NINGUNO de los exclude.
         const normCol = (s) => String(s || '').toLowerCase()
-            .normalize('NFD').replace(/[\u0300-\u036f]/g, '')   // sin tildes
+            .normalize('NFD').replace(/[̀-ͯ]/g, '')   // sin tildes
             .replace(/[^a-z0-9]/g, '');                          // solo alfanumerico
         const findColOne = (keys, mustHave, mustNotHave) => {
             for (const k of keys) {
@@ -4431,6 +4431,48 @@ ${inf.footerHtml}
         else alert('Por favor permite ventanas emergentes para generar el PDF.');
     };
 
+    // Helper: genera sección HTML de despachos del período actual (mes1).
+    // data = {titulo, meses, beneficiarios:[{nombre,capataz,mes1}]}
+    // capatazFiltro = string para filtrar (Capataz), null para todos (Residente)
+    const _generarSeccionDespachos = (data, capatazFiltro) => {
+        if (!data || !data.beneficiarios || !data.beneficiarios.length) return '';
+        const _norm = s => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+        let bens = data.beneficiarios; // ya pre-filtrado (solo mes1 no vacío) desde Firebase
+        if (capatazFiltro) {
+            const nc = _norm(capatazFiltro);
+            let f = bens.filter(b => _norm(b.capataz) === nc);
+            if (!f.length) f = bens.filter(b => { const bc = _norm(b.capataz); return bc.includes(nc) || nc.includes(bc); });
+            bens = f;
+        }
+        if (!bens.length) return '';
+        const mostrarCap = !capatazFiltro;
+        const nombreMes = (data.meses && data.meses[0]) || 'Período actual';
+        const titulo = capatazFiltro
+            ? `Despachos planificados — Capataz: ${capatazFiltro}`
+            : `Despachos planificados — ${data.titulo || ''}`;
+        const colCapTh = mostrarCap
+            ? '<th style="padding:7px 8px;background:#334155;color:#cbd5e1;font-size:10px;text-align:center;white-space:nowrap;">Capataz</th>'
+            : '';
+        const _fmtEtapas = (texto) => {
+            if (!texto || texto === '—') return '<span style="color:#d1d5db;">—</span>';
+            return texto.split(',').map(p => p.trim()).filter(Boolean).map(p => {
+                let color, bg, label;
+                if (p.startsWith('[SOL]')) { color='#0f766e'; bg='#ccfbf1'; label=p.slice(5).trim(); }
+                else if (p.startsWith('[MC]')) { color='#92400e'; bg='#fef3c7'; label=p.slice(4).trim(); }
+                else { color='#374151'; bg='#f3f4f6'; label=p; }
+                return `<span style="display:inline-block;margin:1px 2px;padding:1px 5px;border-radius:4px;background:${bg};color:${color};font-size:10px;white-space:nowrap;">${label}</span>`;
+            }).join('');
+        };
+        const filas = bens.map((b, i) => {
+            const bg = i % 2 === 0 ? '#ffffff' : '#f8fafc';
+            const celCap = mostrarCap
+                ? `<td style="padding:5px 8px;font-size:10px;color:#6b7280;border-bottom:1px solid #e2e8f0;white-space:nowrap;">${b.capataz || ''}</td>`
+                : '';
+            return `<tr style="background:${bg};"><td style="padding:5px 12px;font-size:11px;color:#111827;border-bottom:1px solid #e2e8f0;">${b.nombre}</td>${celCap}<td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;">${_fmtEtapas(b.mes1)}</td></tr>`;
+        }).join('');
+        return `<div style="margin-top:24px;page-break-inside:avoid;"><div style="background:#1e293b;border-radius:8px 8px 0 0;padding:10px 16px;"><div style="font-size:12px;font-weight:700;color:#f1f5f9;">${titulo}</div><div style="font-size:11px;color:#94a3b8;margin-top:2px;">Período: ${nombreMes} · ${bens.length} beneficiario(s) con despacho planificado</div></div><div style="overflow-x:auto;border:1px solid #e2e8f0;border-radius:0 0 8px 8px;"><table style="border-collapse:collapse;width:100%;"><thead><tr><th style="padding:7px 12px;background:#334155;color:#cbd5e1;font-size:10px;text-align:left;min-width:160px;">Beneficiario</th>${colCapTh}<th style="padding:7px 8px;background:#334155;color:#cbd5e1;font-size:10px;text-align:left;">Etapas a despachar</th></tr></thead><tbody>${filas}</tbody></table><div style="padding:8px 12px;background:#f8fafc;border-top:1px solid #e2e8f0;font-size:10px;color:#6b7280;display:flex;gap:12px;flex-wrap:wrap;"><span><span style="background:#ccfbf1;color:#0f766e;border-radius:3px;padding:1px 5px;font-weight:600;">[SOL]</span> Solicitud confirmada</span><span><span style="background:#fef3c7;color:#92400e;border-radius:3px;padding:1px 5px;font-weight:600;">[MC]</span> Proyección Monte Carlo</span></div></div></div>`;
+    };
+
     // Reporte obra/logística — igual que ejecutivo pero sección "Contrato y Garantías" → "Programa" con fechas del Gantt
     const generarInformeObraLogistica = async (tipo = 'residente') => {
         const inf = construirInforme();
@@ -4525,6 +4567,18 @@ ${inf.footerHtml}
                 /<div class="sec-title">Comentarios Destacados<\/div>[\s\S]*/,
                 ''
             );
+        }
+
+        // (1.7) Insertar sección despachos del período actual — Reporte Residente
+        if (tipo === 'residente') {
+            try {
+                const _rDesp2 = await fetch(`https://scraices-dashboard-default-rtdb.firebaseio.com/despachos_data/${proyectoSel}.json`);
+                const _despData2 = await _rDesp2.json();
+                if (_despData2 && _despData2.beneficiarios && _despData2.beneficiarios.length) {
+                    const _secDesp = _generarSeccionDespachos(_despData2, null);
+                    if (_secDesp) portadaObraHtml += _secDesp;
+                }
+            } catch (_e) { /* sin despachos disponibles */ }
         }
 
         // (2) Eliminar KPIs de checkpoints excluidos de la sección "Checkpoints del Proyecto"
@@ -4735,6 +4789,16 @@ ${inf.muestrasHtml ? '<div class="sec-title">Muestras de Hormigón</div>' + inf.
             );
             return '<div class="grupo-page page-break">'+contenido+'</div>';
         }).join('');
+
+        // Insertar sección despachos del período actual — filtrado por capataz
+        try {
+            const _rDespCap = await fetch(`https://scraices-dashboard-default-rtdb.firebaseio.com/despachos_data/${proyectoSel}.json`);
+            const _despDataCap = await _rDespCap.json();
+            if (_despDataCap && _despDataCap.beneficiarios && _despDataCap.beneficiarios.length) {
+                const _secDespCap = _generarSeccionDespachos(_despDataCap, capatazFiltro);
+                if (_secDespCap) portadaCapatazHtml += _secDespCap;
+            }
+        } catch (_e) { /* sin despachos disponibles */ }
 
         const html = `<!DOCTYPE html>
 <html lang="es">
@@ -6173,7 +6237,7 @@ ${viewerCss}</style>
     // Filtrar el manifest a hojas que parezcan ser de "seguimiento" o "cierre"
     const manifestSeguimientoHojas = React.useMemo(() => {
         if (!manifestData) return [];
-        const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+        const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '');
         return Object.entries(manifestData)
             .filter(([name]) => {
                 const n = norm(name);
