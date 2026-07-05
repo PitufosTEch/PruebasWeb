@@ -38,7 +38,7 @@ MES3        = (date(2026, 9, 1),  date(2026, 9, 30))
 
 DRIVE_FILE_ID = "1fPYmvioQvYJjKUMuQgDayf3BnSSEJ7Mp"   # mismo que inyectar_despachos.py
 
-PROJECT_SHEETS = ["P116", "P119", "P12", "P126", "P127", "P131", "P14", "P31", "P38", "P39"]
+PROJECT_SHEETS = ["P116", "P119", "P12", "P126", "P127", "P131", "P14", "P28", "P31", "P38", "P39"]
 
 
 # ── Utilidades ────────────────────────────────────────────────────────────────

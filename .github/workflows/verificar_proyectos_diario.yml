@@ -1,0 +1,48 @@
+name: Verificar Proyectos Nuevos (Diario)
+
+# Corre todos los días a las 09:00 CLT (13:00 UTC en invierno, 12:00 UTC en verano).
+# Detecta proyectos en PROYECTOS_ACTIVOS que no tengan pestaña en el Excel
+# y crea la hoja en blanco automáticamente para que el equipo la complete.
+
+on:
+  schedule:
+    - cron: '0 13 * * *'   # Diario 13:00 UTC (09:00 CLT invierno)
+  workflow_dispatch: {}    # Disparo manual disponible
+
+jobs:
+  verificar-proyectos:
+    name: Verificar proyectos nuevos en Excel de Despachos
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: despachos-pip-v1
+          restore-keys: despachos-pip-
+
+      - name: Instalar dependencias
+        run: |
+          pip install --upgrade pip
+          pip install requests openpyxl \
+            google-auth google-auth-httplib2 google-api-python-client
+
+      - name: Verificar proyectos nuevos en Excel
+        working-directory: SCRaices-LLM/informes
+        env:
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          GOOGLE_CLIENT_ID:     ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+        run: python verificar_proyectos_excel.py
+
+      - name: Resumen en caso de error
+        if: failure()
+        run: echo "::error::Verificacion de proyectos fallo. Revisa el log."
