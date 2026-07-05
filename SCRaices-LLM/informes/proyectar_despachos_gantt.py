@@ -133,12 +133,12 @@ def _reproyectar_beneficiario(
             None,
         )
 
-    # 4) Ajustar P50: nunca más corto que el actual (factor ≥ 1.0).
-    #    Si SPI_real > SPI_objetivo → P50 se extiende (menos optimista).
-    #    Si SPI_real ≤ SPI_objetivo → factor=1.0, P50 igual pero distribución
-    #    se recalcula desde cero (elimina inconsistencias manuales).
-    factor = max(1.0, spi_real / spi_objetivo)
-    p50_ajustado = p50_actual * factor
+    # 4) Ajustar P50 usando SPI real. El spi_objetivo (1.15) es el denominador de referencia.
+    #    SPI_real > spi_objetivo → factor > 1 → P50 se extiende (MC era demasiado optimista).
+    #    SPI_real < spi_objetivo → factor < 1 → P50 se reduce (proyecto a ritmo menor).
+    #    SPI_real = spi_objetivo → factor = 1.0, P50 sin cambio.
+    factor = spi_real / spi_objetivo
+    p50_ajustado = max(1.0, p50_actual * factor)
 
     # 5) Distribuir las etapas [MC] linealmente en P50_ajustado días
     n = len(mc_ordenadas)
@@ -189,7 +189,7 @@ def _procesar_hoja(ws, spi_objetivo: float, preview: bool = False) -> int:
     if spi_real < 0.1:
         spi_real = 1.0
 
-    factor_display = max(1.0, spi_real / spi_objetivo)
+    factor_display = spi_real / spi_objetivo
     print(f"  SPI real={spi_real:.4f}  →  objetivo={spi_objetivo}  "
           f"(factor P50: ×{factor_display:.3f})")
 
