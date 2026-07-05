@@ -84,10 +84,11 @@ def _formatear_celda(etapas: list[dict]) -> str:
 def _reproyectar_beneficiario(
     mes1_val, mes2_val, mes3_val,
     p50_raw, spi_real: float, spi_objetivo: float
-) -> tuple[str, str, str, str]:
+) -> tuple[str, str, str, str, int | None]:
     """
     Re-proyecta las etapas [MC] de un beneficiario con el nuevo SPI objetivo.
-    Retorna (nuevo_mes1, nuevo_mes2, nuevo_mes3, resumen_cambio).
+    Retorna (nuevo_mes1, nuevo_mes2, nuevo_mes3, resumen_cambio, p50_ajustado_dias).
+    p50_ajustado_dias es None cuando no se pudo calcular (sin P50 o sin [MC]).
     """
     # 1) Parsear etapas actuales
     etapas_actuales = {
@@ -114,6 +115,7 @@ def _reproyectar_beneficiario(
             _formatear_celda(etapas_actuales[2]),
             _formatear_celda(etapas_actuales[3]),
             "sin [MC]",
+            None,
         )
 
     # 3) Leer P50 actual
@@ -128,6 +130,7 @@ def _reproyectar_beneficiario(
             _formatear_celda(etapas_actuales[2]),
             _formatear_celda(etapas_actuales[3]),
             "sin P50",
+            None,
         )
 
     # 4) Ajustar P50 por cambio de SPI
@@ -163,6 +166,7 @@ def _reproyectar_beneficiario(
         _formatear_celda(nuevo_mes[2]),
         _formatear_celda(nuevo_mes[3]),
         resumen,
+        round(p50_ajustado),
     )
 
 
@@ -212,7 +216,7 @@ def _procesar_hoja(ws, spi_objetivo: float, preview: bool = False) -> int:
         if todo_dash:
             continue
 
-        n_mes1, n_mes2, n_mes3, resumen = _reproyectar_beneficiario(
+        n_mes1, n_mes2, n_mes3, resumen, p50_adj = _reproyectar_beneficiario(
             mes1_cell.value, mes2_cell.value, mes3_cell.value,
             p50_raw, spi_real, spi_objetivo,
         )
@@ -232,6 +236,12 @@ def _procesar_hoja(ws, spi_objetivo: float, preview: bool = False) -> int:
                 mes1_cell.value = n_mes1
                 mes2_cell.value = n_mes2
                 mes3_cell.value = n_mes3
+                # Actualizar P50/P10/P90 con valores ajustados al SPI objetivo
+                # para que el reporte muestre días coherentes con la proyección
+                if p50_adj is not None:
+                    ws.cell(row_idx, 14).value = p50_adj                    # P50
+                    ws.cell(row_idx, 13).value = max(1, round(p50_adj * 0.75))  # P10
+                    ws.cell(row_idx, 15).value = round(p50_adj * 1.35)         # P90
 
     return modificadas
 
