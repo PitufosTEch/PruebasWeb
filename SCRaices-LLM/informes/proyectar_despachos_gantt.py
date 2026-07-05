@@ -133,10 +133,12 @@ def _reproyectar_beneficiario(
             None,
         )
 
-    # 4) Ajustar P50 por cambio de SPI
-    #    P50_prog = P50_actual × SPI_real   (tiempo del programa)
-    #    P50_adj  = P50_prog  / SPI_obj     (tiempo con SPI objetivo)
-    p50_ajustado = p50_actual * (spi_real / spi_objetivo)
+    # 4) Ajustar P50: nunca más corto que el actual (factor ≥ 1.0).
+    #    Si SPI_real > SPI_objetivo → P50 se extiende (menos optimista).
+    #    Si SPI_real ≤ SPI_objetivo → factor=1.0, P50 igual pero distribución
+    #    se recalcula desde cero (elimina inconsistencias manuales).
+    factor = max(1.0, spi_real / spi_objetivo)
+    p50_ajustado = p50_actual * factor
 
     # 5) Distribuir las etapas [MC] linealmente en P50_ajustado días
     n = len(mc_ordenadas)
@@ -184,16 +186,12 @@ def _procesar_hoja(ws, spi_objetivo: float, preview: bool = False) -> int:
     except ValueError:
         spi_real = 1.0
 
-    # Solo re-proyectar si el proyecto va por encima del ritmo objetivo.
-    # Proyectos con SPI_real ≤ SPI_objetivo (atrasados o en ritmo normal) ya tienen
-    # proyecciones conservadoras — no corresponde cambiarlas.
-    if spi_real <= spi_objetivo:
-        msg = "sin avance real" if spi_real < 0.1 else f"SPI {spi_real:.4f} ≤ objetivo"
-        print(f"  {msg} → sin re-proyección (proyecciones conservadoras se mantienen)")
-        return 0
+    if spi_real < 0.1:
+        spi_real = 1.0
 
-    print(f"  SPI real={spi_real:.4f}  →  SPI objetivo={spi_objetivo}  "
-          f"(factor de ajuste P50: ×{spi_real/spi_objetivo:.3f})")
+    factor_display = max(1.0, spi_real / spi_objetivo)
+    print(f"  SPI real={spi_real:.4f}  →  objetivo={spi_objetivo}  "
+          f"(factor P50: ×{factor_display:.3f})")
 
     modificadas = 0
 
