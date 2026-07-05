@@ -30,6 +30,15 @@ from datetime import date, datetime
 from pathlib import Path
 
 import requests
+from openpyxl.cell import MergedCell
+
+
+def _safe_write(ws, row: int, col: int, value):
+    """Escribe en una celda solo si no es parte de un rango fusionado (read-only)."""
+    cell = ws.cell(row=row, column=col)
+    if not isinstance(cell, MergedCell):
+        cell.value = value
+
 
 FIREBASE_BASE = "https://scraices-dashboard-default-rtdb.firebaseio.com"
 DRIVE_FILE_ID = "1fPYmvioQvYJjKUMuQgDayf3BnSSEJ7Mp"
@@ -311,7 +320,7 @@ def _sincronizar_hoja(ws, pid: str, sheets_svc, preview: bool = False) -> int:
         "P10 Dias", "P50 Dias", "P90 Dias",
     ]
     for col, h in enumerate(headers, start=1):
-        ws.cell(row=5, column=col).value = h
+        _safe_write(ws, 5, col, h)
 
     # 5. Agrupar beneficiarios por grupo para escribir en orden
     grupos_dict: dict[int, list] = {}
@@ -326,7 +335,7 @@ def _sincronizar_hoja(ws, pid: str, sheets_svc, preview: bool = False) -> int:
         capataz = grupos_capataz.get(num_grupo, "")
 
         # Fila de encabezado de grupo
-        ws.cell(row=row_idx, column=2).value = f"  GRUPO {num_grupo}"
+        _safe_write(ws, row_idx, 2, f"  GRUPO {num_grupo}")
         row_idx += 1
 
         for b in bens:
@@ -345,23 +354,23 @@ def _sincronizar_hoja(ws, pid: str, sheets_svc, preview: bool = False) -> int:
             celda_mes3 = ws.cell(row=row_idx, column=12)
 
             # Nombre + grupo + capataz + avances + SPI (siempre actualizar)
-            ws.cell(row=row_idx, column=2).value  = b["nombre"]
-            ws.cell(row=row_idx, column=3).value  = f"Grupo {num_grupo}"
-            ws.cell(row=row_idx, column=4).value  = capataz
-            ws.cell(row=row_idx, column=5).value  = f"{b['avance']:.1f}%"
-            ws.cell(row=row_idx, column=6).value  = f"{b['avance']:.1f}%"
-            ws.cell(row=row_idx, column=7).value  = f"{spi_b:.3f}"
-            ws.cell(row=row_idx, column=8).value  = "[MC]"
+            _safe_write(ws, row_idx, 2,  b["nombre"])
+            _safe_write(ws, row_idx, 3,  f"Grupo {num_grupo}")
+            _safe_write(ws, row_idx, 4,  capataz)
+            _safe_write(ws, row_idx, 5,  f"{b['avance']:.1f}%")
+            _safe_write(ws, row_idx, 6,  f"{b['avance']:.1f}%")
+            _safe_write(ws, row_idx, 7,  f"{spi_b:.3f}")
+            _safe_write(ws, row_idx, 8,  "[MC]")
 
             # mes1/mes2/mes3: solo escribir si estaban vacías o "—"
             for col_idx, celda in [(10, celda_mes1), (11, celda_mes2), (12, celda_mes3)]:
-                if not _tiene_tag(celda.value):
+                if not isinstance(celda, MergedCell) and not _tiene_tag(celda.value):
                     celda.value = "—"
 
             # P10/P50/P90: siempre actualizar (el projection script los necesita frescos)
-            ws.cell(row=row_idx, column=13).value = p10
-            ws.cell(row=row_idx, column=14).value = p50
-            ws.cell(row=row_idx, column=15).value = p90
+            _safe_write(ws, row_idx, 13, p10)
+            _safe_write(ws, row_idx, 14, p50)
+            _safe_write(ws, row_idx, 15, p90)
 
             filas_escritas += 1
             row_idx += 1
