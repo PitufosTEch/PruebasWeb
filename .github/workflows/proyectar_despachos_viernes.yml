@@ -32,7 +32,17 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install requests openpyxl \
-            google-auth google-auth-httplib2 google-api-python-client
+            google-auth google-auth-httplib2 google-api-python-client \
+            google-auth-oauthlib
+
+      - name: Sincronizar datos desde Firebase y Sheets al Excel
+        working-directory: SCRaices-LLM/informes
+        env:
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          GOOGLE_CLIENT_ID:     ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          FIREBASE_URL:         https://scraices-dashboard-default-rtdb.firebaseio.com
+        run: python sincronizar_datos_excel.py
 
       - name: Re-proyectar despachos (SPI objetivo 1.15)
         working-directory: SCRaices-LLM/informes

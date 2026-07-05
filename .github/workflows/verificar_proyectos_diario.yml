@@ -33,15 +33,26 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install requests openpyxl \
-            google-auth google-auth-httplib2 google-api-python-client
+            google-auth google-auth-httplib2 google-api-python-client \
+            google-auth-oauthlib
 
-      - name: Verificar proyectos nuevos en Excel
+      - name: Verificar y crear hojas para proyectos nuevos
         working-directory: SCRaices-LLM/informes
         env:
           GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
           GOOGLE_CLIENT_ID:     ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          FIREBASE_URL:         https://scraices-dashboard-default-rtdb.firebaseio.com
         run: python verificar_proyectos_excel.py
+
+      - name: Poblar datos en hojas (SPI, avance, capataz, P50)
+        working-directory: SCRaices-LLM/informes
+        env:
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          GOOGLE_CLIENT_ID:     ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          FIREBASE_URL:         https://scraices-dashboard-default-rtdb.firebaseio.com
+        run: python sincronizar_datos_excel.py
 
       - name: Resumen en caso de error
         if: failure()
