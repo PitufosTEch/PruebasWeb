@@ -38,7 +38,7 @@ MES3        = (date(2026, 9, 1),  date(2026, 9, 30))
 
 DRIVE_FILE_ID = "1fPYmvioQvYJjKUMuQgDayf3BnSSEJ7Mp"   # mismo que inyectar_despachos.py
 
-PROJECT_SHEETS = ["P116", "P119", "P12", "P126", "P127", "P131", "P14", "P28", "P31", "P38", "P39"]
+HOJAS_EXCLUIDAS = {"CALENDARIO", "RESUMEN_MES", "RESUMEN"}
 
 
 # ── Utilidades ────────────────────────────────────────────────────────────────
@@ -319,11 +319,10 @@ def main():
     import openpyxl
     wb = openpyxl.load_workbook(io.BytesIO(datos))
 
+    project_sheets = sorted(s for s in wb.sheetnames if s not in HOJAS_EXCLUIDAS)
+
     total_modificadas = 0
-    for pid in PROJECT_SHEETS:
-        if pid not in wb.sheetnames:
-            print(f"\n[{pid}] hoja no encontrada — omitiendo")
-            continue
+    for pid in project_sheets:
         print(f"\n► {pid}")
         mod = _procesar_hoja(wb[pid], spi_obj, preview=preview)
         print(f"  → {mod} filas actualizadas")
