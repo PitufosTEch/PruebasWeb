@@ -1,0 +1,48 @@
+name: Proyección Despachos Viernes
+
+# Viernes 20:00 hora Chile (CLT = UTC-4 en invierno → 00:00 UTC sábado)
+# En horario de verano (CLST = UTC-3) dispara a las 21:00 Chile — diferencia aceptable.
+
+on:
+  schedule:
+    - cron: '0 0 * * 6'   # 00:00 UTC sábado = 20:00 CLT viernes (invierno)
+  workflow_dispatch: {}    # Permite ejecución manual desde GitHub Actions
+
+jobs:
+  proyectar-despachos:
+    name: Re-proyectar Despachos SPI 1.15
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: despachos-pip-v1
+          restore-keys: despachos-pip-
+
+      - name: Instalar dependencias
+        run: |
+          pip install --upgrade pip
+          pip install requests openpyxl \
+            google-auth google-auth-httplib2 google-api-python-client
+
+      - name: Re-proyectar despachos (SPI objetivo 1.15)
+        working-directory: SCRaices-LLM/informes
+        env:
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          GOOGLE_CLIENT_ID:     ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          FIREBASE_URL:         https://scraices-dashboard-default-rtdb.firebaseio.com
+        run: python proyectar_despachos_gantt.py --spi 1.15
+
+      - name: Resumen en caso de error
+        if: failure()
+        run: echo "::error::Proyección de despachos falló. Revisa el log completo."
