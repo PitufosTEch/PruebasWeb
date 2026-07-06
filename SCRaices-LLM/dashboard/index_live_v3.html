@@ -6888,7 +6888,7 @@ const INFORME_TIPOS = [
 
 // ===== CONFIGURACIÓN (Grupos + Diagrama + Editor) =====
 const ModalPersonalGlobal = ({ personalGlobal, fbDB, onClose }) => {
-    const [form, setForm] = React.useState({ nombre: '', telefono: '', correo: '', rol: 'capataz', informes: [] });
+    const [form, setForm] = React.useState({ nombre: '', telefono: '', correo: '', rol: 'capataz', informes: [], alerta_climatica: false });
     const [editKey, setEditKey] = React.useState(null);
     const [informesOpenKey, setInformesOpenKey] = React.useState(null);
     const lista = Object.entries(personalGlobal || {});
@@ -6902,7 +6902,7 @@ const ModalPersonalGlobal = ({ personalGlobal, fbDB, onClose }) => {
         } else {
             fbDB.ref(`personal_global/${Date.now()}`).set(entry);
         }
-        setForm({ nombre: '', telefono: '', correo: '', rol: 'capataz', informes: [] });
+        setForm({ nombre: '', telefono: '', correo: '', rol: 'capataz', informes: [], alerta_climatica: false });
     };
 
     const eliminar = (key) => {
@@ -6912,18 +6912,22 @@ const ModalPersonalGlobal = ({ personalGlobal, fbDB, onClose }) => {
 
     const iniciarEdicion = (key, p) => {
         setEditKey(key);
-        setForm({ nombre: p.nombre || '', telefono: p.telefono || '', correo: p.correo || '', rol: p.rol || 'capataz', informes: p.informes || [] });
+        setForm({ nombre: p.nombre || '', telefono: p.telefono || '', correo: p.correo || '', rol: p.rol || 'capataz', informes: p.informes || [], alerta_climatica: !!p.alerta_climatica });
         setInformesOpenKey(null);
     };
 
     const cancelarEdicion = () => {
         setEditKey(null);
-        setForm({ nombre: '', telefono: '', correo: '', rol: 'capataz', informes: [] });
+        setForm({ nombre: '', telefono: '', correo: '', rol: 'capataz', informes: [], alerta_climatica: false });
     };
 
     const toggleInforme = (key, informeKey, current, checked) => {
         const nuevos = checked ? [...current, informeKey] : current.filter(k => k !== informeKey);
         fbDB.ref(`personal_global/${key}/informes`).set(nuevos.length > 0 ? nuevos : null);
+    };
+
+    const toggleAlertaClimatica = (key, current) => {
+        fbDB.ref(`personal_global/${key}/alerta_climatica`).set(current ? null : true);
     };
 
     const ROLES_MAP = { capataz:'Capataz', residente:'Residente', gerente:'Gerente', coordinador:'Coordinador', coordinador_pagos:'Coordinador de pagos', logistica:'Logística', rrhh:'Recursos Humanos' };
@@ -6980,6 +6984,10 @@ const ModalPersonalGlobal = ({ personalGlobal, fbDB, onClose }) => {
                                 ℹ️ Los reportes HTML incluyen todas las obras y se envían en un <strong>único correo</strong>, independiente de cuántos proyectos tenga asignados.
                             </div>
                         )}
+                        <label className="flex items-center gap-1.5 text-xs cursor-pointer text-gray-600 hover:text-sky-700 select-none mt-2.5">
+                            <input type="checkbox" checked={!!form.alerta_climatica} onChange={e => setForm(f => ({ ...f, alerta_climatica: e.target.checked }))} className="rounded border-gray-300 text-sky-500 focus:ring-sky-400" />
+                            🌦️ Recibir Alerta Climática (condiciones adversas por sector)
+                        </label>
                     </div>
                     <div className="flex gap-2 mt-3">
                         <button onClick={guardar} disabled={!form.nombre.trim()} className="px-4 py-2 bg-violet-600 text-white rounded-lg text-sm font-medium hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
@@ -7019,6 +7027,13 @@ const ModalPersonalGlobal = ({ personalGlobal, fbDB, onClose }) => {
                                                             title="Gestionar informes"
                                                         >
                                                             📧 {(p.informes||[]).length > 0 ? (p.informes||[]).length : '—'}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => toggleAlertaClimatica(key, p.alerta_climatica)}
+                                                            className={`flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded border transition-colors ${p.alerta_climatica ? 'bg-sky-100 text-sky-700 border-sky-300' : 'bg-gray-100 text-gray-400 border-gray-200 hover:bg-sky-50 hover:text-sky-500'}`}
+                                                            title="Recibir Alerta Climática"
+                                                        >
+                                                            🌦️
                                                         </button>
                                                         <button onClick={() => iniciarEdicion(key, p)} className="text-violet-500 hover:text-violet-700 text-xs px-1.5" title="Editar">✎</button>
                                                         <button onClick={() => eliminar(key)} className="text-red-400 hover:text-red-600 text-xs px-1" title="Eliminar">×</button>
@@ -7238,6 +7253,10 @@ const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel, personal
             ? [...currentInformes, informeKey]
             : currentInformes.filter(k => k !== informeKey);
         fbDB.ref(`personal_obra/${proyectoSel}/${key}/informes`).set(nuevos.length > 0 ? nuevos : null);
+    };
+
+    const toggleAlertaClimaticaProy = (key, current) => {
+        fbDB.ref(`personal_obra/${proyectoSel}/${key}/alerta_climatica`).set(current ? null : true);
     };
 
     const personalProy = Object.entries((personalObra || {})[proyectoSel] || {});
@@ -7694,6 +7713,19 @@ const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel, personal
                                                                         className={`flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded border transition-colors ${informesActivos.length > 0 ? 'bg-amber-100 text-amber-700 border-amber-300 hover:bg-amber-200' : 'bg-gray-100 text-gray-400 border-gray-200 hover:bg-amber-50 hover:text-amber-500 hover:border-amber-200'}`}
                                                                     >
                                                                         📧 {informesActivos.length > 0 ? informesActivos.length : '—'}
+                                                                    </button>
+                                                                )}
+                                                                {p.global_key ? (
+                                                                    <span title="Alerta Climática definida en registro global" className={`text-[10px] px-1.5 py-0.5 rounded border ${globalRec && globalRec.alerta_climatica ? 'bg-sky-100 text-sky-700 border-sky-300' : 'bg-gray-100 text-gray-400 border-gray-200'}`}>
+                                                                        🌦️🔒
+                                                                    </span>
+                                                                ) : (
+                                                                    <button
+                                                                        onClick={() => toggleAlertaClimaticaProy(key, p.alerta_climatica)}
+                                                                        className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${p.alerta_climatica ? 'bg-sky-100 text-sky-700 border-sky-300' : 'bg-gray-100 text-gray-400 border-gray-200 hover:bg-sky-50 hover:text-sky-500'}`}
+                                                                        title="Recibir Alerta Climática"
+                                                                    >
+                                                                        🌦️
                                                                     </button>
                                                                 )}
                                                                 {!p.global_key && <button onClick={() => setEditandoPersonal({ key, datos: { informes: [], ...p } })} className="text-amber-500 hover:text-amber-700 text-xs px-1" title="Editar">✎</button>}

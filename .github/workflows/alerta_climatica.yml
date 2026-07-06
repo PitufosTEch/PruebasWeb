@@ -1,0 +1,53 @@
+name: Alerta Climática — Sectores IX Región
+
+# Revisa el pronóstico (3 días, Open-Meteo) de los sectores de obra y envía
+# un correo de alerta si detecta condiciones adversas con al menos 24h de
+# anticipación (lluvia intensa, viento fuerte, nieve, heladas, calor extremo).
+
+on:
+  schedule:
+    - cron: '0 10,18 * * *'   # 07:00 y 15:00 hora Chile continental (sin horario de verano)
+  workflow_dispatch:
+    inputs:
+      forzar_envio:
+        description: 'Forzar envío real de correos (pruebas manuales no envían por defecto)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: alerta-climatica
+  cancel-in-progress: false
+
+jobs:
+  revision-climatica:
+    name: Revisar condiciones climáticas y alertar
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Instalar dependencias Python
+        run: pip install -r SCRaices-LLM/alertas/requirements.txt
+
+      - name: Revisar clima y alertar si corresponde
+        working-directory: SCRaices-LLM/alertas
+        env:
+          FIREBASE_URL: https://scraices-dashboard-default-rtdb.firebaseio.com
+          GMAIL_EMAIL: ${{ secrets.GMAIL_EMAIL }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          FORZAR_ENVIO: ${{ (github.event_name == 'schedule' || github.event.inputs.forzar_envio == 'true') && '1' || '0' }}
+        run: python revision_climatica.py
+
+      - name: Resumen en caso de error
+        if: failure()
+        run: echo "::error::La revisión climática falló. Revisa el log completo arriba."
