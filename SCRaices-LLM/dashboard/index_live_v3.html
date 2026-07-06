@@ -5230,7 +5230,7 @@ ${js2}
 <div style="margin:8px 0 4px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;"><span>0%</span><span style="font-weight:600;color:${avBarCol};">${av}% completado</span><span>100%</span></div>
 <div style="height:14px;background:#e5e7eb;border-radius:6px;overflow:hidden;margin-bottom:4px;"><div style="height:100%;width:${av}%;background:${avBarCol};border-radius:6px;transition:width 0.5s;"></div></div>`;
             } else if (tab === 'checkpoints') {
-                h += `Checkpoints del Proyecto</div><div class="summary-grid" style="grid-template-columns:repeat(auto-fit,minmax(90px,1fr));">`;
+                h += `Checkpoints del Proyecto</div><div class="summary-grid" style="grid-template-columns:repeat(5,1fr);">`;
                 const tot = obra.viviendas.length;
                 CPS.forEach(cp => {
                     const n = obra.viviendas.filter(v => getFlags(v)[cp.key]).length;
@@ -5314,14 +5314,14 @@ ${js2}
   ${tituloGrupo}${capLabel} &nbsp;<span style="font-weight:400;color:#94a3b8;">(${grupo.viviendas.length} viv.)</span>
 </div>
 <div class="table-container"><table>
-<thead><tr><th>Beneficiario</th><th>Avance</th><th>HPC</th><th>TE1</th><th>F1</th><th>Empalme</th><th>Recep.</th></tr></thead><tbody>`;
+<thead><tr><th>Beneficiario</th><th>Avance</th><th>HPC</th><th>TE1</th><th>V.AS</th><th>R.AS</th><th>F1</th><th>Empalme</th><th>Recep.</th></tr></thead><tbody>`;
                     grupo.viviendas.forEach(v => {
                         const insp = getInspeccion(v.ID_Benef);
                         const pct = insp ? insp.pct_total : null;
                         const fl = getFlags(v);
                         const pctTxt = pct !== null ? `${pct}%` : '—';
                         const pctCol = pct === null ? '#94a3b8' : pct >= 80 ? '#16a34a' : pct >= 50 ? '#2563eb' : '#dc2626';
-                        h += `<tr><td>${v.NOMBRES||''} ${v.APELLIDOS||''}</td><td style="font-weight:700;color:${pctCol};">${pctTxt}</td><td>${ck(fl.hpc)}</td><td>${ck(fl.te1)}</td><td>${ck(fl.fecha_f1)}</td><td>${ck(fl.empalme)}</td><td>${ck(fl.fecha_recep)}</td></tr>`;
+                        h += `<tr><td>${v.NOMBRES||''} ${v.APELLIDOS||''}</td><td style="font-weight:700;color:${pctCol};">${pctTxt}</td><td>${ck(fl.hpc)}</td><td>${ck(fl.te1)}</td><td>${ck(fl.visita_as)}</td><td>${ck(fl.resol_as)}</td><td>${ck(fl.fecha_f1)}</td><td>${ck(fl.empalme)}</td><td>${ck(fl.fecha_recep)}</td></tr>`;
                     });
                     h += `</tbody></table></div></div>`;
                 });
