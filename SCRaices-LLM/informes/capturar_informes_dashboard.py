@@ -55,9 +55,10 @@ INFORMES_PDF = [
 
 # Informes HTML globales (contienen todos los proyectos — se capturan una sola vez)
 INFORMES_HTML = [
-    ("EjecutivoHTML", "Reporte Ejecutivo HTML"),
-    ("Adquisiciones", "Reporte adquisiciones HTML"),
-    ("EstadosPago",   "Estados de Pago HTML"),
+    ("EjecutivoHTML",   "Reporte Ejecutivo HTML"),
+    ("Adquisiciones",   "Reporte adquisiciones HTML"),
+    ("RecepcionesHTML", "Reporte recepciones HTML"),
+    ("EstadosPago",     "Estados de Pago HTML"),
 ]
 
 

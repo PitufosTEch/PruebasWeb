@@ -5553,6 +5553,339 @@ ${js}</body></html>`;
     };
 
     // ================================================================
+    // RECEPCIONES HTML — informe de recepciones multi-obra
+    // ================================================================
+    const generarInformeRecepciones = async () => {
+        const obrasConCurva = PROYECTOS_DATA.filter(p => (CURVAS_S_CONFIG[p.ID_proy] || []).length > 0);
+        if (obrasConCurva.length === 0) { alert('No hay obras activas con curvas S configuradas.'); return; }
+
+        let ganttRaw = {}, gruposRaw = {}, obsRaw = {}, resumenComRaw = {}, avanceGanttRaw = {};
+        try {
+            const [rGantt, rGrupos, rObs, rResCom, rAvGantt] = await Promise.all([
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/gantt_programa.json'),
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/grupos.json'),
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/observaciones.json'),
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/resumen_comentarios.json'),
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/avance_gantt.json')
+            ]);
+            ganttRaw      = (await rGantt.json())   || {};
+            gruposRaw     = (await rGrupos.json())  || {};
+            obsRaw        = (await rObs.json())     || {};
+            resumenComRaw = (await rResCom.json())  || {};
+            avanceGanttRaw = (await rAvGantt.json()) || {};
+        } catch(e) { ganttRaw = {}; gruposRaw = {}; obsRaw = {}; resumenComRaw = {}; avanceGanttRaw = {}; }
+
+        const getCapataz = (idProy, curvaLabel) => {
+            const gList = gruposRaw[idProy] || [];
+            const grupoNombre = curvaLabel.split(' · ')[0].trim().toLowerCase();
+            const found = gList.find(g => (g.nombre || '').toLowerCase() === grupoNombre);
+            return found && found.capataz ? found.capataz : null;
+        };
+
+        const fmtFecha = (iso) => {
+            if (!iso) return '—';
+            const p = String(iso).substring(0, 10).split('-');
+            return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : String(iso);
+        };
+
+        const getFlags = (v) => {
+            const seg = SEGUIMIENTO_DATA[String(v.ID_Benef)] || { _has: {} };
+            return {
+                hpc:           !!v.habil,
+                te1:           !!v.has_te1,
+                visita_as:     !!seg._has.visita_as,
+                resol_as:      !!seg._has.resol_as,
+                visita_f1:     !!seg._has.visita_f1,
+                fecha_f1:      !!seg._has.fecha_f1,
+                artefactado:   !!seg._has.artefactado,
+                empalme:       !!seg._has.empalme,
+                visita_dom:    !!seg._has.visita_dom,
+                fecha_v_dom:   !!seg._has.fecha_v_dom,
+                recepcion_dom: !!seg._has.recepcion_dom,
+                fecha_recep:   !!(v.fecha_recepcion || seg._has.fecha_recep)
+            };
+        };
+
+        const obrasData = obrasConCurva.map(proy => {
+            const vivs = BENEFICIARIOS_DATA.filter(b => String(b.ID_Proy) === String(proy.ID_proy));
+            return { ID_proy: proy.ID_proy, nombre: `${proy.ID_proy} · ${proy.NOMBRE_PROYECTO}`, viviendas: vivs, grupos: gruposRaw[proy.ID_proy] || [] };
+        });
+
+        const CPS = [
+            {key:'hpc',label:'HPC'}, {key:'te1',label:'TE1'},
+            {key:'visita_as',label:'V.AS'}, {key:'resol_as',label:'R.AS'},
+            {key:'visita_f1',label:'V.F1'}, {key:'fecha_f1',label:'F1'},
+            {key:'artefactado',label:'Artef.'}, {key:'empalme',label:'Empalme'},
+            {key:'visita_dom',label:'V.DOM'}, {key:'recepcion_dom',label:'Recep.'}
+        ];
+
+        const renderTab = (idx, tab) => {
+            const obra = obrasData[idx];
+            let h = `<div class="breadcrumb">Obra <strong>${obra.nombre}</strong> · `;
+
+            if (tab === 'resumen') {
+                const tot = obra.viviendas.length;
+                const av = tot ? Math.round(obra.viviendas.reduce((s,v) => {
+                    const insp = getInspeccion(v.ID_Benef);
+                    return s + (insp ? insp.pct_total : 0);
+                }, 0) / tot) : 0;
+                const conInsp = obra.viviendas.filter(v => getInspeccion(v.ID_Benef) !== null).length;
+                const term = obra.viviendas.filter(v => v.fecha_recepcion).length;
+                const crit = obra.viviendas.filter(v => getFlags(v).fecha_f1 && !v.fecha_recepcion && av < 50).length;
+                const _ag = avanceGanttRaw[obra.ID_proy];
+                const agPct = _ag ? _ag.pct : null;
+                const agCol = agPct == null ? '#94a3b8' : agPct >= 80 ? '#16a34a' : agPct >= 50 ? '#2563eb' : '#dc2626';
+                h += `Estado General</div>
+<div class="summary-grid">
+  <div class="summary-card" style="border-left:3px solid ${agCol};"><div class="summary-card-label">Avance Real</div><div class="summary-card-value" style="color:${agCol};">${agPct != null ? agPct + '%' : '—'}</div><div class="summary-card-detail">${_ag ? _ag.n + '/' + _ag.total + ' con avance' : 'Sin datos Gantt'}</div></div>
+  <div class="summary-card"><div class="summary-card-label">Avance Real (Insp.)</div><div class="summary-card-value" style="color:${av>=80?'#16a34a':av>=50?'#2563eb':'#dc2626'};">${av}%</div><div class="summary-card-detail">${conInsp}/${tot} inspeccionadas</div></div>
+  <div class="summary-card"><div class="summary-card-label">Viviendas</div><div class="summary-card-value">${tot}</div><div class="summary-card-detail">Beneficiarios</div></div>
+  <div class="summary-card"><div class="summary-card-label">Terminadas</div><div class="summary-card-value" style="color:#16a34a;">${term}</div><div class="summary-card-detail">Con recepción</div></div>
+  <div class="summary-card"><div class="summary-card-label">En Proceso</div><div class="summary-card-value" style="color:#2563eb;">${tot - term}</div><div class="summary-card-detail">Sin recepción</div></div>
+</div>`;
+                const proyRec = PROYECTOS_DATA.find(p => p.ID_proy === obra.ID_proy);
+                if (proyRec && proyRec.fecha_inicio) {
+                    const cIni = proyRec.fecha_inicio;
+                    const cDur = proyRec.duracion || 0;
+                    const cFin = cDur > 0 ? (() => { const d = new Date(cIni); d.setDate(d.getDate() + cDur); return d.toISOString().substring(0,10); })() : null;
+                    const cDiasR = cFin ? Math.floor((new Date(cFin) - new Date()) / 86400000) : null;
+                    const cEstado = cDiasR === null ? '—' : cDiasR < 0 ? `Vencido (${Math.abs(cDiasR)}d)` : `${cDiasR}d restantes`;
+                    const cCol = cDiasR === null ? '#6b7280' : cDiasR < 0 ? '#dc2626' : cDiasR < 30 ? '#b45309' : '#16a34a';
+                    const cPctTr = cDur > 0 && cFin ? Math.min(100, Math.round((cDur - Math.max(0, cDiasR)) / cDur * 100)) : 0;
+                    const cBarCol = cPctTr >= 100 ? '#ef4444' : cPctTr >= 80 ? '#f59e0b' : cPctTr >= 50 ? '#3b82f6' : '#22c55e';
+                    h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📄 Contrato</h3>
+<div class="summary-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));">
+  <div class="summary-card"><div class="summary-card-label">Inicio</div><div style="font-size:14px;font-weight:700;">${fmtFecha(cIni)}</div></div>
+  <div class="summary-card"><div class="summary-card-label">Término</div><div style="font-size:14px;font-weight:700;">${fmtFecha(cFin)}</div></div>
+  <div class="summary-card"><div class="summary-card-label">Plazo</div><div style="font-size:14px;font-weight:700;">${cDur} días</div></div>
+  <div class="summary-card"><div class="summary-card-label">Estado</div><div style="font-size:13px;font-weight:700;color:${cCol};">${cEstado}</div></div>
+</div>
+<div style="margin:8px 0 4px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;"><span>${fmtFecha(cIni)}</span><span style="font-weight:600;">${cPctTr}% transcurrido</span><span>${fmtFecha(cFin)}</span></div>
+<div style="height:10px;background:#e5e7eb;border-radius:6px;overflow:hidden;margin-bottom:4px;"><div style="height:100%;width:${cPctTr}%;background:${cBarCol};border-radius:6px;"></div></div>`;
+                }
+                const pg = ganttRaw[obra.ID_proy] || null;
+                if (pg && pg.inicio && pg.finProg) {
+                    const diasR = Math.floor((new Date(pg.finProg) - new Date()) / 86400000);
+                    const estadoTxt = diasR < 0 ? `Vencido (${Math.abs(diasR)}d)` : `${diasR}d restantes`;
+                    const estadoCol = diasR < 0 ? '#dc2626' : diasR < 30 ? '#b45309' : '#16a34a';
+                    const pctTr = pg.plazo > 0 ? Math.min(100, Math.round((pg.plazo - Math.max(0,diasR)) / pg.plazo * 100)) : 0;
+                    const barCol = pctTr >= 100 ? '#ef4444' : pctTr >= 80 ? '#f59e0b' : pctTr >= 50 ? '#3b82f6' : '#22c55e';
+                    h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📋 Programa de Obra</h3>
+<div class="summary-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));">
+  <div class="summary-card"><div class="summary-card-label">Inicio</div><div style="font-size:14px;font-weight:700;">${fmtFecha(pg.inicio)}</div></div>
+  <div class="summary-card"><div class="summary-card-label">Término</div><div style="font-size:14px;font-weight:700;">${fmtFecha(pg.finProg)}</div></div>
+  <div class="summary-card"><div class="summary-card-label">Plazo</div><div style="font-size:14px;font-weight:700;">${pg.plazo} días</div></div>
+  <div class="summary-card"><div class="summary-card-label">Estado</div><div style="font-size:13px;font-weight:700;color:${estadoCol};">${estadoTxt}</div></div>
+</div>
+<div style="margin:10px 0 4px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;"><span>${fmtFecha(pg.inicio)}</span><span style="font-weight:600;">${pctTr}% transcurrido</span><span>${fmtFecha(pg.finProg)}</span></div>
+<div style="height:10px;background:#e5e7eb;border-radius:6px;overflow:hidden;"><div style="height:100%;width:${pctTr}%;background:${barCol};border-radius:6px;"></div></div>`;
+                } else {
+                    h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📋 Programa de Obra</h3><p style="color:#94a3b8;font-size:12px;">Sin datos de programa disponibles.</p>`;
+                }
+                const avBarCol = av >= 80 ? '#16a34a' : av >= 50 ? '#3b82f6' : av >= 25 ? '#f59e0b' : '#ef4444';
+                h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📊 Avance real a la fecha</h3>
+<div class="summary-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));">
+  <div class="summary-card"><div class="summary-card-label">Avance Real</div><div style="font-size:22px;font-weight:800;color:${avBarCol};">${av}%</div></div>
+  <div class="summary-card"><div class="summary-card-label">Inspeccionadas</div><div style="font-size:14px;font-weight:700;">${conInsp} / ${tot}</div><div style="font-size:11px;color:#94a3b8;">viviendas</div></div>
+  <div class="summary-card"><div class="summary-card-label">Terminadas</div><div style="font-size:14px;font-weight:700;color:#16a34a;">${term}</div><div style="font-size:11px;color:#94a3b8;">con recepción</div></div>
+  <div class="summary-card"><div class="summary-card-label">En Proceso</div><div style="font-size:14px;font-weight:700;color:#2563eb;">${tot - term}</div><div style="font-size:11px;color:#94a3b8;">sin recepción</div></div>
+</div>
+<div style="margin:8px 0 4px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;"><span>0%</span><span style="font-weight:600;color:${avBarCol};">${av}% completado</span><span>100%</span></div>
+<div style="height:14px;background:#e5e7eb;border-radius:6px;overflow:hidden;margin-bottom:4px;"><div style="height:100%;width:${av}%;background:${avBarCol};border-radius:6px;transition:width 0.5s;"></div></div>`;
+            } else if (tab === 'checkpoints') {
+                h += `Checkpoints del Proyecto</div><div class="summary-grid" style="grid-template-columns:repeat(5,1fr);">`;
+                const tot = obra.viviendas.length;
+                CPS.forEach(cp => {
+                    const n = obra.viviendas.filter(v => getFlags(v)[cp.key]).length;
+                    const pct = tot ? Math.round(n/tot*100) : 0;
+                    const col = n===tot?'#16a34a':n>0?'#2563eb':'#6b7280';
+                    h += `<div class="summary-card"><div class="summary-card-label">${cp.label}</div><div class="summary-card-value" style="color:${col};">${n}</div><div class="summary-card-detail">/ ${tot} · ${pct}%</div></div>`;
+                });
+                h += `</div>`;
+            } else if (tab === 'curvas') {
+                const curvas = CURVAS_S_CONFIG[obra.ID_proy] || [];
+                h += `Curvas S de Control</div><div class="curvas-grid">`;
+                curvas.forEach(c => {
+                    const cap = getCapataz(obra.ID_proy, c.label);
+                    const capHtml = cap ? `<div style="font-size:10px;color:#64748b;margin-top:2px;">👷 ${cap}</div>` : '';
+                    h += `<div class="curva-card"><div class="curva-header">${c.label}${capHtml}</div><img src="https://drive.google.com/thumbnail?id=${c.id}&sz=w800" style="width:100%;display:block;" alt="${c.label}" loading="lazy"/></div>`;
+                });
+                h += `</div>`;
+            } else if (tab === 'comentarios') {
+                h += `Comentarios Destacados</div>`;
+                const starredIds = new Set(Object.keys(resumenComRaw[obra.ID_proy] || {}));
+                let comHtml = '';
+                obra.viviendas.forEach(v => {
+                    const obsAll = obsRaw[v.ID_Benef] || [];
+                    const starred = obsAll.filter(o => starredIds.has(String(o.id)));
+                    if (starred.length === 0) return;
+                    const nombre = `${v.NOMBRES || ''} ${v.APELLIDOS || ''}`.trim();
+                    const items = starred.map(o => {
+                        const fch = (o.fecha || '').toString().substring(0, 10);
+                        return `<div style="padding:6px 12px;margin-bottom:5px;font-size:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;">
+<span style="font-size:10px;color:#94a3b8;">${fch}</span>
+<div style="color:#374151;margin-top:2px;">${o.texto || ''}</div></div>`;
+                    }).join('');
+                    comHtml += `<div style="margin-bottom:14px;"><div style="font-size:13px;font-weight:700;color:#1a1a2e;margin-bottom:6px;">${nombre}</div>${items}</div>`;
+                });
+                if (!comHtml) {
+                    comHtml = `<div style="color:#94a3b8;font-size:12px;padding:16px;text-align:center;border:1px dashed #e2e8f0;border-radius:8px;">Sin comentarios destacados (marcados con ★) en esta obra.</div>`;
+                }
+                h += `<h3 style="font-size:13px;color:#333;margin:20px 0 10px;display:flex;align-items:center;gap:6px;"><span style="color:#f59e0b;">★</span> Comentarios Destacados por Beneficiario</h3>${comHtml}`;
+            } else if (tab === 'viviendas') {
+                h += `Detalle de Viviendas</div>`;
+                const gruposObra = agruparViviendas(obra.viviendas, obra.grupos);
+                const ck = (ok) => ok ? `<span style="color:#16a34a;font-weight:700;">✓</span>` : `<span style="color:#e5e7eb;">—</span>`;
+                gruposObra.forEach(grupo => {
+                    const tituloGrupo = grupo.nombre || 'Sin asignar';
+                    const capLabel = grupo.capataz ? ` &nbsp;·&nbsp; <span style="font-weight:400;color:#64748b;">Capataz: ${grupo.capataz}</span>` : '';
+                    h += `<div style="margin-bottom:24px;">
+<div style="font-size:12px;font-weight:700;color:#1a1a2e;background:#f1f5f9;border:1px solid #e2e8f0;padding:7px 12px;border-radius:7px;margin-bottom:8px;">
+  ${tituloGrupo}${capLabel} &nbsp;<span style="font-weight:400;color:#94a3b8;">(${grupo.viviendas.length} viv.)</span>
+</div>
+<div class="table-container"><table>
+<thead><tr><th>Beneficiario</th><th>Avance</th><th>HPC</th><th>TE1</th><th>V.AS</th><th>R.AS</th><th>F1</th><th>Empalme</th><th>Recep.</th></tr></thead><tbody>`;
+                    grupo.viviendas.forEach(v => {
+                        const insp = getInspeccion(v.ID_Benef);
+                        const pct = insp ? insp.pct_total : null;
+                        const fl = getFlags(v);
+                        const pctTxt = pct !== null ? `${pct}%` : '—';
+                        const pctCol = pct === null ? '#94a3b8' : pct >= 80 ? '#16a34a' : pct >= 50 ? '#2563eb' : '#dc2626';
+                        h += `<tr><td>${v.NOMBRES||''} ${v.APELLIDOS||''}</td><td style="font-weight:700;color:${pctCol};">${pctTxt}</td><td>${ck(fl.hpc)}</td><td>${ck(fl.te1)}</td><td>${ck(fl.visita_as)}</td><td>${ck(fl.resol_as)}</td><td>${ck(fl.fecha_f1)}</td><td>${ck(fl.empalme)}</td><td>${ck(fl.fecha_recep)}</td></tr>`;
+                    });
+                    h += `</tbody></table></div></div>`;
+                });
+            }
+            return h;
+        };
+
+        const allSections = {};
+        obrasData.forEach((o, idx) => {
+            allSections[idx] = {
+                resumen:     renderTab(idx, 'resumen'),
+                checkpoints: renderTab(idx, 'checkpoints'),
+                curvas:      renderTab(idx, 'curvas'),
+                comentarios: renderTab(idx, 'comentarios'),
+                viviendas:   renderTab(idx, 'viviendas'),
+            };
+        });
+
+        const css = `<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f4f8;color:#1a1a2e;font-size:14px;}
+.multi-container{max-width:980px;margin:0 auto;padding:0 0 40px;}
+.header{background:#0f172a;color:#fff;padding:14px 24px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:100;}
+.header h1{font-size:16px;font-weight:700;}
+.header-sub{font-size:11px;color:#94a3b8;margin-left:auto;}
+.tabs{background:#1e293b;display:flex;padding:0 24px;gap:2px;position:sticky;top:49px;z-index:99;}
+.tab-btn{background:none;border:none;color:#94a3b8;font-size:12px;font-weight:600;padding:11px 18px;cursor:pointer;border-bottom:3px solid transparent;}
+.tab-btn.active{color:#fff;border-bottom-color:#3b82f6;}
+.tab-btn:hover:not(.active){color:#e2e8f0;}
+.obra-jumper{margin-left:auto;align-self:center;background:#0f172a;color:#cbd5e1;border:1px solid #334155;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer;outline:none;max-width:220px;}
+.obra-jumper:focus{border-color:#3b82f6;}
+.obra-jumper option{background:#1e293b;color:#e2e8f0;}
+.content{background:#f0f4f8;min-height:380px;}
+.section{display:none;}
+.section.active{display:block;}
+.obra-block{background:#fff;margin:12px;border-radius:10px;padding:24px;border:1px solid #e2e8f0;}
+.footer{background:#f8fafc;border-top:1px solid #e2e8f0;padding:12px 24px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;}
+.btn{padding:8px 14px;border:1px solid #d1d5db;border-radius:6px;background:#fff;cursor:pointer;font-size:12px;font-weight:600;color:#374151;}
+.btn:hover{background:#f3f4f6;}
+.btn-pdf{background:#0f172a;color:#fff;border-color:#0f172a;}
+.btn-pdf:hover{background:#1e293b;}
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:14px;}
+.summary-card{padding:13px 15px;border-radius:8px;border:1px solid #e2e8f0;background:#f8fafc;}
+.summary-card-label{font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;}
+.summary-card-value{font-size:16px;font-weight:700;color:#0f172a;font-family:monospace;margin-bottom:3px;}
+.summary-card-detail{font-size:10px;color:#94a3b8;}
+.breadcrumb{font-size:12px;color:#94a3b8;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid #e2e8f0;}
+.breadcrumb strong{color:#0f172a;}
+.curvas-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-top:12px;}
+.curva-card{border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;}
+.curva-header{background:#f8fafc;padding:10px 12px;font-size:11px;font-weight:600;color:#475569;border-bottom:1px solid #e2e8f0;}
+.table-container{overflow:auto;max-height:520px;margin-top:12px;border:1px solid #e2e8f0;border-radius:6px;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+table thead{background:#f8fafc;}
+table th{padding:9px 11px;text-align:left;font-weight:700;color:#475569;border-bottom:2px solid #e2e8f0;position:sticky;top:0;background:#f8fafc;z-index:2;font-size:10px;text-transform:uppercase;}
+table td{padding:8px 11px;border-bottom:1px solid #f1f5f9;color:#334155;}
+table tr:hover td{background:#f8fafc;}
+table th:first-child,table td:first-child{position:sticky;left:0;background:white;z-index:1;border-right:1px solid #e2e8f0;min-width:180px;}
+table th:first-child{background:#f8fafc;z-index:3;}
+table tr:hover td:first-child{background:#f8fafc;}
+.no-data{color:#94a3b8;font-size:13px;text-align:center;padding:48px;font-style:italic;line-height:1.8;}
+@media (max-width:768px){
+  .tabs{flex-wrap:wrap;padding:0 8px 0;gap:0;}
+  .tab-btn{font-size:11px;padding:9px 10px;flex:1 1 auto;text-align:center;min-width:0;}
+  .obra-jumper{margin-left:0;width:calc(100% - 16px);max-width:100%;margin:4px 8px 6px;padding:8px 12px;font-size:12px;}
+  .obra-block{margin:8px;padding:14px 12px;border-radius:8px;}
+  .summary-grid{grid-template-columns:1fr 1fr;}
+  .summary-card-value{font-size:14px;}
+}
+@media print{.footer{display:none;}.tabs{display:none;}.section{display:block!important;}.obra-block{page-break-after:always;border:none;border-bottom:2px solid #e2e8f0;border-radius:0;margin:0;}}
+</style>`;
+
+        const jsOpen = '<scr' + 'ipt>';
+        const jsClose = '</scr' + 'ipt>';
+        const js = jsOpen + `
+function mostrar(t,btn){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.tabs .tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('sec-'+t).classList.add('active');
+  btn.classList.add('active');
+}
+function jumpToObra(idx){
+  if(idx==='')return;
+  const sec=document.querySelector('.section.active');
+  const block=sec&&sec.querySelector('.obra-block[data-obra="'+idx+'"]');
+  if(block)block.scrollIntoView({behavior:'smooth',block:'start'});
+}
+` + jsClose;
+
+        const tabKeys = ['resumen','checkpoints','curvas','comentarios','viviendas'];
+        const tabLabels = {resumen:'Resumen',checkpoints:'Checkpoints',curvas:'Curvas S',comentarios:'Comentarios',viviendas:'Viviendas'};
+
+        const tabs = `<div class="tabs">
+${tabKeys.map((t,i)=>`<button class="tab-btn${i===0?' active':''}" onclick="mostrar('${t}',this)">${tabLabels[t]}</button>`).join('\n')}
+<select class="obra-jumper" onchange="jumpToObra(this.value);this.value=''">
+  <option value="">&#128269; Ir a obra...</option>
+  ${obrasData.map((o,i)=>`<option value="${i}">${o.nombre}</option>`).join('')}
+</select>
+</div>`;
+
+        const secs = tabKeys.map(t =>
+            `<div class="section${t==='resumen'?' active':''}" id="sec-${t}">${obrasData.map((o,i)=>`<div class="obra-block" data-obra="${i}">${allSections[i][t]}</div>`).join('')}</div>`
+        ).join('');
+
+        const html = `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Informe de Recepciones — Multi Obras</title>
+${css}</head><body>
+<div class="multi-container">
+  <div class="header">
+    <h1>&#127968; Informe de Recepciones — Multi Obras</h1>
+    <span class="header-sub">${obrasData.length} obras en ejecución · ${new Date().toLocaleDateString('es-CL')}</span>
+  </div>
+  ${tabs}
+  <div class="content">${secs}</div>
+  <div class="footer">
+    <button class="btn btn-pdf" onclick="window.print();">&#128196; Imprimir/PDF</button>
+  </div>
+</div>
+${js}</body></html>`;
+
+        const fname = `Informe_Recepciones_${new Date().toISOString().substring(0,10)}.html`;
+        const blob = new Blob([html], {type:'text/html;charset=utf-8'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = fname;
+        document.body.appendChild(a); a.click(); a.remove();
+        const w = window.open(url, '_blank');
+        if (!w) alert('Archivo descargado: ' + fname);
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+    };
+
+    // ================================================================
     // ESTADOS DE PAGO HTML — informe financiero multi-obra
     // ================================================================
     const generarEstadosPagoHTML = async () => {
@@ -6386,6 +6719,14 @@ ${viewerCss}</style>
                         Reporte Ejecutivo HTML
                     </button>
                     <button
+                        onClick={generarInformeRecepciones}
+                        className="flex items-center gap-2 px-4 py-2 bg-indigo-700 hover:bg-indigo-800 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors"
+                        title="Descarga HTML multi-obras para coordinador de recepciones: Resumen, Checkpoints, Curvas S, Comentarios y Viviendas (sin Estado de Pago ni gráficos de ritmos)"
+                    >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                        Reporte recepciones HTML
+                    </button>
+                    <button
                         onClick={generarEstadosPagoHTML}
                         className="flex items-center gap-2 px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors"
                         title="Descarga HTML con todos los estados de pago, garantías y pagos M.O. por obra (selector de obra + tabs)"
@@ -6884,9 +7225,10 @@ const INFORME_TIPOS = [
     { key: 'residente',          label: 'Reporte residente',             esHtml: false },
     { key: 'adquisiciones',      label: 'Reporte adquisiciones',         esHtml: false },
     { key: 'por_capataz',        label: 'Reporte Capataz',               esHtml: false },
-    { key: 'adquisiciones_html', label: 'Reporte adquisiciones HTML',    esHtml: true  },
-    { key: 'html_navegable',     label: 'Reporte Ejecutivo HTML',        esHtml: true  },
-    { key: 'estados_pago_html',  label: 'Estados de Pago HTML',          esHtml: true  },
+    { key: 'adquisiciones_html',  label: 'Reporte adquisiciones HTML',    esHtml: true  },
+    { key: 'html_navegable',      label: 'Reporte Ejecutivo HTML',        esHtml: true  },
+    { key: 'recepciones_html',    label: 'Reporte recepciones HTML',      esHtml: true  },
+    { key: 'estados_pago_html',   label: 'Estados de Pago HTML',          esHtml: true  },
 ];
 
 // ===== CONFIGURACIÓN (Grupos + Diagrama + Editor) =====
@@ -6982,7 +7324,7 @@ const ModalPersonalGlobal = ({ personalGlobal, fbDB, onClose }) => {
                                 </label>
                             ))}
                         </div>
-                        {(form.informes||[]).some(k => ['adquisiciones_html','html_navegable'].includes(k)) && (
+                        {(form.informes||[]).some(k => ['adquisiciones_html','html_navegable','recepciones_html'].includes(k)) && (
                             <div className="mt-1.5 text-[10px] text-violet-600 bg-violet-50 border border-violet-200 rounded px-2 py-1">
                                 ℹ️ Los reportes HTML incluyen todas las obras y se envían en un <strong>único correo</strong>, independiente de cuántos proyectos tenga asignados.
                             </div>

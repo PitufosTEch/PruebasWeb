@@ -71,8 +71,9 @@ TIPO_ARCHIVO = {
     "html_navegable":    ("Informe_EjecutivoHTML", ".html", True,  False),
     "residente":         ("Informe_Residente",     ".pdf",  False, False),
     "por_capataz":       ("Informe_Capataz",       ".pdf",  False, True),
-    "adquisiciones_html":("Informe_Adquisiciones", ".html", True,  False),
-    "estados_pago_html": ("Informe_EstadosPago",   ".html", True,  False),
+    "adquisiciones_html":("Informe_Adquisiciones",   ".html", True,  False),
+    "recepciones_html":  ("Informe_RecepcionesHTML", ".html", True,  False),
+    "estados_pago_html": ("Informe_EstadosPago",     ".html", True,  False),
 }
 
 
