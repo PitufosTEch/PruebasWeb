@@ -59,10 +59,10 @@ SECTORES_FALLBACK = {
     "Pucón":             (-39.2822, -71.9598),
     "Temuco":            (-38.7359, -72.5904),
     "Teodoro Schmidt":   (-39.0192, -73.0186),
-    "Hualpín":           (-38.9333, -73.1667),
+    "Hualpín":           (-39.091339, -73.1814935),   # coordenada exacta entregada por el usuario
     "Barros Arana":      (-38.6667, -72.7333),
     "Queule":            (-39.3903, -73.2078),
-    "Porma":             (-39.2827, -72.2247),  # sin geocodificar — usa Villarrica como aproximación, CONFIRMAR con el usuario
+    "Porma":             (-39.1209504, -73.2706258),  # coordenada exacta entregada por el usuario
 }
 
 # ─── UMBRALES DE CONDICIÓN ADVERSA (ajustables — ver nota en el docstring) ──
@@ -125,7 +125,7 @@ def construir_sectores() -> dict:
         if coords:
             sectores[nombre] = coords
         else:
-            print(f"  [aviso] No se pudo geocodificar '{nombre}' — usando coordenadas de respaldo (confirmar).")
+            print(f"  [info] '{nombre}' no está en la base de geocoding — usando coordenada de respaldo ya confirmada.")
             sectores[nombre] = fallback
     return sectores
 
