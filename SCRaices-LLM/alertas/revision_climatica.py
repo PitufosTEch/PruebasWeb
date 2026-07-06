@@ -63,6 +63,11 @@ SECTORES_FALLBACK = {
     "Barros Arana":      (-38.6667, -72.7333),
     "Queule":            (-39.3903, -73.2078),
     "Porma":             (-39.1209504, -73.2706258),  # coordenada exacta entregada por el usuario
+    "Perquenco":         (-38.4219927, -72.3888254),  # coordenada exacta entregada por el usuario
+    "Victoria":          (-38.2351416, -72.3470849),  # coordenada exacta entregada por el usuario
+    "Lautaro":           (-38.5353968, -72.4387979),  # coordenada exacta entregada por el usuario
+    "Padre Las Casas":   (-38.7720711, -72.589863),   # coordenada exacta entregada por el usuario
+    "Cunco":             (-38.9324682, -72.0362298),  # coordenada exacta entregada por el usuario
 }
 
 # ─── UMBRALES DE CONDICIÓN ADVERSA (ajustables — ver nota en el docstring) ──
