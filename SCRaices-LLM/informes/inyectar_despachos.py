@@ -320,10 +320,24 @@ def _generar_html_proyecto(datos: dict) -> str:
         f'font-size:10px;text-align:center;white-space:nowrap;">{m}</th>'
         for m in meses
     )
+    colgroup = (
+        '<colgroup>'
+        '<col style="width:25%">'   # Beneficiario
+        '<col style="width:13%">'   # Capataz
+        '<col style="width:7%">'    # Av. Viv%
+        '<col style="width:7%">'    # Av. Total%
+        '<col style="width:7%">'    # Desp. Real.
+        '<col style="width:17%">'   # Mes 1
+        '<col style="width:11%">'   # Mes 2
+        '<col style="width:7%">'    # Mes 3
+        '<col style="width:6%">'    # P50 Días
+        '</colgroup>'
+    )
     thead = (
+        colgroup +
         '<thead><tr style="background:#1e293b;">'
         '<th style="padding:7px 12px;background:#1e293b;color:#94a3b8;'
-        'font-size:10px;text-align:left;min-width:160px;">Beneficiario</th>'
+        'font-size:10px;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Beneficiario</th>'
         '<th style="padding:7px 8px;background:#334155;color:#cbd5e1;'
         'font-size:10px;text-align:center;white-space:nowrap;">Capataz</th>'
         '<th style="padding:7px 8px;background:#334155;color:#cbd5e1;'
@@ -372,7 +386,7 @@ def _generar_html_proyecto(datos: dict) -> str:
         filas_html += (
             f'<tr style="background:{bg};">'
             f'<td style="padding:5px 12px;font-size:11px;color:#111827;'
-            f'border-bottom:1px solid #e2e8f0;">{b["nombre"]}</td>'
+            f'border-bottom:1px solid #e2e8f0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{b["nombre"]}">{b["nombre"]}</td>'
             f'<td style="padding:5px 8px;font-size:10px;color:#6b7280;'
             f'text-align:center;border-bottom:1px solid #e2e8f0;white-space:nowrap;">{b["capataz"]}</td>'
             f'<td style="padding:5px 8px;font-size:12px;font-weight:700;'
@@ -401,7 +415,7 @@ def _generar_html_proyecto(datos: dict) -> str:
 
     tabla = (
         '<div style="overflow-x:auto;border:1px solid #e2e8f0;border-radius:0 0 8px 8px;">'
-        f'<table style="border-collapse:collapse;width:100%;min-width:700px;">'
+        f'<table style="border-collapse:collapse;width:100%;min-width:700px;table-layout:fixed;">'
         f'{thead}<tbody>{filas_html}</tbody></table>'
         f'{leyenda}</div>'
     )
