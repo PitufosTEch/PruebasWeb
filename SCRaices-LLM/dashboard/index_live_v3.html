@@ -5496,9 +5496,9 @@ ${mProy>0?`<tr style="font-weight:700;color:#7c3aed;background:#f5f3ff;"><td col
                 const pRCol = r.progDiasR===null?'#94a3b8':r.progDiasR<0?'#dc2626':r.progDiasR<30?'#b45309':'#374151';
                 t += `<tr style="border-bottom:1px solid #f1f5f9;">
   <td style="padding:5px 6px;border-right:1px solid #f1f5f9;font-size:10px;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.obra.nombre}</td>
-  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${r.cPctTr!==null?r.cPctTr+'%':'—'}</td>
-  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;font-weight:700;color:${r.agPct!==null?(r.agPct>=80?'#16a34a':r.agPct>=50?'#2563eb':'#dc2626'):'#94a3b8'};">${r.agPct!==null?r.agPct+'%':'—'}</td>
-  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;font-weight:700;color:${r.av>=80?'#16a34a':r.av>=50?'#2563eb':'#dc2626'};">${r.av}%</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${r.cPctTr!==null?r.cPctTr+'%':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${r.agPct!==null?r.agPct+'%':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${r.av}%</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;font-weight:700;color:${dCol};background:${dBg};">${dTxt}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${fmtD2(r.pg&&r.pg.inicio)}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${fmtD2(r.pg&&r.pg.finProg)}</td>
