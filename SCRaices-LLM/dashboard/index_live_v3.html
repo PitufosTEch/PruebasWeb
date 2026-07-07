@@ -6061,11 +6061,15 @@ ${js}</body></html>`;
         let obras = PROYECTOS_DATA.filter(p => p.estado === 'ejecucion');
         if (!obras.length) { alert('Sin obras en ejecución.'); return; }
 
-        // Fetch avance de programa desde Firebase
-        let avanceGanttRaw = {};
+        // Fetch avance de programa y carta gantt desde Firebase
+        let avanceGanttRaw = {}, ganttRaw = {};
         try {
-            const rAG = await fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/avance_gantt.json');
+            const [rAG, rG] = await Promise.all([
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/avance_gantt.json'),
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/gantt_programa.json')
+            ]);
             avanceGanttRaw = (await rAG.json()) || {};
+            ganttRaw       = (await rG.json())  || {};
         } catch (_) {}
         obras = obras.slice().sort((a, b) => ((avanceGanttRaw[b.ID_proy] || {}).pct || 0) - ((avanceGanttRaw[a.ID_proy] || {}).pct || 0));
 
@@ -6442,7 +6446,118 @@ window.addEventListener('load',updateStickyTops);
 window.addEventListener('resize',updateStickyTops);
 ` + jsClose;
 
-        const tabResumen = allSections.map((s,i) => `<div class="obra-block" data-obra="${i}">${s.resumen}</div>`).join('');
+        // ── Tabla resumen consolidada (parte superior pestaña Resumen) ──────────
+        const vivConDespachoEP = new Set(DESPACHOS_DATA.map(d => String(d.ID_Benef)));
+        const fmtD2EP = (iso) => { if (!iso) return '—'; const p = String(iso).substring(0,10).split('-'); return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:iso; };
+        const fmtUF2d = (v) => (Math.round((v||0)*100)/100).toLocaleString('es-CL',{minimumFractionDigits:2,maximumFractionDigits:2});
+
+        const resumenPagoFilas = obras.map(proy => {
+            const pid = proy.ID_proy;
+            const montos = MONTOS_PROY_DATA[pid] || { total: 0, viviendas: 0 };
+            const eps = EEPP_DATA.filter(ep => ep.ID_Proy === pid);
+            const sumByEst = (...kw) => eps.filter(e => kw.some(k => e.Estado.toLowerCase().includes(k))).reduce((a,e) => a + e.Monto, 0);
+            const totPagado   = sumByEst('pagado');
+            const totTramite  = sumByEst('ingresado') + sumByEst('aprobado');
+            const totEP       = eps.reduce((a,e) => a + e.Monto, 0);
+            const totContrato = montos.total;
+            const pctCob  = totContrato > 0 ? Math.round(totPagado/totContrato*10000)/100 : 0;
+            const pctEmit = totContrato > 0 ? Math.round(totEP/totContrato*10000)/100 : 0;
+            const agPct   = (avanceGanttRaw[pid] || {}).pct ?? null;
+            const avM     = AVANCE_MENSUAL_DATA[pid];
+            const pctReal = (avM?.avanceActual != null) ? Math.round(avM.avanceActual*100)/100 : null;
+            const pg      = ganttRaw[pid] || null;
+            const progDiasR = pg?.finProg ? Math.floor((new Date(pg.finProg)-new Date())/86400000) : null;
+            const cDur    = proy.duracion || 0;
+            const cIni    = proy.fecha_inicio || null;
+            const cFin    = cDur>0&&cIni ? (()=>{ const d=new Date(cIni); d.setDate(d.getDate()+cDur); return d.toISOString().substring(0,10); })() : null;
+            const cDiasR  = cFin ? Math.floor((new Date(cFin)-new Date())/86400000) : null;
+            const habBens = BENEFICIARIOS_DATA.filter(b => String(b.ID_Proy) === String(pid));
+            const habilitadas = habBens.filter(b => b.habil).length;
+            const enEjecucion = habBens.filter(b => vivConDespachoEP.has(String(b.ID_Benef))).length;
+            return { proy, pid, pctCob, pctEmit, agPct, pctReal, pg, cDur, cDiasR, progDiasR, montos, habilitadas, enEjecucion, totContrato, totPagado, totTramite, totFacturar: Math.max(0, totContrato-totEP) };
+        });
+
+        const resumenPagoTablaHtml = (() => {
+            let t = `<div style="background:#fff;margin:12px 12px 0;border-radius:10px;padding:14px 16px;border:1px solid #e2e8f0;overflow-x:auto;">
+<div style="font-size:12px;font-weight:700;color:#1e293b;margin-bottom:10px;">📋 Resumen ejecutivo — Estados de Pago</div>
+<table style="border-collapse:collapse;font-size:10px;table-layout:fixed;min-width:1300px;width:100%;">
+<colgroup>
+  <col style="width:150px">
+  <col style="width:58px"><col style="width:58px"><col style="width:58px"><col style="width:58px">
+  <col style="width:68px"><col style="width:68px">
+  <col style="width:46px"><col style="width:46px">
+  <col style="width:46px"><col style="width:46px">
+  <col style="width:36px"><col style="width:36px"><col style="width:40px">
+  <col style="width:95px"><col style="width:95px"><col style="width:85px"><col style="width:85px">
+</colgroup>
+<thead>
+<tr style="background:#f1f5f9;">
+  <th rowspan="2" style="padding:5px 6px;border:1px solid #e2e8f0;text-align:left;font-size:9px;text-transform:uppercase;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Proyecto</th>
+  <th colspan="4" style="padding:4px 6px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Avance (%)</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Inicio<br>Prog.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Término<br>Prog.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Pzo.<br>Cont.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Pzo.<br>Prog.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Rest.<br>Cont.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Rest.<br>Prog.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Tot.<br>Viv.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Hab.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;text-transform:uppercase;color:#475569;cursor:help;" title="Con al menos 1 despacho realizado">Viv. en<br>Ejec.</th>
+  <th colspan="4" style="padding:4px 6px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;background:#f0fdf4;">Montos (UF)</th>
+</tr>
+<tr style="background:#f8fafc;">
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;" title="% Cobrado del total del contrato">% Cobrado</th>
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;" title="% EP emitido respecto al total del contrato">% Avan. Cont.</th>
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;" title="% Avance de programa de obra (Gantt)">% Avan. Prog.</th>
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;" title="% Avance real inspeccionado">% Avan. Real</th>
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;background:#f0fdf4;">Total Contrato</th>
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;background:#f0fdf4;">Cobrado (Pagado)</th>
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;background:#f0fdf4;">En Tramitación</th>
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;background:#f0fdf4;">Por Facturar</th>
+</tr>
+</thead><tbody>`;
+            resumenPagoFilas.forEach(r => {
+                const cRCol = r.cDiasR===null?'#94a3b8':r.cDiasR<0?'#dc2626':r.cDiasR<30?'#b45309':'#374151';
+                const pRCol = r.progDiasR===null?'#94a3b8':r.progDiasR<90?'#dc2626':'#374151';
+                const nombre = `${r.pid} · ${r.proy.NOMBRE_PROYECTO || r.pid}`;
+                t += `<tr style="border-bottom:1px solid #f1f5f9;">
+  <td style="padding:5px 6px;border-right:1px solid #f1f5f9;font-size:10px;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${nombre}">${nombre}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${r.pctCob.toFixed(2)}%</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${r.pctEmit.toFixed(2)}%</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${r.agPct!==null?Number(r.agPct).toFixed(2)+'%':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${r.pctReal!==null?Number(r.pctReal).toFixed(2)+'%':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${fmtD2EP(r.pg?.inicio)}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${fmtD2EP(r.pg?.finProg)}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${r.cDur?r.cDur+'d':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${r.pg?.plazo?r.pg.plazo+'d':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:${cRCol};">${r.cDiasR!==null?r.cDiasR+'d':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:${pRCol};">${r.progDiasR!==null?r.progDiasR+'d':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${r.montos.viviendas||'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${r.habilitadas||'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;font-weight:700;color:#2563eb;">${r.enEjecucion}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:right;font-size:10px;font-family:monospace;">${fmtUF2d(r.totContrato)}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:right;font-size:10px;font-family:monospace;color:#16a34a;font-weight:700;">${fmtUF2d(r.totPagado)}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:right;font-size:10px;font-family:monospace;color:#b45309;">${fmtUF2d(r.totTramite)}</td>
+  <td style="padding:4px 4px;text-align:right;font-size:10px;font-family:monospace;color:#7c3aed;">${fmtUF2d(r.totFacturar)}</td>
+</tr>`;
+            });
+            const gCont = resumenPagoFilas.reduce((s,r)=>s+r.totContrato,0);
+            const gPag  = resumenPagoFilas.reduce((s,r)=>s+r.totPagado,0);
+            const gTram = resumenPagoFilas.reduce((s,r)=>s+r.totTramite,0);
+            const gFact = resumenPagoFilas.reduce((s,r)=>s+r.totFacturar,0);
+            t += `<tr style="background:#f1f5f9;border-top:2px solid #cbd5e1;font-weight:700;">
+  <td style="padding:5px 6px;font-size:10px;color:#475569;border-right:1px solid #e2e8f0;">TOTAL (${resumenPagoFilas.length} obras)</td>
+  <td colspan="13" style="padding:4px 4px;border-right:1px solid #e2e8f0;"></td>
+  <td style="padding:4px 4px;text-align:right;font-size:10px;font-family:monospace;border-right:1px solid #e2e8f0;">${fmtUF2d(gCont)}</td>
+  <td style="padding:4px 4px;text-align:right;font-size:10px;font-family:monospace;color:#16a34a;border-right:1px solid #e2e8f0;">${fmtUF2d(gPag)}</td>
+  <td style="padding:4px 4px;text-align:right;font-size:10px;font-family:monospace;color:#b45309;border-right:1px solid #e2e8f0;">${fmtUF2d(gTram)}</td>
+  <td style="padding:4px 4px;text-align:right;font-size:10px;font-family:monospace;color:#7c3aed;">${fmtUF2d(gFact)}</td>
+</tr>`;
+            t += `</tbody></table></div>`;
+            return t;
+        })();
+
+        const tabResumen = resumenPagoTablaHtml + allSections.map((s,i) => `<div class="obra-block" data-obra="${i}">${s.resumen}</div>`).join('');
         const tabEP      = epSummaryBar + allSections.map((s,i) => `<div class="obra-block" data-obra="${i}">${s.ep}</div>`).join('');
         const tabGar     = allSections.map((s,i) => `<div class="obra-block" data-obra="${i}">${s.gar}</div>`).join('');
         const tabCurva   = allSections.map((s,i) => s.curvaHtml.replace('class="obra-block"',`class="obra-block" data-obra="${i}"`)).join('');
