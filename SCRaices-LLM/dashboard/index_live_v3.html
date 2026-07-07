@@ -4933,22 +4933,24 @@ ${inf.footerHtml}
                 h += `</div>`;
             } else if (tab === 'viviendas') {
                 h += `Detalle de Viviendas</div>`;
-                const ck = (ok) => ok ? `<span style="color:#16a34a;font-weight:700;">✓</span>` : `<span style="color:#e5e7eb;">—</span>`;
                 const gruposObra = agruparViviendas(obra.viviendas, obra.grupos);
+                const ck = (ok) => ok ? `<span style="color:#16a34a;font-weight:700;">✓</span>` : `<span style="color:#e5e7eb;">—</span>`;
                 gruposObra.forEach(grupo => {
                     const tituloGrupo = grupo.nombre || 'Sin asignar';
-                    const capLabel = grupo.capataz ? ` &nbsp;·&nbsp; <span style="font-size:10px;color:#7c2d12;">👷 ${grupo.capataz}</span>` : '';
+                    const capLabel = grupo.capataz ? ` &nbsp;·&nbsp; <span style="font-weight:400;color:#64748b;">Capataz: ${grupo.capataz}</span>` : '';
                     h += `<div style="margin-bottom:24px;">
-<div style="background:#fff7ed;border-left:4px solid #c2410c;padding:8px 12px;font-size:12px;font-weight:700;color:#7c2d12;margin-bottom:8px;">${tituloGrupo}${capLabel} <span style="font-weight:400;color:#94a3b8;">(${grupo.viviendas.length} viv.)</span></div>
+<div style="font-size:12px;font-weight:700;color:#1a1a2e;background:#f1f5f9;border:1px solid #e2e8f0;padding:7px 12px;border-radius:7px;margin-bottom:8px;">
+  ${tituloGrupo}${capLabel} &nbsp;<span style="font-weight:400;color:#94a3b8;">(${grupo.viviendas.length} viv.)</span>
+</div>
 <div class="table-container"><table>
-<thead><tr><th>Beneficiario</th><th>Avance</th><th>HPC</th><th>TE1</th><th>R.AS</th><th>F1</th><th>Artef.</th><th>Empalme</th></tr></thead><tbody>`;
+<thead><tr><th>Beneficiario</th><th>Avance</th><th>HPC</th><th>TE1</th><th>V.AS</th><th>R.AS</th><th>F1</th><th>Empalme</th><th>Recep.</th></tr></thead><tbody>`;
                     grupo.viviendas.forEach(v => {
                         const insp = getInspeccion(v.ID_Benef);
                         const pct = insp ? insp.pct_total : null;
                         const fl = getFlags(v);
-                        const pctTxt = pct!==null?`${pct}%`:'—';
-                        const pctCol = pct===null?'#94a3b8':pct>=80?'#16a34a':pct>=50?'#2563eb':'#dc2626';
-                        h += `<tr><td>${v.NOMBRES||''} ${v.APELLIDOS||''}</td><td style="font-weight:700;color:${pctCol};">${pctTxt}</td><td>${ck(fl.hpc)}</td><td>${ck(fl.te1)}</td><td>${ck(fl.resol_as)}</td><td>${ck(fl.fecha_f1)}</td><td>${ck(fl.artefactado)}</td><td>${ck(fl.empalme)}</td></tr>`;
+                        const pctTxt = pct !== null ? `${pct}%` : '—';
+                        const pctCol = pct === null ? '#94a3b8' : pct >= 80 ? '#16a34a' : pct >= 50 ? '#2563eb' : '#dc2626';
+                        h += `<tr><td>${v.NOMBRES||''} ${v.APELLIDOS||''}</td><td style="font-weight:700;color:${pctCol};">${pctTxt}</td><td>${ck(fl.hpc)}</td><td>${ck(fl.te1)}</td><td>${ck(fl.visita_as)}</td><td>${ck(fl.resol_as)}</td><td>${ck(fl.fecha_f1)}</td><td>${ck(fl.empalme)}</td><td>${ck(fl.fecha_recep)}</td></tr>`;
                     });
                     h += `</tbody></table></div></div>`;
                 });
@@ -5459,13 +5461,13 @@ ${mProy>0?`<tr style="font-weight:700;color:#7c3aed;background:#f5f3ff;"><td col
 <div style="font-size:12px;font-weight:700;color:#1e293b;margin-bottom:10px;">📋 Resumen ejecutivo de proyectos</div>
 <table style="width:100%;border-collapse:collapse;font-size:10px;table-layout:fixed;">
 <colgroup>
-  <col style="width:18%">
+  <col style="width:16%">
   <col style="width:6%"><col style="width:6%"><col style="width:6%">
   <col style="width:7%">
   <col style="width:7%"><col style="width:7%">
   <col style="width:6%"><col style="width:6%">
   <col style="width:6%"><col style="width:6%">
-  <col style="width:5%"><col style="width:5%"><col style="width:5%">
+  <col style="width:4%"><col style="width:4%"><col style="width:7%">
 </colgroup>
 <thead>
 <tr style="background:#f1f5f9;">
@@ -5480,12 +5482,12 @@ ${mProy>0?`<tr style="font-weight:700;color:#7c3aed;background:#f5f3ff;"><td col
   <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Rest.<br>Prog.</th>
   <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Tot.<br>Viv.</th>
   <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Hab.</th>
-  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;cursor:help;" title="Viviendas en ejecución — considera en ejecución aquellas con al menos 1 despacho realizado.">Ejec.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;text-transform:uppercase;color:#475569;cursor:help;" title="Considera en ejecución aquellas con al menos 1 despacho realizado.">Viv. en<br>Ejec.</th>
 </tr>
 <tr style="background:#f8fafc;">
-  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;color:#64748b;cursor:help;" title="A: Avance de contrato">A</th>
-  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;color:#64748b;cursor:help;" title="B: Avance de programa de obra">B</th>
-  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;color:#64748b;cursor:help;" title="C: Avance real (inspeccionado)">C</th>
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;" title="% Avance de contrato">% Cont.</th>
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;" title="% Avance de programa de obra">% Prog.</th>
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;" title="% Avance real (inspeccionado)">% Real</th>
 </tr>
 </thead><tbody>`;
             resumenFilas.forEach(r => {
@@ -5496,9 +5498,9 @@ ${mProy>0?`<tr style="font-weight:700;color:#7c3aed;background:#f5f3ff;"><td col
                 const pRCol = r.progDiasR===null?'#94a3b8':r.progDiasR<90?'#dc2626':'#374151';
                 t += `<tr style="border-bottom:1px solid #f1f5f9;">
   <td style="padding:5px 6px;border-right:1px solid #f1f5f9;font-size:10px;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.obra.nombre}</td>
-  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${r.cPctTr!==null?r.cPctTr+'%':'—'}</td>
-  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${r.agPct!==null?r.agPct+'%':'—'}</td>
-  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${r.av}%</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${r.cPctTr!==null?Number(r.cPctTr).toFixed(2)+'%':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${r.agPct!==null?Number(r.agPct).toFixed(2)+'%':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${Number(r.av).toFixed(2)}%</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;font-weight:700;color:${dCol};background:${dBg};">${dTxt}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${fmtD2(r.pg&&r.pg.inicio)}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${fmtD2(r.pg&&r.pg.finProg)}</td>
@@ -5949,13 +5951,13 @@ function jumpToObra(idx){
 <div style="font-size:12px;font-weight:700;color:#1e293b;margin-bottom:10px;">📋 Resumen ejecutivo de proyectos</div>
 <table style="width:100%;border-collapse:collapse;font-size:10px;table-layout:fixed;">
 <colgroup>
-  <col style="width:18%">
+  <col style="width:16%">
   <col style="width:6%"><col style="width:6%"><col style="width:6%">
   <col style="width:7%">
   <col style="width:7%"><col style="width:7%">
   <col style="width:6%"><col style="width:6%">
   <col style="width:6%"><col style="width:6%">
-  <col style="width:5%"><col style="width:5%"><col style="width:5%">
+  <col style="width:4%"><col style="width:4%"><col style="width:7%">
 </colgroup>
 <thead>
 <tr style="background:#f1f5f9;">
@@ -5970,12 +5972,12 @@ function jumpToObra(idx){
   <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Rest.<br>Prog.</th>
   <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Tot.<br>Viv.</th>
   <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Hab.</th>
-  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;cursor:help;" title="Viviendas en ejecución — considera en ejecución aquellas con al menos 1 despacho realizado.">Ejec.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;text-transform:uppercase;color:#475569;cursor:help;" title="Considera en ejecución aquellas con al menos 1 despacho realizado.">Viv. en<br>Ejec.</th>
 </tr>
 <tr style="background:#f8fafc;">
-  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;color:#64748b;cursor:help;" title="A: Avance de contrato">A</th>
-  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;color:#64748b;cursor:help;" title="B: Avance de programa de obra">B</th>
-  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;color:#64748b;cursor:help;" title="C: Avance real (inspeccionado)">C</th>
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;" title="% Avance de contrato">% Cont.</th>
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;" title="% Avance de programa de obra">% Prog.</th>
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;" title="% Avance real (inspeccionado)">% Real</th>
 </tr>
 </thead><tbody>`;
             resumenFilas.forEach(r => {
@@ -5986,9 +5988,9 @@ function jumpToObra(idx){
                 const pRCol = r.progDiasR===null?'#94a3b8':r.progDiasR<90?'#dc2626':'#374151';
                 t += `<tr style="border-bottom:1px solid #f1f5f9;">
   <td style="padding:5px 6px;border-right:1px solid #f1f5f9;font-size:10px;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.obra.nombre}</td>
-  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${r.cPctTr!==null?r.cPctTr+'%':'—'}</td>
-  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${r.agPct!==null?r.agPct+'%':'—'}</td>
-  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${r.av}%</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${r.cPctTr!==null?Number(r.cPctTr).toFixed(2)+'%':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${r.agPct!==null?Number(r.agPct).toFixed(2)+'%':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${Number(r.av).toFixed(2)}%</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;font-weight:700;color:${dCol};background:${dBg};">${dTxt}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${fmtD2(r.pg&&r.pg.inicio)}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${fmtD2(r.pg&&r.pg.finProg)}</td>
