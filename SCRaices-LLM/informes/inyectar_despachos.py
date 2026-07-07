@@ -19,7 +19,8 @@ import json
 import sys
 from pathlib import Path
 
-DRIVE_FILE_ID = "1fPYmvioQvYJjKUMuQgDayf3BnSSEJ7Mp"
+DRIVE_FILE_ID  = "1fPYmvioQvYJjKUMuQgDayf3BnSSEJ7Mp"
+SPI_OBJETIVO   = 1.15   # SPI base para proyecciones Monte Carlo
 
 # Mapa idx HTML → pestaña Excel (según selector del Reporte Adquisiciones)
 IDX_TO_PID = {
@@ -296,21 +297,23 @@ def _generar_html_proyecto(datos: dict) -> str:
     if not datos or not datos.get("beneficiarios"):
         return "<div style='padding:20px;color:#888;font-size:13px;'>Sin datos de despacho para este proyecto.</div>"
 
-    titulo   = datos["titulo"]
-    spi_str  = datos["spi_str"]
-    meses    = datos["meses"] or ["Mes 1", "Mes 2", "Mes 3"]
-    bens     = datos["beneficiarios"]
-    spi_col  = _spi_color(spi_str)
+    titulo    = datos["titulo"]
+    spi_real  = datos["spi_str"]          # e.g. "SPI 1.258" — informativo
+    meses     = datos["meses"] or ["Mes 1", "Mes 2", "Mes 3"]
+    bens      = datos["beneficiarios"]
 
-    # Cabecera del tab
+    # Cabecera del tab — muestra SPI objetivo (base de proyecciones MC)
     header = (
         f'<div style="background:#1e293b;border-radius:8px 8px 0 0;'
         f'padding:12px 18px;margin-bottom:0;">'
         f'<div style="font-size:12px;font-weight:700;color:#f1f5f9;">{titulo}</div>'
         f'<div style="font-size:11px;color:#94a3b8;margin-top:3px;">'
         f'{datos["meta"]}&nbsp;&nbsp;'
-        f'<span style="background:{spi_col};color:#fff;border-radius:4px;'
-        f'padding:1px 8px;font-weight:700;font-size:11px;">{spi_str}</span>'
+        f'<span style="background:#16a34a;color:#fff;border-radius:4px;'
+        f'padding:1px 8px;font-weight:700;font-size:11px;" '
+        f'title="SPI objetivo usado para proyecciones MC · {spi_real} real">'
+        f'SPI {SPI_OBJETIVO}</span>'
+        f'&nbsp;<span style="font-size:10px;color:#64748b;">({spi_real} real)</span>'
         f'</div></div>'
     )
 
