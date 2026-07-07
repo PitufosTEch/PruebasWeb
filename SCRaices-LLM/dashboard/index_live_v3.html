@@ -4898,20 +4898,20 @@ ${inf.footerHtml}
                     const barCol = pctTr>=100?'#ef4444':pctTr>=80?'#f59e0b':pctTr>=50?'#3b82f6':'#22c55e';
                     h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📋 Programa de Obra</h3>
 <div class="summary-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));">
-  <div class="summary-card"><div class="summary-card-label">Inicio</div><div style="font-size:14px;font-weight:700;">${fmtFecha(pg.inicio)}</div></div>
-  <div class="summary-card"><div class="summary-card-label">Término</div><div style="font-size:14px;font-weight:700;">${fmtFecha(pg.finProg)}</div></div>
-  <div class="summary-card"><div class="summary-card-label">Plazo</div><div style="font-size:14px;font-weight:700;">${pg.plazo} días</div></div>
-  <div class="summary-card"><div class="summary-card-label">Estado</div><div style="font-size:13px;font-weight:700;color:${estadoCol};">${estadoTxt}</div></div>
+  <div class="summary-card"><div class="summary-card-label">Inicio</div><div style="font-size:11px;font-weight:700;">${fmtFecha(pg.inicio)}</div></div>
+  <div class="summary-card"><div class="summary-card-label">Término</div><div style="font-size:11px;font-weight:700;">${fmtFecha(pg.finProg)}</div></div>
+  <div class="summary-card"><div class="summary-card-label">Plazo</div><div style="font-size:11px;font-weight:700;">${pg.plazo} días</div></div>
+  <div class="summary-card"><div class="summary-card-label">Estado</div><div style="font-size:11px;font-weight:700;color:${estadoCol};">${estadoTxt}</div></div>
 </div>
 <div style="margin:10px 0 4px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;"><span>${fmtFecha(pg.inicio)}</span><span style="font-weight:600;">${pctTr}% transcurrido</span><span>${fmtFecha(pg.finProg)}</span></div>
-<div style="height:10px;background:#e5e7eb;border-radius:6px;overflow:hidden;"><div style="height:100%;width:${pctTr}%;background:${barCol};border-radius:6px;"></div></div>`;
+<div style="height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden;"><div style="height:100%;width:${pctTr}%;background:${barCol};border-radius:6px;"></div></div>`;
                 } else {
                     h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📋 Programa de Obra</h3><p style="color:#94a3b8;font-size:12px;">Sin datos de programa disponibles.</p>`;
                 }
                 const avBarCol = av>=80?'#16a34a':av>=50?'#3b82f6':av>=25?'#f59e0b':'#ef4444';
                 h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📊 Avance real a la fecha (Inspecciones)</h3>
-<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;"><span style="font-size:20px;font-weight:800;color:${avBarCol};font-family:monospace;">${av}%</span><span style="font-size:11px;color:#94a3b8;">${conInsp}/${tot} viviendas inspeccionadas</span></div>
-<div style="height:10px;background:#e5e7eb;border-radius:6px;overflow:hidden;"><div style="height:100%;width:${av}%;background:${avBarCol};border-radius:6px;"></div></div>`;
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;"><span style="font-size:14px;font-weight:800;color:${avBarCol};font-family:monospace;">${av}%</span><span style="font-size:11px;color:#94a3b8;">${conInsp}/${tot} viviendas inspeccionadas</span></div>
+<div style="height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden;"><div style="height:100%;width:${av}%;background:${avBarCol};border-radius:6px;"></div></div>`;
             } else if (tab === 'checkpoints') {
                 const tot = obra.viviendas.length;
                 h += `Checkpoints (${CPS_ADQ.length} indicadores)</div><div class="summary-grid" style="grid-template-columns:repeat(auto-fit,minmax(90px,1fr));">`;
@@ -4990,10 +4990,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .btn:hover{background:#f3f4f6;}
 .btn-pdf{background:#0f172a;color:#fff;border-color:#0f172a;}
 .btn-pdf:hover{background:#1e293b;}
-.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:10px;}
-.summary-card{padding:8px 10px;border-radius:7px;border:1px solid #e2e8f0;background:#f8fafc;}
-.summary-card-label{font-size:9px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;}
-.summary-card-value{font-size:13px;font-weight:700;color:#0f172a;font-family:monospace;margin-bottom:1px;}
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:5px;margin-bottom:8px;}
+.summary-card{padding:5px 7px;border-radius:5px;border:1px solid #e2e8f0;background:#f8fafc;}
+.summary-card-label{font-size:9px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;}
+.summary-card-value{font-size:11px;font-weight:700;color:#0f172a;font-family:monospace;margin-bottom:1px;}
 .summary-card-detail{font-size:9px;color:#94a3b8;}
 .breadcrumb{font-size:12px;color:#94a3b8;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid #e2e8f0;}
 .breadcrumb strong{color:#0f172a;}
@@ -5192,13 +5192,13 @@ ${js2}
                     const cBarCol = cPctTr >= 100 ? '#ef4444' : cPctTr >= 80 ? '#f59e0b' : cPctTr >= 50 ? '#3b82f6' : '#22c55e';
                     h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📄 Contrato</h3>
 <div class="summary-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));">
-  <div class="summary-card"><div class="summary-card-label">Inicio</div><div style="font-size:14px;font-weight:700;">${fmtFecha(cIni)}</div></div>
-  <div class="summary-card"><div class="summary-card-label">Término</div><div style="font-size:14px;font-weight:700;">${fmtFecha(cFin)}</div></div>
-  <div class="summary-card"><div class="summary-card-label">Plazo</div><div style="font-size:14px;font-weight:700;">${cDur} días</div></div>
-  <div class="summary-card"><div class="summary-card-label">Estado</div><div style="font-size:13px;font-weight:700;color:${cCol};">${cEstado}</div></div>
+  <div class="summary-card"><div class="summary-card-label">Inicio</div><div style="font-size:11px;font-weight:700;">${fmtFecha(cIni)}</div></div>
+  <div class="summary-card"><div class="summary-card-label">Término</div><div style="font-size:11px;font-weight:700;">${fmtFecha(cFin)}</div></div>
+  <div class="summary-card"><div class="summary-card-label">Plazo</div><div style="font-size:11px;font-weight:700;">${cDur} días</div></div>
+  <div class="summary-card"><div class="summary-card-label">Estado</div><div style="font-size:11px;font-weight:700;color:${cCol};">${cEstado}</div></div>
 </div>
 <div style="margin:8px 0 4px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;"><span>${fmtFecha(cIni)}</span><span style="font-weight:600;">${cPctTr}% transcurrido</span><span>${fmtFecha(cFin)}</span></div>
-<div style="height:10px;background:#e5e7eb;border-radius:6px;overflow:hidden;margin-bottom:4px;"><div style="height:100%;width:${cPctTr}%;background:${cBarCol};border-radius:6px;"></div></div>`;
+<div style="height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden;margin-bottom:4px;"><div style="height:100%;width:${cPctTr}%;background:${cBarCol};border-radius:6px;"></div></div>`;
                 }
                 // Programa de Obra desde Firebase (gantt_programa)
                 const pg = ganttRaw[obra.ID_proy] || null;
@@ -5210,13 +5210,13 @@ ${js2}
                     const barCol = pctTr >= 100 ? '#ef4444' : pctTr >= 80 ? '#f59e0b' : pctTr >= 50 ? '#3b82f6' : '#22c55e';
                     h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📋 Programa de Obra</h3>
 <div class="summary-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));">
-  <div class="summary-card"><div class="summary-card-label">Inicio</div><div style="font-size:14px;font-weight:700;">${fmtFecha(pg.inicio)}</div></div>
-  <div class="summary-card"><div class="summary-card-label">Término</div><div style="font-size:14px;font-weight:700;">${fmtFecha(pg.finProg)}</div></div>
-  <div class="summary-card"><div class="summary-card-label">Plazo</div><div style="font-size:14px;font-weight:700;">${pg.plazo} días</div></div>
-  <div class="summary-card"><div class="summary-card-label">Estado</div><div style="font-size:13px;font-weight:700;color:${estadoCol};">${estadoTxt}</div></div>
+  <div class="summary-card"><div class="summary-card-label">Inicio</div><div style="font-size:11px;font-weight:700;">${fmtFecha(pg.inicio)}</div></div>
+  <div class="summary-card"><div class="summary-card-label">Término</div><div style="font-size:11px;font-weight:700;">${fmtFecha(pg.finProg)}</div></div>
+  <div class="summary-card"><div class="summary-card-label">Plazo</div><div style="font-size:11px;font-weight:700;">${pg.plazo} días</div></div>
+  <div class="summary-card"><div class="summary-card-label">Estado</div><div style="font-size:11px;font-weight:700;color:${estadoCol};">${estadoTxt}</div></div>
 </div>
 <div style="margin:10px 0 4px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;"><span>${fmtFecha(pg.inicio)}</span><span style="font-weight:600;">${pctTr}% transcurrido</span><span>${fmtFecha(pg.finProg)}</span></div>
-<div style="height:10px;background:#e5e7eb;border-radius:6px;overflow:hidden;"><div style="height:100%;width:${pctTr}%;background:${barCol};border-radius:6px;"></div></div>`;
+<div style="height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden;"><div style="height:100%;width:${pctTr}%;background:${barCol};border-radius:6px;"></div></div>`;
                 } else {
                     h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📋 Programa de Obra</h3><p style="color:#94a3b8;font-size:12px;">Sin datos de programa disponibles.</p>`;
                 }
@@ -5224,12 +5224,12 @@ ${js2}
                 const avBarCol = av >= 80 ? '#16a34a' : av >= 50 ? '#3b82f6' : av >= 25 ? '#f59e0b' : '#ef4444';
                 h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📊 Avance real a la fecha (Inspecciones)</h3>
 <div class="summary-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));">
-  <div class="summary-card"><div class="summary-card-label">Avance Real</div><div style="font-size:20px;font-weight:800;color:${avBarCol};">${av}%</div></div>
-  <div class="summary-card"><div class="summary-card-label">Inspeccionadas</div><div style="font-size:14px;font-weight:700;">${conInsp} / ${tot}</div><div style="font-size:11px;color:#94a3b8;">viviendas</div></div>
-  <div class="summary-card"><div class="summary-card-label">Terminadas</div><div style="font-size:14px;font-weight:700;color:#16a34a;">${term}</div><div style="font-size:11px;color:#94a3b8;">con recepción</div></div>
+  <div class="summary-card"><div class="summary-card-label">Avance Real</div><div style="font-size:14px;font-weight:800;color:${avBarCol};">${av}%</div></div>
+  <div class="summary-card"><div class="summary-card-label">Inspeccionadas</div><div style="font-size:11px;font-weight:700;">${conInsp} / ${tot}</div><div style="font-size:11px;color:#94a3b8;">viviendas</div></div>
+  <div class="summary-card"><div class="summary-card-label">Terminadas</div><div style="font-size:11px;font-weight:700;color:#16a34a;">${term}</div><div style="font-size:11px;color:#94a3b8;">con recepción</div></div>
 </div>
 <div style="margin:8px 0 4px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;"><span>0%</span><span style="font-weight:600;color:${avBarCol};">${av}% completado</span><span>100%</span></div>
-<div style="height:10px;background:#e5e7eb;border-radius:6px;overflow:hidden;margin-bottom:4px;"><div style="height:100%;width:${av}%;background:${avBarCol};border-radius:6px;transition:width 0.5s;"></div></div>`;
+<div style="height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden;margin-bottom:4px;"><div style="height:100%;width:${av}%;background:${avBarCol};border-radius:6px;transition:width 0.5s;"></div></div>`;
             } else if (tab === 'checkpoints') {
                 h += `Checkpoints del Proyecto</div><div class="summary-grid" style="grid-template-columns:repeat(5,1fr);">`;
                 const tot = obra.viviendas.length;
@@ -5346,16 +5346,16 @@ ${js2}
                 h += `Estados de Pago</div>`;
                 if (mProy > 0) {
                     h += `<div class="summary-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:16px;">
-<div class="summary-card" style="border-color:#8b5cf6;"><div class="summary-card-label">Total por cobrar</div><div style="font-size:18px;font-weight:800;color:#7c3aed;">${fmtUF(mProy)}</div><div class="summary-card-detail">${vivProy} viviendas</div></div>
-<div class="summary-card" style="border-color:#16a34a;"><div class="summary-card-label">Pagado (cobrado)</div><div style="font-size:18px;font-weight:800;color:#16a34a;">${fmtUF(mPag)}</div><div class="summary-card-detail">${pct(mPag,mProy)}% del proyecto</div></div>
-<div class="summary-card" style="border-color:#ca8a04;"><div class="summary-card-label">Ingresado (en trámite)</div><div style="font-size:18px;font-weight:800;color:#b45309;">${fmtUF(mIng)}</div><div class="summary-card-detail">${pct(mIng,mProy)}% · aún no facturado</div></div>
-<div class="summary-card"><div class="summary-card-label">Por facturar</div><div style="font-size:18px;font-weight:800;color:#374151;">${fmtUF(porFact)}</div><div class="summary-card-detail">${pct(porFact,mProy)}% del proyecto</div></div>
+<div class="summary-card" style="border-color:#8b5cf6;"><div class="summary-card-label">Total por cobrar</div><div style="font-size:14px;font-weight:800;color:#7c3aed;">${fmtUF(mProy)}</div><div class="summary-card-detail">${vivProy} viviendas</div></div>
+<div class="summary-card" style="border-color:#16a34a;"><div class="summary-card-label">Pagado (cobrado)</div><div style="font-size:14px;font-weight:800;color:#16a34a;">${fmtUF(mPag)}</div><div class="summary-card-detail">${pct(mPag,mProy)}% del proyecto</div></div>
+<div class="summary-card" style="border-color:#ca8a04;"><div class="summary-card-label">Ingresado (en trámite)</div><div style="font-size:14px;font-weight:800;color:#b45309;">${fmtUF(mIng)}</div><div class="summary-card-detail">${pct(mIng,mProy)}% · aún no facturado</div></div>
+<div class="summary-card"><div class="summary-card-label">Por facturar</div><div style="font-size:14px;font-weight:800;color:#374151;">${fmtUF(porFact)}</div><div class="summary-card-detail">${pct(porFact,mProy)}% del proyecto</div></div>
 </div>`;
                 } else {
                     h += `<div class="summary-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:16px;">
-<div class="summary-card" style="border-color:#16a34a;"><div class="summary-card-label">Pagado</div><div style="font-size:18px;font-weight:800;color:#16a34a;">${fmtUF(mPag)}</div></div>
-<div class="summary-card" style="border-color:#ca8a04;"><div class="summary-card-label">Ingresado</div><div style="font-size:18px;font-weight:800;color:#b45309;">${fmtUF(mIng)}</div></div>
-<div class="summary-card"><div class="summary-card-label">En Preparación</div><div style="font-size:18px;font-weight:800;color:#374151;">${fmtUF(mPrep)}</div></div>
+<div class="summary-card" style="border-color:#16a34a;"><div class="summary-card-label">Pagado</div><div style="font-size:14px;font-weight:800;color:#16a34a;">${fmtUF(mPag)}</div></div>
+<div class="summary-card" style="border-color:#ca8a04;"><div class="summary-card-label">Ingresado</div><div style="font-size:14px;font-weight:800;color:#b45309;">${fmtUF(mIng)}</div></div>
+<div class="summary-card"><div class="summary-card-label">En Preparación</div><div style="font-size:14px;font-weight:800;color:#374151;">${fmtUF(mPrep)}</div></div>
 </div>`;
                 }
 
@@ -5538,15 +5538,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .btn:hover{background:#f3f4f6;}
 .btn-pdf{background:#0f172a;color:#fff;border-color:#0f172a;}
 .btn-pdf:hover{background:#1e293b;}
-.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px;}
-.summary-card{padding:9px 12px;border-radius:8px;border:1px solid #e2e8f0;background:#f8fafc;}
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:5px;margin-bottom:8px;}
+.summary-card{padding:5px 7px;border-radius:5px;border:1px solid #e2e8f0;background:#f8fafc;}
 .sc-blue{background:#eff6ff;border-color:#bfdbfe;}
 .sc-green{background:#f0fdf4;border-color:#bbf7d0;}
 .sc-yellow{background:#fefce8;border-color:#fde68a;}
 .sc-red{background:#fff1f2;border-color:#fecdd3;}
-.summary-card-label{font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;}
-.summary-card-value{font-size:14px;font-weight:700;color:#0f172a;font-family:monospace;margin-bottom:2px;}
-.summary-card-detail{font-size:10px;color:#94a3b8;}
+.summary-card-label{font-size:9px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;}
+.summary-card-value{font-size:11px;font-weight:700;color:#0f172a;font-family:monospace;margin-bottom:1px;}
+.summary-card-detail{font-size:9px;color:#94a3b8;}
 .breadcrumb{font-size:12px;color:#94a3b8;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid #e2e8f0;}
 .breadcrumb strong{color:#0f172a;}
 .sec-h3{font-size:13px;font-weight:700;color:#1e293b;margin:20px 0 10px;padding-bottom:6px;border-bottom:1px solid #e2e8f0;}
@@ -5570,7 +5570,7 @@ table tr:hover td:first-child{background:#f8fafc;}
   .obra-jumper{margin-left:0;width:calc(100% - 16px);max-width:100%;margin:4px 8px 6px;padding:8px 12px;font-size:12px;}
   .obra-block{margin:8px;padding:14px 12px;border-radius:8px;}
   .summary-grid{grid-template-columns:1fr 1fr;}
-  .summary-card-value{font-size:14px;}
+  .summary-card-value{font-size:11px;}
 }
 @media print{.footer{display:none;}.tabs{display:none;}.section{display:block!important;}.obra-block{page-break-after:always;border:none;border-bottom:2px solid #e2e8f0;border-radius:0;margin:0;}}
 </style>`;
@@ -5739,13 +5739,13 @@ ${js}</body></html>`;
                     const cBarCol = cPctTr >= 100 ? '#ef4444' : cPctTr >= 80 ? '#f59e0b' : cPctTr >= 50 ? '#3b82f6' : '#22c55e';
                     h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📄 Contrato</h3>
 <div class="summary-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));">
-  <div class="summary-card"><div class="summary-card-label">Inicio</div><div style="font-size:14px;font-weight:700;">${fmtFecha(cIni)}</div></div>
-  <div class="summary-card"><div class="summary-card-label">Término</div><div style="font-size:14px;font-weight:700;">${fmtFecha(cFin)}</div></div>
-  <div class="summary-card"><div class="summary-card-label">Plazo</div><div style="font-size:14px;font-weight:700;">${cDur} días</div></div>
-  <div class="summary-card"><div class="summary-card-label">Estado</div><div style="font-size:13px;font-weight:700;color:${cCol};">${cEstado}</div></div>
+  <div class="summary-card"><div class="summary-card-label">Inicio</div><div style="font-size:11px;font-weight:700;">${fmtFecha(cIni)}</div></div>
+  <div class="summary-card"><div class="summary-card-label">Término</div><div style="font-size:11px;font-weight:700;">${fmtFecha(cFin)}</div></div>
+  <div class="summary-card"><div class="summary-card-label">Plazo</div><div style="font-size:11px;font-weight:700;">${cDur} días</div></div>
+  <div class="summary-card"><div class="summary-card-label">Estado</div><div style="font-size:11px;font-weight:700;color:${cCol};">${cEstado}</div></div>
 </div>
 <div style="margin:8px 0 4px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;"><span>${fmtFecha(cIni)}</span><span style="font-weight:600;">${cPctTr}% transcurrido</span><span>${fmtFecha(cFin)}</span></div>
-<div style="height:10px;background:#e5e7eb;border-radius:6px;overflow:hidden;margin-bottom:4px;"><div style="height:100%;width:${cPctTr}%;background:${cBarCol};border-radius:6px;"></div></div>`;
+<div style="height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden;margin-bottom:4px;"><div style="height:100%;width:${cPctTr}%;background:${cBarCol};border-radius:6px;"></div></div>`;
                 }
                 const pg = ganttRaw[obra.ID_proy] || null;
                 if (pg && pg.inicio && pg.finProg) {
@@ -5756,25 +5756,25 @@ ${js}</body></html>`;
                     const barCol = pctTr >= 100 ? '#ef4444' : pctTr >= 80 ? '#f59e0b' : pctTr >= 50 ? '#3b82f6' : '#22c55e';
                     h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📋 Programa de Obra</h3>
 <div class="summary-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));">
-  <div class="summary-card"><div class="summary-card-label">Inicio</div><div style="font-size:14px;font-weight:700;">${fmtFecha(pg.inicio)}</div></div>
-  <div class="summary-card"><div class="summary-card-label">Término</div><div style="font-size:14px;font-weight:700;">${fmtFecha(pg.finProg)}</div></div>
-  <div class="summary-card"><div class="summary-card-label">Plazo</div><div style="font-size:14px;font-weight:700;">${pg.plazo} días</div></div>
-  <div class="summary-card"><div class="summary-card-label">Estado</div><div style="font-size:13px;font-weight:700;color:${estadoCol};">${estadoTxt}</div></div>
+  <div class="summary-card"><div class="summary-card-label">Inicio</div><div style="font-size:11px;font-weight:700;">${fmtFecha(pg.inicio)}</div></div>
+  <div class="summary-card"><div class="summary-card-label">Término</div><div style="font-size:11px;font-weight:700;">${fmtFecha(pg.finProg)}</div></div>
+  <div class="summary-card"><div class="summary-card-label">Plazo</div><div style="font-size:11px;font-weight:700;">${pg.plazo} días</div></div>
+  <div class="summary-card"><div class="summary-card-label">Estado</div><div style="font-size:11px;font-weight:700;color:${estadoCol};">${estadoTxt}</div></div>
 </div>
 <div style="margin:10px 0 4px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;"><span>${fmtFecha(pg.inicio)}</span><span style="font-weight:600;">${pctTr}% transcurrido</span><span>${fmtFecha(pg.finProg)}</span></div>
-<div style="height:10px;background:#e5e7eb;border-radius:6px;overflow:hidden;"><div style="height:100%;width:${pctTr}%;background:${barCol};border-radius:6px;"></div></div>`;
+<div style="height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden;"><div style="height:100%;width:${pctTr}%;background:${barCol};border-radius:6px;"></div></div>`;
                 } else {
                     h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📋 Programa de Obra</h3><p style="color:#94a3b8;font-size:12px;">Sin datos de programa disponibles.</p>`;
                 }
                 const avBarCol = av >= 80 ? '#16a34a' : av >= 50 ? '#3b82f6' : av >= 25 ? '#f59e0b' : '#ef4444';
                 h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📊 Avance real a la fecha (Inspecciones)</h3>
 <div class="summary-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));">
-  <div class="summary-card"><div class="summary-card-label">Avance Real</div><div style="font-size:20px;font-weight:800;color:${avBarCol};">${av}%</div></div>
-  <div class="summary-card"><div class="summary-card-label">Inspeccionadas</div><div style="font-size:14px;font-weight:700;">${conInsp} / ${tot}</div><div style="font-size:11px;color:#94a3b8;">viviendas</div></div>
-  <div class="summary-card"><div class="summary-card-label">Terminadas</div><div style="font-size:14px;font-weight:700;color:#16a34a;">${term}</div><div style="font-size:11px;color:#94a3b8;">con recepción</div></div>
+  <div class="summary-card"><div class="summary-card-label">Avance Real</div><div style="font-size:14px;font-weight:800;color:${avBarCol};">${av}%</div></div>
+  <div class="summary-card"><div class="summary-card-label">Inspeccionadas</div><div style="font-size:11px;font-weight:700;">${conInsp} / ${tot}</div><div style="font-size:11px;color:#94a3b8;">viviendas</div></div>
+  <div class="summary-card"><div class="summary-card-label">Terminadas</div><div style="font-size:11px;font-weight:700;color:#16a34a;">${term}</div><div style="font-size:11px;color:#94a3b8;">con recepción</div></div>
 </div>
 <div style="margin:8px 0 4px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;"><span>0%</span><span style="font-weight:600;color:${avBarCol};">${av}% completado</span><span>100%</span></div>
-<div style="height:10px;background:#e5e7eb;border-radius:6px;overflow:hidden;margin-bottom:4px;"><div style="height:100%;width:${av}%;background:${avBarCol};border-radius:6px;transition:width 0.5s;"></div></div>`;
+<div style="height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden;margin-bottom:4px;"><div style="height:100%;width:${av}%;background:${avBarCol};border-radius:6px;transition:width 0.5s;"></div></div>`;
             } else if (tab === 'checkpoints') {
                 h += `Checkpoints del Proyecto</div><div class="summary-grid" style="grid-template-columns:repeat(5,1fr);">`;
                 const tot = obra.viviendas.length;
@@ -5876,10 +5876,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .btn:hover{background:#f3f4f6;}
 .btn-pdf{background:#0f172a;color:#fff;border-color:#0f172a;}
 .btn-pdf:hover{background:#1e293b;}
-.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:10px;}
-.summary-card{padding:8px 10px;border-radius:7px;border:1px solid #e2e8f0;background:#f8fafc;}
-.summary-card-label{font-size:9px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;}
-.summary-card-value{font-size:13px;font-weight:700;color:#0f172a;font-family:monospace;margin-bottom:1px;}
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:5px;margin-bottom:8px;}
+.summary-card{padding:5px 7px;border-radius:5px;border:1px solid #e2e8f0;background:#f8fafc;}
+.summary-card-label{font-size:9px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;}
+.summary-card-value{font-size:11px;font-weight:700;color:#0f172a;font-family:monospace;margin-bottom:1px;}
 .summary-card-detail{font-size:9px;color:#94a3b8;}
 .breadcrumb{font-size:12px;color:#94a3b8;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid #e2e8f0;}
 .breadcrumb strong{color:#0f172a;}
@@ -5902,7 +5902,7 @@ table tr:hover td:first-child{background:#f8fafc;}
   .obra-jumper{margin-left:0;width:calc(100% - 16px);max-width:100%;margin:4px 8px 6px;padding:8px 12px;font-size:12px;}
   .obra-block{margin:8px;padding:14px 12px;border-radius:8px;}
   .summary-grid{grid-template-columns:1fr 1fr;}
-  .summary-card-value{font-size:14px;}
+  .summary-card-value{font-size:11px;}
 }
 @media print{.footer{display:none;}.tabs{display:none;}.section{display:block!important;}.obra-block{page-break-after:always;border:none;border-bottom:2px solid #e2e8f0;border-radius:0;margin:0;}}
 </style>`;
@@ -6247,16 +6247,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .breadcrumb strong{color:#0f172a;}
 .sec-h3{font-size:13px;font-weight:700;color:#1e293b;margin:20px 0 10px;padding-bottom:6px;border-bottom:1px solid #e2e8f0;}
 .sec-h3:first-child{margin-top:0;}
-.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:14px;}
-.summary-card{padding:13px 15px;border-radius:8px;border:1px solid #e2e8f0;background:#f8fafc;}
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:5px;margin-bottom:8px;}
+.summary-card{padding:5px 7px;border-radius:5px;border:1px solid #e2e8f0;background:#f8fafc;}
 .sc-blue{background:#eff6ff;border-color:#bfdbfe;}
 .sc-green{background:#f0fdf4;border-color:#bbf7d0;}
 .sc-yellow{background:#fefce8;border-color:#fde68a;}
 .sc-red{background:#fff1f2;border-color:#fecdd3;}
 .sc-vencida{background:#fff1f2;border-color:#fca5a5;}
-.summary-card-label{font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;}
-.summary-card-value{font-size:16px;font-weight:700;color:#0f172a;font-family:monospace;margin-bottom:3px;}
-.summary-card-detail{font-size:10px;color:#94a3b8;}
+.summary-card-label{font-size:9px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;}
+.summary-card-value{font-size:11px;font-weight:700;color:#0f172a;font-family:monospace;margin-bottom:1px;}
+.summary-card-detail{font-size:9px;color:#94a3b8;}
 .dt{width:100%;border-collapse:collapse;font-size:12px;}
 .dt th{background:#f8fafc;color:#475569;font-weight:700;padding:9px 11px;text-align:left;border-bottom:2px solid #e2e8f0;font-size:10px;text-transform:uppercase;}
 .dt td{padding:8px 11px;border-bottom:1px solid #f1f5f9;color:#334155;}
@@ -6300,7 +6300,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   .ep-sumbar-sep{display:none;}
   .obra-block{margin:8px;padding:14px 12px;border-radius:8px;}
   .summary-grid{grid-template-columns:1fr 1fr;}
-  .summary-card-value{font-size:14px;}
+  .summary-card-value{font-size:11px;}
   .dt{font-size:11px;}
   .dt th,.dt td{padding:6px 7px;}
   .no-data{padding:28px 12px;}
