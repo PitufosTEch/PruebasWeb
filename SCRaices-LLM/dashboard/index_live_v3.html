@@ -5443,7 +5443,7 @@ ${mProy>0?`<tr style="font-weight:700;color:#7c3aed;background:#f5f3ff;"><td col
             const tot = obra.viviendas.length;
             const av = tot ? Math.round(obra.viviendas.reduce((s,v)=>{ const i=getInspeccion(v.ID_Benef); return s+(i?i.pct_total:0); },0)/tot) : 0;
             const _ag = avanceGanttRaw[obra.ID_proy];
-            const agPct = _ag ? _ag.pct : null;
+            const agPct = _ag ? (_ag.pct_prog ?? _ag.pct) : null;
             const proyRec = PROYECTOS_DATA.find(p => p.ID_proy === obra.ID_proy);
             const cIni = proyRec ? proyRec.fecha_inicio : null;
             const cDur = proyRec ? (proyRec.duracion || 0) : 0;
@@ -5935,7 +5935,7 @@ function jumpToObra(idx){
             const tot = obra.viviendas.length;
             const av = tot ? Math.round(obra.viviendas.reduce((s,v)=>{ const i=getInspeccion(v.ID_Benef); return s+(i?i.pct_total:0); },0)/tot) : 0;
             const _ag = avanceGanttRaw[obra.ID_proy];
-            const agPct = _ag ? _ag.pct : null;
+            const agPct = _ag ? (_ag.pct_prog ?? _ag.pct) : null;
             const proyRec = PROYECTOS_DATA.find(p => p.ID_proy === obra.ID_proy);
             const cIni = proyRec ? proyRec.fecha_inicio : null;
             const cDur = proyRec ? (proyRec.duracion || 0) : 0;
@@ -6150,7 +6150,7 @@ ${js}</body></html>`;
             const epNumsEmitidos = epNums.length;
             const epPendientes   = epNums.filter(n => eps.filter(e => e.Num_EP === n).some(e => !e.Estado.toLowerCase().includes('pagado'))).length;
             const agNode         = avanceGanttRaw[pid];
-            const pctPrograma    = (agNode != null && agNode.pct != null) ? Math.min(100, Math.round(agNode.pct * 10) / 10) : null;
+            const pctPrograma    = (agNode != null) ? Math.min(100, Math.round(((agNode.pct_prog ?? agNode.pct) || 0) * 10) / 10) : null;
             const avMensual      = AVANCE_MENSUAL_DATA[pid];
             const pctReal        = (avMensual != null && avMensual.avanceActual != null) ? Math.min(100, Math.round(avMensual.avanceActual * 10) / 10) : null;
 
@@ -6462,7 +6462,7 @@ window.addEventListener('resize',updateStickyTops);
             const totContrato = montos.total;
             const pctCob  = totContrato > 0 ? Math.round(totPagado/totContrato*10000)/100 : 0;
             const pctEmit = totContrato > 0 ? Math.round(totEP/totContrato*10000)/100 : 0;
-            const agPct   = (avanceGanttRaw[pid] || {}).pct ?? null;
+            const agPct   = (ag => ag?.pct_prog ?? ag?.pct ?? null)(avanceGanttRaw[pid]);
             const avM     = AVANCE_MENSUAL_DATA[pid];
             const pctReal = (avM?.avanceActual != null) ? Math.round(avM.avanceActual*100)/100 : null;
             const pg      = ganttRaw[pid] || null;
