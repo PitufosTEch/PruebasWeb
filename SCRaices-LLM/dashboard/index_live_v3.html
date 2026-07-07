@@ -5432,6 +5432,80 @@ ${mProy>0?`<tr style="font-weight:700;color:#7c3aed;background:#f5f3ff;"><td col
             };
         });
 
+        // Cuadro resumen ejecutivo (tabla global al inicio de la pestaña Resumen)
+        const vivConDespacho = new Set(DESPACHOS_DATA.map(d => String(d.ID_Benef)));
+        const fmtD2 = (iso) => { if (!iso) return '—'; const p = String(iso).substring(0,10).split('-'); return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:iso; };
+        const resumenFilas = obrasData.map(obra => {
+            const tot = obra.viviendas.length;
+            const av = tot ? Math.round(obra.viviendas.reduce((s,v)=>{ const i=getInspeccion(v.ID_Benef); return s+(i?i.pct_total:0); },0)/tot) : 0;
+            const _ag = avanceGanttRaw[obra.ID_proy];
+            const agPct = _ag ? _ag.pct : null;
+            const proyRec = PROYECTOS_DATA.find(p => p.ID_proy === obra.ID_proy);
+            const cIni = proyRec ? proyRec.fecha_inicio : null;
+            const cDur = proyRec ? (proyRec.duracion || 0) : 0;
+            const cFin = cDur>0&&cIni ? (()=>{ const d=new Date(cIni); d.setDate(d.getDate()+cDur); return d.toISOString().substring(0,10); })() : null;
+            const cDiasR = cFin ? Math.floor((new Date(cFin)-new Date())/86400000) : null;
+            const cPctTr = cDur>0&&cFin ? Math.min(100,Math.round((cDur-Math.max(0,cDiasR||0))/cDur*100)) : null;
+            const pg = ganttRaw[obra.ID_proy] || null;
+            const progDiasR = pg&&pg.finProg ? Math.floor((new Date(pg.finProg)-new Date())/86400000) : null;
+            const habilitadas = obra.viviendas.filter(v=>v.habil).length;
+            const enEjecucion = obra.viviendas.filter(v=>vivConDespacho.has(String(v.ID_Benef))).length;
+            const diff = (agPct!==null) ? av-agPct : null;
+            return { obra, tot, av, agPct, cPctTr, cDiasR, cDur, pg, progDiasR, habilitadas, enEjecucion, diff };
+        });
+
+        const resumenTablaHtml = (() => {
+            let t = `<div style="background:#fff;margin:12px 12px 0;border-radius:10px;padding:14px 16px;border:1px solid #e2e8f0;overflow-x:auto;">
+<div style="font-size:12px;font-weight:700;color:#1e293b;margin-bottom:10px;">📋 Resumen ejecutivo de proyectos</div>
+<table style="width:100%;border-collapse:collapse;font-size:11px;min-width:900px;">
+<thead>
+<tr style="background:#f1f5f9;">
+  <th rowspan="2" style="padding:6px 8px;border:1px solid #e2e8f0;text-align:left;font-size:9px;text-transform:uppercase;color:#475569;min-width:130px;">Proyecto</th>
+  <th colspan="3" style="padding:5px 8px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Avance (%)</th>
+  <th rowspan="2" style="padding:5px 6px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;background:#fef9c3;">C − B</th>
+  <th rowspan="2" style="padding:5px 6px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Inicio<br>Prog.</th>
+  <th rowspan="2" style="padding:5px 6px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Término<br>Prog.</th>
+  <th rowspan="2" style="padding:5px 6px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Plazo<br>Contrato</th>
+  <th rowspan="2" style="padding:5px 6px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Plazo<br>Prog.</th>
+  <th rowspan="2" style="padding:5px 6px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Restante<br>Contrato</th>
+  <th rowspan="2" style="padding:5px 6px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Restante<br>Prog.</th>
+  <th rowspan="2" style="padding:5px 6px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Total<br>Viv.</th>
+  <th rowspan="2" style="padding:5px 6px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Habili-<br>tadas</th>
+  <th rowspan="2" style="padding:5px 6px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">En<br>Ejec.</th>
+</tr>
+<tr style="background:#f8fafc;">
+  <th style="padding:4px 6px;border:1px solid #e2e8f0;text-align:center;font-size:9px;color:#64748b;">A<br><span style="font-weight:400;">Contrato</span></th>
+  <th style="padding:4px 6px;border:1px solid #e2e8f0;text-align:center;font-size:9px;color:#64748b;">B<br><span style="font-weight:400;">Gantt</span></th>
+  <th style="padding:4px 6px;border:1px solid #e2e8f0;text-align:center;font-size:9px;color:#64748b;">C<br><span style="font-weight:400;">Real</span></th>
+</tr>
+</thead><tbody>`;
+            resumenFilas.forEach(r => {
+                const dCol = r.diff===null?'#94a3b8':r.diff>=0?'#16a34a':'#dc2626';
+                const dBg  = r.diff===null?'':r.diff>=0?'#f0fdf4':'#fef2f2';
+                const dTxt = r.diff===null?'—':(r.diff>=0?'+':'')+r.diff+'%';
+                const cRCol = r.cDiasR===null?'#94a3b8':r.cDiasR<0?'#dc2626':r.cDiasR<30?'#b45309':'#374151';
+                const pRCol = r.progDiasR===null?'#94a3b8':r.progDiasR<0?'#dc2626':r.progDiasR<30?'#b45309':'#374151';
+                t += `<tr style="border-bottom:1px solid #f1f5f9;">
+  <td style="padding:6px 8px;border-right:1px solid #f1f5f9;font-size:11px;font-weight:600;color:#1e293b;">${r.obra.nombre}</td>
+  <td style="padding:5px 6px;border-right:1px solid #f1f5f9;text-align:center;font-size:11px;">${r.cPctTr!==null?r.cPctTr+'%':'—'}</td>
+  <td style="padding:5px 6px;border-right:1px solid #f1f5f9;text-align:center;font-size:11px;font-weight:700;color:${r.agPct!==null?(r.agPct>=80?'#16a34a':r.agPct>=50?'#2563eb':'#dc2626'):'#94a3b8'};">${r.agPct!==null?r.agPct+'%':'—'}</td>
+  <td style="padding:5px 6px;border-right:1px solid #f1f5f9;text-align:center;font-size:11px;font-weight:700;color:${r.av>=80?'#16a34a':r.av>=50?'#2563eb':'#dc2626'};">${r.av}%</td>
+  <td style="padding:5px 6px;border-right:1px solid #f1f5f9;text-align:center;font-size:11px;font-weight:700;color:${dCol};background:${dBg};">${dTxt}</td>
+  <td style="padding:5px 6px;border-right:1px solid #f1f5f9;text-align:center;font-size:11px;">${fmtD2(r.pg&&r.pg.inicio)}</td>
+  <td style="padding:5px 6px;border-right:1px solid #f1f5f9;text-align:center;font-size:11px;">${fmtD2(r.pg&&r.pg.finProg)}</td>
+  <td style="padding:5px 6px;border-right:1px solid #f1f5f9;text-align:center;font-size:11px;">${r.cDur?r.cDur+'d':'—'}</td>
+  <td style="padding:5px 6px;border-right:1px solid #f1f5f9;text-align:center;font-size:11px;">${r.pg&&r.pg.plazo?r.pg.plazo+'d':'—'}</td>
+  <td style="padding:5px 6px;border-right:1px solid #f1f5f9;text-align:center;font-size:11px;color:${cRCol};">${r.cDiasR!==null?r.cDiasR+'d':'—'}</td>
+  <td style="padding:5px 6px;border-right:1px solid #f1f5f9;text-align:center;font-size:11px;color:${pRCol};">${r.progDiasR!==null?r.progDiasR+'d':'—'}</td>
+  <td style="padding:5px 6px;border-right:1px solid #f1f5f9;text-align:center;font-size:11px;">${r.tot}</td>
+  <td style="padding:5px 6px;border-right:1px solid #f1f5f9;text-align:center;font-size:11px;">${r.habilitadas}</td>
+  <td style="padding:5px 6px;text-align:center;font-size:11px;font-weight:700;color:#2563eb;">${r.enEjecucion}</td>
+</tr>`;
+            });
+            t += `</tbody></table></div>`;
+            return t;
+        })();
+
         const css = `<style>
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f4f8;color:#1a1a2e;font-size:14px;}
@@ -5521,7 +5595,7 @@ ${tabKeys.map((t,i)=>`<button class="tab-btn${i===0?' active':''}" onclick="most
 </div>`;
 
         const secs = tabKeys.map(t =>
-            `<div class="section${t==='resumen'?' active':''}" id="sec-${t}">${obrasData.map((o,i)=>`<div class="obra-block" data-obra="${i}">${allSections[i][t]}</div>`).join('')}</div>`
+            `<div class="section${t==='resumen'?' active':''}" id="sec-${t}">${t==='resumen'?resumenTablaHtml:''}${obrasData.map((o,i)=>`<div class="obra-block" data-obra="${i}">${allSections[i][t]}</div>`).join('')}</div>`
         ).join('');
 
         const html = `<!DOCTYPE html>
