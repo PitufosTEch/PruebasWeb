@@ -4919,7 +4919,7 @@ ${inf.footerHtml}
                     const n = obra.viviendas.filter(v => getFlags(v)[cp.key]).length;
                     const pct = tot ? Math.round(n/tot*100) : 0;
                     const col = n===tot?'#16a34a':n>0?'#2563eb':'#6b7280';
-                    h += `<div class="summary-card"><div class="summary-card-label">${cp.label}</div><div class="summary-card-value" style="color:${col};">${n}</div><div class="summary-card-detail">/ ${tot} · ${pct}%</div></div>`;
+                    h += `<div class="summary-card" style="text-align:center;padding:3px 4px;"><div class="summary-card-label" style="margin-bottom:1px;">${cp.label}</div><div style="font-size:10px;font-weight:700;color:${col};">${n}<span style="font-size:8px;font-weight:400;color:#94a3b8;"> / ${tot} · ${pct}%</span></div></div>`;
                 });
                 h += `</div>`;
             } else if (tab === 'curvas') {
@@ -5237,7 +5237,7 @@ ${js2}
                     const n = obra.viviendas.filter(v => getFlags(v)[cp.key]).length;
                     const pct = tot ? Math.round(n/tot*100) : 0;
                     const col = n===tot?'#16a34a':n>0?'#2563eb':'#6b7280';
-                    h += `<div class="summary-card"><div class="summary-card-label">${cp.label}</div><div class="summary-card-value" style="color:${col};">${n}</div><div class="summary-card-detail">/ ${tot} · ${pct}%</div></div>`;
+                    h += `<div class="summary-card" style="text-align:center;padding:3px 4px;"><div class="summary-card-label" style="margin-bottom:1px;">${cp.label}</div><div style="font-size:10px;font-weight:700;color:${col};">${n}<span style="font-size:8px;font-weight:400;color:#94a3b8;"> / ${tot} · ${pct}%</span></div></div>`;
                 });
                 h += `</div>`;
             } else if (tab === 'curvas') {
@@ -5782,7 +5782,7 @@ ${js}</body></html>`;
                     const n = obra.viviendas.filter(v => getFlags(v)[cp.key]).length;
                     const pct = tot ? Math.round(n/tot*100) : 0;
                     const col = n===tot?'#16a34a':n>0?'#2563eb':'#6b7280';
-                    h += `<div class="summary-card"><div class="summary-card-label">${cp.label}</div><div class="summary-card-value" style="color:${col};">${n}</div><div class="summary-card-detail">/ ${tot} · ${pct}%</div></div>`;
+                    h += `<div class="summary-card" style="text-align:center;padding:3px 4px;"><div class="summary-card-label" style="margin-bottom:1px;">${cp.label}</div><div style="font-size:10px;font-weight:700;color:${col};">${n}<span style="font-size:8px;font-weight:400;color:#94a3b8;"> / ${tot} · ${pct}%</span></div></div>`;
                 });
                 h += `</div>`;
             } else if (tab === 'curvas') {
@@ -5924,6 +5924,87 @@ function jumpToObra(idx){
 }
 ` + jsClose;
 
+        const vivConDespacho = new Set(DESPACHOS_DATA.map(d => String(d.ID_Benef)));
+        const fmtD2 = (iso) => { if (!iso) return '—'; const p = String(iso).substring(0,10).split('-'); return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:iso; };
+        const resumenFilas = obrasData.map(obra => {
+            const tot = obra.viviendas.length;
+            const av = tot ? Math.round(obra.viviendas.reduce((s,v)=>{ const i=getInspeccion(v.ID_Benef); return s+(i?i.pct_total:0); },0)/tot) : 0;
+            const _ag = avanceGanttRaw[obra.ID_proy];
+            const agPct = _ag ? _ag.pct : null;
+            const proyRec = PROYECTOS_DATA.find(p => p.ID_proy === obra.ID_proy);
+            const cIni = proyRec ? proyRec.fecha_inicio : null;
+            const cDur = proyRec ? (proyRec.duracion || 0) : 0;
+            const cFin = cDur>0&&cIni ? (()=>{ const d=new Date(cIni); d.setDate(d.getDate()+cDur); return d.toISOString().substring(0,10); })() : null;
+            const cDiasR = cFin ? Math.floor((new Date(cFin)-new Date())/86400000) : null;
+            const cPctTr = cDur>0&&cFin ? Math.min(100,Math.round((cDur-Math.max(0,cDiasR||0))/cDur*100)) : null;
+            const pg = ganttRaw[obra.ID_proy] || null;
+            const progDiasR = pg&&pg.finProg ? Math.floor((new Date(pg.finProg)-new Date())/86400000) : null;
+            const habilitadas = obra.viviendas.filter(v=>v.habil).length;
+            const enEjecucion = obra.viviendas.filter(v=>vivConDespacho.has(String(v.ID_Benef))).length;
+            const diff = (agPct!==null) ? Math.round((av-agPct)*100)/100 : null;
+            return { obra, tot, av, agPct, cPctTr, cDiasR, cDur, pg, progDiasR, habilitadas, enEjecucion, diff };
+        });
+        const resumenTablaHtml = (() => {
+            let t = `<div style="background:#fff;margin:12px 12px 0;border-radius:10px;padding:14px 16px;border:1px solid #e2e8f0;overflow-x:auto;">
+<div style="font-size:12px;font-weight:700;color:#1e293b;margin-bottom:10px;">📋 Resumen ejecutivo de proyectos</div>
+<table style="width:100%;border-collapse:collapse;font-size:10px;table-layout:fixed;">
+<colgroup>
+  <col style="width:18%">
+  <col style="width:6%"><col style="width:6%"><col style="width:6%">
+  <col style="width:7%">
+  <col style="width:7%"><col style="width:7%">
+  <col style="width:6%"><col style="width:6%">
+  <col style="width:6%"><col style="width:6%">
+  <col style="width:5%"><col style="width:5%"><col style="width:5%">
+</colgroup>
+<thead>
+<tr style="background:#f1f5f9;">
+  <th rowspan="2" style="padding:5px 6px;border:1px solid #e2e8f0;text-align:left;font-size:9px;text-transform:uppercase;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Proyecto</th>
+  <th colspan="3" style="padding:4px 6px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Avance (%)</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;background:#fef9c3;">C−B</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Inicio<br>Prog.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Término<br>Prog.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Pzo.<br>Cont.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Pzo.<br>Prog.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Rest.<br>Cont.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Rest.<br>Prog.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Tot.<br>Viv.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Hab.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;cursor:help;" title="Viviendas en ejecución — considera en ejecución aquellas con al menos 1 despacho realizado.">Ejec.</th>
+</tr>
+<tr style="background:#f8fafc;">
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;color:#64748b;cursor:help;" title="A: Avance de contrato">A</th>
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;color:#64748b;cursor:help;" title="B: Avance de programa de obra">B</th>
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;color:#64748b;cursor:help;" title="C: Avance real (inspeccionado)">C</th>
+</tr>
+</thead><tbody>`;
+            resumenFilas.forEach(r => {
+                const dCol = r.diff===null?'#94a3b8':r.diff>=0?'#16a34a':'#dc2626';
+                const dBg  = r.diff===null?'':r.diff>=0?'#f0fdf4':'#fef2f2';
+                const dTxt = r.diff===null?'—':(r.diff>=0?'+':'')+r.diff+'%';
+                const cRCol = r.cDiasR===null?'#94a3b8':r.cDiasR<0?'#dc2626':r.cDiasR<30?'#b45309':'#374151';
+                const pRCol = r.progDiasR===null?'#94a3b8':r.progDiasR<90?'#dc2626':'#374151';
+                t += `<tr style="border-bottom:1px solid #f1f5f9;">
+  <td style="padding:5px 6px;border-right:1px solid #f1f5f9;font-size:10px;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.obra.nombre}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${r.cPctTr!==null?r.cPctTr+'%':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${r.agPct!==null?r.agPct+'%':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${r.av}%</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;font-weight:700;color:${dCol};background:${dBg};">${dTxt}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${fmtD2(r.pg&&r.pg.inicio)}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${fmtD2(r.pg&&r.pg.finProg)}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${r.cDur?r.cDur+'d':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${r.pg&&r.pg.plazo?r.pg.plazo+'d':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:${cRCol};">${r.cDiasR!==null?r.cDiasR+'d':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:${pRCol};">${r.progDiasR!==null?r.progDiasR+'d':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${r.tot}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${r.habilitadas}</td>
+  <td style="padding:4px 4px;text-align:center;font-size:10px;font-weight:700;color:#2563eb;">${r.enEjecucion}</td>
+</tr>`;
+            });
+            t += `</tbody></table></div>`;
+            return t;
+        })();
+
         const tabKeys = ['resumen','checkpoints','curvas','comentarios','viviendas'];
         const tabLabels = {resumen:'Resumen',checkpoints:'Checkpoints',curvas:'Curvas S',comentarios:'Comentarios',viviendas:'Viviendas'};
 
@@ -5936,7 +6017,7 @@ ${tabKeys.map((t,i)=>`<button class="tab-btn${i===0?' active':''}" onclick="most
 </div>`;
 
         const secs = tabKeys.map(t =>
-            `<div class="section${t==='resumen'?' active':''}" id="sec-${t}">${obrasData.map((o,i)=>`<div class="obra-block" data-obra="${i}">${allSections[i][t]}</div>`).join('')}</div>`
+            `<div class="section${t==='resumen'?' active':''}" id="sec-${t}">${t==='resumen'?resumenTablaHtml:''}${obrasData.map((o,i)=>`<div class="obra-block" data-obra="${i}">${allSections[i][t]}</div>`).join('')}</div>`
         ).join('');
 
         const html = `<!DOCTYPE html>
