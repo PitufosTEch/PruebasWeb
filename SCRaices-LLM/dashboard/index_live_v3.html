@@ -5480,12 +5480,12 @@ ${mProy>0?`<tr style="font-weight:700;color:#7c3aed;background:#f5f3ff;"><td col
   <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Rest.<br>Prog.</th>
   <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Tot.<br>Viv.</th>
   <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Hab.</th>
-  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Ejec.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;cursor:help;" title="Viviendas en ejecución — considera en ejecución aquellas con al menos 1 despacho realizado.">Ejec.</th>
 </tr>
 <tr style="background:#f8fafc;">
-  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;color:#64748b;">A</th>
-  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;color:#64748b;">B</th>
-  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;color:#64748b;">C</th>
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;color:#64748b;cursor:help;" title="A: Avance de contrato">A</th>
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;color:#64748b;cursor:help;" title="B: Avance de programa de obra">B</th>
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;color:#64748b;cursor:help;" title="C: Avance real (inspeccionado)">C</th>
 </tr>
 </thead><tbody>`;
             resumenFilas.forEach(r => {
@@ -5493,7 +5493,7 @@ ${mProy>0?`<tr style="font-weight:700;color:#7c3aed;background:#f5f3ff;"><td col
                 const dBg  = r.diff===null?'':r.diff>=0?'#f0fdf4':'#fef2f2';
                 const dTxt = r.diff===null?'—':(r.diff>=0?'+':'')+r.diff+'%';
                 const cRCol = r.cDiasR===null?'#94a3b8':r.cDiasR<0?'#dc2626':r.cDiasR<30?'#b45309':'#374151';
-                const pRCol = r.progDiasR===null?'#94a3b8':r.progDiasR<0?'#dc2626':r.progDiasR<30?'#b45309':'#374151';
+                const pRCol = r.progDiasR===null?'#94a3b8':r.progDiasR<90?'#dc2626':'#374151';
                 t += `<tr style="border-bottom:1px solid #f1f5f9;">
   <td style="padding:5px 6px;border-right:1px solid #f1f5f9;font-size:10px;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.obra.nombre}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${r.cPctTr!==null?r.cPctTr+'%':'—'}</td>
