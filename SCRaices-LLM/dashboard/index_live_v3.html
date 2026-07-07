@@ -4914,7 +4914,7 @@ ${inf.footerHtml}
 <div style="height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden;"><div style="height:100%;width:${av}%;background:${avBarCol};border-radius:6px;"></div></div>`;
             } else if (tab === 'checkpoints') {
                 const tot = obra.viviendas.length;
-                h += `Checkpoints (${CPS_ADQ.length} indicadores)</div><div class="summary-grid" style="grid-template-columns:repeat(auto-fit,minmax(90px,1fr));">`;
+                h += `Checkpoints (${CPS_ADQ.length} indicadores)</div><div class="summary-grid" style="grid-template-columns:repeat(${CPS_ADQ.length},1fr);">`;
                 CPS_ADQ.forEach(cp => {
                     const n = obra.viviendas.filter(v => getFlags(v)[cp.key]).length;
                     const pct = tot ? Math.round(n/tot*100) : 0;
@@ -5231,7 +5231,7 @@ ${js2}
 <div style="margin:8px 0 4px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;"><span>0%</span><span style="font-weight:600;color:${avBarCol};">${av}% completado</span><span>100%</span></div>
 <div style="height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden;margin-bottom:4px;"><div style="height:100%;width:${av}%;background:${avBarCol};border-radius:6px;transition:width 0.5s;"></div></div>`;
             } else if (tab === 'checkpoints') {
-                h += `Checkpoints del Proyecto</div><div class="summary-grid" style="grid-template-columns:repeat(5,1fr);">`;
+                h += `Checkpoints del Proyecto</div><div class="summary-grid" style="grid-template-columns:repeat(${CPS.length},1fr);">`;
                 const tot = obra.viviendas.length;
                 CPS.forEach(cp => {
                     const n = obra.viviendas.filter(v => getFlags(v)[cp.key]).length;
@@ -5776,7 +5776,7 @@ ${js}</body></html>`;
 <div style="margin:8px 0 4px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;"><span>0%</span><span style="font-weight:600;color:${avBarCol};">${av}% completado</span><span>100%</span></div>
 <div style="height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden;margin-bottom:4px;"><div style="height:100%;width:${av}%;background:${avBarCol};border-radius:6px;transition:width 0.5s;"></div></div>`;
             } else if (tab === 'checkpoints') {
-                h += `Checkpoints del Proyecto</div><div class="summary-grid" style="grid-template-columns:repeat(5,1fr);">`;
+                h += `Checkpoints del Proyecto</div><div class="summary-grid" style="grid-template-columns:repeat(${CPS.length},1fr);">`;
                 const tot = obra.viviendas.length;
                 CPS.forEach(cp => {
                     const n = obra.viviendas.filter(v => getFlags(v)[cp.key]).length;
