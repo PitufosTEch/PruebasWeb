@@ -5450,33 +5450,42 @@ ${mProy>0?`<tr style="font-weight:700;color:#7c3aed;background:#f5f3ff;"><td col
             const progDiasR = pg&&pg.finProg ? Math.floor((new Date(pg.finProg)-new Date())/86400000) : null;
             const habilitadas = obra.viviendas.filter(v=>v.habil).length;
             const enEjecucion = obra.viviendas.filter(v=>vivConDespacho.has(String(v.ID_Benef))).length;
-            const diff = (agPct!==null) ? av-agPct : null;
+            const diff = (agPct!==null) ? Math.round((av-agPct)*100)/100 : null;
             return { obra, tot, av, agPct, cPctTr, cDiasR, cDur, pg, progDiasR, habilitadas, enEjecucion, diff };
         });
 
         const resumenTablaHtml = (() => {
             let t = `<div style="background:#fff;margin:12px 12px 0;border-radius:10px;padding:14px 16px;border:1px solid #e2e8f0;overflow-x:auto;">
 <div style="font-size:12px;font-weight:700;color:#1e293b;margin-bottom:10px;">📋 Resumen ejecutivo de proyectos</div>
-<table style="width:100%;border-collapse:collapse;font-size:11px;min-width:900px;">
+<table style="width:100%;border-collapse:collapse;font-size:10px;table-layout:fixed;">
+<colgroup>
+  <col style="width:18%">
+  <col style="width:6%"><col style="width:6%"><col style="width:6%">
+  <col style="width:7%">
+  <col style="width:7%"><col style="width:7%">
+  <col style="width:6%"><col style="width:6%">
+  <col style="width:6%"><col style="width:6%">
+  <col style="width:5%"><col style="width:5%"><col style="width:5%">
+</colgroup>
 <thead>
 <tr style="background:#f1f5f9;">
-  <th rowspan="2" style="padding:6px 8px;border:1px solid #e2e8f0;text-align:left;font-size:9px;text-transform:uppercase;color:#475569;min-width:130px;">Proyecto</th>
-  <th colspan="3" style="padding:5px 8px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Avance (%)</th>
-  <th rowspan="2" style="padding:5px 6px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;background:#fef9c3;">C − B</th>
-  <th rowspan="2" style="padding:5px 6px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Inicio<br>Prog.</th>
-  <th rowspan="2" style="padding:5px 6px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Término<br>Prog.</th>
-  <th rowspan="2" style="padding:5px 6px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Plazo<br>Contrato</th>
-  <th rowspan="2" style="padding:5px 6px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Plazo<br>Prog.</th>
-  <th rowspan="2" style="padding:5px 6px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Restante<br>Contrato</th>
-  <th rowspan="2" style="padding:5px 6px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Restante<br>Prog.</th>
-  <th rowspan="2" style="padding:5px 6px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Total<br>Viv.</th>
-  <th rowspan="2" style="padding:5px 6px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Habili-<br>tadas</th>
-  <th rowspan="2" style="padding:5px 6px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">En<br>Ejec.</th>
+  <th rowspan="2" style="padding:5px 6px;border:1px solid #e2e8f0;text-align:left;font-size:9px;text-transform:uppercase;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Proyecto</th>
+  <th colspan="3" style="padding:4px 6px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Avance (%)</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;background:#fef9c3;">C−B</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Inicio<br>Prog.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Término<br>Prog.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Pzo.<br>Cont.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Pzo.<br>Prog.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Rest.<br>Cont.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Rest.<br>Prog.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Tot.<br>Viv.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Hab.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Ejec.</th>
 </tr>
 <tr style="background:#f8fafc;">
-  <th style="padding:4px 6px;border:1px solid #e2e8f0;text-align:center;font-size:9px;color:#64748b;">A<br><span style="font-weight:400;">Contrato</span></th>
-  <th style="padding:4px 6px;border:1px solid #e2e8f0;text-align:center;font-size:9px;color:#64748b;">B<br><span style="font-weight:400;">Gantt</span></th>
-  <th style="padding:4px 6px;border:1px solid #e2e8f0;text-align:center;font-size:9px;color:#64748b;">C<br><span style="font-weight:400;">Real</span></th>
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;color:#64748b;">A</th>
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;color:#64748b;">B</th>
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;color:#64748b;">C</th>
 </tr>
 </thead><tbody>`;
             resumenFilas.forEach(r => {
@@ -5486,20 +5495,20 @@ ${mProy>0?`<tr style="font-weight:700;color:#7c3aed;background:#f5f3ff;"><td col
                 const cRCol = r.cDiasR===null?'#94a3b8':r.cDiasR<0?'#dc2626':r.cDiasR<30?'#b45309':'#374151';
                 const pRCol = r.progDiasR===null?'#94a3b8':r.progDiasR<0?'#dc2626':r.progDiasR<30?'#b45309':'#374151';
                 t += `<tr style="border-bottom:1px solid #f1f5f9;">
-  <td style="padding:6px 8px;border-right:1px solid #f1f5f9;font-size:11px;font-weight:600;color:#1e293b;">${r.obra.nombre}</td>
-  <td style="padding:5px 6px;border-right:1px solid #f1f5f9;text-align:center;font-size:11px;">${r.cPctTr!==null?r.cPctTr+'%':'—'}</td>
-  <td style="padding:5px 6px;border-right:1px solid #f1f5f9;text-align:center;font-size:11px;font-weight:700;color:${r.agPct!==null?(r.agPct>=80?'#16a34a':r.agPct>=50?'#2563eb':'#dc2626'):'#94a3b8'};">${r.agPct!==null?r.agPct+'%':'—'}</td>
-  <td style="padding:5px 6px;border-right:1px solid #f1f5f9;text-align:center;font-size:11px;font-weight:700;color:${r.av>=80?'#16a34a':r.av>=50?'#2563eb':'#dc2626'};">${r.av}%</td>
-  <td style="padding:5px 6px;border-right:1px solid #f1f5f9;text-align:center;font-size:11px;font-weight:700;color:${dCol};background:${dBg};">${dTxt}</td>
-  <td style="padding:5px 6px;border-right:1px solid #f1f5f9;text-align:center;font-size:11px;">${fmtD2(r.pg&&r.pg.inicio)}</td>
-  <td style="padding:5px 6px;border-right:1px solid #f1f5f9;text-align:center;font-size:11px;">${fmtD2(r.pg&&r.pg.finProg)}</td>
-  <td style="padding:5px 6px;border-right:1px solid #f1f5f9;text-align:center;font-size:11px;">${r.cDur?r.cDur+'d':'—'}</td>
-  <td style="padding:5px 6px;border-right:1px solid #f1f5f9;text-align:center;font-size:11px;">${r.pg&&r.pg.plazo?r.pg.plazo+'d':'—'}</td>
-  <td style="padding:5px 6px;border-right:1px solid #f1f5f9;text-align:center;font-size:11px;color:${cRCol};">${r.cDiasR!==null?r.cDiasR+'d':'—'}</td>
-  <td style="padding:5px 6px;border-right:1px solid #f1f5f9;text-align:center;font-size:11px;color:${pRCol};">${r.progDiasR!==null?r.progDiasR+'d':'—'}</td>
-  <td style="padding:5px 6px;border-right:1px solid #f1f5f9;text-align:center;font-size:11px;">${r.tot}</td>
-  <td style="padding:5px 6px;border-right:1px solid #f1f5f9;text-align:center;font-size:11px;">${r.habilitadas}</td>
-  <td style="padding:5px 6px;text-align:center;font-size:11px;font-weight:700;color:#2563eb;">${r.enEjecucion}</td>
+  <td style="padding:5px 6px;border-right:1px solid #f1f5f9;font-size:10px;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.obra.nombre}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${r.cPctTr!==null?r.cPctTr+'%':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;font-weight:700;color:${r.agPct!==null?(r.agPct>=80?'#16a34a':r.agPct>=50?'#2563eb':'#dc2626'):'#94a3b8'};">${r.agPct!==null?r.agPct+'%':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;font-weight:700;color:${r.av>=80?'#16a34a':r.av>=50?'#2563eb':'#dc2626'};">${r.av}%</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;font-weight:700;color:${dCol};background:${dBg};">${dTxt}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${fmtD2(r.pg&&r.pg.inicio)}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${fmtD2(r.pg&&r.pg.finProg)}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${r.cDur?r.cDur+'d':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${r.pg&&r.pg.plazo?r.pg.plazo+'d':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:${cRCol};">${r.cDiasR!==null?r.cDiasR+'d':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:${pRCol};">${r.progDiasR!==null?r.progDiasR+'d':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${r.tot}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${r.habilitadas}</td>
+  <td style="padding:4px 4px;text-align:center;font-size:10px;font-weight:700;color:#2563eb;">${r.enEjecucion}</td>
 </tr>`;
             });
             t += `</tbody></table></div>`;
