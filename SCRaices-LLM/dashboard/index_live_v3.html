@@ -4942,15 +4942,16 @@ ${inf.footerHtml}
 <div style="font-size:12px;font-weight:700;color:#1a1a2e;background:#f1f5f9;border:1px solid #e2e8f0;padding:7px 12px;border-radius:7px;margin-bottom:8px;">
   ${tituloGrupo}${capLabel} &nbsp;<span style="font-weight:400;color:#94a3b8;">(${grupo.viviendas.length} viv.)</span>
 </div>
-<div class="table-container"><table>
-<thead><tr><th>Beneficiario</th><th>Avance</th><th>HPC</th><th>TE1</th><th>V.AS</th><th>R.AS</th><th>F1</th><th>Empalme</th><th>Recep.</th></tr></thead><tbody>`;
+<div class="table-container"><table style="table-layout:fixed;width:100%;">
+<colgroup><col style="width:28%"><col style="width:10%"><col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:12%"><col style="width:10%"></colgroup>
+<thead><tr><th style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Beneficiario</th><th>Avance</th><th>HPC</th><th>TE1</th><th>V.AS</th><th>R.AS</th><th>F1</th><th>Empalme</th><th>Recep.</th></tr></thead><tbody>`;
                     grupo.viviendas.forEach(v => {
                         const insp = getInspeccion(v.ID_Benef);
                         const pct = insp ? insp.pct_total : null;
                         const fl = getFlags(v);
                         const pctTxt = pct !== null ? `${pct}%` : '—';
                         const pctCol = pct === null ? '#94a3b8' : pct >= 80 ? '#16a34a' : pct >= 50 ? '#2563eb' : '#dc2626';
-                        h += `<tr><td>${v.NOMBRES||''} ${v.APELLIDOS||''}</td><td style="font-weight:700;color:${pctCol};">${pctTxt}</td><td>${ck(fl.hpc)}</td><td>${ck(fl.te1)}</td><td>${ck(fl.visita_as)}</td><td>${ck(fl.resol_as)}</td><td>${ck(fl.fecha_f1)}</td><td>${ck(fl.empalme)}</td><td>${ck(fl.fecha_recep)}</td></tr>`;
+                        h += `<tr><td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${v.NOMBRES||''} ${v.APELLIDOS||''}">${v.NOMBRES||''} ${v.APELLIDOS||''}</td><td style="font-weight:700;color:${pctCol};">${pctTxt}</td><td>${ck(fl.hpc)}</td><td>${ck(fl.te1)}</td><td>${ck(fl.visita_as)}</td><td>${ck(fl.resol_as)}</td><td>${ck(fl.fecha_f1)}</td><td>${ck(fl.empalme)}</td><td>${ck(fl.fecha_recep)}</td></tr>`;
                     });
                     h += `</tbody></table></div></div>`;
                 });
@@ -5316,15 +5317,16 @@ ${js2}
 <div style="font-size:12px;font-weight:700;color:#1a1a2e;background:#f1f5f9;border:1px solid #e2e8f0;padding:7px 12px;border-radius:7px;margin-bottom:8px;">
   ${tituloGrupo}${capLabel} &nbsp;<span style="font-weight:400;color:#94a3b8;">(${grupo.viviendas.length} viv.)</span>
 </div>
-<div class="table-container"><table>
-<thead><tr><th>Beneficiario</th><th>Avance</th><th>HPC</th><th>TE1</th><th>V.AS</th><th>R.AS</th><th>F1</th><th>Empalme</th><th>Recep.</th></tr></thead><tbody>`;
+<div class="table-container"><table style="table-layout:fixed;width:100%;">
+<colgroup><col style="width:28%"><col style="width:10%"><col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:12%"><col style="width:10%"></colgroup>
+<thead><tr><th style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Beneficiario</th><th>Avance</th><th>HPC</th><th>TE1</th><th>V.AS</th><th>R.AS</th><th>F1</th><th>Empalme</th><th>Recep.</th></tr></thead><tbody>`;
                     grupo.viviendas.forEach(v => {
                         const insp = getInspeccion(v.ID_Benef);
                         const pct = insp ? insp.pct_total : null;
                         const fl = getFlags(v);
                         const pctTxt = pct !== null ? `${pct}%` : '—';
                         const pctCol = pct === null ? '#94a3b8' : pct >= 80 ? '#16a34a' : pct >= 50 ? '#2563eb' : '#dc2626';
-                        h += `<tr><td>${v.NOMBRES||''} ${v.APELLIDOS||''}</td><td style="font-weight:700;color:${pctCol};">${pctTxt}</td><td>${ck(fl.hpc)}</td><td>${ck(fl.te1)}</td><td>${ck(fl.visita_as)}</td><td>${ck(fl.resol_as)}</td><td>${ck(fl.fecha_f1)}</td><td>${ck(fl.empalme)}</td><td>${ck(fl.fecha_recep)}</td></tr>`;
+                        h += `<tr><td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${v.NOMBRES||''} ${v.APELLIDOS||''}">${v.NOMBRES||''} ${v.APELLIDOS||''}</td><td style="font-weight:700;color:${pctCol};">${pctTxt}</td><td>${ck(fl.hpc)}</td><td>${ck(fl.te1)}</td><td>${ck(fl.visita_as)}</td><td>${ck(fl.resol_as)}</td><td>${ck(fl.fecha_f1)}</td><td>${ck(fl.empalme)}</td><td>${ck(fl.fecha_recep)}</td></tr>`;
                     });
                     h += `</tbody></table></div></div>`;
                 });
@@ -5828,15 +5830,16 @@ ${js}</body></html>`;
 <div style="font-size:12px;font-weight:700;color:#1a1a2e;background:#f1f5f9;border:1px solid #e2e8f0;padding:7px 12px;border-radius:7px;margin-bottom:8px;">
   ${tituloGrupo}${capLabel} &nbsp;<span style="font-weight:400;color:#94a3b8;">(${grupo.viviendas.length} viv.)</span>
 </div>
-<div class="table-container"><table>
-<thead><tr><th>Beneficiario</th><th>Avance</th><th>HPC</th><th>TE1</th><th>V.AS</th><th>R.AS</th><th>F1</th><th>Empalme</th><th>Recep.</th></tr></thead><tbody>`;
+<div class="table-container"><table style="table-layout:fixed;width:100%;">
+<colgroup><col style="width:28%"><col style="width:10%"><col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:12%"><col style="width:10%"></colgroup>
+<thead><tr><th style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Beneficiario</th><th>Avance</th><th>HPC</th><th>TE1</th><th>V.AS</th><th>R.AS</th><th>F1</th><th>Empalme</th><th>Recep.</th></tr></thead><tbody>`;
                     grupo.viviendas.forEach(v => {
                         const insp = getInspeccion(v.ID_Benef);
                         const pct = insp ? insp.pct_total : null;
                         const fl = getFlags(v);
                         const pctTxt = pct !== null ? `${pct}%` : '—';
                         const pctCol = pct === null ? '#94a3b8' : pct >= 80 ? '#16a34a' : pct >= 50 ? '#2563eb' : '#dc2626';
-                        h += `<tr><td>${v.NOMBRES||''} ${v.APELLIDOS||''}</td><td style="font-weight:700;color:${pctCol};">${pctTxt}</td><td>${ck(fl.hpc)}</td><td>${ck(fl.te1)}</td><td>${ck(fl.visita_as)}</td><td>${ck(fl.resol_as)}</td><td>${ck(fl.fecha_f1)}</td><td>${ck(fl.empalme)}</td><td>${ck(fl.fecha_recep)}</td></tr>`;
+                        h += `<tr><td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${v.NOMBRES||''} ${v.APELLIDOS||''}">${v.NOMBRES||''} ${v.APELLIDOS||''}</td><td style="font-weight:700;color:${pctCol};">${pctTxt}</td><td>${ck(fl.hpc)}</td><td>${ck(fl.te1)}</td><td>${ck(fl.visita_as)}</td><td>${ck(fl.resol_as)}</td><td>${ck(fl.fecha_f1)}</td><td>${ck(fl.empalme)}</td><td>${ck(fl.fecha_recep)}</td></tr>`;
                     });
                     h += `</tbody></table></div></div>`;
                 });
