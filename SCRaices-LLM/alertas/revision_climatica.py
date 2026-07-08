@@ -82,8 +82,10 @@ UMBRALES = {
     "radiacion_uv":   {"var": "uv_index_max",         "op": ">=", "valor": 6,  "unidad": "índice UV", "label": "Radiación UV alta"},
 }
 
-DIAS_ANTICIPACION = (1,)  # índice del pronóstico diario: solo mañana (~24h) — evita avisar con 48h de
-                          # antelación, que el usuario tiende a olvidar antes de que ocurra el evento.
+DIAS_ANTICIPACION = (1, 2)  # índices del pronóstico diario: mañana y pasado mañana (ventana móvil de
+                            # 2 días, nunca el día actual). La deduplicación (ver filtrar_nuevos) se
+                            # encarga de volver a notificar un evento cuando pasa de "pasado mañana" a
+                            # "mañana", en vez de bloquearlo por haber sido visto antes con la misma fecha.
 
 
 def is_cloud() -> bool:
@@ -178,6 +180,7 @@ def evaluar_sector(nombre: str, daily: dict) -> list:
                 eventos.append({
                     "sector": nombre, "fecha": fecha, "tipo": tipo,
                     "label": u["label"], "valor": valor, "unidad": u["unidad"],
+                    "dia_indice": i,
                 })
     return eventos
 
@@ -196,16 +199,20 @@ def guardar_estado(estado: dict) -> None:
 
 
 def filtrar_nuevos(eventos: list, estado: dict):
-    """Un evento es 'nuevo' si la fecha del evento cambió respecto a la última
-    notificación registrada para ese sector+tipo (evita reenviar el mismo
-    aviso en cada corrida mientras el pronóstico no cambie)."""
+    """Un evento (sector+tipo+fecha) es 'nuevo' si nunca se notificó antes, o si
+    ahora aparece en una ventana más urgente (dia_indice menor) que la última
+    vez notificada. Así, un evento visto primero como 'pasado mañana' (índice 2)
+    se vuelve a notificar cuando pasa a ser 'mañana' (índice 1) — dando un
+    recordatorio más cercano al evento — pero no se repite dentro del mismo día
+    (misma fecha, mismo índice) entre la corrida de las 06:00 y las 14:00."""
     nuevos = []
     estado_actualizado = dict(estado)
     for ev in eventos:
-        clave = f"{_slug(ev['sector'])}_{ev['tipo']}"
-        if estado.get(clave) != ev["fecha"]:
+        clave = f"{_slug(ev['sector'])}_{ev['tipo']}_{ev['fecha']}"
+        indice_previo = estado.get(clave)
+        if indice_previo is None or ev["dia_indice"] < indice_previo:
             nuevos.append(ev)
-        estado_actualizado[clave] = ev["fecha"]
+            estado_actualizado[clave] = ev["dia_indice"]
     return nuevos, estado_actualizado
 
 
