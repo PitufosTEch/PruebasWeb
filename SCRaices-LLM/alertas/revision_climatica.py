@@ -1,10 +1,12 @@
 """
 revision_climatica.py
 ======================
-Revisa el pronóstico (3 días) de los sectores de obra en la IX Región y
+Revisa el pronóstico de los sectores de obra en la IX Región y
 zonas aledañas, y dispara un correo de alerta si detecta condiciones
 adversas (lluvia intensa, viento fuerte/huracanado, nieve, heladas/hielo,
-calor extremo o radiación UV alta) con al menos 24 h de anticipación.
+calor extremo o radiación UV alta) para el día siguiente (~24 h de
+anticipación). No avisa con 48h de antelación para evitar que el
+destinatario olvide la alerta antes de que ocurra el evento.
 
 Fuente de datos: Open-Meteo (gratis, sin API key, https://open-meteo.com).
 No existe una API pública estable de SENAPRED/DMC para alertas tempranas
@@ -80,11 +82,18 @@ UMBRALES = {
     "radiacion_uv":   {"var": "uv_index_max",         "op": ">=", "valor": 6,  "unidad": "índice UV", "label": "Radiación UV alta"},
 }
 
-DIAS_ANTICIPACION = (1, 2)  # índices del pronóstico diario: mañana y pasado mañana (>= 24h)
+DIAS_ANTICIPACION = (1,)  # índice del pronóstico diario: solo mañana (~24h) — evita avisar con 48h de
+                          # antelación, que el usuario tiende a olvidar antes de que ocurra el evento.
 
 
 def is_cloud() -> bool:
     return bool(os.environ.get("GOOGLE_REFRESH_TOKEN") or os.environ.get("GITHUB_ACTIONS"))
+
+
+def _fecha_cl(fecha_iso: str) -> str:
+    """Convierte fecha ISO (YYYY-MM-DD, formato de Open-Meteo) a DD/MM/YYYY para mostrar en el correo."""
+    anio, mes, dia = fecha_iso.split("-")
+    return f"{dia}/{mes}/{anio}"
 
 
 def _slug(nombre: str) -> str:
@@ -257,7 +266,7 @@ def _cuerpo_correo(nombre: str, eventos: list) -> str:
     bloques = []
     for sector, evs in por_sector.items():
         lineas = "\n".join(
-            f"    - {e['fecha']}: {e['label']} ({e['valor']} {e['unidad']})" for e in evs
+            f"    - {_fecha_cl(e['fecha'])}: {e['label']} ({e['valor']} {e['unidad']})" for e in evs
         )
         bloques.append(f"  {sector}:\n{lineas}")
 
@@ -305,7 +314,7 @@ def _cuerpo_correo_html(nombre: str, eventos: list, fecha_display: str) -> str:
             pills += (
                 f'<span style="display:inline-block;background:{bg};color:{color};'
                 f'border-radius:6px;padding:3px 9px;font-size:11px;font-weight:600;'
-                f'margin:3px 6px 3px 0;">{icono} {e["label"]} · {e["fecha"]} · {e["valor"]} {e["unidad"]}</span>'
+                f'margin:3px 6px 3px 0;">{icono} {e["label"]} · {_fecha_cl(e["fecha"])} · {e["valor"]} {e["unidad"]}</span>'
             )
         tarjetas_html += f"""
         <tr><td style="padding:6px 0;">
