@@ -145,6 +145,14 @@ select.v-nook { background: #c0392b !important; color: #fff !important; }
 .dias-a { color: #27ae60; }
 .dias-0 { color: #7f8c8d; }
 
+/* ── EQUIPO (read-only) ── */
+.eq-display {
+  font-size: 10.5px; color: #1a3a5c; font-weight: 600;
+  padding: 2px 4px; min-width: 100px; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.eq-nd { color: #bbb; font-weight: normal; font-style: italic; }
+
 /* ── OBSERVACIONES CELL ── */
 .obs-preview {
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
@@ -249,7 +257,7 @@ button.dbtn:hover { background: #922b21; }
 <div id="toolbar">
   <label>Buscar: <input type="text" id="searchBox" placeholder="Filtrar por obra, región o comuna…" oninput="filterTable()"></label>
   <button onclick="openSyncModal()" style="padding:5px 13px;background:#1a6b3a;color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:12px;font-weight:bold;letter-spacing:.3px">↻ Sincronizar AppSheet</button>
-  <button id="btn-sync-equipo" onclick="syncEquipoDesdeFirebase()" style="padding:5px 13px;background:#1a4b6b;color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:12px;font-weight:bold;letter-spacing:.3px">↺ Sync Equipo</button>
+  <button id="btn-sync-equipo" onclick="syncEquipoDesdeFirebase(true)" style="padding:5px 13px;background:#1a4b6b;color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:12px;font-weight:bold;letter-spacing:.3px">↺ Sync Equipo</button>
   <span id="saveStatus">Sin cambios pendientes</span>
 </div>
 
@@ -952,15 +960,11 @@ function mkRow(p) {
     <button class="obs-edit-btn" onclick="openObsModal(${id})">✎ ver / editar</button>
   </td>
 
-  <!-- Equipo -->
-  <td><input type="text" data-id="${id}" data-field="residente" value="${esc(p.residente)}"
-    placeholder="Residente…" oninput="onText(this)" style="width:104px"></td>
-  <td><input type="text" data-id="${id}" data-field="capataz1"  value="${esc(p.capataz1)}"
-    placeholder="Capataz…"  oninput="onText(this)" style="width:104px"></td>
-  <td><input type="text" data-id="${id}" data-field="capataz2"  value="${esc(p.capataz2)}"
-    placeholder="Capataz…"  oninput="onText(this)" style="width:104px"></td>
-  <td><input type="text" data-id="${id}" data-field="capataz3"  value="${esc(p.capataz3)}"
-    placeholder="Capataz…"  oninput="onText(this)" style="width:104px"></td>
+  <!-- Equipo (solo lectura — fuente: dashboard Firebase) -->
+  <td><div id="eq_residente_${id}" class="eq-display">${esc(p.residente) || '<span class="eq-nd">—</span>'}</div></td>
+  <td><div id="eq_capataz1_${id}"  class="eq-display">${esc(p.capataz1)  || '<span class="eq-nd">—</span>'}</div></td>
+  <td><div id="eq_capataz2_${id}"  class="eq-display">${esc(p.capataz2)  || '<span class="eq-nd">—</span>'}</div></td>
+  <td><div id="eq_capataz3_${id}"  class="eq-display">${esc(p.capataz3)  || '<span class="eq-nd">—</span>'}</div></td>
 
   <!-- Eliminar -->
   <td><button class="dbtn" onclick="delProj(${id})" title="Eliminar">✕</button></td>
@@ -1299,11 +1303,9 @@ const FIREBASE_OBRA_MAP = {
   "P172": "P172 - Raíces Costeras",
 };
 
-async function syncEquipoDesdeFirebase() {
+async function syncEquipoDesdeFirebase(fromButton = false) {
   const btn = document.getElementById("btn-sync-equipo");
-  const orig = btn.textContent;
-  btn.textContent = "⏳ Sincronizando...";
-  btn.disabled = true;
+  if (fromButton && btn) { btn.textContent = "⏳ Sincronizando..."; btn.disabled = true; }
   try {
     const res = await fetch(FIREBASE_PERSONAL_URL);
     if (!res.ok) throw new Error("HTTP " + res.status);
@@ -1333,14 +1335,27 @@ async function syncEquipoDesdeFirebase() {
       updated++;
     }
 
-    renderTable();
+    /* Actualizar divs de equipo en el DOM sin re-renderizar toda la tabla */
+    for (const p of projects) {
+      const nd = '<span class="eq-nd">—</span>';
+      const set = (id, val) => { const el = document.getElementById(id); if (el) el.innerHTML = val ? esc(val) : nd; };
+      set(`eq_residente_${p.id}`, p.residente);
+      set(`eq_capataz1_${p.id}`,  p.capataz1);
+      set(`eq_capataz2_${p.id}`,  p.capataz2);
+      set(`eq_capataz3_${p.id}`,  p.capataz3);
+    }
+
     scheduleSave();
-    btn.textContent = `✓ ${updated} obras actualizadas`;
-    setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 3000);
+    if (fromButton && btn) {
+      btn.textContent = `✓ ${updated} obras actualizadas`;
+      setTimeout(() => { btn.textContent = "↺ Sync Equipo"; btn.disabled = false; }, 3000);
+    }
   } catch(e) {
-    btn.textContent = "✗ Error: " + e.message;
     console.error("syncEquipo:", e);
-    setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 4000);
+    if (fromButton && btn) {
+      btn.textContent = "✗ Error: " + e.message;
+      setTimeout(() => { btn.textContent = "↺ Sync Equipo"; btn.disabled = false; }, 4000);
+    }
   }
 }
 
@@ -1595,6 +1610,7 @@ async function loadData() {
   _id = Math.max(_id, ...projects.map(p => p.id + 1), 1);
   renderAll();
   if (fromFirebase) st.textContent = "Datos cargados desde Firebase · " + new Date().toLocaleTimeString("es-CL");
+  syncEquipoDesdeFirebase(); // auto-sync equipo desde dashboard en cada carga
 }
 
 /* ════════════════════════════════════════════════
