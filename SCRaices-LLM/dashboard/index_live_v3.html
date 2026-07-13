@@ -4492,9 +4492,228 @@ ${comentariosHtml}`;
         return `<div style="margin-top:24px;page-break-inside:avoid;"><div style="background:#1e293b;border-radius:8px 8px 0 0;padding:10px 16px;"><div style="font-size:12px;font-weight:700;color:#f1f5f9;">${titulo}</div><div style="font-size:11px;color:#94a3b8;margin-top:2px;">Período: ${nombreMes} · ${bens.length} beneficiario(s) con despacho planificado</div></div><div style="overflow-x:auto;border:1px solid #e2e8f0;border-radius:0 0 8px 8px;"><table style="border-collapse:collapse;width:100%;"><thead><tr><th style="padding:7px 12px;background:#334155;color:#cbd5e1;font-size:10px;text-align:left;min-width:160px;">Beneficiario</th>${colCapTh}<th style="padding:7px 8px;background:#334155;color:#cbd5e1;font-size:10px;text-align:left;">Etapas a despachar</th></tr></thead><tbody>${filas}</tbody></table><div style="padding:8px 12px;background:#f8fafc;border-top:1px solid #e2e8f0;font-size:10px;color:#6b7280;display:flex;gap:12px;flex-wrap:wrap;"><span><span style="background:#ccfbf1;color:#0f766e;border-radius:3px;padding:1px 5px;font-weight:600;">[SOL]</span> Solicitud confirmada</span><span><span style="background:#fef3c7;color:#92400e;border-radius:3px;padding:1px 5px;font-weight:600;">[MC]</span> Proyección Monte Carlo</span></div></div></div>`;
     };
 
-    // Reporte residente — sección "Programa" con fechas del Gantt, descarga HTML
+    // ── CSS + JS compartido para informes HTML navegables (residente / capataz) ──────────────
+    const _CSS_INF = `<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f4f8;color:#1a1a2e;font-size:14px;}
+.cnt{max-width:1080px;margin:0 auto;padding:0 0 40px;}
+.hdr{background:#0f172a;color:#fff;padding:14px 24px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100;flex-wrap:wrap;}
+.hdr h1{font-size:15px;font-weight:700;line-height:1.3;flex:1 1 auto;}
+.hdr-sub{font-size:11px;color:#94a3b8;white-space:nowrap;}
+.tabs{background:#1e293b;display:flex;padding:0 24px;gap:2px;position:sticky;top:53px;z-index:99;overflow-x:auto;}
+.tab-btn{background:none;border:none;color:#94a3b8;font-size:12px;font-weight:600;padding:11px 16px;cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;}
+.tab-btn.active{color:#fff;border-bottom-color:#3b82f6;}
+.tab-btn:hover:not(.active){color:#e2e8f0;}
+.sec{display:none;}.sec.active{display:block;}
+.blk{background:#fff;margin:12px;border-radius:10px;padding:20px 24px;border:1px solid #e2e8f0;}
+.ftr{background:#f8fafc;border-top:1px solid #e2e8f0;padding:12px 24px;display:flex;gap:8px;justify-content:flex-end;align-items:center;flex-wrap:wrap;}
+.btn{padding:8px 14px;border:1px solid #d1d5db;border-radius:6px;background:#fff;cursor:pointer;font-size:12px;font-weight:600;color:#374151;}
+.btn:hover{background:#f3f4f6;}
+.btn-dark{background:#0f172a;color:#fff;border-color:#0f172a;}.btn-dark:hover{background:#1e293b;}
+.sg{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:5px;margin-bottom:8px;}
+.sc{padding:3px 7px;border-radius:5px;border:1px solid #e2e8f0;background:#f8fafc;display:flex;align-items:baseline;gap:5px;overflow:hidden;}
+.scl{font-size:9px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;flex-shrink:0;}
+.scv{font-size:11px;font-weight:700;color:#0f172a;font-family:monospace;}
+.scd{font-size:9px;color:#94a3b8;}
+.cg{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-top:12px;}
+.cc{border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;}
+.ch{background:#f8fafc;padding:10px 12px;font-size:11px;font-weight:600;color:#475569;border-bottom:1px solid #e2e8f0;}
+.tc{overflow:auto;max-height:520px;margin-top:12px;border:1px solid #e2e8f0;border-radius:6px;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+table thead{background:#f8fafc;}
+table th{padding:9px 11px;text-align:left;font-weight:700;color:#475569;border-bottom:2px solid #e2e8f0;position:sticky;top:0;background:#f8fafc;z-index:2;font-size:10px;text-transform:uppercase;}
+table td{padding:8px 11px;border-bottom:1px solid #f1f5f9;color:#334155;}
+table tr:hover td{background:#f8fafc;}
+table th:first-child,table td:first-child{position:sticky;left:0;background:white;z-index:1;border-right:1px solid #e2e8f0;min-width:160px;}
+table th:first-child{background:#f8fafc;z-index:3;}
+table tr:hover td:first-child{background:#f8fafc;}
+h3.sh{font-size:13px;color:#333;margin:18px 0 9px;display:flex;align-items:center;gap:8px;}
+h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
+@media (max-width:768px){.tabs{padding:0 8px;}.tab-btn{font-size:11px;padding:9px 10px;flex:1 1 auto;text-align:center;min-width:0;}.blk{margin:8px;padding:14px 12px;}.sg{grid-template-columns:1fr 1fr;}}
+@media print{.ftr{display:none;}.tabs{display:none;}.sec{display:block!important;}.blk{page-break-after:always;border:none;border-radius:0;margin:0;}}
+</style>`;
+    const _JS_INF = '<scr'+'ipt>function mst(t,b){document.querySelectorAll(\'.sec\').forEach(s=>s.classList.remove(\'active\'));document.querySelectorAll(\'.tab-btn\').forEach(x=>x.classList.remove(\'active\'));document.getElementById(\'s-\'+t).classList.add(\'active\');b.classList.add(\'active\');}</scr'+'ipt>';
+
+    // ── Construye las 6 secciones de tabs para residente o capataz ────────────────────────────
+    const _buildSecciones = (vivs, grps, curvasFiltro, capatazDesp, ganttRaw, despachosData) => {
+        const hoy = new Date();
+        const esc = escapeHtmlBasic;
+        const fF = (iso) => { if (!iso) return '—'; const p = String(iso).substring(0,10).split('-'); return p.length===3 ? `${p[2]}/${p[1]}/${p[0]}` : String(iso); };
+        const ck = (ok) => ok ? `<span style="color:#16a34a;font-weight:700;">✓</span>` : `<span style="color:#e5e7eb;">—</span>`;
+        const tot = vivs.length;
+
+        // ── RESUMEN ────────────────────────────────────────────────────────────────────────────
+        const avPct = tot ? Math.round(vivs.reduce((s,v) => s+(v.pctTotal||0),0)/tot) : 0;
+        const conInsp = vivs.filter(v => v.pctTotal != null).length;
+        const terminadas = vivs.filter(v => !!v.fecha_recepcion || !!(cierresForzados[v.ID_Benef])).length;
+        const criticos = vivs.filter(v => v.estadoGeneral === 'critico').length;
+        const _ag = avanceGanttData[proyectoSel] || null;
+        const agPct = _ag ? _ag.pct : null;
+        const agC = agPct == null ? '#94a3b8' : agPct>=80 ? '#16a34a' : agPct>=50 ? '#2563eb' : '#dc2626';
+        const avC = avPct>=80 ? '#16a34a' : avPct>=50 ? '#2563eb' : '#dc2626';
+
+        let sR = `<div class="blk"><div class="sg" style="grid-template-columns:repeat(auto-fit,minmax(110px,1fr));margin-bottom:14px;">
+<div class="sc" style="border-left:3px solid ${agC};"><div class="scl">Avance Real (Gantt)</div><div class="scv" style="color:${agC};">${agPct!=null?agPct+'%':'—'}</div><div class="scd">${_ag?_ag.n+'/'+_ag.total+' benef.':'Sin datos'}</div></div>
+<div class="sc" style="border-left:3px solid ${avC};"><div class="scl">Avance Insp.</div><div class="scv" style="color:${avC};">${avPct}%</div><div class="scd">${conInsp}/${tot} inspeccionadas</div></div>
+<div class="sc"><div class="scl">Viviendas</div><div class="scv">${tot}</div><div class="scd">Beneficiarios</div></div>
+<div class="sc" style="border-left:3px solid #16a34a;"><div class="scl">Terminadas</div><div class="scv" style="color:#16a34a;">${terminadas}</div><div class="scd">RF + cierre forzado</div></div>
+<div class="sc" style="border-left:3px solid ${criticos>0?'#dc2626':'#94a3b8'};"><div class="scl">Críticas</div><div class="scv" style="color:${criticos>0?'#dc2626':'#6b7280'};">${criticos}</div><div class="scd">Estado crítico</div></div>
+</div>`;
+
+        if (proy && proy.fecha_inicio && proy.duracion && !capatazDesp) {
+            const cIni=proy.fecha_inicio,cDur=proy.duracion;
+            const cFin=(()=>{const d=new Date(cIni);d.setDate(d.getDate()+cDur);return d.toISOString().substring(0,10);})();
+            const cDR=Math.floor((new Date(cFin)-hoy)/86400000);
+            const cEst=cDR<0?`Vencido (${Math.abs(cDR)}d)`:`${cDR}d restantes`;
+            const cC=cDR<0?'#dc2626':cDR<30?'#b45309':'#16a34a';
+            const cP=Math.min(100,Math.round((cDur-Math.max(0,cDR))/cDur*100));
+            const cB=cP>=100?'#ef4444':cP>=80?'#f59e0b':cP>=50?'#3b82f6':'#22c55e';
+            sR += `<h3 class="sh">📄 Contrato</h3>
+<div class="sg" style="grid-template-columns:repeat(4,1fr);">
+<div class="sc"><div class="scl">Inicio</div><div style="font-size:11px;font-weight:700;">${fF(cIni)}</div></div>
+<div class="sc"><div class="scl">Plazo</div><div style="font-size:11px;font-weight:700;">${cDur} días</div></div>
+<div class="sc"><div class="scl">Término</div><div style="font-size:11px;font-weight:700;">${fF(cFin)}</div></div>
+<div class="sc"><div class="scl">Estado</div><div style="font-size:11px;font-weight:700;color:${cC};">${cEst}</div></div>
+</div>
+<div style="display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;margin:6px 0 3px;"><span>${fF(cIni)}</span><span style="font-weight:600;">${cP}% transcurrido</span><span>${fF(cFin)}</span></div>
+<div style="height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden;margin-bottom:12px;"><div style="height:100%;width:${cP}%;background:${cB};border-radius:6px;"></div></div>`;
+        }
+
+        const pg = ganttRaw[proyectoSel] || null;
+        if (pg && pg.inicio && pg.finProg) {
+            const dR=Math.floor((new Date(pg.finProg)-hoy)/86400000);
+            const pgE=dR<0?`Vencido (${Math.abs(dR)}d)`:`${dR}d restantes`;
+            const pgC=dR<0?'#dc2626':dR<30?'#b45309':'#16a34a';
+            const pgP=pg.plazo>0?Math.min(100,Math.round((pg.plazo-Math.max(0,dR))/pg.plazo*100)):0;
+            const pgB=pgP>=100?'#ef4444':pgP>=80?'#f59e0b':pgP>=50?'#3b82f6':'#22c55e';
+            sR += `<h3 class="sh">📋 Programa de Obra</h3>
+<div class="sg" style="grid-template-columns:repeat(4,1fr);">
+<div class="sc"><div class="scl">Inicio</div><div style="font-size:11px;font-weight:700;">${fF(pg.inicio)}</div></div>
+<div class="sc"><div class="scl">Plazo</div><div style="font-size:11px;font-weight:700;">${pg.plazo} días</div></div>
+<div class="sc"><div class="scl">Término</div><div style="font-size:11px;font-weight:700;">${fF(pg.finProg)}</div></div>
+<div class="sc"><div class="scl">Estado</div><div style="font-size:11px;font-weight:700;color:${pgC};">${pgE}</div></div>
+</div>
+<div style="display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;margin:6px 0 3px;"><span>${fF(pg.inicio)}</span><span style="font-weight:600;">${pgP}% transcurrido</span><span>${fF(pg.finProg)}</span></div>
+<div style="height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden;margin-bottom:12px;"><div style="height:100%;width:${pgP}%;background:${pgB};border-radius:6px;"></div></div>`;
+        } else {
+            sR += `<h3 class="sh">📋 Programa de Obra</h3><p style="color:#94a3b8;font-size:12px;padding:6px 0 12px;">Sin datos de programa disponibles.</p>`;
+        }
+
+        sR += `<h3 class="sh">📊 Resumen por Grupo</h3>
+<div class="tc"><table><thead><tr><th>Grupo</th><th>Capataz</th><th style="text-align:center;">Viv.</th><th style="text-align:center;">Avance</th><th style="text-align:center;">Terminadas</th><th style="text-align:center;">Críticas</th></tr></thead><tbody>`;
+        grps.forEach(g => {
+            if (g.viviendas.length === 0) return;
+            const res=grupoResumen(g.viviendas,cierresForzados);
+            const aC=res.avanceInsp>=80?'#16a34a':res.avanceInsp>=50?'#2563eb':'#dc2626';
+            sR += `<tr><td style="font-weight:600;">${esc(g.nombre||'Sin Asignar')}</td><td>${esc(g.capataz||'—')}</td><td style="text-align:center;">${res.n}</td><td style="text-align:center;font-weight:700;color:${aC};">${res.avanceInsp}%</td><td style="text-align:center;color:#16a34a;">${res.terminadas}</td><td style="text-align:center;color:${res.criticas>0?'#dc2626':'#6b7280'};font-weight:${res.criticas>0?700:400};">${res.criticas}</td></tr>`;
+        });
+        sR += `</tbody></table></div></div>`;
+
+        // ── CHECKPOINTS ───────────────────────────────────────────────────────────────────────
+        const CP_OBR = CHECKPOINTS.filter(cp => !['V.AS','V.F1','F.V.DOM','F.Recep'].includes(cp.label));
+        let sCk = `<div class="blk"><div class="sg" style="grid-template-columns:repeat(${CP_OBR.length},1fr);margin-bottom:20px;">`;
+        CP_OBR.forEach(cp => {
+            const n=vivs.filter(v=>v.flags&&v.flags[cp.key]).length;
+            const pct=tot?Math.round(n/tot*100):0;
+            const col=n===tot?'#16a34a':n>0?'#2563eb':'#6b7280';
+            sCk += `<div class="sc" style="flex-direction:column;align-items:center;text-align:center;padding:4px;"><div class="scl" style="margin-bottom:2px;">${cp.label}</div><div style="font-size:11px;font-weight:700;color:${col};">${n}<span style="font-size:9px;font-weight:400;color:#94a3b8;"> / ${tot}</span></div><div style="font-size:9px;color:#94a3b8;">${pct}%</div></div>`;
+        });
+        sCk += `</div><div class="tc"><table style="table-layout:fixed;width:100%;"><colgroup><col style="width:26%">${CP_OBR.map(()=>'<col>').join('')}<col></colgroup>
+<thead><tr><th>Beneficiario</th>${CP_OBR.map(cp=>`<th style="text-align:center;">${cp.label}</th>`).join('')}<th style="text-align:center;">Recep.</th></tr></thead><tbody>`;
+        vivs.forEach(v => {
+            const p=v.pctTotal,pT=p!=null?`${p}%`:'—';
+            const pC=p==null?'#94a3b8':p>=80?'#16a34a':p>=50?'#2563eb':'#dc2626';
+            const rfOk=!!v.fecha_recepcion||!!(cierresForzados[v.ID_Benef]);
+            const nm=esc((v.NOMBRES||'')+' '+(v.APELLIDOS||''));
+            sCk += `<tr${rfOk?' style="background:#f0fdf4;"':''}><td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${nm}">${nm} <span style="font-size:10px;font-weight:700;color:${pC};">${pT}</span></td>${CP_OBR.map(cp=>`<td style="text-align:center;">${ck(v.flags&&v.flags[cp.key])}</td>`).join('')}<td style="text-align:center;">${ck(rfOk)}</td></tr>`;
+        });
+        sCk += `</tbody></table></div></div>`;
+
+        // ── CURVAS S ──────────────────────────────────────────────────────────────────────────
+        let sCurv = `<div class="blk"><div class="cg">`;
+        if (curvasFiltro.length > 0) {
+            curvasFiltro.forEach(c => { sCurv += `<div class="cc"><div class="ch">${esc(c.label)}</div><img src="https://drive.google.com/thumbnail?id=${c.id}&sz=w800" style="width:100%;display:block;" alt="${esc(c.label)}" loading="lazy"/></div>`; });
+        } else {
+            sCurv += `<div style="color:#94a3b8;font-size:13px;padding:32px;text-align:center;grid-column:1/-1;">Sin curvas S configuradas para este proyecto.</div>`;
+        }
+        sCurv += `</div></div>`;
+
+        // ── RITMOS Y COMENTARIOS ──────────────────────────────────────────────────────────────
+        const fMR = (ym) => { if(!ym||ym.length<7)return ym; const [y,m]=ym.split('-'); const ms=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']; return `${ms[parseInt(m,10)-1]}'${y.slice(2)}`; };
+        const fCR = (n) => n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(0)+'k':String(n);
+        const bMO={}; vivs.forEach(v=>(v.pagosBenef||[]).forEach(p=>{if(!p.fecha)return;const mm=p.fecha.match(/^(\d{4})-(\d{2})-(\d{2})/);if(!mm)return;let yr=parseInt(mm[1]),mo=parseInt(mm[2]),dy=parseInt(mm[3]);if(dy>=25){mo++;if(mo>12){mo=1;yr++;}}const ym=`${yr}-${String(mo).padStart(2,'0')}`;bMO[ym]=(bMO[ym]||0)+p.monto;}));
+        const oMO=Object.keys(bMO).sort().slice(-12);
+        const bD={}; vivs.forEach(v=>DESPACHOS_DATA.filter(x=>String(x.ID_Benef)===String(v.ID_Benef)).forEach(x=>{if(!x.Fecha)return;const ym=x.Fecha.substring(0,7);bD[ym]=(bD[ym]||0)+1;}));
+        const oD=Object.keys(bD).sort().slice(-12);
+        const svgMO=svgLineChartString({meses:oMO,valores:oMO.map(k=>bMO[k]),color:'#7c3aed',fillColor:'rgba(124,58,237,0.10)',fmtMes:fMR,fmtV:fCR});
+        const svgD=svgLineChartString({meses:oD,valores:oD.map(k=>bD[k]),color:'#10b981',fillColor:'rgba(16,185,129,0.10)',fmtMes:fMR,fmtV:(v)=>String(v)});
+        let sRit=`<div class="blk"><div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+<div><div style="font-size:12px;font-weight:600;color:#333;margin-bottom:8px;">Ritmo Mano de Obra (ciclo 25-25)</div>${svgMO}</div>
+<div><div style="font-size:12px;font-weight:600;color:#333;margin-bottom:8px;">Ritmo Despachos (por mes)</div>${svgD}</div>
+</div><h3 class="sh">⭐ Comentarios Destacados</h3>`;
+        let comH='';
+        grps.forEach(g=>{if(g.viviendas.length===0)return;const items=[];if(g.comentario)items.push(`<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;margin-bottom:6px;"><span style="font-size:9px;font-weight:700;text-transform:uppercase;color:#b45309;">Nota del coordinador</span><div style="margin-top:2px;font-style:italic;font-size:12px;color:#374151;">${esc(g.comentario)}</div></div>`);g.viviendas.forEach(v=>(v.obsPublicas||[]).forEach(o=>{const fch=(o.fecha||'').toString().substring(0,10);items.push(`<div style="padding:6px 12px;margin-bottom:5px;font-size:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;"><span style="font-weight:600;color:#1a1a2e;">${esc((v.NOMBRES||'')+' '+(v.APELLIDOS||''))}</span> <span style="font-size:10px;color:#94a3b8;">${fch}</span><div style="color:#374151;margin-top:1px;">${esc(o.texto||'')}</div></div>`);}));if(items.length)comH+=`<div style="margin-bottom:14px;"><div style="font-size:13px;font-weight:700;color:#1a1a2e;margin-bottom:6px;">${esc(g.nombre||'Sin Asignar')}</div>${items.join('')}</div>`;});
+        sRit += (comH || `<div style="color:#94a3b8;font-size:12px;padding:16px;text-align:center;border:1px dashed #e2e8f0;border-radius:8px;">Sin comentarios destacados.</div>`) + `</div>`;
+
+        // ── VIVIENDAS ─────────────────────────────────────────────────────────────────────────
+        let sViv=`<div class="blk">`;
+        grps.forEach(g=>{if(g.viviendas.length===0)return;sViv+=`<div style="margin-bottom:24px;"><div style="font-size:12px;font-weight:700;color:#1a1a2e;background:#f1f5f9;border:1px solid #e2e8f0;padding:7px 12px;border-radius:7px;margin-bottom:8px;">${esc(g.nombre||'Sin Asignar')}${g.capataz?` · <span style="font-weight:400;color:#64748b;">Capataz: ${esc(g.capataz)}</span>`:''} <span style="font-weight:400;color:#94a3b8;">(${g.viviendas.length} viv.)</span></div>
+<div class="tc"><table style="table-layout:fixed;width:100%;"><colgroup><col style="width:28%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:9%"></colgroup>
+<thead><tr><th>Beneficiario</th><th>Avance</th><th style="text-align:center;">HPC</th><th style="text-align:center;">TE1</th><th style="text-align:center;">R.AS</th><th style="text-align:center;">F1</th><th style="text-align:center;">Artef.</th><th style="text-align:center;">Empalme</th><th style="text-align:center;">Recep.</th></tr></thead><tbody>`;
+            g.viviendas.forEach(v=>{const p=v.pctTotal,pT=p!=null?`${p}%`:'—',pC=p==null?'#94a3b8':p>=80?'#16a34a':p>=50?'#2563eb':'#dc2626';const fl=v.flags||{};const rfOk=!!v.fecha_recepcion||!!(cierresForzados[v.ID_Benef]);const nm=esc((v.NOMBRES||'')+' '+(v.APELLIDOS||''));sViv+=`<tr${rfOk?' style="background:#f0fdf4;"':''}><td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${nm}">${nm}</td><td style="font-weight:700;color:${pC};">${pT}</td><td style="text-align:center;">${ck(fl.hpc)}</td><td style="text-align:center;">${ck(fl.te1)}</td><td style="text-align:center;">${ck(fl.resol_as)}</td><td style="text-align:center;">${ck(fl.fecha_f1)}</td><td style="text-align:center;">${ck(fl.artefactado)}</td><td style="text-align:center;">${ck(fl.empalme)}</td><td style="text-align:center;">${ck(rfOk)}</td></tr>`;});
+            sViv+=`</tbody></table></div></div>`;});
+        sViv+=`</div>`;
+
+        // ── DESPACHOS ─────────────────────────────────────────────────────────────────────────
+        let sDesp=`<div class="blk">`;
+        if(despachosData&&despachosData.beneficiarios&&despachosData.beneficiarios.length){
+            sDesp+=_generarSeccionDespachos(despachosData,capatazDesp)||`<p style="color:#94a3b8;text-align:center;padding:32px;">Sin despachos para este filtro.</p>`;
+        } else {
+            sDesp+=`<p style="color:#94a3b8;font-size:13px;text-align:center;padding:48px;">Sin datos de despachos disponibles para este proyecto.</p>`;
+        }
+        sDesp+=`</div>`;
+
+        return {sR, sCk, sCurv, sRit, sViv, sDesp};
+    };
+
+    // ── Ensambla HTML completo y dispara descarga + nueva pestaña ─────────────────────────────
+    const _emitirInformeHTML = (titulo, subtitulo, semana, fechaGen, secs) => {
+        const TABS=[['resumen','Resumen'],['checkpoints','Checkpoints'],['curvas','Curvas S'],['ritmos','Ritmos y comentarios'],['viviendas','Viviendas'],['despachos','Despachos']];
+        const tabsHtml=TABS.map(([k,l],i)=>`<button class="tab-btn${i===0?' active':''}" onclick="mst('${k}',this)">${l}</button>`).join('');
+        const secsHtml=TABS.map(([k],i)=>`<div class="sec${i===0?' active':''}" id="s-${k}">${secs[i]}</div>`).join('');
+        const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>${titulo} — Sem ${semana}</title>${_CSS_INF}</head><body>
+<div class="cnt">
+  <div class="hdr"><span style="font-size:20px;">🏗️</span><h1>${titulo}</h1><span class="hdr-sub">${subtitulo}</span></div>
+  <div class="tabs">${tabsHtml}</div>
+  <div class="content">${secsHtml}</div>
+  <div class="ftr"><span style="font-size:11px;color:#94a3b8;">Generado: ${fechaGen}</span><button class="btn btn-dark" onclick="window.print();">🖨️ Imprimir / PDF</button></div>
+</div>${_JS_INF}</body></html>`;
+        return html;
+    };
+
+    // ── Reporte residente HTML ─────────────────────────────────────────────────────────────────
     const generarInformeResidenteHTML = async () => {
-        const inf = construirInforme();
+        const hoy = new Date();
+        const sem = Math.ceil(((hoy - new Date(hoy.getFullYear(),0,1))/86400000 + new Date(hoy.getFullYear(),0,1).getDay()+1)/7);
+        const fechaGen = hoy.toLocaleString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+        const proyNombre = proy ? `${proy.ID_proy} · ${proy.NOMBRE_PROYECTO}` : proyectoSel;
+        let ganttRaw={}, despachosData=null;
+        try {
+            const [rG,rD]=await Promise.all([fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/gantt_programa.json'),fetch(`https://scraices-dashboard-default-rtdb.firebaseio.com/despachos_data/${proyectoSel}.json`)]);
+            ganttRaw=(await rG.json())||{}; despachosData=await rD.json();
+        } catch(_e){}
+        const gruposData = agruparViviendas(datos, grupos);
+        const curvas = CURVAS_S_CONFIG[proyectoSel] || [];
+        const secs = _buildSecciones(datos, gruposData, curvas, null, ganttRaw, despachosData);
+        const html = _emitirInformeHTML(`Reporte Residente — ${proyNombre}`, `Semana ${sem} · ${fechaGen}`, sem, fechaGen, [secs.sR,secs.sCk,secs.sCurv,secs.sRit,secs.sViv,secs.sDesp]);
+        const _fn=`Reporte_Residente_${proyectoSel}_Sem${sem}.html`;
+        const _bl=new Blob([html],{type:'text/html;charset=utf-8'}); const _ul=URL.createObjectURL(_bl);
+        const _a=document.createElement('a'); _a.href=_ul; _a.download=_fn;
+        document.body.appendChild(_a); _a.click(); _a.remove();
+        const _w=window.open(_ul,'_blank'); if(!_w)alert('Archivo descargado: '+_fn+'. Permite ventanas emergentes para verlo.');
+        setTimeout(()=>URL.revokeObjectURL(_ul),60000);
+    };
         const fmtFechaInf = (iso) => { if (!iso) return '—'; const p = String(iso).substring(0, 10).split('-'); return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : String(iso); };
         const tituloInforme = 'Reporte Residente';
 
@@ -4641,189 +4860,36 @@ ${inf.footerHtml}
         setTimeout(() => URL.revokeObjectURL(_urlR), 60000);
     };
 
-    // Reporte filtrado por capataz: métricas, curvas S y grupos solo de ese capataz
+    // ── Reporte capataz HTML ──────────────────────────────────────────────────────────────────
     const generarReporteCapataz = async (capatazFiltro) => {
-        const inf = construirInforme();
-
-        // Firebase gantt (igual que Obra)
-        const fmtFechaInf = (iso) => { if (!iso) return '—'; const p = String(iso).substring(0,10).split('-'); return p.length===3 ? `${p[2]}/${p[1]}/${p[0]}` : String(iso); };
-        let _ganttRaw = {};
-        try { const _r = await fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/gantt_programa.json'); _ganttRaw = (await _r.json()) || {}; } catch(_e) {}
-
-        let programaCard;
-        const pgData = _ganttRaw[proyectoSel] || null;
-        if (pgData && pgData.inicio && pgData.finProg) {
-            const inicioG = pgData.inicio, terminoG = pgData.finProg, plazoG = pgData.plazo;
-            const diasR = Math.floor((new Date(terminoG) - new Date()) / 86400000);
-            const estadoTxt = diasR < 0 ? `Vencido (${Math.abs(diasR)}d)` : `${diasR}d restantes`;
-            const estadoCol = diasR < 0 ? '#dc2626' : diasR < 30 ? '#b45309' : '#16a34a';
-            const pctTr = plazoG > 0 ? Math.min(100, Math.max(0, Math.round((plazoG - Math.max(0,diasR)) / plazoG * 100))) : 0;
-            const pct90 = plazoG > 90 ? Math.round((plazoG-90)/plazoG*100) : null;
-            const barCol = pctTr >= 100 ? '#ef4444' : pctTr >= 80 ? '#f59e0b' : pctTr >= 50 ? '#3b82f6' : '#22c55e';
-            programaCard = `<div class="rc-card"><div class="rc-h">Programa</div><div class="rc-grid4"><div><div class="rc-l">Inicio</div><div class="rc-v">${fmtFechaInf(inicioG)}</div></div><div><div class="rc-l">Plazo</div><div class="rc-v">${plazoG} días</div></div><div><div class="rc-l">Vencimiento</div><div class="rc-v">${fmtFechaInf(terminoG)}</div></div><div><div class="rc-l">Estado</div><div class="rc-v" style="color:${estadoCol};">${estadoTxt}</div></div></div><div style="margin-top:10px;"><div style="display:flex;justify-content:space-between;font-size:9px;color:#94a3b8;margin-bottom:3px;"><span>${fmtFechaInf(inicioG)}</span><span style="font-weight:600;">${plazoG-Math.max(0,diasR)}d / ${plazoG}d (${pctTr}%)</span><span>${fmtFechaInf(terminoG)}</span></div><div style="position:relative;height:10px;background:#e5e7eb;border-radius:6px;overflow:hidden;"><div style="height:100%;width:${Math.min(pctTr,100)}%;background:${barCol};border-radius:6px;"></div>${pct90!==null?`<div style="position:absolute;top:0;bottom:0;left:${pct90}%;width:2px;background:#dc2626;"></div>`:''}</div>${pct90!==null?`<div style="font-size:8px;color:#ef4444;text-align:right;margin-top:1px;">&#9660; 90d (fase cierre)</div>`:''}</div></div>`;
-        } else {
-            programaCard = `<div class="rc-card"><div class="rc-h">Programa</div><div style="color:#94a3b8;font-size:11px;padding:8px 0;">Sin datos de programa.</div></div>`;
-        }
-
-        // Filtrar grupos del capataz
-        const gruposCapataz = inf.gruposData.filter(g => g.capataz === capatazFiltro && g.viviendas.length > 0);
-        const vivCap = gruposCapataz.flatMap(g => g.viviendas);
-        if (vivCap.length === 0) { alert(`Sin viviendas para: ${capatazFiltro}`); return; }
-
-        // Métricas filtradas
-        const avanceReal = Math.round(vivCap.reduce((s,v) => s + (v.pctTotal || 0), 0) / vivCap.length);
-        const conInsp = vivCap.filter(v => v.pctTotal != null).length;
-        const terminadas = vivCap.filter(v => !!v.fecha_recepcion).length;
-        const criticos = vivCap.filter(v => v.estadoGeneral === 'critico').length;
-        const avColor = avanceReal >= 80 ? '#16a34a' : avanceReal >= 50 ? '#2563eb' : '#dc2626';
-        const _agCap  = avanceGanttData[proyectoSel] || null;
-        const agPctCap = _agCap ? _agCap.pct : null;
-        const agColCap = agPctCap == null ? '#94a3b8' : agPctCap >= 80 ? '#16a34a' : agPctCap >= 50 ? '#2563eb' : '#dc2626';
-
-        // Checkpoints (excluir mismos 4 que en Obra)
-        const CP_EXCL = ['V.AS', 'V.F1', 'F.V.DOM', 'F.Recep'];
-        const CP_TOTAL = CHECKPOINTS.length - CP_EXCL.length; // 8
-        const cpKpisHtml = CHECKPOINTS.filter(cp => !CP_EXCL.includes(cp.label)).map(cp => {
-            const n = vivCap.filter(v => v.flags && v.flags[cp.key]).length;
-            const tot = vivCap.length;
-            const pct = tot ? Math.round(n/tot*100) : 0;
-            const col = pct>=80?'#16a34a':pct>=40?'#b45309':'#64748b';
-            const bg  = pct>=80?'#f0fdf4':pct>=40?'#fffbeb':'#f8fafc';
-            const bd  = pct>=80?'#bbf7d0':pct>=40?'#fde68a':'#e2e8f0';
-            return `<div style="border:1px solid ${bd};border-radius:8px;padding:7px 3px;text-align:center;background:${bg};"><div style="font-size:8.5px;font-weight:600;color:#64748b;">${escapeHtmlBasic(cp.label)}</div><div style="font-size:17px;font-weight:700;color:${col};line-height:1.1;">${n}</div><div style="font-size:8.5px;color:#94a3b8;">/ ${tot}</div></div>`;
-        }).join('');
-
-        // Ritmo M.O. filtrado al capataz
-        const _bMO = {};
-        vivCap.forEach(v => (v.pagosBenef||[]).forEach(p => {
-            if (!p.fecha) return;
-            const m = p.fecha.match(/^(\d{4})-(\d{2})-(\d{2})/); if (!m) return;
-            let y=parseInt(m[1]), mo=parseInt(m[2]), d=parseInt(m[3]);
-            if (d>=25) { mo++; if (mo>12){mo=1;y++;} }
-            const ym=`${y}-${String(mo).padStart(2,'0')}`;
-            _bMO[ym]=(_bMO[ym]||0)+p.monto;
-        }));
-        const _oMO = Object.keys(_bMO).sort().slice(-12);
-        const chartMO = svgLineChartString({ meses:_oMO, valores:_oMO.map(k=>_bMO[k]), color:'#7c3aed', fillColor:'rgba(124,58,237,0.10)', fmtMes, fmtV:(v)=>fmtCorto(v) });
-
-        // Ritmo Despachos filtrado al capataz
-        const _bD = {};
-        vivCap.forEach(v => DESPACHOS_DATA.filter(x=>String(x.ID_Benef)===String(v.ID_Benef)).forEach(x => {
-            if (!x.Fecha) return;
-            const ym=x.Fecha.substring(0,7);
-            _bD[ym]=(_bD[ym]||0)+1;
-        }));
-        const _oD = Object.keys(_bD).sort().slice(-12);
-        const chartDesp = svgLineChartString({ meses:_oD, valores:_oD.map(k=>_bD[k]), color:'#10b981', fillColor:'rgba(16,185,129,0.10)', fmtMes, fmtV:(v)=>String(v) });
-
-        // Curvas S — solo grupos del capataz (excluye "Total Proyecto" y "Todos los Grupos")
-        const grupoNums = new Set(gruposCapataz.map(g => { const mm=(g.nombre||'').match(/[Gg]rupo\s+(?:N[°o]?\s*)?(\d+)/); return mm?parseInt(mm[1]):null; }).filter(n=>n!==null));
-        const curvasFull = CURVAS_S_CONFIG[proyectoSel] || [];
-        const curvasCapataz = curvasFull.filter(c => { const mm=c.label.match(/[Gg]rupo\s+(\d+)/); return mm ? grupoNums.has(parseInt(mm[1])) : false; });
-        const curvasHtml = curvasCapataz.length > 0
-            ? curvasCapataz.map(c => `<div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;break-inside:avoid;"><div style="background:#f8fafc;padding:6px 12px;font-size:11px;font-weight:600;color:#475569;border-bottom:1px solid #e2e8f0;">${escapeHtmlBasic(c.label)}</div><img src="https://drive.google.com/thumbnail?id=${c.id}&sz=w800" style="width:100%;display:block;" alt="${escapeHtmlBasic(c.label)}" loading="lazy"/></div>`).join('')
-            : `<div style="color:#94a3b8;font-size:12px;padding:20px;text-align:center;border:1px dashed #e2e8f0;border-radius:8px;">Sin curvas S para este capataz.</div>`;
-
-        // Tabla resumen de grupos del capataz
-        let tablaGruposHtml = '<table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="background:#f8fafc;">'
-            + ['Grupo','Viv.','Avance Insp.','Recep.','Críticas'].map((h,i)=>`<th style="padding:7px 10px;text-align:${i===0?'left':'center'};font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:#64748b;border-bottom:1px solid #e2e8f0;">${h}</th>`).join('')
-            + '</tr></thead><tbody>';
-        gruposCapataz.forEach(g => {
-            const res = grupoResumen(g.viviendas, cierresForzados);
-            const rec = g.viviendas.filter(v => v.flags && v.flags.fecha_recep).length;
-            const avCol = res.avanceInsp>=80?'#16a34a':res.avanceInsp>=50?'#2563eb':'#dc2626';
-            tablaGruposHtml += `<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:7px 10px;font-weight:600;">${escapeHtmlBasic(g.nombre||'Sin Asignar')}</td><td style="padding:7px 10px;text-align:center;">${res.n}</td><td style="padding:7px 10px;text-align:center;font-weight:700;color:${avCol};">${res.avanceInsp}%</td><td style="padding:7px 10px;text-align:center;">${rec}/${res.n}</td><td style="padding:7px 10px;text-align:center;color:${res.criticas>0?'#dc2626':'#94a3b8'};font-weight:${res.criticas>0?'700':'400'};">${res.criticas}</td></tr>`;
-        });
-        tablaGruposHtml += '</tbody></table>';
-
-        // Portada del capataz
-        const portadaCapatazHtml = `
-<div style="display:inline-block;background:#1a1a2e;color:#fff;padding:5px 16px;font-size:11px;font-weight:700;letter-spacing:.06em;border-radius:6px;margin-bottom:12px;">CAPATAZ: ${escapeHtmlBasic(capatazFiltro)}</div>
-<div class="sec-title">Programa</div>
-<div class="resumen-cards">${programaCard}</div>
-${inf.muestrasHtml ? '<div class="sec-title">Muestras de Hormigón</div>' + inf.muestrasHtml : ''}
-<div class="sec-title">Estado del Proyecto</div>
-<div class="kpis">
-  <div class="kpi" style="border-left:3px solid ${agColCap};"><div class="kpi-v" style="color:${agColCap};">${agPctCap != null ? agPctCap + '%' : '—'}</div><div class="kpi-l">Avance Real<br><span style="font-size:8px;color:#94a3b8;">${_agCap ? _agCap.n + '/' + _agCap.total + ' benef. · Datos Control' : 'Sin datos Gantt'}</span></div></div>
-  <div class="kpi"><div class="kpi-v" style="color:${avColor};">${avanceReal}%</div><div class="kpi-l">Avance Real (Insp.)<br><span style="font-size:8px;color:#94a3b8;">${conInsp}/${vivCap.length} con insp. · sin insp = 0%</span></div></div>
-  <div class="kpi"><div class="kpi-v" style="color:#1e3a5f;">${vivCap.length}</div><div class="kpi-l">Beneficiarios</div></div>
-  <div class="kpi"><div class="kpi-v" style="color:#16a34a;">${terminadas}</div><div class="kpi-l">Terminadas</div></div>
-  <div class="kpi"><div class="kpi-v" style="color:${criticos>0?'#dc2626':'#6b7280'};">${criticos}</div><div class="kpi-l">Críticas</div></div>
-</div>
-<div class="sec-title">Checkpoints del Proyecto</div>
-<div class="cp-grid">${cpKpisHtml}</div>
-<div class="sec-title">Ritmo de Pagos M.O. y Despachos</div>
-<div class="charts-grid">
-  <div class="chart-box"><div class="ct">Ritmo Pagos M.O.</div><div class="cs">Ciclo de pago 25 a 25 &middot; solo aprobados &middot; eje autoescalado</div>${chartMO}</div>
-  <div class="chart-box"><div class="ct">Ritmo Despachos</div><div class="cs">Cantidad de despachos por mes calendario</div>${chartDesp}</div>
-</div>
-<div class="sec-title">Curvas S de Control</div>
-<div class="curvas-grid">${curvasHtml}</div>
-<div style="display:flex;gap:18px;font-size:10px;color:#94a3b8;margin-top:10px;margin-bottom:4px;">
-  <span><span style="display:inline-block;width:20px;height:3px;background:#22c55e;border-radius:2px;vertical-align:middle;margin-right:4px;"></span>% Real</span>
-  <span><span style="display:inline-block;width:20px;height:0;border-top:2px dashed #3b82f6;vertical-align:middle;margin-right:4px;"></span>% Programado</span>
-  <span><span style="display:inline-block;width:20px;height:0;border-top:2px dashed #ef4444;vertical-align:middle;margin-right:4px;opacity:.6;"></span>% Proyectado</span>
-</div>
-<div class="sec-title">Resumen por Grupo</div>
-<div class="grupos-table">${tablaGruposHtml}</div>`;
-
-        // Páginas de grupos del capataz (mismas exclusiones que Obra)
-        const gruposCapatazNombres = new Set(gruposCapataz.map(g => g.nombre || 'Sin Asignar'));
-        const CP_OBRA_TOTAL = CP_TOTAL;
-        const labelsReCap = CP_EXCL.map(l => l.replace(/\./g,'\\.')).join('|');
-        const gruposHtmlCap = inf.gruposPaginas.filter(g => gruposCapatazNombres.has(g.nombre)).map(g => {
-            let contenido = g.contenidoHtml;
-            contenido = contenido.replace(/<div class="sec-title">Comentarios Recientes por Beneficiario<\/div>[\s\S]*/, '');
-            contenido = contenido.replace(
-                /(<td style="padding:7px 10px 2px;text-align:center;color:#475569;">)(\d+)(\/12)(<\/td>[\s\S]*?<tr[^>]*><td colspan="5"[^>]*>)([\s\S]*?)(<\/td><\/tr>)/g,
-                (match, tdOpen, count, _s12, closingPart, chips, ending) => {
-                    let gr = 0;
-                    CP_EXCL.forEach(label => { const lRe=label.replace(/\./g,'\\.'); if (new RegExp('background:#dcfce7[^>]*>'+lRe+'<\\/span>').test(chips)) gr++; });
-                    const newChips = chips.replace(new RegExp('<span style="[^"]*">('+labelsReCap+')<\\/span>','g'), '');
-                    return tdOpen+(parseInt(count)-gr)+'/'+CP_OBRA_TOTAL+closingPart+newChips+ending;
-                }
-            );
-            return '<div class="grupo-page page-break">'+contenido+'</div>';
-        }).join('');
-
-        // Cargar sección despachos del período actual — filtrado por capataz (se inserta al final)
-        let _despachosCapatazHtml = '';
+        const hoy = new Date();
+        const sem = Math.ceil(((hoy - new Date(hoy.getFullYear(),0,1))/86400000 + new Date(hoy.getFullYear(),0,1).getDay()+1)/7);
+        const fechaGen = hoy.toLocaleString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+        const proyNombre = proy ? `${proy.ID_proy} · ${proy.NOMBRE_PROYECTO}` : proyectoSel;
+        let ganttRaw={}, despachosData=null;
         try {
-            const _rDespCap = await fetch(`https://scraices-dashboard-default-rtdb.firebaseio.com/despachos_data/${proyectoSel}.json`);
-            const _despDataCap = await _rDespCap.json();
-            if (_despDataCap && _despDataCap.beneficiarios && _despDataCap.beneficiarios.length) {
-                _despachosCapatazHtml = _generarSeccionDespachos(_despDataCap, capatazFiltro) || '';
-            }
-        } catch (_e) { /* sin despachos disponibles */ }
-
-        const html = `<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Reporte Capataz ${escapeHtmlBasic(capatazFiltro)} — ${inf.meta.proyNombre} — Sem ${inf.meta.semana}</title>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<style>${inf.css}</style>
-</head>
-<body>
-<button class="print-btn no-print" onclick="window.print()">Imprimir / Guardar PDF</button>
-${inf.headerHtml}
-${portadaCapatazHtml}
-${gruposHtmlCap}
-${_despachosCapatazHtml}
-${inf.footerHtml}
-</body>
-</html>`;
-        const _capSafe = capatazFiltro.replace(/[^a-zA-Z0-9À-ſ]/g, '_');
-        const _fnameCap = `Reporte_Capataz_${_capSafe}_${inf.meta.proyectoSel}_Sem${inf.meta.semana}.html`;
-        const _blobCap = new Blob([html], {type:'text/html;charset=utf-8'});
-        const _urlCap = URL.createObjectURL(_blobCap);
-        const _aCap = document.createElement('a');
-        _aCap.href = _urlCap; _aCap.download = _fnameCap;
-        document.body.appendChild(_aCap); _aCap.click(); _aCap.remove();
-        const _wCap = window.open(_urlCap, '_blank');
-        if (!_wCap) alert('Archivo descargado: ' + _fnameCap + '. Permite ventanas emergentes para verlo en una pestaña.');
-        setTimeout(() => URL.revokeObjectURL(_urlCap), 60000);
+            const [rG,rD]=await Promise.all([
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/gantt_programa.json'),
+                fetch(`https://scraices-dashboard-default-rtdb.firebaseio.com/despachos_data/${proyectoSel}.json`)
+            ]);
+            ganttRaw=(await rG.json())||{}; despachosData=await rD.json();
+        } catch(_e){}
+        const gruposData = agruparViviendas(datos, grupos);
+        const gruposCapataz = gruposData.filter(g => g.capataz === capatazFiltro && g.viviendas.length > 0);
+        const vivCapataz = gruposCapataz.flatMap(g => g.viviendas);
+        if (vivCapataz.length === 0) { alert(`Sin viviendas para: ${capatazFiltro}`); return; }
+        const grupoNums = new Set(gruposCapataz.map(g => { const mm=(g.nombre||'').match(/[Gg]rupo\s+(?:N[°o]?\s*)?(\d+)/); return mm?parseInt(mm[1]):null; }).filter(n=>n!==null));
+        const curvasAll = CURVAS_S_CONFIG[proyectoSel] || [];
+        const curvasCapataz = curvasAll.filter(c => { const mm=c.label.match(/[Gg]rupo\s+(\d+)/); return mm ? grupoNums.has(parseInt(mm[1])) : false; });
+        const secs = _buildSecciones(vivCapataz, gruposCapataz, curvasCapataz, capatazFiltro, ganttRaw, despachosData);
+        const html = _emitirInformeHTML(`Reporte Capataz: ${capatazFiltro} — ${proyNombre}`, `Semana ${sem} · ${fechaGen}`, sem, fechaGen, [secs.sR,secs.sCk,secs.sCurv,secs.sRit,secs.sViv,secs.sDesp]);
+        const _capSafe = capatazFiltro.replace(/[^a-zA-Z0-9À-ſ]/g,'_');
+        const _fn=`Reporte_Capataz_${_capSafe}_${proyectoSel}_Sem${sem}.html`;
+        const _bl=new Blob([html],{type:'text/html;charset=utf-8'}); const _ul=URL.createObjectURL(_bl);
+        const _a=document.createElement('a'); _a.href=_ul; _a.download=_fn;
+        document.body.appendChild(_a); _a.click(); _a.remove();
+        const _w=window.open(_ul,'_blank'); if(!_w)alert('Archivo descargado: '+_fn+'. Permite ventanas emergentes para verlo.');
+        setTimeout(()=>URL.revokeObjectURL(_ul),60000);
     };
 
     const generarInformeAdquisicionesHTML = async () => {
