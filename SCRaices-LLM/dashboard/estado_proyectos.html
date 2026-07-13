@@ -1,0 +1,1452 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Estado de Proyectos — Coordinación de Obras</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Arial, sans-serif; font-size: 12px; background: #ecf0f1; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+/* ── TOP BAR ── */
+#topbar {
+  background: #1a3a5c; color: #fff;
+  padding: 9px 16px; display: flex; justify-content: space-between; align-items: center;
+  flex-shrink: 0; box-shadow: 0 2px 6px rgba(0,0,0,.4); z-index: 100;
+}
+#topbar h1 { font-size: 15px; }
+#topbar .sub { font-size: 10px; color: #aac4e0; margin-top: 2px; }
+#topbar .acts { display: flex; gap: 7px; }
+
+.btn { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; font-size: 11.5px; font-weight: bold; }
+.btn:hover { opacity: .85; }
+.btn-add  { background: #27ae60; color: #fff; }
+.btn-save { background: #2980b9; color: #fff; }
+.btn-exp  { background: #8e44ad; color: #fff; }
+
+/* ── TOOLBAR ── */
+#toolbar {
+  background: #dde4ea; padding: 6px 16px;
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+  border-bottom: 1px solid #c3cdd7; flex-shrink: 0;
+}
+#toolbar label { font-size: 11px; color: #555; }
+#toolbar input[type=text] { padding: 4px 8px; border: 1px solid #bbb; border-radius: 4px; font-size: 11.5px; width: 200px; }
+#saveStatus { margin-left: auto; font-size: 10.5px; color: #777; font-style: italic; }
+
+/* ── NOTE ── */
+.note {
+  margin: 6px 12px; padding: 6px 10px; flex-shrink: 0;
+  background: #fff8e1; border-left: 4px solid #f39c12; border-radius: 3px;
+  font-size: 10.5px; color: #666; line-height: 1.5;
+}
+
+/* ── TABLE WRAP — fills remaining height, scrolls both axes ── */
+#tableWrap {
+  flex: 1; overflow: auto; padding: 0 12px 12px;
+  /* bottom scrollbar always reachable since this container has fixed height */
+}
+
+/* ── TABLE ── */
+table { border-collapse: collapse; white-space: nowrap; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.15); }
+
+/* ── STICKY HEADER ROWS ── */
+thead th {
+  padding: 5px 7px; border: 1px solid #9eaab4; color: #fff;
+  text-align: center; font-size: 10.5px; line-height: 1.3; vertical-align: middle;
+  position: sticky; z-index: 20;
+}
+/* Row 1 sticks at top=0, row 2 sticks below row 1 (~34px) */
+thead tr:first-child  th { top: 0;    font-size: 11px; font-weight: bold; }
+thead tr:nth-child(2) th { top: 34px; }
+
+/* ── STICKY FIRST COLUMN (OBRA) ── */
+/* header intersection: needs top + left both sticky */
+thead th.col-obra { left: 0; z-index: 40 !important; }
+tbody td:first-child {
+  position: sticky; left: 0; z-index: 10;
+  background: #ecf0f1; font-weight: bold; text-align: left;
+  min-width: 160px; max-width: 210px; white-space: normal;
+}
+tbody tr:nth-child(even) td:first-child { background: #dde4ea; }
+tbody tr:hover td:first-child { background: #cce2f4 !important; }
+
+/* ── BODY CELLS ── */
+tbody td { padding: 1px 4px; border: 1px solid #cfd8dc; vertical-align: middle; text-align: center; }
+tbody tr:nth-child(even) td { background: #f4f7f9; }
+tbody tr:hover td { background: #e3f0fb !important; }
+
+/* ── GROUP COLOURS ── */
+.g-info     { background: #2c3e50; }
+.g-region   { background: #1a5276; }
+.g-carpeta  { background: #6c3483; }
+.g-preverif { background: #117a65; }
+.g-app      { background: #154360; }
+.g-ejec     { background: #935116; }
+.g-norma    { background: #922b21; }
+.g-receta   { background: #1e8449; }
+.g-mdo      { background: #9a7d0a; }
+.g-gantt    { background: #117a65; }
+.g-atr      { background: #6c3483; }
+.g-obs      { background: #626567; }
+.g-correo-ini { background: #1b4f72; }
+.g-equipo   { background: #1f3a5f; }
+.g-del      { background: #2c3e50; }
+.g-tipol    { background: #1a6b3a; }
+
+/* ── FORM ELEMENTS ── */
+input[type=text], input[type=number], input[type=date], select, textarea {
+  border: 1px solid #bbb; border-radius: 3px; padding: 1px 3px;
+  font-size: 10.5px; font-family: Arial, sans-serif; background: #fff;
+  line-height: 1.2;
+}
+input:focus, select:focus, textarea:focus {
+  outline: none; border-color: #2980b9; box-shadow: 0 0 0 2px rgba(41,128,185,.2);
+}
+/* Altura compacta para controles dentro de la tabla */
+tbody td input[type=text], tbody td input[type=number], tbody td input[type=date], tbody td select {
+  height: 20px; padding: 0 3px;
+}
+textarea { resize: vertical; min-height: 20px; min-width: 200px; max-width: 280px; white-space: normal; }
+select { cursor: pointer; }
+
+/* Select coloured states */
+select.v-si   { background: #27ae60 !important; color: #fff !important; }
+select.v-no   { background: #c0392b !important; color: #fff !important; }
+select.v-ok   { background: #27ae60 !important; color: #fff !important; }
+select.v-nook { background: #c0392b !important; color: #fff !important; }
+
+/* ── TOGGLE SWITCH (checkbox Si/No) ── */
+.toggle { position: relative; display: inline-block; width: 34px; height: 18px; flex-shrink: 0; }
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle .knob {
+  position: absolute; cursor: pointer; inset: 0;
+  background: #ccc; border-radius: 22px; transition: .22s;
+}
+.toggle .knob:before {
+  content: ""; position: absolute;
+  width: 12px; height: 12px; left: 3px; bottom: 3px;
+  background: #fff; border-radius: 50%; transition: .22s;
+  box-shadow: 0 1px 3px rgba(0,0,0,.25);
+}
+.toggle input:checked + .knob { background: #27ae60; }
+.toggle input:checked + .knob:before { transform: translateX(16px); }
+.toggle-label { font-size: 8.5px; color: #666; display: block; line-height: 1; margin-top: 1px; text-align: center; }
+
+/* ── CHIPS ── */
+.chip { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10.5px; font-weight: bold; }
+.chip-nueva   { background: #27ae60; color: #fff; }
+.chip-antigua { background: #c0392b; color: #fff; }
+.chip-nd      { background: #aaa; color: #fff; }
+
+/* ── DÍAS DIF ── */
+.dias { font-weight: bold; font-size: 11px; }
+.dias-r { color: #c0392b; }
+.dias-a { color: #27ae60; }
+.dias-0 { color: #7f8c8d; }
+
+/* ── LINK CELL ── */
+.lw { display: flex; align-items: center; gap: 3px; min-width: 140px; }
+.lw input { flex: 1; min-width: 90px; }
+a.lbtn { padding: 3px 6px; background: #2980b9; color: #fff; text-decoration: none; border-radius: 3px; font-size: 10px; flex-shrink: 0; }
+a.lbtn:hover { background: #1a5f8a; }
+
+/* ── EMAIL BTN ── */
+button.ebtn { padding: 4px 8px; background: #e67e22; color: #fff; border: none; border-radius: 3px; cursor: pointer; font-size: 10.5px; font-weight: bold; }
+button.ebtn:hover { background: #ca6a12; }
+
+/* ── DELETE BTN ── */
+button.dbtn { padding: 4px 8px; background: #c0392b; color: #fff; border: none; border-radius: 3px; cursor: pointer; font-size: 11px; font-weight: bold; }
+button.dbtn:hover { background: #922b21; }
+
+/* ── MODAL ── */
+#ov { display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:300; align-items:center; justify-content:center; }
+#ov.on { display:flex; }
+#modal { background:#fff; border-radius:8px; padding:22px 26px; max-width:480px; width:92%; box-shadow:0 8px 32px rgba(0,0,0,.3); }
+#modal h2 { font-size:14px; margin-bottom:10px; color:#1a3a5c; }
+#modal p  { font-size:11.5px; color:#555; line-height:1.6; }
+#modal .ma { display:flex; gap:8px; margin-top:14px; justify-content:flex-end; }
+#modal button { padding:6px 14px; border:none; border-radius:4px; cursor:pointer; font-size:11.5px; font-weight:bold; }
+.mc { background:#95a5a6; color:#fff; }
+.mo { background:#27ae60; color:#fff; }
+
+/* ── SYNC MODAL ── */
+#sync-ov { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:400; align-items:center; justify-content:center; }
+#sync-ov.on { display:flex; }
+#sync-box {
+  background:#fff; border-radius:10px; padding:24px 28px;
+  max-width:640px; width:96%; box-shadow:0 10px 40px rgba(0,0,0,.35);
+  max-height:90vh; overflow-y:auto;
+}
+#sync-box h2 { font-size:15px; margin:0 0 14px; color:#0d4a25; display:flex; align-items:center; gap:8px; }
+.sync-step { margin-bottom:16px; }
+.sync-step strong { font-size:12px; color:#1a3a5c; display:block; margin-bottom:5px; }
+.sync-step p { font-size:11.5px; color:#555; margin:0 0 6px; line-height:1.5; }
+#sync-script-wrap { position:relative; }
+#sync-script {
+  font-family:monospace; font-size:10px; background:#1e1e2e; color:#cdd6f4;
+  border-radius:6px; padding:10px 12px; width:100%; box-sizing:border-box;
+  height:100px; resize:none; border:none; overflow:auto; white-space:pre;
+}
+#sync-json {
+  font-family:monospace; font-size:10.5px; background:#f8f9fa; color:#333;
+  border:1px solid #ccc; border-radius:6px; padding:8px 10px;
+  width:100%; box-sizing:border-box; height:80px; resize:vertical;
+}
+.sync-actions { display:flex; gap:8px; margin-top:16px; justify-content:flex-end; flex-wrap:wrap; }
+.sync-actions button { padding:7px 16px; border:none; border-radius:5px; cursor:pointer; font-size:12px; font-weight:bold; }
+.sbtn-copy { background:#2980b9; color:#fff; }
+.sbtn-apply { background:#27ae60; color:#fff; }
+.sbtn-cancel { background:#95a5a6; color:#fff; }
+#sync-status { font-size:11px; margin-top:8px; min-height:18px; }
+#sync-status.ok  { color:#27ae60; font-weight:bold; }
+#sync-status.err { color:#c0392b; font-weight:bold; }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div id="topbar">
+  <div>
+    <h1>Estado de Proyectos — Coordinación de Obras</h1>
+    <div class="sub">Seguimiento de obra · datos guardados en el navegador</div>
+  </div>
+  <div class="acts">
+    <button class="btn btn-exp"  onclick="exportExcel()">↓ Excel</button>
+    <button class="btn btn-save" onclick="saveData()">💾 Guardar</button>
+  </div>
+</div>
+
+<!-- TOOLBAR -->
+<div id="toolbar">
+  <label>Buscar: <input type="text" id="searchBox" placeholder="Filtrar por obra, región o comuna…" oninput="filterTable()"></label>
+  <button onclick="openSyncModal()" style="padding:5px 13px;background:#1a6b3a;color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:12px;font-weight:bold;letter-spacing:.3px">↻ Sincronizar AppSheet</button>
+  <button id="btn-sync-equipo" onclick="syncEquipoDesdeFirebase()" style="padding:5px 13px;background:#1a4b6b;color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:12px;font-weight:bold;letter-spacing:.3px">↺ Sync Equipo</button>
+  <span id="saveStatus">Sin cambios pendientes</span>
+</div>
+
+<!-- NOTE -->
+<div class="note">
+  <strong>Nota:</strong> Datos guardados automáticamente en el navegador (localStorage). ·
+  <strong>Norma eléctrica</strong>: permisos posteriores a julio 2011 → NORMA NUEVA. ·
+  <strong>Días diferencia</strong>: positivo = retraso (rojo), negativo = adelanto (verde). ·
+  El toggle <span style="color:#27ae60;font-weight:bold">verde</span> = Sí realizado.
+</div>
+
+<!-- TABLE -->
+<div id="tableWrap">
+<table id="pt">
+<thead>
+<!-- ROW 1: group headers -->
+<tr>
+  <th rowspan="2" class="g-info col-obra" style="min-width:160px;position:sticky;left:0;top:0;z-index:40">OBRA</th>
+  <th rowspan="2" class="g-region"  style="min-width:155px">REGIÓN</th>
+  <th rowspan="2" class="g-region"  style="min-width:145px">COMUNA</th>
+  <th rowspan="2" class="g-info"    style="min-width:65px">N°<br>CASAS</th>
+  <th colspan="2" class="g-tipol" style="border-right:2px solid #0d4a25">VIVIENDA BASE</th>
+  <th colspan="2" class="g-tipol" style="border-right:2px solid #0d4a25">VIVIENDA 3D</th>
+  <th colspan="2" class="g-tipol" style="border-right:2px solid #0d4a25">DISC. 2D</th>
+  <th colspan="2" class="g-tipol" style="border-right:2px solid #0d4a25">DISC. 3D</th>
+  <th colspan="2" class="g-tipol" style="border-right:2px solid #0d4a25">BODEGA RC</th>
+  <th colspan="4" class="g-carpeta">CARPETA ANTECEDENTES PRE-VERIFICACIÓN</th>
+  <th colspan="3" class="g-preverif">PRE-VERIFICACIÓN</th>
+  <th rowspan="2" class="g-app"     style="min-width:80px">PRE-VERIF.<br>APP<br><span style="font-size:9px;font-weight:normal">(Subida)</span></th>
+  <th rowspan="2" class="g-ejec"    style="min-width:112px">INICIO PROBABLE<br>EJECUCIÓN</th>
+  <th colspan="2" class="g-norma">PERMISO / NORMA ELÉCTRICA</th>
+  <th colspan="3" class="g-receta">RECETA</th>
+  <th colspan="3" class="g-mdo">TABLA MANO DE OBRA</th>
+  <th colspan="3" class="g-gantt">CARTA GANTT</th>
+  <th colspan="2" class="g-atr">ATRIBUTOS POR OBRA</th>
+  <th rowspan="2" class="g-correo-ini" style="min-width:80px">CORREO<br>INICIO<br>OBRA</th>
+  <th rowspan="2" class="g-obs"    style="min-width:220px">CONDICIONES<br>ESPECIALES</th>
+  <th colspan="4" class="g-equipo">EQUIPO</th>
+  <th rowspan="2" class="g-del"    style="min-width:48px">DEL.</th>
+</tr>
+<!-- ROW 2: sub-headers -->
+<tr>
+  <!-- Desglose Tipológico (10 sub-cols: tip+cant ×5) -->
+  <th class="g-tipol" style="min-width:102px">Tipología</th>
+  <th class="g-tipol" style="min-width:44px;border-right:2px solid #0d4a25">Cant.</th>
+  <th class="g-tipol" style="min-width:102px">Tipología</th>
+  <th class="g-tipol" style="min-width:44px;border-right:2px solid #0d4a25">Cant.</th>
+  <th class="g-tipol" style="min-width:102px">Tipología</th>
+  <th class="g-tipol" style="min-width:44px;border-right:2px solid #0d4a25">Cant.</th>
+  <th class="g-tipol" style="min-width:102px">Tipología</th>
+  <th class="g-tipol" style="min-width:44px;border-right:2px solid #0d4a25">Cant.</th>
+  <th class="g-tipol" style="min-width:102px">Tipo Bod.</th>
+  <th class="g-tipol" style="min-width:44px;border-right:2px solid #0d4a25">Cant.</th>
+  <!-- Carpeta -->
+  <th class="g-carpeta" style="min-width:68px">Entregada</th>
+  <th class="g-carpeta" style="min-width:112px">F. Prometida</th>
+  <th class="g-carpeta" style="min-width:112px">F. Real Entrega</th>
+  <th class="g-carpeta" style="min-width:78px">Días Dif.</th>
+  <!-- Pre-Verif sub-headers -->
+  <th class="g-preverif" style="min-width:80px">Realizada</th>
+  <th class="g-preverif" style="min-width:160px">Obs. Pre-Verif</th>
+  <th class="g-preverif" style="min-width:90px">Hab. para<br>Construir</th>
+  <!-- Norma -->
+  <th class="g-norma"   style="min-width:112px">F. Permiso Edif.</th>
+  <th class="g-norma"   style="min-width:88px">Norma</th>
+  <!-- Receta -->
+  <th class="g-receta"  style="min-width:86px">Estado</th>
+  <th class="g-receta"  style="min-width:150px">Link Drive</th>
+  <th class="g-receta"  style="min-width:88px">Correo</th>
+  <!-- MdO -->
+  <th class="g-mdo"     style="min-width:86px">Estado</th>
+  <th class="g-mdo"     style="min-width:150px">Link Drive</th>
+  <th class="g-mdo"     style="min-width:88px">Correo</th>
+  <!-- Gantt -->
+  <th class="g-gantt"   style="min-width:86px">Estado</th>
+  <th class="g-gantt"   style="min-width:150px">Link Drive</th>
+  <th class="g-gantt"   style="min-width:88px">Correo</th>
+  <!-- Atributos -->
+  <th class="g-atr"     style="min-width:86px">Estado</th>
+  <th class="g-atr"     style="min-width:150px">Link Drive</th>
+  <!-- Equipo -->
+  <th class="g-equipo"  style="min-width:110px">Residente</th>
+  <th class="g-equipo"  style="min-width:110px">Capataz 1</th>
+  <th class="g-equipo"  style="min-width:110px">Capataz 2</th>
+  <th class="g-equipo"  style="min-width:110px">Capataz 3</th>
+</tr>
+</thead>
+<tbody id="pb"></tbody>
+<tfoot>
+  <tr id="tfoot-add">
+    <td colspan="43" style="padding:8px;border-top:2px solid #2980b9;background:#eaf4fb;text-align:left">
+      <button onclick="addProject()" style="
+        padding:7px 18px;background:#27ae60;color:#fff;border:none;
+        border-radius:5px;cursor:pointer;font-size:12.5px;font-weight:bold;
+        display:inline-flex;align-items:center;gap:6px;
+        box-shadow:0 2px 4px rgba(0,0,0,.2)">
+        ＋ Agregar nueva obra
+      </button>
+      <span style="margin-left:12px;font-size:11px;color:#777">
+        Haga clic para agregar una fila nueva al listado
+      </span>
+    </td>
+  </tr>
+</tfoot>
+</table>
+</div>
+
+<!-- MODAL CORREO -->
+<div id="ov">
+  <div id="modal">
+    <h2 id="mt">Enviar correo</h2>
+    <p  id="mb"></p>
+    <div class="ma">
+      <button class="mc" onclick="closeModal()">Cerrar</button>
+      <button class="mo" onclick="closeModal()">Aceptar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL SINCRONIZAR APPSHEET -->
+<div id="sync-ov">
+  <div id="sync-box">
+    <h2>↻ Sincronizar tipologías desde AppSheet</h2>
+
+    <div class="sync-step">
+      <strong>Paso 1 — Abre AppSheet en otra pestaña</strong>
+      <p>Entra a <a href="https://www.appsheet.com/start/e07d4aa1-e59e-4b9b-bf4c-32582e74e8fc" target="_blank" style="color:#1a6b3a">AppSheet (clic aquí)</a> y espera que cargue completamente la vista de Proyectos.</p>
+    </div>
+
+    <div class="sync-step">
+      <strong>Paso 2 — Abre la consola del navegador (F12 → Console) y pega este script</strong>
+      <div id="sync-script-wrap">
+        <textarea id="sync-script" readonly></textarea>
+      </div>
+      <button class="sbtn-copy" onclick="copiarScript()" style="margin-top:6px;padding:5px 12px;border:none;border-radius:4px;cursor:pointer;font-size:11.5px;font-weight:bold;background:#2980b9;color:#fff">📋 Copiar script</button>
+    </div>
+
+    <div class="sync-step">
+      <strong>Paso 3 — Pega el JSON resultante aquí y haz clic en Aplicar</strong>
+      <textarea id="sync-json" placeholder='{"Nuke Mapu":{...},"Com. Juan Hulcan Tolten":{...},...}'></textarea>
+    </div>
+
+    <div id="sync-status"></div>
+
+    <div class="sync-actions">
+      <button class="sbtn-cancel" onclick="closeSyncModal()">Cancelar</button>
+      <button class="sbtn-apply" onclick="applySync()">✔ Aplicar datos</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ════════════════════════════════════════════════
+   REGIONES Y COMUNAS DE CHILE
+   ════════════════════════════════════════════════ */
+const RC = {
+  "Arica y Parinacota":          ["Arica","Camarones","General Lagos","Putre"],
+  "Tarapacá":                    ["Alto Hospicio","Camiña","Colchane","Huara","Iquique","Pica","Pozo Almonte"],
+  "Antofagasta":                 ["Antofagasta","Calama","María Elena","Mejillones","Ollagüe","San Pedro de Atacama","Sierra Gorda","Taltal","Tocopilla"],
+  "Atacama":                     ["Alto del Carmen","Caldera","Chañaral","Copiapó","Diego de Almagro","Freirina","Huasco","Tierra Amarilla","Vallenar"],
+  "Coquimbo":                    ["Andacollo","Canela","Combarbalá","Coquimbo","Illapel","La Higuera","La Serena","Los Vilos","Monte Patria","Ovalle","Paiguano","Punitaqui","Río Hurtado","Salamanca","Vicuña"],
+  "Valparaíso":                  ["Algarrobo","Cabildo","Calera","Calle Larga","Cartagena","Casablanca","Catemu","Concón","El Quisco","El Tabo","Hijuelas","Isla de Pascua","Juan Fernández","La Cruz","La Ligua","Limache","Llay-Llay","Los Andes","Nogales","Olmué","Panquehue","Papudo","Petorca","Puchuncaví","Putaendo","Quilpué","Quintero","Riñonada","San Antonio","San Esteban","San Felipe","Santa María","Santo Domingo","Valparaíso","Villa Alemana","Viña del Mar","Zapallar"],
+  "Metropolitana de Santiago":   ["Alhué","Buin","Calera de Tango","Cerrillos","Cerro Navia","Colina","Conchalí","Curacaví","El Bosque","El Monte","Estación Central","Huechuraba","Independencia","Isla de Maipo","La Cisterna","La Florida","La Granja","La Pintana","La Reina","Lampa","Las Condes","Lo Barnechea","Lo Espejo","Lo Prado","Macul","Maipú","María Pinto","Melipilla","Ñuñoa","Padre Hurtado","Paine","Pedro Aguirre Cerda","Peñaflor","Peñalolén","Pirque","Providencia","Pudahuel","Puente Alto","Quilicura","Quinta Normal","Recoleta","Renca","San Bernardo","San Joaquín","San José de Maipo","San Miguel","San Pedro","San Ramón","Santiago","Talagante","Tiltil","Vitacura"],
+  "O'Higgins":                   ["Chépica","Chimbarongo","Codegua","Coinco","Coltauco","Doñihue","Graneros","La Estrella","Las Cabras","Litueche","Lolol","Machalí","Malloa","Marchihue","Mostazal","Nancagua","Navidad","Olivar","Palmilla","Paredones","Peralillo","Peumo","Pichidegua","Pichilemu","Placilla","Pumanque","Quinta de Tilcoco","Rancagua","Rengo","Requínoa","San Fernando","San Vicente","Santa Cruz"],
+  "Maule":                       ["Cauquenes","Chanco","Colbún","Constitución","Curepto","Curicó","Empedrado","Hualañé","Licantén","Linares","Longaví","Maule","Molina","Parral","Pelarco","Pelluhue","Pencahue","Rauco","Retiro","Río Claro","Romeral","Sagrada Familia","San Clemente","San Javier","San Rafael","Talca","Teno","Vichuquén","Villa Alegre","Yerbas Buenas"],
+  "Ñuble":                       ["Bulnes","Chillán","Chillán Viejo","Cobquecura","Coelemu","Coihueco","El Carmen","Ninhue","Ñiquén","Pemuco","Pinto","Portezuelo","Quillón","Quirihue","Ránquil","San Carlos","San Fabián","San Ignacio","San Nicolás","Treguaco","Yungay"],
+  "Biobío":                      ["Alto Biobío","Antuco","Arauco","Cabrero","Cañete","Chiguayante","Concepción","Contulmo","Coronel","Curanilahue","Florida","Hualpén","Hualqui","Laja","Lebu","Los Álamos","Los Ángeles","Lota","Mulchén","Nacimiento","Negrete","Penco","Quilaco","Quilleco","San Pedro de la Paz","San Rosendo","Santa Bárbara","Santa Juana","Talcahuano","Tirúa","Tomé","Tucapel","Yumbel"],
+  "La Araucanía":                ["Angol","Carahue","Cholchol","Collipulli","Cunco","Curacautín","Curarrehue","Ercilla","Freire","Galvarino","Gorbea","Lautaro","Loncoche","Lonquimay","Los Sauces","Lumaco","Melipeuco","Nueva Imperial","Padre Las Casas","Perquenco","Pitrufquén","Pucón","Purén","Renaico","Saavedra","Temuco","Teodoro Schmidt","Toltén","Traiguén","Victoria","Vilcún","Villarrica"],
+  "Los Ríos":                    ["Corral","Futrono","La Unión","Lago Ranco","Lanco","Los Lagos","Máfil","Mariquina","Paillaco","Panguipulli","Río Bueno","Valdivia"],
+  "Los Lagos":                   ["Ancud","Calbuco","Castro","Chaitén","Chonchi","Cochamó","Curaco de Vélez","Dalcahue","Fresia","Frutillar","Futaleufú","Hualaihué","Llanquihue","Los Muermos","Maullín","Osorno","Palena","Puerto Montt","Puerto Octay","Puerto Varas","Puqueldón","Purranque","Puyehue","Queilén","Quellón","Quemchi","Quinchao","Río Negro","San Juan de la Costa","San Pablo"],
+  "Aysén":                       ["Aisén","Chile Chico","Cisnes","Cochrane","Coihaique","Guaitecas","Lago Verde","O'Higgins","Río Ibáñez","Tortel"],
+  "Magallanes":                  ["Antártica","Cabo de Hornos","Laguna Blanca","Porvenir","Primavera","Puerto Natales","Punta Arenas","Río Verde","San Gregorio","Timaukel","Torres del Paine"],
+};
+const REGIONES = Object.keys(RC);
+
+/* ════════════════════════════════════════════════
+   DATOS INICIALES
+   ════════════════════════════════════════════════ */
+const INIT = [
+  { obra:"P119 - Ñuke Mapu",                 region:"La Araucanía", comuna:"Teodoro Schmidt", casas:35, tipBase:"MT5815EM14",
+    tipVivBase:"MT5815EM14", cantVivBase:30, tipViv3D:"MT6905EM14",  cantViv3D:3,
+    tipDisc2D:"",            cantDisc2D:0,   tipDisc3D:"MT7346EWd14",cantDisc3D:1,
+    tipRC:"16.0m2 Madera",   cantRC:33,
+    carpetaEntregada:"Si", inicioProbable:"2026-01-09",
+    preverifRealizada:"Si", obsPreVerif:"Queda una verificacion por realizar", habilitarConstruir:"Si",
+    recetaEstado:"Si", mdoEstado:"Si", ganttEstado:"Si", atributosEstado:"Si",
+    correoReceta:"Si", correoMdo:"Si", correoGantt:"No", correoInicio:"Si",
+    residente:"R.Maldonado", capataz1:"W. Peña", capataz2:"J. Carroza" },
+
+  { obra:"P12 - Juan Huilcan Tolten",   region:"La Araucanía", comuna:"Toltén",          casas:10, tipBase:"AM5964",
+    tipVivBase:"AM5964",     cantVivBase:3,  tipViv3D:"AM7201",       cantViv3D:7,
+    tipDisc2D:"",            cantDisc2D:0,   tipDisc3D:"",            cantDisc3D:0,
+    tipRC:"17.0m2 Madera",   cantRC:9,
+    carpetaEntregada:"Si", inicioProbable:"2026-03-04",
+    preverifRealizada:"Si", obsPreVerif:"Quedan dos por realizar", habilitarConstruir:"Si",
+    recetaEstado:"Si", mdoEstado:"Si", ganttEstado:"Si", atributosEstado:"Si",
+    correoReceta:"Si", correoMdo:"Si", correoGantt:"No", correoInicio:"No",
+    condicionesEspeciales:"Casa de madera ya cotizada x F.Andes",
+    residente:"A.Neira", capataz1:"N.Peña", capataz2:"Angelo" },
+
+  { obra:"P116 - Sonia Quilaleo", region:"La Araucanía", comuna:"Nueva Imperial",  casas:1,  tipBase:"AM5700",
+    tipVivBase:"AM5700",     cantVivBase:1,  tipViv3D:"",             cantViv3D:0,
+    tipDisc2D:"",            cantDisc2D:0,   tipDisc3D:"",            cantDisc3D:0,
+    tipRC:"16.0m2 Madera",   cantRC:1,
+    carpetaEntregada:"Si", inicioProbable:"2026-03-10", fechaPermiso:"2021-11-23",
+    preverifRealizada:"Si", obsPreVerif:"100% ok", habilitarConstruir:"Si",
+    recetaEstado:"Si", mdoEstado:"Si", ganttEstado:"Si", atributosEstado:"Si",
+    correoReceta:"Si", correoMdo:"Si", correoGantt:"No", correoInicio:"Si",
+    condicionesEspeciales:"Casa de madera ya cotizada x F.Andes",
+    residente:"A.Neira", capataz1:"A.Morales" },
+
+  { obra:"P14 - Com. Madihue",                   region:"La Araucanía", comuna:"Nueva Imperial",  casas:2,  tipBase:"SA5701",
+    tipVivBase:"SA5701",     cantVivBase:2,  tipViv3D:"",             cantViv3D:0,
+    tipDisc2D:"",            cantDisc2D:0,   tipDisc3D:"",            cantDisc3D:0,
+    tipRC:"16.0m2 Madera",   cantRC:2,
+    carpetaEntregada:"Si", inicioProbable:"2026-03-10",
+    preverifRealizada:"Si", obsPreVerif:"100% ok", habilitarConstruir:"Si",
+    recetaEstado:"No", mdoEstado:"No", ganttEstado:"No", atributosEstado:"Si",
+    correoReceta:"Si", correoMdo:"Si", correoGantt:"No", correoInicio:"Si",
+    condicionesEspeciales:"Casa de madera ya cotizada x F.Andes",
+    residente:"A.Neira", capataz1:"A.Morales" },
+
+  { obra:"P38 - Aliwen",                    region:"La Araucanía", comuna:"Toltén",          casas:6,  tipBase:"MT5815FM14",
+    tipVivBase:"MT5815FM14", cantVivBase:5,  tipViv3D:"MT6905FM14",   cantViv3D:1,
+    tipDisc2D:"",            cantDisc2D:0,   tipDisc3D:"",            cantDisc3D:0,
+    tipRC:"16.0m2 Madera",   cantRC:6,
+    carpetaEntregada:"Si", inicioProbable:"2026-02-25",
+    preverifRealizada:"Si", obsPreVerif:"Faltan 2 que hay que responder obs FTO/SAT", habilitarConstruir:"Si",
+    recetaEstado:"Si", mdoEstado:"Si", ganttEstado:"Si", atributosEstado:"Si",
+    correoReceta:"Si", correoMdo:"Si", correoGantt:"No", correoInicio:"Si",
+    residente:"J. Alvarez", capataz1:"E.Lopez" },
+
+  { obra:"P126 - El Maitén",             region:"La Araucanía", comuna:"Teodoro Schmidt", casas:29, tipBase:"MT5815EM14",
+    tipVivBase:"MT5815EM14", cantVivBase:23, tipViv3D:"MT6905EM14",   cantViv3D:3,
+    tipDisc2D:"MT6242EWd14", cantDisc2D:1,   tipDisc3D:"MT7332EWd14", cantDisc3D:2,
+    tipRC:"16.0m2 Madera",   cantRC:28,
+    carpetaEntregada:"Si", inicioProbable:"2025-05-10",
+    preverifRealizada:"Si", obsPreVerif:"-", habilitarConstruir:"No",
+    recetaEstado:"No", mdoEstado:"No", ganttEstado:"No", atributosEstado:"No",
+    correoReceta:"No", correoMdo:"No", correoGantt:"No", correoInicio:"No",
+    residente:"J. Alvarez", capataz1:"A.Curivil", capataz2:"E.Lopez" },
+
+  { obra:"P123 - Peumayen 2023",       region:"La Araucanía", comuna:"Cunco",           casas:43, tipBase:"MT5589FM12",
+    tipVivBase:"MT5589FM12", cantVivBase:29, tipViv3D:"MT6679FM12",   cantViv3D:8,
+    tipDisc2D:"MT6242FWd12", cantDisc2D:4,   tipDisc3D:"MT7332FWd12", cantDisc3D:2,
+    tipRC:"14.4m2 Madera",   cantRC:43,
+    carpetaEntregada:"", carpetaFechaPrometida:"2026-03-17", preverifRealizada:"No", obsPreVerif:"-", habilitarConstruir:"No",
+    recetaEstado:"No", mdoEstado:"No", ganttEstado:"No", atributosEstado:"No",
+    correoReceta:"No", correoMdo:"No", correoGantt:"No", correoInicio:"No",
+    condicionesEspeciales:"60 A 90 DÍAS PARA EJECUCION. REV. DE CONTRATO PARA CALIFICACION",
+    residente:"A.Neira", capataz1:"A.Morales", capataz2:"N.Peña" },
+
+  { obra:"P127 - Nuevo Cunco",               region:"La Araucanía", comuna:"Cunco",           casas:25, tipBase:"MT5815FM14",
+    tipVivBase:"MT5815FM14", cantVivBase:19, tipViv3D:"MT6905FM14",   cantViv3D:3,
+    tipDisc2D:"MT6242FWd14", cantDisc2D:1,   tipDisc3D:"MT7332FWd14", cantDisc3D:2,
+    tipRC:"14.4m2 Madera",   cantRC:25,
+    carpetaEntregada:"Si", inicioProbable:"2026-03-10", fechaPermiso:"2025-05-10",
+    preverifRealizada:"Si", obsPreVerif:"-", habilitarConstruir:"No",
+    recetaEstado:"No", mdoEstado:"No", ganttEstado:"No", atributosEstado:"No",
+    correoReceta:"No", correoMdo:"No", correoGantt:"No", correoInicio:"No",
+    residente:"A.Neira", capataz1:"C.Millanao", capataz2:"Nato", capataz3:"Angelo" },
+
+  { obra:"P39 - El Coihue",                 region:"La Araucanía", comuna:"Villarrica",      casas:21, tipBase:"MT5589FM12",
+    tipVivBase:"MT5589FM12", cantVivBase:14, tipViv3D:"MT6679FM12",   cantViv3D:7,
+    tipDisc2D:"",            cantDisc2D:0,   tipDisc3D:"",            cantDisc3D:0,
+    tipRC:"14.4m2 Madera",   cantRC:19,
+    carpetaEntregada:"No", inicioProbable:"2026-03-05", fechaPermiso:"2025-05-10",
+    preverifRealizada:"Si", obsPreVerif:"-", habilitarConstruir:"No",
+    recetaEstado:"No", mdoEstado:"No", ganttEstado:"No", atributosEstado:"No",
+    correoReceta:"No", correoMdo:"No", correoGantt:"No", correoInicio:"No",
+    residente:"A.Neira", capataz1:"C.Millanao" },
+
+  { obra:"P131 - Raíces de Melipeuco",       region:"La Araucanía", comuna:"Melipeuco",       casas:14, tipBase:"MT5815FM14",
+    tipVivBase:"MT5815FM14", cantVivBase:13, tipViv3D:"MT6905FM14",   cantViv3D:1,
+    tipDisc2D:"",            cantDisc2D:0,   tipDisc3D:"",            cantDisc3D:0,
+    tipRC:"16.0m2 Madera",   cantRC:13,
+    carpetaEntregada:"Si", inicioProbable:"2026-03-13", fechaPermiso:"2025-05-10",
+    preverifRealizada:"Si", obsPreVerif:"", habilitarConstruir:"No",
+    recetaEstado:"No", mdoEstado:"No", ganttEstado:"No", atributosEstado:"No",
+    correoReceta:"No", correoMdo:"No", correoGantt:"No", correoInicio:"No",
+    residente:"A.Neira", capataz1:"Nato" },
+
+  { obra:"P129 - Nuevo Gorbea",        region:"La Araucanía", comuna:"Gorbea",          casas:11, tipBase:"MT5815FM14",
+    tipVivBase:"MT5815FM14", cantVivBase:9,  tipViv3D:"",             cantViv3D:0,
+    tipDisc2D:"MT6242FWd14", cantDisc2D:2,   tipDisc3D:"",            cantDisc3D:0,
+    tipRC:"16.0m2 Madera",   cantRC:10,
+    carpetaEntregada:"", preverifRealizada:"No", obsPreVerif:"", habilitarConstruir:"No",
+    recetaEstado:"No", mdoEstado:"No", ganttEstado:"No", atributosEstado:"No",
+    correoReceta:"No", correoMdo:"No", correoGantt:"No", correoInicio:"No",
+    condicionesEspeciales:"60 A 90 DÍAS PARA EJECUCION. REV. DE CONTRATO PARA CALIFICACION",
+    residente:"A.Neira", capataz1:"Cocio (En evaluacion)" },
+
+  { obra:"P128 - Com. José Carvajal", region:"La Araucanía", comuna:"Freire",          casas:12, tipBase:"MT5589FM12",
+    tipVivBase:"MT5589FM12", cantVivBase:10, tipViv3D:"MT6679FM12",   cantViv3D:1,
+    tipDisc2D:"MT6242FWd12", cantDisc2D:1,   tipDisc3D:"",            cantDisc3D:0,
+    tipRC:"14.4m2 Madera",   cantRC:12,
+    carpetaEntregada:"", preverifRealizada:"No", obsPreVerif:"", habilitarConstruir:"No",
+    recetaEstado:"No", mdoEstado:"No", ganttEstado:"No", atributosEstado:"No",
+    correoReceta:"No", correoMdo:"No", correoGantt:"No", correoInicio:"No",
+    condicionesEspeciales:"SE INGRESAN CONTRATOS EN 15 DÍAS, FALTA RENOVACION DE ATPK DE CONVENIO" },
+
+  { obra:"P132 - Com. Fermín Manquilef", region:"La Araucanía", comuna:"Freire",        casas:15, tipBase:"MT5589FM12",
+    tipVivBase:"MT5589FM12", cantVivBase:11, tipViv3D:"MT6679FM12",   cantViv3D:4,
+    tipDisc2D:"",            cantDisc2D:0,   tipDisc3D:"",            cantDisc3D:0,
+    tipRC:"14.4m2 Madera",   cantRC:15,
+    carpetaEntregada:"", preverifRealizada:"No", obsPreVerif:"", habilitarConstruir:"No",
+    recetaEstado:"No", mdoEstado:"No", ganttEstado:"No", atributosEstado:"No",
+    correoReceta:"No", correoMdo:"No", correoGantt:"No", correoInicio:"No",
+    condicionesEspeciales:"EN PROCESO DE REVISION EN SERVIU PARA EMITIR MONTOS Y CONTRATOS, CON SUERTE EN DICIEMBRE" },
+
+  { obra:"P150 - Llaima Antu",         region:"La Araucanía", comuna:"Freire",          casas:27, tipBase:"MT5589FM12",
+    tipVivBase:"MT5589FM12", cantVivBase:24, tipViv3D:"MT6679FM12",   cantViv3D:3,
+    tipDisc2D:"",            cantDisc2D:0,   tipDisc3D:"",            cantDisc3D:0,
+    tipRC:"14.4m2 Madera",   cantRC:24,
+    carpetaEntregada:"", preverifRealizada:"No", obsPreVerif:"", habilitarConstruir:"No",
+    recetaEstado:"No", mdoEstado:"No", ganttEstado:"No", atributosEstado:"No",
+    correoReceta:"No", correoMdo:"No", correoGantt:"No", correoInicio:"No",
+    condicionesEspeciales:"POSTULADO, CALIFICADO, SIN SELECCION DE PLATA (INCERTIDUMBRE TOTAL)" },
+
+  { obra:"P154 - Com. Jose Carvajal 2", region:"La Araucanía", comuna:"Freire",         casas:10, tipBase:"MT5589FM12",
+    tipVivBase:"MT5589FM12", cantVivBase:7,  tipViv3D:"MT6679FM12",   cantViv3D:3,
+    tipDisc2D:"",            cantDisc2D:0,   tipDisc3D:"",            cantDisc3D:0,
+    tipRC:"14.4m2 Madera",   cantRC:10,
+    carpetaEntregada:"", preverifRealizada:"No", obsPreVerif:"", habilitarConstruir:"No",
+    recetaEstado:"No", mdoEstado:"No", ganttEstado:"No", atributosEstado:"No",
+    correoReceta:"No", correoMdo:"No", correoGantt:"No", correoInicio:"No",
+    condicionesEspeciales:"AYER SE SUBIERON LOS PAGOS DE LAS DJ PARA INICIO DE OBRA, CON SUERTE SALE A EJECUCION EN ENERO 2027" },
+
+  { obra:"P147 - Ruka Antü",           region:"La Araucanía", comuna:"Gorbea",          casas:23, tipBase:"MT5815FM14",
+    tipVivBase:"MT5815FM14", cantVivBase:16, tipViv3D:"MT6905FM14",   cantViv3D:5,
+    tipDisc2D:"MT6242FWd14", cantDisc2D:1,   tipDisc3D:"MT7332FWd14", cantDisc3D:1,
+    tipRC:"16.0m2 Madera",   cantRC:20,
+    carpetaEntregada:"", preverifRealizada:"No", obsPreVerif:"", habilitarConstruir:"No",
+    recetaEstado:"No", mdoEstado:"No", ganttEstado:"No", atributosEstado:"No",
+    correoReceta:"No", correoMdo:"No", correoGantt:"No", correoInicio:"No",
+    condicionesEspeciales:"POSTULADO, CALIFICADO, SIN SELECCION DE PLATA (INCERTIDUMBRE TOTAL)" },
+
+  { obra:"P145 - Perkenko 2025",       region:"La Araucanía", comuna:"Perquenco",       casas:19, tipBase:"MT5589FM12",
+    tipVivBase:"MT5589FM12", cantVivBase:10, tipViv3D:"MT6679FM12",   cantViv3D:4,
+    tipDisc2D:"MT6242FWd12", cantDisc2D:4,   tipDisc3D:"MT7332FWd12", cantDisc3D:1,
+    tipRC:"14.4m2 Madera",   cantRC:16,
+    carpetaEntregada:"", preverifRealizada:"No", obsPreVerif:"", habilitarConstruir:"No",
+    recetaEstado:"No", mdoEstado:"No", ganttEstado:"No", atributosEstado:"No",
+    correoReceta:"No", correoMdo:"No", correoGantt:"No", correoInicio:"No",
+    condicionesEspeciales:"POSTULADO, CALIFICADO, SIN SELECCION DE PLATA (INCERTIDUMBRE TOTAL)" },
+
+  { obra:"P156 - Poyen Ruka",          region:"La Araucanía", comuna:"Perquenco",       casas:15, tipBase:"MT5589FM12",
+    tipVivBase:"MT5589FM12", cantVivBase:7,  tipViv3D:"MT6679FM12",   cantViv3D:6,
+    tipDisc2D:"MT6242FWd12", cantDisc2D:1,   tipDisc3D:"MT7332FWd12", cantDisc3D:1,
+    tipRC:"14.4m2 Madera",   cantRC:14,
+    carpetaEntregada:"", preverifRealizada:"No", obsPreVerif:"", habilitarConstruir:"No",
+    recetaEstado:"No", mdoEstado:"No", ganttEstado:"No", atributosEstado:"No",
+    correoReceta:"No", correoMdo:"No", correoGantt:"No", correoInicio:"No",
+    condicionesEspeciales:"POSTULADO, CALIFICADO, SIN SELECCION DE PLATA (INCERTIDUMBRE TOTAL)" },
+
+  { obra:"P155 - Los Arrayanes",       region:"La Araucanía", comuna:"Teodoro Schmidt", casas:19, tipBase:"MT5815EM14",
+    tipVivBase:"MT5815EM14", cantVivBase:15, tipViv3D:"MT6905EM14",   cantViv3D:2,
+    tipDisc2D:"MT6242EWd14", cantDisc2D:1,   tipDisc3D:"MT7332EWd14", cantDisc3D:1,
+    tipRC:"16.0m2 Madera",   cantRC:18,
+    carpetaEntregada:"", preverifRealizada:"No", obsPreVerif:"", habilitarConstruir:"No",
+    recetaEstado:"No", mdoEstado:"No", ganttEstado:"No", atributosEstado:"No",
+    correoReceta:"No", correoMdo:"No", correoGantt:"No", correoInicio:"No",
+    condicionesEspeciales:"POSTULADO, CALIFICADO, SIN SELECCION DE PLATA (INCERTIDUMBRE TOTAL)" },
+
+  { obra:"P153 - Vilcún Mapu",         region:"La Araucanía", comuna:"Vilcún",          casas:20, tipBase:"MT5815FM13",
+    tipVivBase:"MT5815FM13", cantVivBase:15, tipViv3D:"MT6905FM13",   cantViv3D:3,
+    tipDisc2D:"MT6242FWd13", cantDisc2D:1,   tipDisc3D:"MT7332FWd13", cantDisc3D:1,
+    tipRC:"14.4m2 Acero",    cantRC:17,
+    carpetaEntregada:"", preverifRealizada:"No", obsPreVerif:"", habilitarConstruir:"No",
+    recetaEstado:"No", mdoEstado:"No", ganttEstado:"No", atributosEstado:"No",
+    correoReceta:"No", correoMdo:"No", correoGantt:"No", correoInicio:"No",
+    condicionesEspeciales:"POSTULADO, CALIFICADO, SIN SELECCION DE PLATA (INCERTIDUMBRE TOTAL)" },
+
+  { obra:"P31 - Trovolhue",            region:"La Araucanía", comuna:"Carahue",         casas:3,  tipBase:"",
+    tipVivBase:"",          cantVivBase:0,  tipViv3D:"",             cantViv3D:0,
+    tipDisc2D:"",           cantDisc2D:0,   tipDisc3D:"",            cantDisc3D:0,
+    tipRC:"",               cantRC:0,
+    carpetaEntregada:"", preverifRealizada:"No", obsPreVerif:"", habilitarConstruir:"No",
+    recetaEstado:"No", mdoEstado:"No", ganttEstado:"No", atributosEstado:"No",
+    correoReceta:"No", correoMdo:"No", correoGantt:"No", correoInicio:"No" },
+
+  { obra:"P28 - Elsa Pinchulaf",        region:"La Araucanía", comuna:"Freire",          casas:1,  tipBase:"",
+    tipVivBase:"",          cantVivBase:0,  tipViv3D:"",             cantViv3D:0,
+    tipDisc2D:"",           cantDisc2D:0,   tipDisc3D:"",            cantDisc3D:0,
+    tipRC:"",               cantRC:0,
+    carpetaEntregada:"", preverifRealizada:"No", obsPreVerif:"", habilitarConstruir:"No",
+    recetaEstado:"No", mdoEstado:"No", ganttEstado:"No", atributosEstado:"No",
+    correoReceta:"No", correoMdo:"No", correoGantt:"No", correoInicio:"No" },
+];
+
+/* ════════════════════════════════════════════════
+   MODELO
+   ════════════════════════════════════════════════ */
+let _id = 1;
+function uid() { return _id++; }
+
+function mkProj(o = {}) {
+  return Object.assign({
+    id: uid(),
+    obra: "", tipBase: "", region: "", comuna: "", casas: "",
+    tipVivBase: "", cantVivBase: "",
+    tipViv3D: "",   cantViv3D: "",
+    tipDisc2D: "",  cantDisc2D: "",
+    tipDisc3D: "",  cantDisc3D: "",
+    tipRC: "",      cantRC: "",
+    carpetaEntregada: "",
+    carpetaFechaPrometida: "", carpetaFechaReal: "",
+    preverifRealizada: "No", obsPreVerif: "", habilitarConstruir: "No",
+    appSubida: "No",
+    inicioProbable: "",
+    fechaPermiso: "",
+    recetaEstado: "", recetaLink: "", correoReceta: "No",
+    mdoEstado: "", mdoLink: "", correoMdo: "No",
+    ganttEstado: "", ganttLink: "", correoGantt: "No",
+    atributosEstado: "", atributosLink: "",
+    correoInicio: "No",
+    condicionesEspeciales: "",
+    residente: "", capataz1: "", capataz2: "", capataz3: "",
+  }, o);
+}
+
+let projects = [];
+
+/* ════════════════════════════════════════════════
+   HELPERS
+   ════════════════════════════════════════════════ */
+const esc = s => String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+const gp  = id => projects.find(p => p.id === +id);
+
+function calcDias(a, b) {
+  if (!a || !b) return null;
+  const d1 = new Date(a), d2 = new Date(b);
+  return isNaN(d1)||isNaN(d2) ? null : Math.round((d2-d1)/86400000);
+}
+function calcNorma(f) {
+  if (!f) return null;
+  const d = new Date(f);
+  return isNaN(d) ? null : d > new Date("2011-07-31") ? "NUEVA" : "ANTIGUA";
+}
+
+/* ════════════════════════════════════════════════
+   CELL BUILDERS
+   ════════════════════════════════════════════════ */
+function regionSel(id, val) {
+  let s = `<select id="rg_${id}" data-id="${id}" data-field="region" onchange="onRegion(this)" style="width:148px">`;
+  s += `<option value="">— Seleccione —</option>`;
+  REGIONES.forEach(r => s += `<option value="${esc(r)}" ${val===r?"selected":""}>${esc(r)}</option>`);
+  return s + `</select>`;
+}
+
+function comunaSel(id, region, val) {
+  const list = RC[region] || [];
+  let s = `<select id="cm_${id}" data-id="${id}" data-field="comuna" onchange="onText(this)" style="width:138px">`;
+  s += `<option value="">— Seleccione —</option>`;
+  list.forEach(c => s += `<option value="${esc(c)}" ${val===c?"selected":""}>${esc(c)}</option>`);
+  return s + `</select>`;
+}
+
+function siNoSel(id, field, val) {
+  const cls = val==="Si"?"v-si":val==="No"?"v-no":"";
+  let s = `<select class="${cls}" data-id="${id}" data-field="${field}" onchange="onSel(this)" style="width:65px">`;
+  s += `<option value="" ${!val?"selected":""}>—</option>`;
+  s += `<option value="Si" ${val==="Si"?"selected":""}>Si</option>`;
+  s += `<option value="No" ${val==="No"?"selected":""}>No</option>`;
+  return s + `</select>`;
+}
+
+function okSel(id, field, val, dt) {
+  const cls = val==="Ok"?"v-ok":val==="No Ok"?"v-nook":"";
+  let s = `<select class="${cls}" data-id="${id}" data-field="${field}" data-dt="${dt}" onchange="onOk(this)" style="width:82px">`;
+  s += `<option value="" ${!val?"selected":""}>—</option>`;
+  s += `<option value="Ok" ${val==="Ok"?"selected":""}>Ok</option>`;
+  s += `<option value="No Ok" ${val==="No Ok"?"selected":""}>No Ok</option>`;
+  return s + `</select>`;
+}
+
+function toggle(id, field, val) {
+  const chk = val === "Si" ? "checked" : "";
+  const lbl = val === "Si" ? "Sí" : "No";
+  return `<div style="display:flex;flex-direction:column;align-items:center;gap:1px">
+    <label class="toggle">
+      <input type="checkbox" data-id="${id}" data-field="${field}" ${chk} onchange="onToggle(this)">
+      <span class="knob"></span>
+    </label>
+    <span class="toggle-label" id="tl_${id}_${field}">${lbl}</span>
+  </div>`;
+}
+
+function lnkCell(id, field, val) {
+  const show = val ? "" : "display:none";
+  return `<div class="lw">
+    <input type="text" data-id="${id}" data-field="${field}" value="${esc(val)}" placeholder="URL Drive…" oninput="onLink(this)">
+    <a href="${esc(val||"#")}" target="_blank" class="lbtn" id="lb_${id}_${field}" style="${show}">🔗</a>
+  </div>`;
+}
+
+function eBtn(id, dt, estado) {
+  const show = estado==="Ok" ? "" : "display:none";
+  return `<button class="ebtn" id="eb_${id}_${dt}" onclick="sendEmail('${id}','${dt}')" style="${show}">📧 Enviar</button>`;
+}
+
+function diasHtml(dias) {
+  if (dias === null) return "—";
+  if (dias > 0)  return `<span class="dias dias-r">+${dias} d</span>`;
+  if (dias < 0)  return `<span class="dias dias-a">${dias} d</span>`;
+  return `<span class="dias dias-0">0 d</span>`;
+}
+function normaHtml(n) {
+  if (!n) return `<span class="chip chip-nd">—</span>`;
+  return n==="NUEVA"
+    ? `<span class="chip chip-nueva">NUEVA</span>`
+    : `<span class="chip chip-antigua">ANTIGUA</span>`;
+}
+
+/* ════════════════════════════════════════════════
+   CREATE ROW
+   ════════════════════════════════════════════════ */
+function mkRow(p) {
+  const id   = p.id;
+  const dias = calcDias(p.carpetaFechaPrometida, p.carpetaFechaReal);
+  const norm = calcNorma(p.fechaPermiso);
+  const tr   = document.createElement("tr");
+  tr.id = `row_${id}`;
+  tr.dataset.obra   = (p.obra  ||"").toLowerCase();
+  tr.dataset.region = (p.region||"").toLowerCase();
+  tr.dataset.comuna = (p.comuna||"").toLowerCase();
+
+  tr.innerHTML = `
+  <td>
+    <input type="text" data-id="${id}" data-field="obra" value="${esc(p.obra)}"
+      placeholder="Nombre o código…" oninput="onText(this)" style="width:100%">
+  </td>
+  <td>${regionSel(id, p.region)}</td>
+  <td>${comunaSel(id, p.region, p.comuna)}</td>
+  <td><input type="number" min="0" data-id="${id}" data-field="casas" value="${esc(p.casas)}"
+    oninput="onText(this)" style="width:52px;text-align:center"></td>
+
+  <!-- Desglose tipológico: 5 pares tip+cant -->
+  <td><input type="text" data-id="${id}" data-field="tipVivBase" value="${esc(p.tipVivBase)}"
+    oninput="onText(this)" style="width:97px;font-size:10.5px;font-weight:bold;text-align:center;letter-spacing:.3px"></td>
+  <td style="border-right:2px solid #b2ccba"><input type="number" min="0" data-id="${id}" data-field="cantVivBase" value="${esc(p.cantVivBase)}"
+    oninput="onText(this)" style="width:40px;text-align:center"></td>
+  <td><input type="text" data-id="${id}" data-field="tipViv3D" value="${esc(p.tipViv3D)}"
+    oninput="onText(this)" style="width:97px;font-size:10.5px;font-weight:bold;text-align:center;letter-spacing:.3px"></td>
+  <td style="border-right:2px solid #b2ccba"><input type="number" min="0" data-id="${id}" data-field="cantViv3D" value="${esc(p.cantViv3D)}"
+    oninput="onText(this)" style="width:40px;text-align:center"></td>
+  <td><input type="text" data-id="${id}" data-field="tipDisc2D" value="${esc(p.tipDisc2D)}"
+    oninput="onText(this)" style="width:97px;font-size:10.5px;font-weight:bold;text-align:center;letter-spacing:.3px"></td>
+  <td style="border-right:2px solid #b2ccba"><input type="number" min="0" data-id="${id}" data-field="cantDisc2D" value="${esc(p.cantDisc2D)}"
+    oninput="onText(this)" style="width:40px;text-align:center"></td>
+  <td><input type="text" data-id="${id}" data-field="tipDisc3D" value="${esc(p.tipDisc3D)}"
+    oninput="onText(this)" style="width:97px;font-size:10.5px;font-weight:bold;text-align:center;letter-spacing:.3px"></td>
+  <td style="border-right:2px solid #b2ccba"><input type="number" min="0" data-id="${id}" data-field="cantDisc3D" value="${esc(p.cantDisc3D)}"
+    oninput="onText(this)" style="width:40px;text-align:center"></td>
+  <td><input type="text" data-id="${id}" data-field="tipRC" value="${esc(p.tipRC)}"
+    oninput="onText(this)" style="width:97px;font-size:10.5px;text-align:center"></td>
+  <td style="border-right:2px solid #b2ccba"><input type="number" min="0" data-id="${id}" data-field="cantRC" value="${esc(p.cantRC)}"
+    oninput="onText(this)" style="width:40px;text-align:center"></td>
+
+  <!-- Carpeta -->
+  <td>${siNoSel(id,"carpetaEntregada",p.carpetaEntregada)}</td>
+  <td><input type="date" data-id="${id}" data-field="carpetaFechaPrometida" value="${esc(p.carpetaFechaPrometida)}"
+    onchange="onDate(this);recDias(${id})" style="width:108px"></td>
+  <td><input type="date" data-id="${id}" data-field="carpetaFechaReal" value="${esc(p.carpetaFechaReal)}"
+    onchange="onDate(this);recDias(${id})" style="width:108px"></td>
+  <td id="dias_${id}">${diasHtml(dias)}</td>
+
+  <!-- Pre-Verif -->
+  <td>${toggle(id,"preverifRealizada",p.preverifRealizada)}</td>
+  <td><input type="text" data-id="${id}" data-field="obsPreVerif" value="${esc(p.obsPreVerif)}"
+    placeholder="Obs. pre-verif…" oninput="onText(this)" style="width:150px"></td>
+  <td>${toggle(id,"habilitarConstruir",p.habilitarConstruir)}</td>
+
+  <!-- App -->
+  <td>${toggle(id,"appSubida",p.appSubida)}</td>
+
+  <!-- Inicio probable -->
+  <td><input type="date" data-id="${id}" data-field="inicioProbable" value="${esc(p.inicioProbable)}"
+    onchange="onDate(this)" style="width:108px"></td>
+
+  <!-- Norma -->
+  <td><input type="date" data-id="${id}" data-field="fechaPermiso" value="${esc(p.fechaPermiso)}"
+    onchange="onDate(this);recNorma(${id})" style="width:108px"></td>
+  <td id="norma_${id}">${normaHtml(norm)}</td>
+
+  <!-- Receta -->
+  <td>${okSel(id,"recetaEstado",p.recetaEstado,"receta")}</td>
+  <td>${lnkCell(id,"recetaLink",p.recetaLink)}</td>
+  <td>${toggle(id,"correoReceta",p.correoReceta)}</td>
+
+  <!-- MdO -->
+  <td>${okSel(id,"mdoEstado",p.mdoEstado,"mdo")}</td>
+  <td>${lnkCell(id,"mdoLink",p.mdoLink)}</td>
+  <td>${toggle(id,"correoMdo",p.correoMdo)}</td>
+
+  <!-- Gantt -->
+  <td>${okSel(id,"ganttEstado",p.ganttEstado,"gantt")}</td>
+  <td>${lnkCell(id,"ganttLink",p.ganttLink)}</td>
+  <td>${toggle(id,"correoGantt",p.correoGantt)}</td>
+
+  <!-- Atributos -->
+  <td>${okSel(id,"atributosEstado",p.atributosEstado,"atributos")}</td>
+  <td>${lnkCell(id,"atributosLink",p.atributosLink)}</td>
+
+  <!-- Correo Inicio Obra -->
+  <td>${toggle(id,"correoInicio",p.correoInicio)}</td>
+
+  <!-- Condiciones -->
+  <td><textarea data-id="${id}" data-field="condicionesEspeciales"
+    oninput="onText(this)" placeholder="Observaciones…">${esc(p.condicionesEspeciales)}</textarea></td>
+
+  <!-- Equipo -->
+  <td><input type="text" data-id="${id}" data-field="residente" value="${esc(p.residente)}"
+    placeholder="Residente…" oninput="onText(this)" style="width:104px"></td>
+  <td><input type="text" data-id="${id}" data-field="capataz1"  value="${esc(p.capataz1)}"
+    placeholder="Capataz…"  oninput="onText(this)" style="width:104px"></td>
+  <td><input type="text" data-id="${id}" data-field="capataz2"  value="${esc(p.capataz2)}"
+    placeholder="Capataz…"  oninput="onText(this)" style="width:104px"></td>
+  <td><input type="text" data-id="${id}" data-field="capataz3"  value="${esc(p.capataz3)}"
+    placeholder="Capataz…"  oninput="onText(this)" style="width:104px"></td>
+
+  <!-- Eliminar -->
+  <td><button class="dbtn" onclick="delProj(${id})" title="Eliminar">✕</button></td>
+  `;
+  return tr;
+}
+
+/* ════════════════════════════════════════════════
+   EVENT HANDLERS
+   ════════════════════════════════════════════════ */
+function onText(el) {
+  const p = gp(el.dataset.id);
+  if (!p) return;
+  p[el.dataset.field] = el.value;
+  const tr = el.closest("tr");
+  if (el.dataset.field === "obra")   tr.dataset.obra   = el.value.toLowerCase();
+  scheduleSave();
+}
+function onDate(el) {
+  const p = gp(el.dataset.id);
+  if (!p) return;
+  p[el.dataset.field] = el.value;
+  scheduleSave();
+}
+function onSel(el) {
+  const p = gp(el.dataset.id);
+  if (!p) return;
+  p[el.dataset.field] = el.value;
+  el.className = el.value==="Si"?"v-si":el.value==="No"?"v-no":"";
+  scheduleSave();
+}
+function onOk(el) {
+  const p = gp(el.dataset.id);
+  if (!p) return;
+  p[el.dataset.field] = el.value;
+  el.className = el.value==="Ok"?"v-ok":el.value==="No Ok"?"v-nook":"";
+  const btn = document.getElementById(`eb_${p.id}_${el.dataset.dt}`);
+  if (btn) btn.style.display = el.value==="Ok" ? "" : "none";
+  scheduleSave();
+}
+function onToggle(el) {
+  const p = gp(el.dataset.id);
+  if (!p) return;
+  p[el.dataset.field] = el.checked ? "Si" : "No";
+  const lbl = document.getElementById(`tl_${p.id}_${el.dataset.field}`);
+  if (lbl) lbl.textContent = el.checked ? "Sí" : "No";
+  scheduleSave();
+}
+function onLink(el) {
+  const p = gp(el.dataset.id);
+  if (!p) return;
+  p[el.dataset.field] = el.value;
+  const btn = document.getElementById(`lb_${p.id}_${el.dataset.field}`);
+  if (btn) { btn.href = el.value||"#"; btn.style.display = el.value?"":"none"; }
+  scheduleSave();
+}
+function onRegion(el) {
+  const p = gp(el.dataset.id);
+  if (!p) return;
+  p.region = el.value;
+  el.closest("tr").dataset.region = el.value.toLowerCase();
+  // Rebuild commune dropdown
+  const cm = document.getElementById(`cm_${p.id}`);
+  if (cm) {
+    const list = RC[el.value] || [];
+    cm.innerHTML = `<option value="">— Seleccione —</option>`;
+    list.forEach(c => cm.innerHTML += `<option value="${esc(c)}">${esc(c)}</option>`);
+    // If old value still valid keep it
+    if (p.comuna && list.includes(p.comuna)) cm.value = p.comuna;
+    else p.comuna = "";
+  }
+  scheduleSave();
+}
+
+/* ════════════════════════════════════════════════
+   RECALCULATE
+   ════════════════════════════════════════════════ */
+function recDias(id) {
+  const p = gp(id);
+  if (!p) return;
+  const cell = document.getElementById(`dias_${id}`);
+  if (cell) cell.innerHTML = diasHtml(calcDias(p.carpetaFechaPrometida, p.carpetaFechaReal));
+}
+function recNorma(id) {
+  const p = gp(id);
+  if (!p) return;
+  const cell = document.getElementById(`norma_${id}`);
+  if (cell) cell.innerHTML = normaHtml(calcNorma(p.fechaPermiso));
+}
+
+/* ════════════════════════════════════════════════
+   EMAIL MODAL
+   ════════════════════════════════════════════════ */
+const DNAMES = { receta:"Receta", mdo:"Tabla de Mano de Obra", gantt:"Carta Gantt" };
+function sendEmail(id, dt) {
+  const p = gp(id);
+  if (!p) return;
+  document.getElementById("mt").textContent = `Correo — ${DNAMES[dt]||dt}`;
+  document.getElementById("mb").innerHTML   =
+    `<strong>Proyecto:</strong> ${esc(p.obra)}<br>
+     <strong>Región:</strong> ${esc(p.region)}<br>
+     <strong>Comuna:</strong> ${esc(p.comuna)}<br>
+     <strong>N° Casas:</strong> ${esc(p.casas)}<br><br>
+     La plantilla de correo para <em>${esc(DNAMES[dt]||dt)}</em> se configurará en una etapa posterior.<br>
+     Próximamente podrá enviar el correo estándar directamente desde aquí.`;
+  document.getElementById("ov").classList.add("on");
+}
+function closeModal() { document.getElementById("ov").classList.remove("on"); }
+
+/* ════════════════════════════════════════════════
+   SYNC APPSHEET
+   ════════════════════════════════════════════════ */
+const SYNC_SCRIPT = `(async()=>{
+/* Script de extracción AppSheet → Estado de Proyectos */
+const DB='e07d4aa1-e59e-4b9b-bf4c-32582e74e8fc||519201981|';
+async function dec(rec){
+  const b=new Uint8Array(rec.data);
+  const ds=new DecompressionStream('deflate');
+  const w=ds.writable.getWriter(),r=ds.readable.getReader();
+  w.write(b);w.close();
+  const parts=[];
+  for(;;){const{done,value}=await r.read();if(done)break;parts.push(value);}
+  const tot=parts.reduce((s,c)=>s+c.length,0);
+  const out=new Uint8Array(tot);let off=0;
+  for(const p of parts){out.set(p,off);off+=p.length;}
+  return JSON.parse(new TextDecoder().decode(out));
+}
+const db=await new Promise((ok,er)=>{
+  const q=indexedDB.open(DB);
+  q.onsuccess=e=>ok(e.target.result);
+  q.onerror=e=>er(e.target.error);
+});
+async function getKey(k){return new Promise((ok,er)=>{
+  const tx=db.transaction('keyvaluepairs','readonly');
+  const req=tx.objectStore('keyvaluepairs').get(k);
+  req.onsuccess=e=>ok(e.target.result);
+  req.onerror=e=>er(e.target.error);
+});}
+/* Leer tablas */
+let tRows=[],pRows=[],bRows=[];
+for(let i=0;i<3;i++){try{const r=await getKey('Tipologias~#'+i);tRows.push(...await dec(r));}catch(e){}}
+for(let i=0;i<2;i++){try{const r=await getKey('Proyectos~#'+i);pRows.push(...await dec(r));}catch(e){}}
+for(let i=0;i<20;i++){try{const r=await getKey('Beneficiario~#'+i);bRows.push(...await dec(r));}catch(e){}}
+db.close();
+/* Mapa tipologías: hash→{code,tipo,dorm,fam} */
+const tipMap={};
+for(const t of tRows){if(t[1])tipMap[t[1]]={code:t[2],tipo:t[3],dorm:+t[7]||0,fam:t[9]||''};}
+/* Mapa proyectos: código→nombre */
+const projMap={};
+for(const p of pRows){if(p[1]&&p[3])projMap[p[1]]=p[3];}
+/* Descripción bodega desde código RC */
+function bodDesc(code){
+  if(!code)return '';
+  if(/RC1700/.test(code))return '17.0m2 Madera';
+  if(/RC1600/.test(code))return '16.0m2 Madera';
+  if(/RC144013/.test(code))return '14.4m2 Acero';
+  if(/RC1440/.test(code))return '14.4m2 Madera';
+  if(/^AM/.test(code))return '17.0m2 Madera';
+  if(/FM13/.test(code))return '14.4m2 Acero';
+  if(/FM12/.test(code))return '14.4m2 Madera';
+  if(/EM14|FM14/.test(code))return '16.0m2 Madera';
+  return code;
+}
+/* Agrupar beneficiarios por proyecto */
+const byProj={};
+for(const b of bRows){
+  const name=projMap[b[2]];if(!name)continue;
+  if(!byProj[name])byProj[name]={viv:{},rc:{}};
+  if(b[10])byProj[name].viv[b[10]]=(byProj[name].viv[b[10]]||0)+1;
+  if(b[11])byProj[name].rc[b[11]]=(byProj[name].rc[b[11]]||0)+1;
+}
+/* Construir resultado */
+const result={};
+for(const [name,d] of Object.entries(byProj)){
+  const e={tipVivBase:'',cantVivBase:0,tipViv3D:'',cantViv3D:0,
+            tipDisc2D:'',cantDisc2D:0,tipDisc3D:'',cantDisc3D:0,tipRC:'',cantRC:0};
+  for(const [h,cnt] of Object.entries(d.viv)){
+    const t=tipMap[h];if(!t)continue;
+    if(t.fam==='Vivienda'&&t.dorm===2){if(!e.tipVivBase)e.tipVivBase=t.code;e.cantVivBase+=cnt;}
+    else if(t.fam==='Vivienda'&&t.dorm===3){if(!e.tipViv3D)e.tipViv3D=t.code;e.cantViv3D+=cnt;}
+    else if(t.fam==='Vivienda Disc.'&&t.dorm===2){if(!e.tipDisc2D)e.tipDisc2D=t.code;e.cantDisc2D+=cnt;}
+    else if(t.fam==='Vivienda Disc.'&&t.dorm===3){if(!e.tipDisc3D)e.tipDisc3D=t.code;e.cantDisc3D+=cnt;}
+    else if(!e.tipVivBase){e.tipVivBase=t.code;e.cantVivBase+=cnt;}
+  }
+  /* Fallback: si sólo hay viv3D (tipología única sin 2D), mover a VivBase */
+  if(!e.tipVivBase&&e.tipViv3D){e.tipVivBase=e.tipViv3D;e.cantVivBase=e.cantViv3D;e.tipViv3D='';e.cantViv3D=0;}
+  for(const [h,cnt] of Object.entries(d.rc)){
+    const t=tipMap[h];if(!t)continue;
+    e.tipRC=bodDesc(t.code);e.cantRC+=cnt;
+  }
+  result[name]=e;
+}
+const json=JSON.stringify(result,null,2);
+try{await navigator.clipboard.writeText(json);console.log('✅ JSON copiado al portapapeles ('+Object.keys(result).length+' proyectos)');}
+catch(e){console.log('⚠ No se pudo copiar. Copia manualmente:');}
+console.log(json);
+})();`;
+
+function openSyncModal() {
+  document.getElementById("sync-script").value = SYNC_SCRIPT;
+  document.getElementById("sync-json").value = "";
+  document.getElementById("sync-status").textContent = "";
+  document.getElementById("sync-status").className = "";
+  document.getElementById("sync-ov").classList.add("on");
+}
+function closeSyncModal() {
+  document.getElementById("sync-ov").classList.remove("on");
+}
+function copiarScript() {
+  navigator.clipboard.writeText(SYNC_SCRIPT).then(() => {
+    const btn = event.target;
+    btn.textContent = "✅ Copiado!";
+    setTimeout(() => btn.textContent = "📋 Copiar script", 2000);
+  });
+}
+/* Aliases AppSheet → obra HTML para nombres que difieren */
+const SYNC_ALIASES = {
+  /* AppSheet nombre (norm) → HTML obra (norm) */
+  "el coihue":                 "p39 el coihue",
+  "nuevo gorbea":              "p129 nuevo gorbea",
+  "com madihue":               "p14 com madihue",
+  "comunidad jose carvajal":   "p128 com jose carvajal",
+  "com jose carvajal":         "p128 com jose carvajal",
+  "com jose carvajal 2":       "p154 com jose carvajal 2",
+  "las raices de melipeuco":   "p131 raices de melipeuco",
+  "individual sonia quilaleo": "p116 sonia quilaleo",
+  "juan hulcan tolten":        "p12 juan huilcan tolten",
+  "com juan hulcan tolten":    "p12 juan huilcan tolten",
+  "el maiten tsh":             "p126 el maiten",
+  "com fermin manquilef":      "p132 com fermin manquilef",
+  "llaima antu":               "p150 llaima antu",
+  "ruka antu":                 "p147 ruka antu",
+  "perkenko 2025":             "p145 perkenko 2025",
+  "poyen ruka":                "p156 poyen ruka",
+  "los arrayanes":             "p155 los arrayanes",
+  "vilcun mapu":               "p153 vilcun mapu",
+  "peumayen 2023":             "p123 peumayen 2023",
+  "trovolhue":                 "p31 trovolhue",
+  "elsa pinchulaf":            "p28 elsa pinchulaf",
+};
+
+/* ── Firebase: sync residente/capataz desde Panel de Control ── */
+const FIREBASE_PERSONAL_URL = "https://scraices-dashboard-default-rtdb.firebaseio.com/personal_obra.json";
+const FIREBASE_OBRA_MAP = {
+  "P119": "P119 - Ñuke Mapu",
+  "P12":  "P12 - Juan Huilcan Tolten",
+  "P116": "P116 - Sonia Quilaleo",
+  "P14":  "P14 - Com. Madihue",
+  "P38":  "P38 - Aliwen",
+  "P126": "P126 - El Maitén",
+  "P39":  "P39 - El Coihue",
+  "P127": "P127 - Nuevo Cunco",
+  "P131": "P131 - Raíces de Melipeuco",
+  "P31":  "P31 - Trovolhue",
+  "P28":  "P28 - Elsa Pinchulaf",
+  "P129": "P129 - Nuevo Gorbea",
+  "P128": "P128 - Com. José Carvajal",
+  "P132": "P132 - Com. Fermín Manquilef",
+  "P150": "P150 - Llaima Antu",
+  "P154": "P154 - Com. Jose Carvajal 2",
+  "P147": "P147 - Ruka Antü",
+  "P145": "P145 - Perkenko 2025",
+  "P156": "P156 - Poyen Ruka",
+  "P155": "P155 - Los Arrayanes",
+  "P153": "P153 - Vilcún Mapu",
+  "P123": "P123 - Peumayen 2023",
+};
+
+async function syncEquipoDesdeFirebase() {
+  const btn = document.getElementById("btn-sync-equipo");
+  const orig = btn.textContent;
+  btn.textContent = "⏳ Sincronizando...";
+  btn.disabled = true;
+  try {
+    const res = await fetch(FIREBASE_PERSONAL_URL);
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+
+    /* Índice proyectos por nombre normalizado */
+    const idx = {};
+    for (const p of projects) idx[normObra(p.obra)] = p;
+
+    let updated = 0;
+    for (const [pid, personas] of Object.entries(data)) {
+      const obraName = FIREBASE_OBRA_MAP[pid];
+      if (!obraName) continue;
+      const p = idx[normObra(obraName)];
+      if (!p) continue;
+
+      const residentes = [], capataces = [];
+      for (const per of Object.values(personas)) {
+        if (!per || !per.nombre) continue;
+        if (per.rol === "residente") residentes.push(per.nombre);
+        else if (per.rol === "capataz") capataces.push(per.nombre);
+      }
+      if (residentes.length > 0) p.residente = residentes[0];
+      p.capataz1 = capataces[0] || "";
+      p.capataz2 = capataces[1] || "";
+      p.capataz3 = capataces[2] || "";
+      updated++;
+    }
+
+    renderTable();
+    scheduleSave();
+    btn.textContent = `✓ ${updated} obras actualizadas`;
+    setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 3000);
+  } catch(e) {
+    btn.textContent = "✗ Error: " + e.message;
+    console.error("syncEquipo:", e);
+    setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 4000);
+  }
+}
+
+function normalizeNombre(s) {
+  return (s||"").toLowerCase()
+    .normalize("NFD").replace(/[̀-ͯ]/g,"")
+    .replace(/[^a-z0-9]/g," ").replace(/\s+/g," ").trim();
+}
+function applySync() {
+  const raw = document.getElementById("sync-json").value.trim();
+  const st  = document.getElementById("sync-status");
+  if (!raw) { st.textContent = "⚠ Pega el JSON primero."; st.className="err"; return; }
+  let data;
+  try { data = JSON.parse(raw); }
+  catch(e) { st.textContent = "✗ JSON inválido: " + e.message; st.className="err"; return; }
+
+  /* Construir índice normalizado de nombres AppSheet */
+  const appIndex = {};
+  for (const n of Object.keys(data)) {
+    const norm = normalizeNombre(n);
+    appIndex[norm] = n;                        // exacto
+    if (SYNC_ALIASES[norm]) appIndex[SYNC_ALIASES[norm]] = n; // alias
+  }
+
+  let updated = 0, noMatch = [];
+  for (const p of projects) {
+    const pNorm = normalizeNombre(p.obra);
+    /* 1) Exacto o alias */
+    let appKey = appIndex[pNorm];
+    /* 2) Contención parcial */
+    if (!appKey) {
+      const appNames = Object.keys(data);
+      const found = appNames.find(n => {
+        const aN = normalizeNombre(n);
+        return aN.includes(pNorm) || pNorm.includes(aN);
+      });
+      if (found) appKey = found;
+    }
+    if (!appKey) { noMatch.push(p.obra); continue; }
+    const d = data[appKey];
+    p.tipVivBase  = d.tipVivBase  ?? p.tipVivBase;
+    p.cantVivBase = d.cantVivBase ?? p.cantVivBase;
+    p.tipViv3D    = d.tipViv3D    ?? p.tipViv3D;
+    p.cantViv3D   = d.cantViv3D   ?? p.cantViv3D;
+    p.tipDisc2D   = d.tipDisc2D   ?? p.tipDisc2D;
+    p.cantDisc2D  = d.cantDisc2D  ?? p.cantDisc2D;
+    p.tipDisc3D   = d.tipDisc3D   ?? p.tipDisc3D;
+    p.cantDisc3D  = d.cantDisc3D  ?? p.cantDisc3D;
+    p.tipRC       = d.tipRC       ?? p.tipRC;
+    p.cantRC      = d.cantRC      ?? p.cantRC;
+    updated++;
+  }
+  renderTable();
+  scheduleSave();
+  let msg = `✔ ${updated} proyecto(s) actualizados.`;
+  if (noMatch.length) msg += ` Sin coincidencia: ${noMatch.join(", ")}.`;
+  st.textContent = msg;
+  st.className = noMatch.length ? "ok" : "ok";
+  if (noMatch.length) { st.textContent += " (verificar manualmente)"; st.className="err"; }
+}
+
+/* ════════════════════════════════════════════════
+   ADD / DELETE
+   ════════════════════════════════════════════════ */
+function addProject() {
+  const p = mkProj();
+  projects.push(p);
+  const tbody = document.getElementById("pb");
+  tbody.appendChild(mkRow(p));
+  tbody.lastElementChild.scrollIntoView({ behavior:"smooth", block:"center" });
+  scheduleSave();
+}
+function delProj(id) {
+  if (!confirm("¿Eliminar este proyecto?")) return;
+  projects = projects.filter(p => p.id !== +id);
+  const row = document.getElementById(`row_${id}`);
+  if (row) row.remove();
+  scheduleSave();
+}
+
+/* ════════════════════════════════════════════════
+   FILTER
+   ════════════════════════════════════════════════ */
+function filterTable() {
+  const q = document.getElementById("searchBox").value.toLowerCase().trim();
+  document.querySelectorAll("#pb tr").forEach(tr => {
+    const ok = !q || tr.dataset.obra.includes(q) || tr.dataset.region.includes(q) || tr.dataset.comuna.includes(q);
+    tr.style.display = ok ? "" : "none";
+  });
+}
+
+/* ════════════════════════════════════════════════
+   PERSIST
+   ════════════════════════════════════════════════ */
+const SK = "ep_v11";
+
+function saveData() {
+  localStorage.setItem(SK, JSON.stringify({ nextId: _id, projects }));
+  document.getElementById("saveStatus").textContent = "Guardado: " + new Date().toLocaleString("es-CL");
+}
+
+let _st = null;
+function scheduleSave() {
+  document.getElementById("saveStatus").textContent = "Cambios pendientes…";
+  clearTimeout(_st);
+  _st = setTimeout(saveData, 1200);
+}
+
+function renderAll() {
+  const tb = document.getElementById("pb");
+  tb.innerHTML = "";
+  projects.forEach(p => tb.appendChild(mkRow(p)));
+}
+
+function normObra(s) {
+  return (s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]/g," ").replace(/\s+/g," ").trim();
+}
+
+const OBRA_RENAME = {
+  /* ep_v9 → ep_v10 */
+  "Nuke Mapu":                 "P119 - Ñuke Mapu",
+  "Com. Juan Hulcan Tolten":   "P12 - Juan Huilcan Tolten",
+  "Individual Sonia Quilaleo": "P116 - Sonia Quilaleo",
+  "Madihue":                   "P14 - Com. Madihue",
+  "Aliwen":                    "P38 - Aliwen",
+  "El Maiten TSH":             "P126 - El Maitén",
+  "Nuevo Cunco":               "P127 - Nuevo Cunco",
+  "El Colhue":                 "P39 - El Coihue",
+  "Raíces de Melipeuco":       "P131 - Raíces de Melipeuco",
+  /* ep_v10 → ep_v11 */
+  "Nueva Gorbea":              "P129 - Nuevo Gorbea",
+  "Com. Jose Carvajal":        "P128 - Com. José Carvajal",
+  "Com. Fermin Manquilef":     "P132 - Com. Fermín Manquilef",
+  "Llaima Antu":               "P150 - Llaima Antu",
+  "Jose Carvajal 2":           "P154 - Com. Jose Carvajal 2",
+  "Perkenko 2025":             "P145 - Perkenko 2025",
+  "Poyen Ruka":                "P156 - Poyen Ruka",
+  "Los Arrayanes":             "P155 - Los Arrayanes",
+  "Peumayen 2023 (Romina)":    "P123 - Peumayen 2023",
+  "Vilcun Mapu":               "P153 - Vilcún Mapu",
+  "Ruka Antu":                 "P147 - Ruka Antü",
+};
+
+function loadData() {
+  /* Intentar ep_v11; si no existe, migrar desde ep_v10, ep_v9, ep_v8 o ep_v7 */
+  let raw = localStorage.getItem(SK);
+  const prevRaw = localStorage.getItem("ep_v10") || localStorage.getItem("ep_v9") || localStorage.getItem("ep_v8") || localStorage.getItem("ep_v7");
+  const migrating = !raw && !!prevRaw;
+  if (!raw) raw = prevRaw;
+
+  if (raw) {
+    try {
+      const { nextId, projects: saved } = JSON.parse(raw);
+      _id = nextId || 1;
+
+      /* Índice INIT por nombre normalizado para rellenar datos vacíos */
+      const initIdx = {};
+      for (const d of INIT) initIdx[normObra(d.obra)] = d;
+
+      projects = (saved || []).map(p => {
+        p.id = +p.id;
+        if (!p.tipBase) p.tipBase = "";
+        if (!p.region) p.region = "";
+        if (!p.tipVivBase) p.tipVivBase = "";
+        if (!p.cantVivBase && p.cantVivBase !== 0) p.cantVivBase = p.cantViv2D ?? "";
+        if (!p.tipViv3D)  p.tipViv3D  = "";
+        if (!p.cantViv3D  && p.cantViv3D  !== 0) p.cantViv3D  = "";
+        if (!p.tipDisc2D) p.tipDisc2D = "";
+        if (!p.cantDisc2D && p.cantDisc2D !== 0) p.cantDisc2D = "";
+        if (!p.tipDisc3D) p.tipDisc3D = "";
+        if (!p.cantDisc3D && p.cantDisc3D !== 0) p.cantDisc3D = "";
+        if (!p.tipRC)     p.tipRC     = "";
+        if (!p.cantRC     && p.cantRC     !== 0) p.cantRC     = "";
+        delete p.cantViv2D;
+        if (p.preverifRealizada !== "Si" && p.preverifRealizada !== "No") p.preverifRealizada = "No";
+        if (!p.obsPreVerif) p.obsPreVerif = "";
+        if (p.habilitarConstruir !== "Si" && p.habilitarConstruir !== "No") p.habilitarConstruir = "No";
+        if (p.appSubida !== "Si" && p.appSubida !== "No") p.appSubida = "No";
+        if (p.correoReceta !== "Si") p.correoReceta = "No";
+        if (p.correoMdo    !== "Si") p.correoMdo    = "No";
+        if (p.correoGantt  !== "Si") p.correoGantt  = "No";
+        if (p.correoInicio !== "Si") p.correoInicio = "No";
+        delete p.preverifFecha;
+
+        /* ep_v7→ep_v8: rellenar conteos vacíos desde INIT */
+        const ini = initIdx[normObra(p.obra)];
+        if (ini) {
+          const fill = (field) => (p[field] === "" || p[field] == null) ? (ini[field] ?? "") : p[field];
+          p.tipVivBase  = fill("tipVivBase");  p.cantVivBase = fill("cantVivBase");
+          p.tipViv3D    = fill("tipViv3D");    p.cantViv3D   = fill("cantViv3D");
+          p.tipDisc2D   = fill("tipDisc2D");   p.cantDisc2D  = fill("cantDisc2D");
+          p.tipDisc3D   = fill("tipDisc3D");   p.cantDisc3D  = fill("cantDisc3D");
+          p.tipRC       = fill("tipRC");       p.cantRC      = fill("cantRC");
+
+          /* ep_v8→ep_v9: fechaPermiso y carpetaFechaPrometida desde INIT si vacíos;
+             inicioProbable si aún tenía el placeholder "2025-05-10";
+             carpetaEntregada corregida donde INIT dice "No" */
+          const fill2 = (f) => (p[f] === "" || p[f] == null) ? (ini[f] ?? "") : p[f];
+          p.fechaPermiso          = fill2("fechaPermiso");
+          p.carpetaFechaPrometida = fill2("carpetaFechaPrometida");
+          if (p.inicioProbable === "2025-05-10" && ini.inicioProbable && ini.inicioProbable !== "2025-05-10")
+            p.inicioProbable = ini.inicioProbable;
+          if (ini.carpetaEntregada === "No" && p.carpetaEntregada === "Si")
+            p.carpetaEntregada = "No";
+        }
+        /* ep_v10→ep_v11: renombrar obras con nuevos P-codes */
+        if (OBRA_RENAME[p.obra]) p.obra = OBRA_RENAME[p.obra];
+        return p;
+      });
+      /* ep_v10→ep_v11: agregar P28 y P31 si no existen */
+      const existingObras = new Set(projects.map(p => normObra(p.obra)));
+      _id = Math.max(_id, ...projects.map(p => p.id + 1), 1);
+      for (const ini of INIT) {
+        if (!existingObras.has(normObra(ini.obra))) {
+          if (ini.obra === "P31 - Trovolhue" || ini.obra === "P28 - Elsa Pinchulaf") {
+            projects.push(mkProj(ini));
+          }
+        }
+      }
+      if (migrating) saveData(); /* guardar inmediatamente en ep_v11 */
+    } catch(e) { projects = []; }
+  } else {
+    projects = INIT.map(d => mkProj(d));
+  }
+  _id = Math.max(_id, ...projects.map(p => p.id + 1), 1);
+  renderAll();
+}
+
+/* ════════════════════════════════════════════════
+   EXPORT EXCEL
+   ════════════════════════════════════════════════ */
+function exportExcel() {
+  const hdr = ["Obra","Región","Comuna","N° Casas",
+    "Tip. Viv Base","Cant. Viv Base","Tip. Viv 3D","Cant. Viv 3D",
+    "Tip. Disc 2D","Cant. Disc 2D","Tip. Disc 3D","Cant. Disc 3D",
+    "Tipo Bodega RC","Cant. Bodega RC",
+    "Carpeta Entregada","F. Prometida Carpeta","F. Real Carpeta","Días Diferencia",
+    "Pre-Verif Realizada","Obs. Pre-Verif","Hab. para Construir","App Subida",
+    "Inicio Probable","F. Permiso Edif.","Norma Eléctrica",
+    "Receta Estado","Receta Link","Correo Receta",
+    "MdO Estado","MdO Link","Correo MdO",
+    "Gantt Estado","Gantt Link","Correo Gantt",
+    "Atributos Estado","Atributos Link",
+    "Correo Inicio Obra",
+    "Condiciones Especiales",
+    "Residente","Capataz 1","Capataz 2","Capataz 3"];
+
+  const cell = v => `<td>${String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;')}</td>`;
+
+  const dataRows = projects.map(p => {
+    const dias = calcDias(p.carpetaFechaPrometida, p.carpetaFechaReal);
+    return [p.obra, p.region, p.comuna, p.casas,
+      p.tipVivBase, p.cantVivBase, p.tipViv3D, p.cantViv3D,
+      p.tipDisc2D, p.cantDisc2D, p.tipDisc3D, p.cantDisc3D,
+      p.tipRC, p.cantRC,
+      p.carpetaEntregada, p.carpetaFechaPrometida, p.carpetaFechaReal, dias??'',
+      p.preverifRealizada, p.obsPreVerif, p.habilitarConstruir, p.appSubida,
+      p.inicioProbable, p.fechaPermiso, calcNorma(p.fechaPermiso)||'',
+      p.recetaEstado, p.recetaLink, p.correoReceta,
+      p.mdoEstado, p.mdoLink, p.correoMdo,
+      p.ganttEstado, p.ganttLink, p.correoGantt,
+      p.atributosEstado, p.atributosLink,
+      p.correoInicio,
+      p.condicionesEspeciales,
+      p.residente, p.capataz1, p.capataz2, p.capataz3
+    ].map(cell).join('');
+  });
+
+  const xls = `
+    <html xmlns:o="urn:schemas-microsoft-com:office:office"
+          xmlns:x="urn:schemas-microsoft-com:office:excel"
+          xmlns="http://www.w3.org/TR/REC-html40">
+    <head><meta charset="UTF-8">
+    <!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets>
+    <x:ExcelWorksheet><x:Name>Estado de Proyectos</x:Name>
+    <x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>
+    </x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
+    </head><body><table>
+    <thead><tr style="background:#1a3a5c;color:#fff;font-weight:bold">${hdr.map(h=>`<th>${h}</th>`).join('')}</tr></thead>
+    <tbody>${dataRows.map(r=>`<tr>${r}</tr>`).join('')}</tbody>
+    </table></body></html>`;
+
+  const a = Object.assign(document.createElement('a'), {
+    href: 'data:application/vnd.ms-excel;charset=utf-8,' + encodeURIComponent(xls),
+    download: `Estado_Proyectos_${new Date().toISOString().slice(0,10)}.xls`
+  });
+  a.click();
+}
+
+/* ════════════════════════════════════════════════
+   INIT
+   ════════════════════════════════════════════════ */
+document.addEventListener("DOMContentLoaded", loadData);
+</script>
+</body>
+</html>
