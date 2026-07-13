@@ -256,7 +256,7 @@ button.dbtn:hover { background: #922b21; }
 <!-- NOTE -->
 <div class="note">
   <strong>Nota:</strong> Datos guardados automáticamente en Firebase (compartido entre equipos). ·
-  <strong>Norma eléctrica</strong>: permisos posteriores a julio 2011 → NORMA NUEVA. ·
+  <strong>Norma eléctrica</strong>: permisos hasta el 11-07-2021 → ANTIGUA · desde el 12-07-2021 → NUEVA. ·
   <strong>Días diferencia</strong>: positivo = retraso (rojo), negativo = adelanto (verde). ·
   El toggle <span style="color:#27ae60;font-weight:bold">verde</span> = Sí realizado.
 </div>
@@ -768,7 +768,7 @@ function calcDias(a, b) {
 function calcNorma(f) {
   if (!f) return null;
   const d = new Date(f);
-  return isNaN(d) ? null : d > new Date("2011-07-30") ? "NUEVA" : "ANTIGUA";
+  return isNaN(d) ? null : d > new Date("2021-07-11") ? "NUEVA" : "ANTIGUA";
 }
 
 /* ════════════════════════════════════════════════
