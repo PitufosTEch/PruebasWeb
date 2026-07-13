@@ -655,6 +655,9 @@ const INIT = [
     correoReceta:"No", correoMdo:"No", correoGantt:"No", correoInicio:"No" },
 ];
 
+/* Lista maestra de obras (derivada de INIT — misma fuente de verdad) */
+const MASTER_OBRAS = INIT.map(d => d.obra);
+
 /* ════════════════════════════════════════════════
    MODELO
    ════════════════════════════════════════════════ */
@@ -708,6 +711,17 @@ function calcNorma(f) {
 /* ════════════════════════════════════════════════
    CELL BUILDERS
    ════════════════════════════════════════════════ */
+function obraSelect(id, currentVal) {
+  const used = new Set(projects.filter(p => p.id !== id).map(p => p.obra).filter(Boolean));
+  let s = `<select id="obra_${id}" data-id="${id}" onchange="onObra(this)" style="width:155px;font-weight:bold;font-size:10.5px">`;
+  s += `<option value="">— Seleccione obra —</option>`;
+  MASTER_OBRAS.forEach(o => {
+    if (used.has(o)) return;
+    s += `<option value="${esc(o)}" ${o === currentVal ? "selected" : ""}>${esc(o)}</option>`;
+  });
+  return s + `</select>`;
+}
+
 function regionSel(id, val) {
   let s = `<select id="rg_${id}" data-id="${id}" data-field="region" onchange="onRegion(this)" style="width:148px">`;
   s += `<option value="">— Seleccione —</option>`;
@@ -793,10 +807,7 @@ function mkRow(p) {
   tr.dataset.comuna = (p.comuna||"").toLowerCase();
 
   tr.innerHTML = `
-  <td>
-    <input type="text" data-id="${id}" data-field="obra" value="${esc(p.obra)}"
-      placeholder="Nombre o código…" oninput="onText(this)" style="width:100%">
-  </td>
+  <td>${obraSelect(id, p.obra)}</td>
   <td>${regionSel(id, p.region)}</td>
   <td>${comunaSel(id, p.region, p.comuna)}</td>
   <td><input type="number" min="0" data-id="${id}" data-field="casas" value="${esc(p.casas)}"
@@ -897,6 +908,30 @@ function mkRow(p) {
 /* ════════════════════════════════════════════════
    EVENT HANDLERS
    ════════════════════════════════════════════════ */
+function onObra(el) {
+  const p = gp(el.dataset.id);
+  if (!p) return;
+  p.obra = el.value;
+  const tr = el.closest("tr");
+  if (tr) tr.dataset.obra = el.value.toLowerCase();
+  refreshAllObraSelects();
+  scheduleSave();
+}
+
+function refreshAllObraSelects() {
+  const used = new Set(projects.map(p => p.obra).filter(Boolean));
+  projects.forEach(p => {
+    const sel = document.getElementById(`obra_${p.id}`);
+    if (!sel) return;
+    const current = p.obra;
+    sel.innerHTML = `<option value="">— Seleccione obra —</option>`;
+    MASTER_OBRAS.forEach(o => {
+      if (used.has(o) && o !== current) return;
+      sel.innerHTML += `<option value="${esc(o)}" ${o === current ? "selected" : ""}>${esc(o)}</option>`;
+    });
+  });
+}
+
 function onText(el) {
   const p = gp(el.dataset.id);
   if (!p) return;
@@ -1307,6 +1342,7 @@ function delProj(id) {
   projects = projects.filter(p => p.id !== +id);
   const row = document.getElementById(`row_${id}`);
   if (row) row.remove();
+  refreshAllObraSelects();
   scheduleSave();
 }
 
@@ -1355,6 +1391,7 @@ function renderAll() {
   const tb = document.getElementById("pb");
   tb.innerHTML = "";
   projects.forEach(p => tb.appendChild(mkRow(p)));
+  refreshAllObraSelects();
 }
 
 function normObra(s) {
