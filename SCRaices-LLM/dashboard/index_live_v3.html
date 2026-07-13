@@ -4091,7 +4091,7 @@ const CURVAS_S_CONFIG = {
     ],
 };
 
-const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios, proyectoSel, proy, garantiasProy = [], muestrasProy = [], muestrasResumen = null, kpis = null }) => {
+const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios, proyectoSel, proy, garantiasProy = [], muestrasProy = [], muestrasResumen = null, kpis = null, cierresForzados = {} }) => {
     const [expandida, setExpandida] = React.useState(null);
     const [busqueda, setBusqueda] = React.useState("");
     const [filtro, setFiltro] = React.useState("todas"); // todas | pendientes | recepcionadas
@@ -10293,7 +10293,7 @@ const App = () => {
                     {tab === "financiero" && <FinancieroTab viviendas={viviendas} />}
                     {tab === "mano_obra" && <ManoDeObraTab viviendas={viviendas} />}
                     {tab === "estados_pago" && <EstadosPagoTab viviendas={viviendas} />}
-                    {tab === "estado_general" && <EstadoGeneralTab viviendas={viviendas} observaciones={observaciones} grupos={grupos} resumenComentarios={resumenComentarios} proyectoSel={proyectoSel} proy={proy} garantiasProy={garantiasProy} muestrasProy={getMuestrasProy()} muestrasResumen={getMuestrasResumen()} kpis={kpis} />}
+                    {tab === "estado_general" && <EstadoGeneralTab viviendas={viviendas} observaciones={observaciones} grupos={grupos} resumenComentarios={resumenComentarios} proyectoSel={proyectoSel} proy={proy} garantiasProy={garantiasProy} muestrasProy={getMuestrasProy()} muestrasResumen={getMuestrasResumen()} kpis={kpis} cierresForzados={cierresForzados} />}
                     {tab === "configuracion" && <ConfiguracionView grupos={grupos} setGrupos={setGruposForProy} viviendas={viviendas} proyectoSel={proyectoSel} personalObra={personalObra} personalObraRef={personalObraRef} personalGlobal={personalGlobal} />}
                 </div>
 
