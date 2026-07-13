@@ -663,7 +663,14 @@ const ETAPAS_CONFIG_FULL = {
 
             Object.entries(CIERRE_COLS).forEach(([col, label]) => {
                 const val = String(e[col] || '').trim().toLowerCase();
-                if (val && val !== 'nan') inspMap[idB].cierre[label] = val === 'terminado' ? 1 : 0;
+                if (val && val !== 'nan') {
+                    if (val === 'terminado') {
+                        inspMap[idB].cierre[label] = 1;          // verde gana: no se puede sobreescribir
+                    } else if (inspMap[idB].cierre[label] !== 1) {
+                        inspMap[idB].cierre[label] = 0;          // rojo solo si aún no está verde
+                    }
+                }
+                // Sin valor → clave no presente en cierre → gris (sin datos)
             });
         });
 
@@ -1765,6 +1772,15 @@ const getEstadoGeneral = (estadoEtapas) => {
 // ========== GRUPO COLORS & HELPERS ==========
 const ACTIVIDADES_HAB = ["Empalme", "Pre-F1", "Desarme", "Escombros", "Aseo"];
 
+// Verificación de cierre — orden y etiquetas para los badges (fuente: AppSheet Ejecucion)
+const CIERRE_BADGES = [
+    {label: "Empalme",   key: "E"},
+    {label: "Pre-F1",    key: "P"},
+    {label: "Desarme",   key: "D"},
+    {label: "Escombros", key: "R"},
+    {label: "Aseo",      key: "A"},
+];
+
 const CONSULTAS_ETAPA = {
     "02_1ERA_ETAPA": "Postes instalados?",
     "03_2DA_ETAPA": "TE1 solicitado?",
@@ -2020,13 +2036,19 @@ const ViviendaCard = ({ beneficiario, estadoEtapas, expanded, onToggle, grupoCol
                                 <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden"><div className="triple-bar bg-emerald-500" style={{width:`${insp ? insp.pct_total : 0}%`}} /></div>
                                 <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden"><div className="triple-bar bg-violet-500" style={{width:`${Math.min(avance.porcentaje, 100)}%`}} /></div>
                             </div>
-                            <div className="flex gap-0.5 mt-1.5" onClick={(e) => e.stopPropagation()}>
-                                {ACTIVIDADES_HAB.map(act => {
-                                    const done = actividades && actividades[act];
+                            <div className="flex gap-0.5 mt-1.5" title="Verificación de cierre — AppSheet">
+                                {CIERRE_BADGES.map(({label, key}) => {
+                                    const val = insp && insp.cierre != null && key in insp.cierre ? insp.cierre[key] : undefined;
+                                    const cls = val === 1
+                                        ? "bg-green-500 text-white border-green-600 shadow-sm"
+                                        : val === 0
+                                            ? "bg-red-100 text-red-500 border-red-300"
+                                            : "bg-gray-100 text-gray-300 border-gray-200";
+                                    const ttl = val === 1 ? `${label}: Terminado` : val === 0 ? `${label}: Pendiente` : `${label}: Sin datos`;
                                     return (
-                                        <button key={act} onClick={() => toggleActividad(b.ID_Benef, act)} className={`w-6 h-6 rounded text-[7px] leading-tight font-bold border transition-all flex items-center justify-center ${done ? "bg-green-500 text-white border-green-600 shadow-sm" : "bg-gray-100 text-gray-400 border-gray-200 hover:border-gray-400 hover:bg-gray-200"}`} title={done ? `${act}: Terminado (${done.fecha.replace('T', ' ')})` : `${act}: Pendiente — Click para marcar`}>
-                                            {done ? "✓" : act.substring(0, 2)}
-                                        </button>
+                                        <span key={key} className={`w-6 h-6 rounded text-[7px] leading-tight font-bold border flex items-center justify-center ${cls}`} title={ttl}>
+                                            {label.substring(0, 2)}
+                                        </span>
                                     );
                                 })}
                             </div>
@@ -2157,14 +2179,14 @@ const ViviendaCard = ({ beneficiario, estadoEtapas, expanded, onToggle, grupoCol
                                     </div>
                                 ))}
                             </div>
-                            {insp.cierre && Object.keys(insp.cierre).length > 0 && (
-                                <div className="mt-3 flex items-center gap-2 text-xs">
-                                    <span className="text-gray-500 font-medium">Cierre:</span>
-                                    {Object.entries(insp.cierre).map(([label, done]) => (
-                                        <span key={label} className={`inline-flex items-center justify-center w-5 h-5 rounded text-[9px] font-bold ${done ? "bg-green-500 text-white" : "bg-red-100 text-red-400 border border-red-200"}`}>{label}</span>
-                                    ))}
-                                </div>
-                            )}
+                            <div className="mt-3 flex items-center gap-1.5 text-xs">
+                                <span className="text-gray-400 font-medium text-[10px]">Verif. cierre:</span>
+                                {CIERRE_BADGES.map(({label, key}) => {
+                                    const val = insp && insp.cierre != null && key in insp.cierre ? insp.cierre[key] : undefined;
+                                    const cls = val === 1 ? "bg-green-500 text-white" : val === 0 ? "bg-red-100 text-red-400 border border-red-200" : "bg-gray-100 text-gray-300 border border-gray-200";
+                                    return <span key={key} className={`inline-flex items-center justify-center w-6 h-5 rounded text-[9px] font-bold ${cls}`} title={val === 1 ? `${label}: Terminado` : val === 0 ? `${label}: Pendiente` : `${label}: Sin datos`}>{label.substring(0,2)}</span>;
+                                })}
+                            </div>
                         </div>
                     ) : <div className="mt-4 pt-4 border-t border-gray-200"><p className="text-xs text-gray-400">Sin registros de inspeccion</p></div>}
                     {/* Pagos por Familia */}
