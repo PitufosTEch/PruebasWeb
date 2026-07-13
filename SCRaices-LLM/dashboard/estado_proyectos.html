@@ -169,8 +169,8 @@ select.v-nook { background: #c0392b !important; color: #fff !important; }
 .obs-edit-btn:hover { background: #5d6d7e; }
 
 /* ── MODAL OBSERVACIONES ── */
-#obs-ov { display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:350; align-items:center; justify-content:center; }
-#obs-ov.on { display:flex; }
+#obs-ov, #pv-ov { display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:350; align-items:center; justify-content:center; }
+#obs-ov.on, #pv-ov.on { display:flex; }
 #obs-box { background:#fff; border-radius:9px; padding:22px 26px; width:520px; max-width:94%; box-shadow:0 8px 32px rgba(0,0,0,.3); }
 #obs-box h2 { font-size:13px; color:#1a3a5c; margin-bottom:4px; }
 #obs-box .obs-obra-name { font-size:11px; color:#888; margin-bottom:10px; }
@@ -257,7 +257,6 @@ button.dbtn:hover { background: #922b21; }
 <div id="toolbar">
   <label>Buscar: <input type="text" id="searchBox" placeholder="Filtrar por obra, región o comuna…" oninput="filterTable()"></label>
   <button onclick="openSyncModal()" style="padding:5px 13px;background:#1a6b3a;color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:12px;font-weight:bold;letter-spacing:.3px">↻ Sincronizar AppSheet</button>
-  <button id="btn-sync-equipo" onclick="syncEquipoDesdeFirebase(true)" style="padding:5px 13px;background:#1a4b6b;color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:12px;font-weight:bold;letter-spacing:.3px">↺ Sync Equipo</button>
   <span id="saveStatus">Sin cambios pendientes</span>
 </div>
 
@@ -386,6 +385,19 @@ button.dbtn:hover { background: #922b21; }
     <div class="obs-actions">
       <button class="obs-btn-cancel" onclick="closeObsModal()">Cerrar</button>
       <button class="obs-btn-save"   onclick="saveObsModal()">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL OBS. PRE-VERIFICACIÓN -->
+<div id="pv-ov">
+  <div id="obs-box">
+    <h2>Obs. Pre-Verificación</h2>
+    <div class="obs-obra-name" id="pv-obra-name"></div>
+    <textarea id="pv-textarea" placeholder="Escribe las observaciones de pre-verificación aquí…"></textarea>
+    <div class="obs-actions">
+      <button class="obs-btn-cancel" onclick="closeObsPVModal()">Cerrar</button>
+      <button class="obs-btn-save"   onclick="saveObsPVModal()">💾 Guardar</button>
     </div>
   </div>
 </div>
@@ -916,8 +928,10 @@ function mkRow(p) {
 
   <!-- Pre-Verif -->
   <td>${toggle(id,"preverifRealizada",p.preverifRealizada)}</td>
-  <td><input type="text" data-id="${id}" data-field="obsPreVerif" value="${esc(p.obsPreVerif)}"
-    placeholder="Obs. pre-verif…" oninput="onText(this)" style="width:150px"></td>
+  <td style="vertical-align:top;padding:3px 4px">
+    <div class="obs-preview ${p.obsPreVerif ? '' : 'obs-empty'}" id="pv_${id}" onclick="openObsPVModal(${id})">${esc(p.obsPreVerif) || '—'}</div>
+    <button class="obs-edit-btn" onclick="openObsPVModal(${id})">✎ ver / editar</button>
+  </td>
   <td>${toggle(id,"habilitarConstruir",p.habilitarConstruir)}</td>
 
   <!-- App -->
@@ -1110,7 +1124,41 @@ function saveObsModal() {
   closeObsModal();
 }
 /* Cerrar con Escape */
-document.addEventListener("keydown", e => { if (e.key === "Escape" && _obsId !== null) closeObsModal(); });
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") {
+    if (_obsId !== null) closeObsModal();
+    if (_pvId  !== null) closeObsPVModal();
+  }
+});
+
+/* ── MODAL OBS. PRE-VERIFICACIÓN ── */
+let _pvId = null;
+function openObsPVModal(id) {
+  const p = gp(id);
+  if (!p) return;
+  _pvId = id;
+  document.getElementById("pv-obra-name").textContent = p.obra;
+  document.getElementById("pv-textarea").value = p.obsPreVerif || "";
+  document.getElementById("pv-ov").classList.add("on");
+  setTimeout(() => document.getElementById("pv-textarea").focus(), 50);
+}
+function closeObsPVModal() {
+  document.getElementById("pv-ov").classList.remove("on");
+  _pvId = null;
+}
+function saveObsPVModal() {
+  const p = gp(_pvId);
+  if (!p) return;
+  const val = document.getElementById("pv-textarea").value;
+  p.obsPreVerif = val;
+  const preview = document.getElementById(`pv_${_pvId}`);
+  if (preview) {
+    preview.textContent = val || "—";
+    preview.classList.toggle("obs-empty", !val);
+  }
+  scheduleSave();
+  closeObsPVModal();
+}
 
 /* ════════════════════════════════════════════════
    EMAIL MODAL
