@@ -9871,8 +9871,8 @@ const App = () => {
                         <select className="bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 flex-1 max-w-md focus:outline-none focus:ring-2 focus:ring-violet-500" value={proyectoSel} onChange={e => { setProyectoSel(e.target.value); setExpandida(null); setTab("viviendas"); }}>
                             {PROYECTOS_DATA.map(p => {
                                 const bens = BENEFICIARIOS_DATA.filter(b => String(b.ID_Proy) === String(p.ID_proy));
-                                const nRecep = bens.filter(b => b.fecha_recepcion).length;
-                                const fin = p.estado === 'finalizado' || (bens.length > 0 && nRecep === bens.length);
+                                const nCerradas = bens.filter(b => b.fecha_recepcion || cierresForzados[b.ID_Benef]).length;
+                                const fin = p.estado === 'finalizado' || (bens.length > 0 && nCerradas === bens.length);
                                 return <option key={p.ID_proy} value={p.ID_proy}>{fin ? '✓ ' : ''}{p.ID_proy} · {p.NOMBRE_PROYECTO} — {p.COMUNA} ({bens.length} viv.)</option>;
                             })}
                         </select>
