@@ -702,7 +702,7 @@ function calcDias(a, b) {
 function calcNorma(f) {
   if (!f) return null;
   const d = new Date(f);
-  return isNaN(d) ? null : d > new Date("2011-07-31") ? "NUEVA" : "ANTIGUA";
+  return isNaN(d) ? null : d > new Date("2011-07-30") ? "NUEVA" : "ANTIGUA";
 }
 
 /* ════════════════════════════════════════════════
