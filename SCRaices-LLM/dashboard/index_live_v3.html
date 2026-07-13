@@ -4630,12 +4630,15 @@ ${_despachosResidenteHtml}
 ${inf.footerHtml}
 </body>
 </html>`;
+        const _fnameR = `Reporte_Residente_${inf.meta.proyectoSel}_Sem${inf.meta.semana}.html`;
         const _blobR = new Blob([html], {type:'text/html;charset=utf-8'});
         const _urlR = URL.createObjectURL(_blobR);
         const _aR = document.createElement('a');
-        _aR.href = _urlR; _aR.download = `Reporte_Residente_${inf.meta.proyectoSel}_Sem${inf.meta.semana}.html`;
+        _aR.href = _urlR; _aR.download = _fnameR;
         document.body.appendChild(_aR); _aR.click(); _aR.remove();
-        setTimeout(() => URL.revokeObjectURL(_urlR), 5000);
+        const _wR = window.open(_urlR, '_blank');
+        if (!_wR) alert('Archivo descargado: ' + _fnameR + '. Permite ventanas emergentes para verlo en una pestaña.');
+        setTimeout(() => URL.revokeObjectURL(_urlR), 60000);
     };
 
     // Reporte filtrado por capataz: métricas, curvas S y grupos solo de ese capataz
@@ -4812,12 +4815,15 @@ ${inf.footerHtml}
 </body>
 </html>`;
         const _capSafe = capatazFiltro.replace(/[^a-zA-Z0-9À-ſ]/g, '_');
+        const _fnameCap = `Reporte_Capataz_${_capSafe}_${inf.meta.proyectoSel}_Sem${inf.meta.semana}.html`;
         const _blobCap = new Blob([html], {type:'text/html;charset=utf-8'});
         const _urlCap = URL.createObjectURL(_blobCap);
         const _aCap = document.createElement('a');
-        _aCap.href = _urlCap; _aCap.download = `Reporte_Capataz_${_capSafe}_${inf.meta.proyectoSel}_Sem${inf.meta.semana}.html`;
+        _aCap.href = _urlCap; _aCap.download = _fnameCap;
         document.body.appendChild(_aCap); _aCap.click(); _aCap.remove();
-        setTimeout(() => URL.revokeObjectURL(_urlCap), 5000);
+        const _wCap = window.open(_urlCap, '_blank');
+        if (!_wCap) alert('Archivo descargado: ' + _fnameCap + '. Permite ventanas emergentes para verlo en una pestaña.');
+        setTimeout(() => URL.revokeObjectURL(_urlCap), 60000);
     };
 
     const generarInformeAdquisicionesHTML = async () => {
