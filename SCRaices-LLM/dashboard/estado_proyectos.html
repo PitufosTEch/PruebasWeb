@@ -1412,31 +1412,20 @@ function normalizeNombre(s) {
     .normalize("NFD").replace(/[̀-ͯ]/g,"")
     .replace(/[^a-z0-9]/g," ").replace(/\s+/g," ").trim();
 }
-function applySync() {
-  const raw = document.getElementById("sync-json").value.trim();
-  const st  = document.getElementById("sync-status");
-  if (!raw) { st.textContent = "⚠ Pega el JSON primero."; st.className="err"; return; }
-  let data;
-  try { data = JSON.parse(raw); }
-  catch(e) { st.textContent = "✗ JSON inválido: " + e.message; st.className="err"; return; }
-
-  /* Construir índice normalizado de nombres AppSheet */
+function applySyncData(data) {
+  /* Núcleo del sync: recibe el objeto {nombreObra: {tipVivBase, ...}} */
   const appIndex = {};
   for (const n of Object.keys(data)) {
     const norm = normalizeNombre(n);
-    appIndex[norm] = n;                        // exacto
-    if (SYNC_ALIASES[norm]) appIndex[SYNC_ALIASES[norm]] = n; // alias
+    appIndex[norm] = n;
+    if (SYNC_ALIASES[norm]) appIndex[SYNC_ALIASES[norm]] = n;
   }
-
   let updated = 0, noMatch = [];
   for (const p of projects) {
     const pNorm = normalizeNombre(p.obra);
-    /* 1) Exacto o alias */
     let appKey = appIndex[pNorm];
-    /* 2) Contención parcial */
     if (!appKey) {
-      const appNames = Object.keys(data);
-      const found = appNames.find(n => {
+      const found = Object.keys(data).find(n => {
         const aN = normalizeNombre(n);
         return aN.includes(pNorm) || pNorm.includes(aN);
       });
@@ -1456,13 +1445,40 @@ function applySync() {
     p.cantRC      = d.cantRC      ?? p.cantRC;
     updated++;
   }
-  renderTable();
+  return { updated, noMatch };
+}
+
+async function autoSyncTipologiasDesdeFirebase() {
+  try {
+    const res = await fetch(FIREBASE_TIPOLOGIAS);
+    if (!res.ok) return;
+    const fb = await res.json();
+    if (!fb || !fb.data) return;
+    const { updated } = applySyncData(fb.data);
+    if (updated > 0) {
+      renderAll();
+      scheduleSave();
+      const st = document.getElementById("saveStatus");
+      const fecha = fb._updated ? ` · datos del ${fb._updated.slice(0,10)}` : "";
+      st.textContent = `Tipologías sincronizadas desde AppSheet${fecha} (${updated} obras)`;
+    }
+  } catch(e) { console.warn("autoSync tipologías:", e); }
+}
+
+function applySync() {
+  const raw = document.getElementById("sync-json").value.trim();
+  const st  = document.getElementById("sync-status");
+  if (!raw) { st.textContent = "⚠ Pega el JSON primero."; st.className="err"; return; }
+  let data;
+  try { data = JSON.parse(raw); }
+  catch(e) { st.textContent = "✗ JSON inválido: " + e.message; st.className="err"; return; }
+  const { updated, noMatch } = applySyncData(data);
+  renderAll();
   scheduleSave();
   let msg = `✔ ${updated} proyecto(s) actualizados.`;
-  if (noMatch.length) msg += ` Sin coincidencia: ${noMatch.join(", ")}.`;
+  if (noMatch.length) { msg += ` Sin coincidencia: ${noMatch.join(", ")}. (verificar manualmente)`; st.className="err"; }
+  else { st.className = "ok"; }
   st.textContent = msg;
-  st.className = noMatch.length ? "ok" : "ok";
-  if (noMatch.length) { st.textContent += " (verificar manualmente)"; st.className="err"; }
 }
 
 /* ════════════════════════════════════════════════
@@ -1499,7 +1515,8 @@ function filterTable() {
 /* ════════════════════════════════════════════════
    PERSIST — Firebase RTDB (remoto, compartido)
    ════════════════════════════════════════════════ */
-const FIREBASE_EP_URL = "https://scraices-dashboard-default-rtdb.firebaseio.com/estado_proyectos.json";
+const FIREBASE_EP_URL      = "https://scraices-dashboard-default-rtdb.firebaseio.com/estado_proyectos.json";
+const FIREBASE_TIPOLOGIAS  = "https://scraices-dashboard-default-rtdb.firebaseio.com/tipologias_sync.json";
 
 async function saveData() {
   const st = document.getElementById("saveStatus");
@@ -1658,7 +1675,8 @@ async function loadData() {
   _id = Math.max(_id, ...projects.map(p => p.id + 1), 1);
   renderAll();
   if (fromFirebase) st.textContent = "Datos cargados desde Firebase · " + new Date().toLocaleTimeString("es-CL");
-  syncEquipoDesdeFirebase(); // auto-sync equipo desde dashboard en cada carga
+  syncEquipoDesdeFirebase();         // auto-sync equipo desde dashboard
+  autoSyncTipologiasDesdeFirebase(); // auto-sync tipologías desde AppSheet (vía Firebase)
 }
 
 /* ════════════════════════════════════════════════
