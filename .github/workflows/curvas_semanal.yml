@@ -169,3 +169,49 @@ jobs:
       - name: Resumen en caso de error
         if: failure()
         run: echo "::error::Post-proceso falló. Revisa el log completo."
+
+  # ── Job 3: Sincronizar despachos futuros AppSheet → Firebase ─────────────
+  sincronizar-despachos:
+    name: Sincronizar Despachos AppSheet → Firebase
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: curvas-proyecto
+    if: always()
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: despachos-pip-${{ runner.os }}
+          restore-keys: despachos-pip-
+
+      - name: Instalar dependencias
+        run: pip install --upgrade pip requests playwright
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}
+          restore-keys: playwright-chromium-
+
+      - name: Instalar Playwright + Chromium
+        run: playwright install chromium --with-deps
+
+      - name: Sincronizar despachos futuros → Firebase /despachos_data
+        working-directory: SCRaices-LLM/curvas_s
+        env:
+          APPSHEET_COOKIES_B64: ${{ secrets.APPSHEET_COOKIES_B64 }}
+          FIREBASE_URL:         https://scraices-dashboard-default-rtdb.firebaseio.com
+        run: python sincronizar_soldespachos.py --ventana 60
+
+      - name: Resumen en caso de error
+        if: failure()
+        run: echo "::error::Sincronización de despachos falló. Revisa el log."
