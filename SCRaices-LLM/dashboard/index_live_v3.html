@@ -4707,8 +4707,6 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
         const sem = Math.ceil(((hoy - new Date(hoy.getFullYear(),0,1))/86400000 + new Date(hoy.getFullYear(),0,1).getDay()+1)/7);
         const fechaGen = hoy.toLocaleString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
 
-        // Nombre del residente desde personalProy del proyecto actual
-        const resNombre = personalProy.filter(([,p])=>p.rol==='residente').map(([,p])=>p.nombre)[0] || null;
         const normStr = s => (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();
 
         // Fetch Firebase: gantt, grupos, observaciones
@@ -4721,6 +4719,9 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
             ]);
             ganttRaw=(await rG.json())||{}; gruposRaw=(await rGr.json())||{}; obsRaw=(await rObs.json())||{};
         } catch(_e){}
+
+        // Nombre del residente: desde grupos del proyecto actual en Firebase
+        const resNombre = ((gruposRaw[proyectoSel]||[]).map(g=>g.residente).filter(Boolean)[0]) || null;
 
         // Proyectos del residente: buscar en grupos de todos los proyectos
         let proysList = [];
