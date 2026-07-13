@@ -227,7 +227,7 @@ button.dbtn:hover { background: #922b21; }
 
 <!-- NOTE -->
 <div class="note">
-  <strong>Nota:</strong> Datos guardados automáticamente en el navegador (localStorage). ·
+  <strong>Nota:</strong> Datos guardados automáticamente en Firebase (compartido entre equipos). ·
   <strong>Norma eléctrica</strong>: permisos posteriores a julio 2011 → NORMA NUEVA. ·
   <strong>Días diferencia</strong>: positivo = retraso (rojo), negativo = adelanto (verde). ·
   El toggle <span style="color:#27ae60;font-weight:bold">verde</span> = Sí realizado.
@@ -1246,13 +1246,26 @@ function filterTable() {
 }
 
 /* ════════════════════════════════════════════════
-   PERSIST
+   PERSIST — Firebase RTDB (remoto, compartido)
    ════════════════════════════════════════════════ */
-const SK = "ep_v11";
+const FIREBASE_EP_URL = "https://scraices-dashboard-default-rtdb.firebaseio.com/estado_proyectos.json";
 
-function saveData() {
-  localStorage.setItem(SK, JSON.stringify({ nextId: _id, projects }));
-  document.getElementById("saveStatus").textContent = "Guardado: " + new Date().toLocaleString("es-CL");
+async function saveData() {
+  const st = document.getElementById("saveStatus");
+  try {
+    const res = await fetch(FIREBASE_EP_URL, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nextId: _id, projects })
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    st.textContent = "Guardado: " + new Date().toLocaleString("es-CL");
+    /* Limpiar localStorage heredado si existe */
+    ["ep_v11","ep_v10","ep_v9","ep_v8","ep_v7"].forEach(k => localStorage.removeItem(k));
+  } catch(e) {
+    st.textContent = "⚠ Error al guardar: " + e.message;
+    console.error("saveData:", e);
+  }
 }
 
 let _st = null;
@@ -1297,19 +1310,35 @@ const OBRA_RENAME = {
   "Ruka Antu":                 "P147 - Ruka Antü",
 };
 
-function loadData() {
-  /* Intentar ep_v11; si no existe, migrar desde ep_v10, ep_v9, ep_v8 o ep_v7 */
-  let raw = localStorage.getItem(SK);
-  const prevRaw = localStorage.getItem("ep_v10") || localStorage.getItem("ep_v9") || localStorage.getItem("ep_v8") || localStorage.getItem("ep_v7");
-  const migrating = !raw && !!prevRaw;
-  if (!raw) raw = prevRaw;
+async function loadData() {
+  const st = document.getElementById("saveStatus");
+  st.textContent = "Cargando datos…";
+
+  /* 1. Intentar Firebase (fuente de verdad remota) */
+  let raw = null;
+  let fromFirebase = false;
+  try {
+    const res = await fetch(FIREBASE_EP_URL);
+    if (res.ok) {
+      const fbData = await res.json();
+      if (fbData && fbData.projects) { raw = JSON.stringify(fbData); fromFirebase = true; }
+    }
+  } catch(e) { console.warn("Firebase load failed:", e); }
+
+  /* 2. Fallback: localStorage heredado (migración one-shot) */
+  let migrating = false;
+  if (!fromFirebase) {
+    const localRaw = localStorage.getItem("ep_v11") || localStorage.getItem("ep_v10")
+                   || localStorage.getItem("ep_v9")  || localStorage.getItem("ep_v8")
+                   || localStorage.getItem("ep_v7");
+    if (localRaw) { raw = localRaw; migrating = true; }
+  }
 
   if (raw) {
     try {
       const { nextId, projects: saved } = JSON.parse(raw);
       _id = nextId || 1;
 
-      /* Índice INIT por nombre normalizado para rellenar datos vacíos */
       const initIdx = {};
       for (const d of INIT) initIdx[normObra(d.obra)] = d;
 
@@ -1338,20 +1367,15 @@ function loadData() {
         if (p.correoInicio !== "Si") p.correoInicio = "No";
         delete p.preverifFecha;
 
-        /* ep_v7→ep_v8: rellenar conteos vacíos desde INIT */
         const ini = initIdx[normObra(p.obra)];
         if (ini) {
-          const fill = (field) => (p[field] === "" || p[field] == null) ? (ini[field] ?? "") : p[field];
+          const fill  = (f) => (p[f] === "" || p[f] == null) ? (ini[f] ?? "") : p[f];
+          const fill2 = (f) => (p[f] === "" || p[f] == null) ? (ini[f] ?? "") : p[f];
           p.tipVivBase  = fill("tipVivBase");  p.cantVivBase = fill("cantVivBase");
           p.tipViv3D    = fill("tipViv3D");    p.cantViv3D   = fill("cantViv3D");
           p.tipDisc2D   = fill("tipDisc2D");   p.cantDisc2D  = fill("cantDisc2D");
           p.tipDisc3D   = fill("tipDisc3D");   p.cantDisc3D  = fill("cantDisc3D");
           p.tipRC       = fill("tipRC");       p.cantRC      = fill("cantRC");
-
-          /* ep_v8→ep_v9: fechaPermiso y carpetaFechaPrometida desde INIT si vacíos;
-             inicioProbable si aún tenía el placeholder "2025-05-10";
-             carpetaEntregada corregida donde INIT dice "No" */
-          const fill2 = (f) => (p[f] === "" || p[f] == null) ? (ini[f] ?? "") : p[f];
           p.fechaPermiso          = fill2("fechaPermiso");
           p.carpetaFechaPrometida = fill2("carpetaFechaPrometida");
           if (p.inicioProbable === "2025-05-10" && ini.inicioProbable && ini.inicioProbable !== "2025-05-10")
@@ -1359,11 +1383,9 @@ function loadData() {
           if (ini.carpetaEntregada === "No" && p.carpetaEntregada === "Si")
             p.carpetaEntregada = "No";
         }
-        /* ep_v10→ep_v11: renombrar obras con nuevos P-codes */
         if (OBRA_RENAME[p.obra]) p.obra = OBRA_RENAME[p.obra];
         return p;
       });
-      /* ep_v10→ep_v11: agregar P28 y P31 si no existen */
       const existingObras = new Set(projects.map(p => normObra(p.obra)));
       _id = Math.max(_id, ...projects.map(p => p.id + 1), 1);
       for (const ini of INIT) {
@@ -1373,13 +1395,17 @@ function loadData() {
           }
         }
       }
-      if (migrating) saveData(); /* guardar inmediatamente en ep_v11 */
-    } catch(e) { projects = []; }
+      /* Migración desde localStorage → subir a Firebase y limpiar local */
+      if (migrating) await saveData();
+    } catch(e) { console.error("Parse error:", e); projects = []; }
   } else {
+    /* Sin datos en ningún lado: usar INIT por defecto y guardar en Firebase */
     projects = INIT.map(d => mkProj(d));
+    await saveData();
   }
   _id = Math.max(_id, ...projects.map(p => p.id + 1), 1);
   renderAll();
+  if (fromFirebase) st.textContent = "Datos cargados desde Firebase · " + new Date().toLocaleTimeString("es-CL");
 }
 
 /* ════════════════════════════════════════════════
