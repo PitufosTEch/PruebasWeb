@@ -1817,14 +1817,14 @@ function agruparViviendas(viviendas, grupos) {
     return result;
 }
 
-function grupoResumen(vivs) {
+function grupoResumen(vivs, cierresForzados = {}) {
     const n = vivs.length;
     const avanceDesp = n ? Math.round(vivs.reduce((s,v) => s + v.avance.porcentaje, 0) / n) : 0;
     // Avance Insp.: promedio sobre TODAS las viviendas del grupo; las sin inspeccion cuentan 0%
     const avanceInsp = n ? Math.round(vivs.reduce((s,v) => { const i = getInspeccion(v.ID_Benef); return s + (i ? i.pct_total : 0); }, 0) / n) : 0;
     const criticas = vivs.filter(v => v.estadoGeneral === "critico").length;
-    // Terminada = tiene Recepcion Definitiva (RF). Antes de RF no es "terminada" aunque tenga 100% de avance/inspeccion.
-    const terminadas = vivs.filter(v => !!v.fecha_recepcion).length;
+    // Terminada = tiene Recepcion Definitiva (RF) o cierre forzado registrado.
+    const terminadas = vivs.filter(v => !!v.fecha_recepcion || !!(cierresForzados[v.ID_Benef])).length;
     const habiles = vivs.filter(v => v.habil).length;
     const recepcionadas = vivs.filter(v => v.fecha_recepcion).length;
     return { n, avanceDesp, avanceInsp, criticas, terminadas, habiles, recepcionadas };
@@ -1974,13 +1974,17 @@ const LineaTiempo = ({ estadoEtapas, fechaHPC }) => {
 // ===== VIVIENDA CARD =====
 // Estilo "TERMINADO" (Recepcion Definitiva): verde emerald-50 + achurado gris diagonal denso (6px)
 const RF_HATCH_STYLE = { backgroundColor: "#ecfdf5", backgroundImage: "repeating-linear-gradient(45deg, #94a3b8 0, #94a3b8 1.5px, transparent 1.5px, transparent 6px)" };
+// Estilo "CIERRE FORZADO": amber-50 + achurado diagonal ámbar
+const CF_HATCH_STYLE = { backgroundColor: "#fffbeb", backgroundImage: "repeating-linear-gradient(45deg, #d97706 0, #d97706 1.5px, transparent 1.5px, transparent 6px)" };
 // Halo blanco para mantener legible el texto del nombre sobre el achurado
 const RF_TEXT_SHADOW = { textShadow: "0 0 3px #fff, 0 0 5px #fff, 0 1px 1px #fff" };
 
-const ViviendaCard = ({ beneficiario, estadoEtapas, expanded, onToggle, grupoColor, obsCount, observaciones, addObservacion, deleteObservacion, actividades, toggleActividad, consultas, toggleConsulta, ocultarBeneficiario, resumenComentarios }) => {
+const ViviendaCard = ({ beneficiario, estadoEtapas, expanded, onToggle, grupoColor, obsCount, observaciones, addObservacion, deleteObservacion, actividades, toggleActividad, consultas, toggleConsulta, ocultarBeneficiario, resumenComentarios, cierreForzado, forzarCierre, deshacerCierre }) => {
     const [obsTexto, setObsTexto] = React.useState("");
     const [showObsInput, setShowObsInput] = React.useState(false);
     const [showOcultarInput, setShowOcultarInput] = React.useState(false);
+    const [showCierreInput, setShowCierreInput] = React.useState(false);
+    const [motivoCierre, setMotivoCierre] = React.useState("");
     const [motivoOcultar, setMotivoOcultar] = React.useState("");
     const b = beneficiario;
     const avance = b.avance || calcularAvance(estadoEtapas);
@@ -1995,20 +1999,21 @@ const ViviendaCard = ({ beneficiario, estadoEtapas, expanded, onToggle, grupoCol
     const estadoGeneral = b.estadoGeneral || getEstadoGeneral(estadoEtapas);
 
     const recepDef = !!b.fecha_recepcion;
-    const borderClass = recepDef ? "border-l-4 border-l-emerald-500 border-emerald-200" : alertasRojas.length > 0 ? "border-l-4 border-l-red-500 border-red-200" : estadoGeneral === "critico" ? "border-l-4 border-l-red-500 border-red-100" : estadoGeneral === "atencion" ? "border-l-4 border-l-yellow-500 border-yellow-100" : "border border-gray-200";
+    const hasCF = !!cierreForzado;
+    const borderClass = recepDef ? "border-l-4 border-l-emerald-500 border-emerald-200" : hasCF ? "border-l-4 border-l-amber-500 border-amber-200" : alertasRojas.length > 0 ? "border-l-4 border-l-red-500 border-red-200" : estadoGeneral === "critico" ? "border-l-4 border-l-red-500 border-red-100" : estadoGeneral === "atencion" ? "border-l-4 border-l-yellow-500 border-yellow-100" : "border border-gray-200";
     const gc = grupoColor >= 0 ? GRUPO_COLORS[grupoColor] : null;
 
     return (
-        <div className={`bg-white ${borderClass} rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow ${gc ? `ring-1 ${gc.ring}` : ""}`} style={recepDef ? RF_HATCH_STYLE : undefined}>
-            <div className={`p-4 cursor-pointer transition-colors ${recepDef ? "hover:bg-white/40" : "hover:bg-gray-50/80"}`} onClick={onToggle}>
+        <div className={`bg-white ${borderClass} rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow ${gc ? `ring-1 ${gc.ring}` : ""}`} style={recepDef ? RF_HATCH_STYLE : hasCF ? CF_HATCH_STYLE : undefined}>
+            <div className={`p-4 cursor-pointer transition-colors ${recepDef ? "hover:bg-white/40" : hasCF ? "hover:bg-amber-50/40" : "hover:bg-gray-50/80"}`} onClick={onToggle}>
                 <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
                         <span className="text-gray-400"><IconChevron open={expanded} /></span>
                         {gc && <div className={`w-1.5 h-10 rounded-full ${gc.accent}`} />}
                         <span className={b.tipologia === "Casa + RC" ? "text-blue-600" : "text-gray-400"}><IconHome /></span>
                         <div>
-                            <h3 className="font-semibold text-gray-800" style={recepDef ? RF_TEXT_SHADOW : undefined}>{b.NOMBRES} {b.APELLIDOS} {obsCount > 0 && <span className="ml-1 inline-flex items-center gap-0.5 text-[9px] bg-amber-100 text-amber-700 border border-amber-300 rounded px-1 py-0.5 font-medium align-middle cursor-pointer" title={`${obsCount} observacion(es)`} onClick={(e) => { e.stopPropagation(); if (!expanded) onToggle(); }}>&#9998; {obsCount}</span>} {b.habil ? <span className="ml-1 text-[9px] bg-green-100 text-green-700 border border-green-300 rounded px-1 py-0.5 font-medium align-middle">Habilitado{b.fecha_hpc ? ` ${(() => { const p = b.fecha_hpc.split('-'); return `${p[2]}/${p[1]}/${p[0]}`; })()}` : ''}</span> : <span className="ml-1 text-[9px] bg-red-100 text-red-600 border border-red-300 rounded px-1 py-0.5 font-medium align-middle">No Habilitada</span>} {b.fecha_recepcion && (() => { const p = b.fecha_recepcion.split('-'); return <span className="ml-1 text-[9px] bg-blue-100 text-blue-700 border border-blue-300 rounded px-1 py-0.5 font-medium align-middle" title="Recepcion Definitiva">&#10003; Recepcion {`${p[2]}/${p[1]}/${p[0]}`}</span>; })()} {b.alerta_logistica && <span className="ml-1 text-[9px] bg-amber-500 text-white border border-amber-600 rounded px-1.5 py-0.5 font-bold align-middle" title={b.alerta_logistica}>&#9888; Alerta</span>}</h3>
-                            <p className="text-xs text-gray-500" style={recepDef ? RF_TEXT_SHADOW : undefined}>{b.tipologia}</p>
+                            <h3 className="font-semibold text-gray-800" style={(recepDef || hasCF) ? RF_TEXT_SHADOW : undefined}>{b.NOMBRES} {b.APELLIDOS} {obsCount > 0 && <span className="ml-1 inline-flex items-center gap-0.5 text-[9px] bg-amber-100 text-amber-700 border border-amber-300 rounded px-1 py-0.5 font-medium align-middle cursor-pointer" title={`${obsCount} observacion(es)`} onClick={(e) => { e.stopPropagation(); if (!expanded) onToggle(); }}>&#9998; {obsCount}</span>} {b.habil ? <span className="ml-1 text-[9px] bg-green-100 text-green-700 border border-green-300 rounded px-1 py-0.5 font-medium align-middle">Habilitado{b.fecha_hpc ? ` ${(() => { const p = b.fecha_hpc.split('-'); return `${p[2]}/${p[1]}/${p[0]}`; })()}` : ''}</span> : <span className="ml-1 text-[9px] bg-red-100 text-red-600 border border-red-300 rounded px-1 py-0.5 font-medium align-middle">No Habilitada</span>} {b.fecha_recepcion && (() => { const p = b.fecha_recepcion.split('-'); return <span className="ml-1 text-[9px] bg-blue-100 text-blue-700 border border-blue-300 rounded px-1 py-0.5 font-medium align-middle" title="Recepcion Definitiva">&#10003; Recepcion {`${p[2]}/${p[1]}/${p[0]}`}</span>; })()} {hasCF && !b.fecha_recepcion && <span className="ml-1 text-[9px] bg-amber-100 text-amber-700 border border-amber-400 rounded px-1 py-0.5 font-medium align-middle" title={cierreForzado.motivo || ''}>&#9888; Cierre forzado</span>} {b.alerta_logistica && <span className="ml-1 text-[9px] bg-amber-500 text-white border border-amber-600 rounded px-1.5 py-0.5 font-bold align-middle" title={b.alerta_logistica}>&#9888; Alerta</span>}</h3>
+                            <p className="text-xs text-gray-500" style={(recepDef || hasCF) ? RF_TEXT_SHADOW : undefined}>{b.tipologia}</p>
                             {b.alerta_logistica && <p className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 mt-1 leading-snug" onClick={(e) => e.stopPropagation()}>{b.alerta_logistica}</p>}
                             {b.obs_seguimiento && <p className="text-[10px] text-gray-500 bg-gray-50 border border-gray-200 rounded px-2 py-0.5 mt-0.5 italic" onClick={(e) => e.stopPropagation()}>{b.obs_seguimiento}</p>}
                         </div>
@@ -2052,6 +2057,23 @@ const ViviendaCard = ({ beneficiario, estadoEtapas, expanded, onToggle, grupoCol
                                     );
                                 })}
                             </div>
+                            {hasCF ? (
+                                <div className="mt-1.5 flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                                    <span className="inline-flex items-center gap-1 text-[9px] font-bold text-amber-700 bg-amber-50 border border-amber-300 rounded px-1.5 py-0.5" title={`Cierre forzado${cierreForzado.motivo ? ': ' + cierreForzado.motivo : ''} · ${cierreForzado.fecha || ''}`}>&#9888; Cierre forzado</span>
+                                    <button className="text-[9px] text-gray-300 hover:text-red-500 underline" onClick={() => deshacerCierre(b.ID_Benef)}>deshacer</button>
+                                </div>
+                            ) : showCierreInput ? (
+                                <div className="mt-1.5 p-2 bg-amber-50 border border-amber-200 rounded-lg" onClick={(e) => e.stopPropagation()}>
+                                    <div className="text-[10px] font-semibold text-amber-700 mb-1.5">Motivo del término forzado</div>
+                                    <textarea rows={2} placeholder="Ej: Terreno con servidumbre, propietario rechazó obra..." value={motivoCierre} onChange={(e) => setMotivoCierre(e.target.value)} className="w-full border border-amber-300 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-amber-400 focus:outline-none resize-none mb-1.5 bg-white" />
+                                    <div className="flex gap-2 justify-end">
+                                        <button onClick={() => { setShowCierreInput(false); setMotivoCierre(""); }} className="px-2 py-0.5 text-[10px] text-gray-500 hover:text-gray-700">Cancelar</button>
+                                        <button disabled={!motivoCierre.trim()} onClick={() => { forzarCierre(b.ID_Benef, motivoCierre); setShowCierreInput(false); setMotivoCierre(""); }} className="px-2 py-1 bg-amber-600 text-white text-[10px] rounded hover:bg-amber-700 font-medium disabled:opacity-40">Confirmar</button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <button className="mt-1.5 text-[9px] text-gray-300 hover:text-amber-600 border border-dashed border-gray-200 hover:border-amber-400 rounded px-1.5 py-0.5 transition-colors" onClick={(e) => { e.stopPropagation(); setShowCierreInput(true); }}>&#9888; Término forzado</button>
+                            )}
                         </div>
                         <div className="flex flex-col items-center gap-1">
                             <EstadoBadge estado={estadoGeneral} />
@@ -2426,10 +2448,10 @@ const HeaderProyecto = ({ proy, garantiasProy, eeppResumen, kpis, avanceInsp = 0
 };
 
 // ===== GRUPO HEADER =====
-const GrupoHeader = ({ grupo, colorIdx, open, onToggle, onUpdateComentario }) => {
+const GrupoHeader = ({ grupo, colorIdx, open, onToggle, onUpdateComentario, cierresForzados = {} }) => {
     if (!grupo.nombre) return null;
     const c = colorIdx >= 0 ? GRUPO_COLORS[colorIdx] : { bg:"bg-gray-50", border:"border-gray-200", text:"text-gray-600", accent:"bg-gray-400" };
-    const res = grupoResumen(grupo.viviendas);
+    const res = grupoResumen(grupo.viviendas, cierresForzados);
     const [editing, setEditing] = React.useState(false);
     const [draft, setDraft] = React.useState(grupo.comentario || "");
     React.useEffect(() => { setDraft(grupo.comentario || ""); }, [grupo.comentario]);
@@ -2512,7 +2534,7 @@ const GrupoHeader = ({ grupo, colorIdx, open, onToggle, onUpdateComentario }) =>
 };
 
 // ===== VIVIENDAS TAB =====
-const ViviendasTab = ({ viviendas, grupos, expandida, setExpandida, filtro, setFiltro, busqueda, setBusqueda, observaciones, addObservacion, deleteObservacion, showResumenObs, setShowResumenObs, actividades, toggleActividad, consultas, toggleConsulta, ocultados, ocultarBeneficiario, mostrarBeneficiario, onUpdateComentarioGrupo, resumenComentarios }) => {
+const ViviendasTab = ({ viviendas, grupos, expandida, setExpandida, filtro, setFiltro, busqueda, setBusqueda, observaciones, addObservacion, deleteObservacion, showResumenObs, setShowResumenObs, actividades, toggleActividad, consultas, toggleConsulta, ocultados, ocultarBeneficiario, mostrarBeneficiario, onUpdateComentarioGrupo, resumenComentarios, cierresForzados = {}, forzarCierre, deshacerCierre }) => {
     const [showOcultas, setShowOcultas] = React.useState(false);
     const ocultadasProy = viviendas.filter(v => ocultados[v.ID_Benef]);
     const vivVisibles = viviendas.filter(v => !ocultados[v.ID_Benef]);
@@ -2814,11 +2836,11 @@ const ViviendasTab = ({ viviendas, grupos, expandida, setExpandida, filtro, setF
             <div className="space-y-3">
                 {gruposData.map(grupo => (
                     <div key={grupo.id}>
-                        <GrupoHeader grupo={grupo} colorIdx={grupo.colorIdx} open={gruposAbiertos[grupo.id] !== false} onToggle={() => toggleGrupo(grupo.id)} onUpdateComentario={onUpdateComentarioGrupo} />
+                        <GrupoHeader grupo={grupo} colorIdx={grupo.colorIdx} open={gruposAbiertos[grupo.id] !== false} onToggle={() => toggleGrupo(grupo.id)} onUpdateComentario={onUpdateComentarioGrupo} cierresForzados={cierresForzados} />
                         {(gruposAbiertos[grupo.id] !== false) && (
                             <div className={`space-y-2 ${grupo.nombre ? "ml-2 pl-3 border-l-2 " + (grupo.colorIdx >= 0 ? GRUPO_COLORS[grupo.colorIdx].border : "border-gray-200") : ""} mt-2`}>
                                 {grupo.viviendas.map(v =>
-                                    <ViviendaCard key={v.ID_Benef} beneficiario={v} estadoEtapas={v.estadoEtapas} expanded={expandida === v.ID_Benef} onToggle={() => setExpandida(expandida === v.ID_Benef ? null : v.ID_Benef)} grupoColor={grupo.colorIdx} obsCount={(observaciones[v.ID_Benef] || []).length} observaciones={observaciones[v.ID_Benef] || []} addObservacion={addObservacion} deleteObservacion={deleteObservacion} actividades={actividades[v.ID_Benef] || {}} toggleActividad={toggleActividad} consultas={consultas[v.ID_Benef] || {}} toggleConsulta={toggleConsulta} ocultarBeneficiario={ocultarBeneficiario} resumenComentarios={resumenComentarios} />
+                                    <ViviendaCard key={v.ID_Benef} beneficiario={v} estadoEtapas={v.estadoEtapas} expanded={expandida === v.ID_Benef} onToggle={() => setExpandida(expandida === v.ID_Benef ? null : v.ID_Benef)} grupoColor={grupo.colorIdx} obsCount={(observaciones[v.ID_Benef] || []).length} observaciones={observaciones[v.ID_Benef] || []} addObservacion={addObservacion} deleteObservacion={deleteObservacion} actividades={actividades[v.ID_Benef] || {}} toggleActividad={toggleActividad} consultas={consultas[v.ID_Benef] || {}} toggleConsulta={toggleConsulta} ocultarBeneficiario={ocultarBeneficiario} resumenComentarios={resumenComentarios} cierreForzado={cierresForzados[v.ID_Benef] || null} forzarCierre={forzarCierre} deshacerCierre={deshacerCierre} />
                                 )}
                             </div>
                         )}
@@ -4097,8 +4119,8 @@ const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios
         const avanceReal = viviendas.length
             ? Math.round(viviendas.reduce((s, v) => { const i = getInspeccion(v.ID_Benef); return s + (i ? i.pct_total : 0); }, 0) / viviendas.length)
             : 0;
-        // Terminada = tiene Recepcion Definitiva (RF), no por % de avance/inspeccion.
-        const terminadas = viviendas.filter(v => !!v.fecha_recepcion).length;
+        // Terminada = tiene Recepcion Definitiva (RF) o cierre forzado.
+        const terminadas = viviendas.filter(v => !!v.fecha_recepcion || !!(cierresForzados[v.ID_Benef])).length;
         const criticos  = viviendas.filter(v => v.estadoGeneral === "critico").length;
         // Avance Gantt: dato del nodo avance_gantt/{pid} en Firebase
         const _ag      = avanceGanttData[proyectoSel] || null;
@@ -4128,7 +4150,7 @@ const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios
             + '</tr></thead><tbody>';
         gruposData.forEach(g => {
             if (g.viviendas.length === 0) return;
-            const res = grupoResumen(g.viviendas);
+            const res = grupoResumen(g.viviendas, cierresForzados);
             const rec = g.viviendas.filter(v => v.flags && v.flags.fecha_recep).length;
             const avCol = res.avanceInsp >= 80 ? '#16a34a' : res.avanceInsp >= 50 ? '#2563eb' : '#dc2626';
             tablaGruposHtml += `<tr style="border-bottom:1px solid #f1f5f9;">
@@ -4171,7 +4193,7 @@ const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios
         const gruposPaginas = [];
         gruposData.forEach(g => {
             if (g.viviendas.length === 0) return;
-            const res = grupoResumen(g.viviendas);
+            const res = grupoResumen(g.viviendas, cierresForzados);
             const rec = g.viviendas.filter(v => v.flags && v.flags.fecha_recep).length;
             const avCol = res.avanceInsp >= 80 ? '#16a34a' : res.avanceInsp >= 50 ? '#2563eb' : '#dc2626';
             const miniKpis = `<div class="gp-kpis">
@@ -4756,7 +4778,7 @@ ${inf.footerHtml}
             + ['Grupo','Viv.','Avance Insp.','Recep.','Críticas'].map((h,i)=>`<th style="padding:7px 10px;text-align:${i===0?'left':'center'};font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:#64748b;border-bottom:1px solid #e2e8f0;">${h}</th>`).join('')
             + '</tr></thead><tbody>';
         gruposCapataz.forEach(g => {
-            const res = grupoResumen(g.viviendas);
+            const res = grupoResumen(g.viviendas, cierresForzados);
             const rec = g.viviendas.filter(v => v.flags && v.flags.fecha_recep).length;
             const avCol = res.avanceInsp>=80?'#16a34a':res.avanceInsp>=50?'#2563eb':'#dc2626';
             tablaGruposHtml += `<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:7px 10px;font-weight:600;">${escapeHtmlBasic(g.nombre||'Sin Asignar')}</td><td style="padding:7px 10px;text-align:center;">${res.n}</td><td style="padding:7px 10px;text-align:center;font-weight:700;color:${avCol};">${res.avanceInsp}%</td><td style="padding:7px 10px;text-align:center;">${rec}/${res.n}</td><td style="padding:7px 10px;text-align:center;color:${res.criticas>0?'#dc2626':'#94a3b8'};font-weight:${res.criticas>0?'700':'400'};">${res.criticas}</td></tr>`;
@@ -8988,6 +9010,8 @@ const App = () => {
     const skipSugPush = React.useRef(true);
     const ocultadosRef = React.useRef(null);
     const skipOcultadosPush = React.useRef(true);
+    const cierresForzadosRef = React.useRef(null);
+    const skipCierresForzadosPush = React.useRef(true);
 
     React.useEffect(() => {
         // Listener Firebase para Grupos
@@ -9051,6 +9075,12 @@ const App = () => {
             skipOcultadosPush.current = true;
             setOcultados(val || {});
         });
+        // Listener Firebase para Cierres Forzados
+        cierresForzadosRef.current = fbDB.ref('cierres_forzados');
+        cierresForzadosRef.current.on('value', (snap) => {
+            skipCierresForzadosPush.current = true;
+            setCierresForzados(snap.val() || {});
+        });
         // Listener Firebase para Resumen Comentarios
         resumenRef.current = fbDB.ref('resumen_comentarios');
         resumenRef.current.on('value', (snap) => {
@@ -9076,6 +9106,7 @@ const App = () => {
             if (muestrasRef.current) muestrasRef.current.off();
             if (muestrasConfigRef.current) muestrasConfigRef.current.off();
             if (ocultadosRef.current) ocultadosRef.current.off();
+            if (cierresForzadosRef.current) cierresForzadosRef.current.off();
             if (resumenRef.current) resumenRef.current.off();
             if (proyTermRef.current) proyTermRef.current.off();
             if (ganttProgramaRef.current) ganttProgramaRef.current.off();
@@ -9335,6 +9366,28 @@ const App = () => {
         if (ocultadosRef.current) ocultadosRef.current.set(ocultados);
     }, [ocultados]);
 
+    // Cierres Forzados (Firebase)
+    const [cierresForzados, setCierresForzados] = React.useState({});
+
+    React.useEffect(() => {
+        if (skipCierresForzadosPush.current) { skipCierresForzadosPush.current = false; return; }
+        if (cierresForzadosRef.current) cierresForzadosRef.current.set(cierresForzados);
+    }, [cierresForzados]);
+
+    const forzarCierre = (idBenef, motivo) => {
+        const entry = { motivo: motivo || "", fecha: fechaChile(), done: true };
+        const next = { ...cierresForzados, [idBenef]: entry };
+        fbDB.ref('cierres_forzados').set(next);
+        setCierresForzados(next);
+    };
+
+    const deshacerCierre = (idBenef) => {
+        const next = { ...cierresForzados };
+        delete next[idBenef];
+        fbDB.ref('cierres_forzados').set(next);
+        setCierresForzados(next);
+    };
+
     const ocultarBeneficiario = (idBenef, motivo) => {
         const entry = { motivo: motivo || "", fecha: fechaChile() };
         const next = { ...ocultados, [idBenef]: entry };
@@ -9454,8 +9507,8 @@ const App = () => {
         const totalPagadoProy = viviendas.reduce((s, v) => s + getTotalPagado(v.ID_Benef), 0);
         const conAlertasRojas = viviendas.filter(v => calcCoherencia(v.ID_Benef, v.estadoEtapas).some(a => a.tipo === "rojo")).length;
 
-        // Terminada = tiene Recepcion Definitiva (RF), no por % de avance/inspeccion.
-        const terminadas = viviendas.filter(v => !!v.fecha_recepcion).length;
+        // Terminada = tiene Recepcion Definitiva (RF) o cierre forzado.
+        const terminadas = viviendas.filter(v => !!v.fecha_recepcion || !!(cierresForzados[v.ID_Benef])).length;
 
         // Solicitudes pendientes
         const totalSolicitadas = viviendas.reduce((s, v) => s + Object.values(v.estadoEtapas).filter(e => e.estado === "solicitado").length, 0);
@@ -10232,7 +10285,7 @@ const App = () => {
 
                 {/* CONTENIDO */}
                 <div className="min-h-[500px]">
-                    {tab === "viviendas" && <ViviendasTab viviendas={viviendas} grupos={grupos} expandida={expandida} setExpandida={setExpandida} filtro={filtro} setFiltro={setFiltro} busqueda={busqueda} setBusqueda={setBusqueda} observaciones={observaciones} addObservacion={addObservacion} deleteObservacion={deleteObservacion} showResumenObs={showResumenObs} setShowResumenObs={setShowResumenObs} actividades={actividades} toggleActividad={toggleActividad} consultas={consultas} toggleConsulta={toggleConsulta} ocultados={ocultados} ocultarBeneficiario={ocultarBeneficiario} mostrarBeneficiario={mostrarBeneficiario} onUpdateComentarioGrupo={actualizarComentarioGrupo} resumenComentarios={resumenComentarios} />}
+                    {tab === "viviendas" && <ViviendasTab viviendas={viviendas} grupos={grupos} expandida={expandida} setExpandida={setExpandida} filtro={filtro} setFiltro={setFiltro} busqueda={busqueda} setBusqueda={setBusqueda} observaciones={observaciones} addObservacion={addObservacion} deleteObservacion={deleteObservacion} showResumenObs={showResumenObs} setShowResumenObs={setShowResumenObs} actividades={actividades} toggleActividad={toggleActividad} consultas={consultas} toggleConsulta={toggleConsulta} ocultados={ocultados} ocultarBeneficiario={ocultarBeneficiario} mostrarBeneficiario={mostrarBeneficiario} onUpdateComentarioGrupo={actualizarComentarioGrupo} resumenComentarios={resumenComentarios} cierresForzados={cierresForzados} forzarCierre={forzarCierre} deshacerCierre={deshacerCierre} />}
                     {tab === "matriz" && <MatrizAvance viviendas={viviendas} grupos={grupos} />}
                     {tab === "distribucion" && <DistribucionTab viviendas={viviendas} />}
                     {tab === "financiero" && <FinancieroTab viviendas={viviendas} />}
