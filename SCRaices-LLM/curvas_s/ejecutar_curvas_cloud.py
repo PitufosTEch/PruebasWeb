@@ -60,6 +60,28 @@ SCRIPTS_EN_ORDEN = [
     ("P116 - Sonia Quilaleo",  "curvas_automatico_quilaleo"),
     ("P31  - Trovolhue",       "curvas_automatico_trovolhue"),
     ("P28  - Elsa Pinchulaf",  "curvas_automatico_pinchulaf"),
+    # ── Proyectos futuros — descomentar cuando tengan script ──────────────────
+    # ("P118 - El Canelo",              "curvas_automatico_el_canelo"),          # Rural Araucanía 2024
+    # ("P123 - Peumayen 2023",          "curvas_automatico_peumayen_2023"),      # Rural Araucanía 2024
+    # ("P128 - Com. José Carvajal",     "curvas_automatico_jose_carvajal"),      # Rural Araucanía 2024
+    # ("P129 - Nuevo Gorbea",           "curvas_automatico_nuevo_gorbea"),       # Rural Araucanía 2024
+    # ("P132 - Com. Fermín Manquilef",  "curvas_automatico_fermin_manquilef"),   # Rural Araucanía 2024
+    # ("P145 - Perkenko 2025",          "curvas_automatico_perkenko"),           # Rural Araucanía 2025
+    # ("P146 - Demanda Villarrica 2025","curvas_automatico_villarrica_2025"),    # Rural Araucanía 2025
+    # ("P147 - Ruka Antü",              "curvas_automatico_ruka_antu"),          # Rural Araucanía 2025
+    # ("P150 - Llaima Antu",            "curvas_automatico_llaima_antu"),        # Rural Araucanía 2025
+    # ("P152 - Ayün Ruka",              "curvas_automatico_ayun_ruka"),          # Rural Araucanía 2025
+    # ("P153 - Vilcún Mapu",            "curvas_automatico_vilcun_mapu"),        # Rural Araucanía 2025
+    # ("P154 - Com. José Carvajal 2",   "curvas_automatico_carvajal_2"),         # Rural Araucanía 2025
+    # ("P155 - Los Arrayanes",          "curvas_automatico_arrayanes"),          # Rural Araucanía 2025
+    # ("P156 - Poyen Ruka",             "curvas_automatico_poyen_ruka"),         # Rural Araucanía 2025
+    # ("P164 - Conún Huenu",            "curvas_automatico_conun_huenu"),        # Rural Araucanía 2026
+    # ("P166 - Malalhue",               "curvas_automatico_malalhue"),           # Rural Araucanía 2026
+    # ("P167 - Witran Donguil",         "curvas_automatico_witran_donguil"),     # Rural Araucanía 2026
+    # ("P168 - Raíces de Perquenco",    "curvas_automatico_perquenco"),          # Rural Araucanía 2026
+    # ("P170 - Los Copihues de Cunco",  "curvas_automatico_copihues_cunco"),     # Rural Araucanía 2026
+    # ("P171 - Raíces de Trovolhue",    "curvas_automatico_trovolhue_2026"),     # Rural Araucanía 2026
+    # ("P172 - Raíces Costeras",        "curvas_automatico_raices_costeras"),    # Rural Araucanía 2026
 ]
 
 POST_SCRIPTS = [

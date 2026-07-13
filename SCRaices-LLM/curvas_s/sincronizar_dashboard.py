@@ -62,6 +62,30 @@ PROYECTOS_META = {
     "P31":  {"nombre": "Trovolhue",           "json": "drive_ids_trovolhue.json", "id": "P31"},
     "P131": {"nombre": "Raíces de Melipeuco", "json": "drive_ids_melipeuco.json", "id": "P131"},
     "P28":  {"nombre": "Elsa Pinchulaf",      "json": "drive_ids_pinchulaf.json", "id": "P28"},
+    # ── Rural Araucanía 2024 (sin ejecución aún — pre-registrados) ──────────────
+    "P118": {"nombre": "El Canelo",              "json": "drive_ids_el_canelo.json",        "id": "P118"},
+    "P123": {"nombre": "Peumayen 2023",          "json": "drive_ids_peumayen_2023.json",    "id": "P123"},
+    "P128": {"nombre": "Com. José Carvajal",     "json": "drive_ids_jose_carvajal.json",    "id": "P128"},
+    "P129": {"nombre": "Nuevo Gorbea",           "json": "drive_ids_nuevo_gorbea.json",     "id": "P129"},
+    "P132": {"nombre": "Com. Fermín Manquilef",  "json": "drive_ids_fermin_manquilef.json", "id": "P132"},
+    # ── Rural Araucanía 2025 (pre-registrados) ──────────────────────────────────
+    "P145": {"nombre": "Perkenko 2025",          "json": "drive_ids_perkenko.json",         "id": "P145"},
+    "P146": {"nombre": "Demanda Villarrica 2025","json": "drive_ids_villarrica_2025.json",  "id": "P146"},
+    "P147": {"nombre": "Ruka Antü",              "json": "drive_ids_ruka_antu.json",        "id": "P147"},
+    "P150": {"nombre": "Llaima Antu",            "json": "drive_ids_llaima_antu.json",      "id": "P150"},
+    "P152": {"nombre": "Ayün Ruka",              "json": "drive_ids_ayun_ruka.json",        "id": "P152"},
+    "P153": {"nombre": "Vilcún Mapu",            "json": "drive_ids_vilcun_mapu.json",      "id": "P153"},
+    "P154": {"nombre": "Com. José Carvajal 2",   "json": "drive_ids_carvajal_2.json",       "id": "P154"},
+    "P155": {"nombre": "Los Arrayanes",          "json": "drive_ids_arrayanes.json",        "id": "P155"},
+    "P156": {"nombre": "Poyen Ruka",             "json": "drive_ids_poyen_ruka.json",       "id": "P156"},
+    # ── Rural Araucanía 2026 (pre-registrados) ──────────────────────────────────
+    "P164": {"nombre": "Conún Huenu",            "json": "drive_ids_conun_huenu.json",      "id": "P164"},
+    "P166": {"nombre": "Malalhue",               "json": "drive_ids_malalhue.json",         "id": "P166"},
+    "P167": {"nombre": "Witran Donguil",         "json": "drive_ids_witran_donguil.json",   "id": "P167"},
+    "P168": {"nombre": "Raíces de Perquenco",    "json": "drive_ids_perquenco.json",        "id": "P168"},
+    "P170": {"nombre": "Los Copihues de Cunco",  "json": "drive_ids_copihues_cunco.json",   "id": "P170"},
+    "P171": {"nombre": "Raíces de Trovolhue",    "json": "drive_ids_trovolhue_2026.json",   "id": "P171"},
+    "P172": {"nombre": "Raíces Costeras",        "json": "drive_ids_raices_costeras.json",  "id": "P172"},
 }
 
 # Orden de aparición preferido: TOTAL primero, luego Todos_Grupos, luego grupos individuales

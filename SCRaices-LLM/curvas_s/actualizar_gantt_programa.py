@@ -51,6 +51,28 @@ PROYECTOS = {
     "P119": "1t_1j62f_3l1nrlufmvhnV-o1WTplv0OnQL_JdVaWgKA",
     "P131": "1n5F-P5cy8Wj5BujllzdnwCrKwGsfIkdvHxcyd6YwscU",
     "P28":  "18XkRb7RAF52Aqj4immGebME-d9sODY0HgxIKWcBGrlg",
+    # ── Proyectos futuros — descomentar y reemplazar TODO con el ID de la planilla Gantt ──
+    # "P118": "TODO",  # El Canelo             — Rural Araucanía 2024
+    # "P123": "TODO",  # Peumayen 2023          — Rural Araucanía 2024
+    # "P128": "TODO",  # Com. José Carvajal     — Rural Araucanía 2024
+    # "P129": "TODO",  # Nuevo Gorbea           — Rural Araucanía 2024
+    # "P132": "TODO",  # Com. Fermín Manquilef  — Rural Araucanía 2024
+    # "P145": "TODO",  # Perkenko 2025          — Rural Araucanía 2025
+    # "P146": "TODO",  # Demanda Villarrica 2025
+    # "P147": "TODO",  # Ruka Antü              — Rural Araucanía 2025
+    # "P150": "TODO",  # Llaima Antu            — Rural Araucanía 2025
+    # "P152": "TODO",  # Ayün Ruka              — Rural Araucanía 2025
+    # "P153": "TODO",  # Vilcún Mapu            — Rural Araucanía 2025
+    # "P154": "TODO",  # Com. José Carvajal 2   — Rural Araucanía 2025
+    # "P155": "TODO",  # Los Arrayanes          — Rural Araucanía 2025
+    # "P156": "TODO",  # Poyen Ruka             — Rural Araucanía 2025
+    # "P164": "TODO",  # Conún Huenu            — Rural Araucanía 2026
+    # "P166": "TODO",  # Malalhue               — Rural Araucanía 2026
+    # "P167": "TODO",  # Witran Donguil         — Rural Araucanía 2026
+    # "P168": "TODO",  # Raíces de Perquenco    — Rural Araucanía 2026
+    # "P170": "TODO",  # Los Copihues de Cunco  — Rural Araucanía 2026
+    # "P171": "TODO",  # Raíces de Trovolhue    — Rural Araucanía 2026
+    # "P172": "TODO",  # Raíces Costeras        — Rural Araucanía 2026
 }
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -37,6 +37,31 @@ jobs:
           - { label: "P116 Sonia Quilaleo",    script: curvas_automatico_quilaleo }
           - { label: "P31  Trovolhue",         script: curvas_automatico_trovolhue }
           - { label: "P28  Elsa Pinchulaf",    script: curvas_automatico_pinchulaf }
+          # ── Proyectos futuros — descomentar cuando tengan script y carta Gantt ──────
+          # Rural Araucanía 2024
+          # - { label: "P118 El Canelo",               script: curvas_automatico_el_canelo }
+          # - { label: "P123 Peumayen 2023",           script: curvas_automatico_peumayen_2023 }
+          # - { label: "P128 Com. José Carvajal",      script: curvas_automatico_jose_carvajal }
+          # - { label: "P129 Nuevo Gorbea",            script: curvas_automatico_nuevo_gorbea }
+          # - { label: "P132 Com. Fermín Manquilef",   script: curvas_automatico_fermin_manquilef }
+          # Rural Araucanía 2025
+          # - { label: "P145 Perkenko 2025",           script: curvas_automatico_perkenko }
+          # - { label: "P146 Demanda Villarrica 2025", script: curvas_automatico_villarrica_2025 }
+          # - { label: "P147 Ruka Antü",               script: curvas_automatico_ruka_antu }
+          # - { label: "P150 Llaima Antu",             script: curvas_automatico_llaima_antu }
+          # - { label: "P152 Ayün Ruka",               script: curvas_automatico_ayun_ruka }
+          # - { label: "P153 Vilcún Mapu",             script: curvas_automatico_vilcun_mapu }
+          # - { label: "P154 Com. José Carvajal 2",    script: curvas_automatico_carvajal_2 }
+          # - { label: "P155 Los Arrayanes",           script: curvas_automatico_arrayanes }
+          # - { label: "P156 Poyen Ruka",              script: curvas_automatico_poyen_ruka }
+          # Rural Araucanía 2026
+          # - { label: "P164 Conún Huenu",             script: curvas_automatico_conun_huenu }
+          # - { label: "P166 Malalhue",                script: curvas_automatico_malalhue }
+          # - { label: "P167 Witran Donguil",          script: curvas_automatico_witran_donguil }
+          # - { label: "P168 Raíces de Perquenco",     script: curvas_automatico_perquenco }
+          # - { label: "P170 Los Copihues de Cunco",   script: curvas_automatico_copihues_cunco }
+          # - { label: "P171 Raíces de Trovolhue",     script: curvas_automatico_trovolhue_2026 }
+          # - { label: "P172 Raíces Costeras",         script: curvas_automatico_raices_costeras }
 
     steps:
       - uses: actions/checkout@v4
