@@ -69,7 +69,8 @@ SECTORES_FALLBACK = {
     "Victoria":          (-38.2351416, -72.3470849),  # coordenada exacta entregada por el usuario
     "Lautaro":           (-38.5353968, -72.4387979),  # coordenada exacta entregada por el usuario
     "Padre Las Casas":   (-38.7720711, -72.589863),   # coordenada exacta entregada por el usuario
-    "Cunco":             (-38.9324682, -72.0362298),  # coordenada exacta entregada por el usuario
+    "Cunco":             (-38.92963475718263, -72.03771034977605),  # coordenada exacta entregada por el usuario
+    "Melipeuco":         (-38.85396689165283, -71.6969809824884),   # coordenada exacta entregada por el usuario
 }
 
 # ─── UMBRALES DE CONDICIÓN ADVERSA (ajustables — ver nota en el docstring) ──
