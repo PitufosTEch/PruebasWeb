@@ -4453,7 +4453,7 @@ ${comentariosHtml}`;
     // Helper: genera sección HTML de despachos del período actual (mes1).
     // data = {titulo, meses, beneficiarios:[{nombre,capataz,mes1}]}
     // capatazFiltro = string para filtrar (Capataz), null para todos (Residente)
-    const _generarSeccionDespachos = (data, capatazFiltro) => {
+    const _generarSeccionDespachos = (data, capatazFiltro, soloSol = false) => {
         if (!data || !data.beneficiarios || !data.beneficiarios.length) return '';
         const _norm = s => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
         let bens = data.beneficiarios; // ya pre-filtrado (solo mes1 no vacío) desde Firebase
@@ -4462,6 +4462,12 @@ ${comentariosHtml}`;
             let f = bens.filter(b => _norm(b.capataz) === nc);
             if (!f.length) f = bens.filter(b => { const bc = _norm(b.capataz); return bc.includes(nc) || nc.includes(bc); });
             bens = f;
+        }
+        if (soloSol) {
+            bens = bens.map(b => {
+                const etapas = (b.mes1 || '').split(',').map(p => p.trim()).filter(p => p && !p.startsWith('[MC]'));
+                return etapas.length ? Object.assign({}, b, {mes1: etapas.join(', ')}) : null;
+            }).filter(Boolean);
         }
         if (!bens.length) return '';
         const mostrarCap = !capatazFiltro;
@@ -4489,7 +4495,10 @@ ${comentariosHtml}`;
                 : '';
             return `<tr style="background:${bg};"><td style="padding:5px 12px;font-size:11px;color:#111827;border-bottom:1px solid #e2e8f0;">${b.nombre}</td>${celCap}<td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;">${_fmtEtapas(b.mes1)}</td></tr>`;
         }).join('');
-        return `<div style="margin-top:24px;page-break-inside:avoid;"><div style="background:#1e293b;border-radius:8px 8px 0 0;padding:10px 16px;"><div style="font-size:12px;font-weight:700;color:#f1f5f9;">${titulo}</div><div style="font-size:11px;color:#94a3b8;margin-top:2px;">Período: ${nombreMes} · ${bens.length} beneficiario(s) con despacho planificado</div></div><div style="overflow-x:auto;border:1px solid #e2e8f0;border-radius:0 0 8px 8px;"><table style="border-collapse:collapse;width:100%;"><thead><tr><th style="padding:7px 12px;background:#334155;color:#cbd5e1;font-size:10px;text-align:left;min-width:160px;">Beneficiario</th>${colCapTh}<th style="padding:7px 8px;background:#334155;color:#cbd5e1;font-size:10px;text-align:left;">Etapas a despachar</th></tr></thead><tbody>${filas}</tbody></table><div style="padding:8px 12px;background:#f8fafc;border-top:1px solid #e2e8f0;font-size:10px;color:#6b7280;display:flex;gap:12px;flex-wrap:wrap;"><span><span style="background:#ccfbf1;color:#0f766e;border-radius:3px;padding:1px 5px;font-weight:600;">[SOL]</span> Solicitud confirmada</span><span><span style="background:#fef3c7;color:#92400e;border-radius:3px;padding:1px 5px;font-weight:600;">[MC]</span> Proyección Monte Carlo</span></div></div></div>`;
+        const leyenda = soloSol
+            ? `<span><span style="background:#ccfbf1;color:#0f766e;border-radius:3px;padding:1px 5px;font-weight:600;">[SOL]</span> Solicitud confirmada</span>`
+            : `<span><span style="background:#ccfbf1;color:#0f766e;border-radius:3px;padding:1px 5px;font-weight:600;">[SOL]</span> Solicitud confirmada</span><span><span style="background:#fef3c7;color:#92400e;border-radius:3px;padding:1px 5px;font-weight:600;">[MC]</span> Proyección Monte Carlo</span>`;
+        return `<div style="margin-top:24px;page-break-inside:avoid;"><div style="background:#1e293b;border-radius:8px 8px 0 0;padding:10px 16px;"><div style="font-size:12px;font-weight:700;color:#f1f5f9;">${titulo}</div><div style="font-size:11px;color:#94a3b8;margin-top:2px;">Período: ${nombreMes} · ${bens.length} beneficiario(s) con despacho planificado</div></div><div style="overflow-x:auto;border:1px solid #e2e8f0;border-radius:0 0 8px 8px;"><table style="border-collapse:collapse;width:100%;"><thead><tr><th style="padding:7px 12px;background:#334155;color:#cbd5e1;font-size:10px;text-align:left;min-width:160px;">Beneficiario</th>${colCapTh}<th style="padding:7px 8px;background:#334155;color:#cbd5e1;font-size:10px;text-align:left;">Etapas a despachar</th></tr></thead><tbody>${filas}</tbody></table><div style="padding:8px 12px;background:#f8fafc;border-top:1px solid #e2e8f0;font-size:10px;color:#6b7280;display:flex;gap:12px;flex-wrap:wrap;">${leyenda}</div></div></div>`;
     };
 
     // ── CSS + JS compartido para informes HTML navegables (residente / capataz) ──────────────
@@ -4667,7 +4676,7 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
         // ── DESPACHOS ─────────────────────────────────────────────────────────────────────────
         let sDesp=`<div class="blk">`;
         if(despachosData&&despachosData.beneficiarios&&despachosData.beneficiarios.length){
-            sDesp+=_generarSeccionDespachos(despachosData,capatazDesp)||`<p style="color:#94a3b8;text-align:center;padding:32px;">Sin despachos para este filtro.</p>`;
+            sDesp+=_generarSeccionDespachos(despachosData,capatazDesp,!capatazDesp)||`<p style="color:#94a3b8;text-align:center;padding:32px;">Sin despachos para este filtro.</p>`;
         } else {
             sDesp+=`<p style="color:#94a3b8;font-size:13px;text-align:center;padding:48px;">Sin datos de despachos disponibles para este proyecto.</p>`;
         }
