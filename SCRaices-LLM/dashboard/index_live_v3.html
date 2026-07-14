@@ -6437,8 +6437,9 @@ ${gars.length ? `<div class="summary-grid">${gars.map(g => {
             eps.forEach(e => {
                 if (!e.Fecha) return;
                 const m = String(e.Fecha).substring(0,7);
-                emitidoByMes[m] = (emitidoByMes[m]||0) + e.Monto;
-                if (e.Estado.toLowerCase().includes('pagado')) pagadoByMes[m] = (pagadoByMes[m]||0) + e.Monto;
+                const est = (e.Estado||'').toLowerCase();
+                if (est.includes('pagado')) pagadoByMes[m] = (pagadoByMes[m]||0) + e.Monto;
+                if (est.includes('pagado') || est.includes('tramitaci')) emitidoByMes[m] = (emitidoByMes[m]||0) + e.Monto;
             });
             const serieAvReal = (AVANCE_MENSUAL_DATA[pid]?.serie) || [];
             const mesSet = new Set([...Object.keys(pagadoByMes), ...Object.keys(emitidoByMes), ...serieAvReal.map(s=>s.mes)]);
@@ -6468,20 +6469,17 @@ ${gars.length ? `<div class="summary-grid">${gars.map(g => {
                     i = next - 1; // saltar los meses ya rellenados
                 }
             }
-            const dPrograma = (pctPrograma != null && chartMeses.length > 0)
-                ? chartMeses.map((_,i) => Math.round((i+1)/chartMeses.length*(pctPrograma/100*totalContrato)*100)/100)
-                : [];
             const chartSeries = [
                 { color:'#16a34a', data:dCobrado,  dash:null    },   // verde sólido  — Cobrado real
+                { color:'#2563eb', data:dEmitido,  dash:'4,3'   },   // azul — EP emitidos (cobrado + en tramitación)
                 { color:'#ca8a04', data:dAvReal,   dash:'6,2'   },   // amarillo — Por avance real
-                ...(dPrograma.length ? [{ color:'#dc2626', data:dPrograma, dash:'2,4' }] : [])  // rojo — Por programa
             ];
             const curvaHtml = `<div class="obra-block">
 <div class="breadcrumb">Obra <strong>${nombre}</strong>${comuna?' · '+comuna:''} · Curva Cobros/Pagos · Contrato: ${fmtUF(totalContrato)}</div>
 <div class="ch-legend">
   <span class="ch-dot" style="background:#16a34a;"></span><span>Cobrado real</span>
+  <span class="ch-dot ch-dashed" style="border-color:#2563eb;"></span><span>EP emitidos (cobrado + en tramitación)</span>
   <span class="ch-dot ch-dashed" style="border-color:#ca8a04;"></span><span>Por avance real</span>
-  ${pctPrograma!=null?'<span class="ch-dot ch-dashed" style="border-color:#dc2626;"></span><span>Por programa</span>':''}
 </div>
 ${svgChart(chartMeses, chartSeries, totalContrato)}
 </div>`;
@@ -6669,26 +6667,17 @@ window.addEventListener('resize',updateStickyTops);
             let t = `<div style="background:#fff;margin:12px 12px 0;border-radius:10px;padding:14px 16px;border:1px solid #e2e8f0;">
 <div style="font-size:12px;font-weight:700;color:#1e293b;margin-bottom:10px;">📋 Resumen ejecutivo — Estados de Pago</div>
 <div id="ep-resumen-wrap" style="overflow:auto;max-height:70vh;position:relative;border:1px solid #e2e8f0;border-radius:6px;">
-<table id="ep-resumen-table" style="border-collapse:collapse;font-size:10px;table-layout:fixed;min-width:1300px;width:100%;">
+<table id="ep-resumen-table" style="border-collapse:collapse;font-size:10px;table-layout:fixed;min-width:780px;width:100%;">
 <colgroup>
-  <col style="width:150px">
-  <col style="width:58px"><col style="width:58px"><col style="width:58px"><col style="width:58px">
-  <col style="width:68px"><col style="width:68px">
-  <col style="width:46px"><col style="width:46px">
-  <col style="width:46px"><col style="width:46px">
+  <col style="width:160px">
+  <col style="width:62px"><col style="width:62px">
   <col style="width:36px"><col style="width:36px"><col style="width:40px">
   <col style="width:95px"><col style="width:95px"><col style="width:85px"><col style="width:85px">
 </colgroup>
 <thead>
 <tr style="background:#f1f5f9;">
   <th rowspan="2" style="padding:5px 6px;border:1px solid #e2e8f0;text-align:left;font-size:9px;text-transform:uppercase;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;position:sticky;top:0;left:0;z-index:4;background:#f1f5f9;box-shadow:2px 0 4px rgba(0,0,0,.08);">Proyecto</th>
-  <th colspan="4" style="padding:4px 6px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;position:sticky;top:0;z-index:2;background:#f1f5f9;">Avance (%)</th>
-  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;position:sticky;top:0;z-index:2;background:#f1f5f9;">Inicio<br>Prog.</th>
-  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;position:sticky;top:0;z-index:2;background:#f1f5f9;">Término<br>Prog.</th>
-  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;position:sticky;top:0;z-index:2;background:#f1f5f9;">Pzo.<br>Cont.</th>
-  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;position:sticky;top:0;z-index:2;background:#f1f5f9;">Pzo.<br>Prog.</th>
-  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;position:sticky;top:0;z-index:2;background:#f1f5f9;">Rest.<br>Cont.</th>
-  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;position:sticky;top:0;z-index:2;background:#f1f5f9;">Rest.<br>Prog.</th>
+  <th colspan="2" style="padding:4px 6px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;position:sticky;top:0;z-index:2;background:#f1f5f9;">Avance (%)</th>
   <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;position:sticky;top:0;z-index:2;background:#f1f5f9;">Tot.<br>Viv.</th>
   <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;position:sticky;top:0;z-index:2;background:#f1f5f9;">Hab.</th>
   <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;text-transform:uppercase;color:#475569;cursor:help;position:sticky;top:0;z-index:2;background:#f1f5f9;" title="Con al menos 1 despacho realizado">Viv. en<br>Ejec.</th>
@@ -6696,8 +6685,6 @@ window.addEventListener('resize',updateStickyTops);
 </tr>
 <tr style="background:#f8fafc;">
   <th class="ep-r2" style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;position:sticky;z-index:2;background:#f8fafc;" title="% Cobrado del total del contrato">% Cobrado</th>
-  <th class="ep-r2" style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;position:sticky;z-index:2;background:#f8fafc;" title="% EP emitido respecto al total del contrato">% Avan. Cont.</th>
-  <th class="ep-r2" style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;position:sticky;z-index:2;background:#f8fafc;" title="% Avance de programa de obra (Gantt)">% Avan. Prog.</th>
   <th class="ep-r2" style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;position:sticky;z-index:2;background:#f8fafc;" title="% Avance real inspeccionado">% Avan. Real</th>
   <th class="ep-r2" style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;background:#f0fdf4;position:sticky;z-index:2;">Total Contrato</th>
   <th class="ep-r2" style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;background:#f0fdf4;position:sticky;z-index:2;">Cobrado (Pagado)</th>
@@ -6712,15 +6699,7 @@ window.addEventListener('resize',updateStickyTops);
                 t += `<tr style="border-bottom:1px solid #f1f5f9;">
   <td style="padding:5px 6px;border-right:1px solid #e2e8f0;font-size:10px;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;position:sticky;left:0;z-index:1;background:#fff;box-shadow:2px 0 4px rgba(0,0,0,.06);" title="${nombre}">${nombre}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${r.pctCob.toFixed(2)}%</td>
-  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${r.pctEmit.toFixed(2)}%</td>
-  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${r.agPct!==null?Number(r.agPct).toFixed(2)+'%':'—'}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${r.pctReal!==null?Number(r.pctReal).toFixed(2)+'%':'—'}</td>
-  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${fmtD2EP(r.pg?.inicio)}</td>
-  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${fmtD2EP(r.pg?.finProg)}</td>
-  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${r.cDur?r.cDur+'d':'—'}</td>
-  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${r.pg?.plazo?r.pg.plazo+'d':'—'}</td>
-  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:${cRCol};">${r.cDiasR!==null?r.cDiasR+'d':'—'}</td>
-  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:${pRCol};">${r.progDiasR!==null?r.progDiasR+'d':'—'}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${r.montos.viviendas||'—'}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${r.habilitadas||'—'}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;font-weight:700;color:#2563eb;">${r.enEjecucion}</td>
@@ -6736,7 +6715,7 @@ window.addEventListener('resize',updateStickyTops);
             const gFact = resumenPagoFilas.reduce((s,r)=>s+r.totFacturar,0);
             t += `<tr style="background:#f1f5f9;border-top:2px solid #cbd5e1;font-weight:700;">
   <td style="padding:5px 6px;font-size:10px;color:#475569;border-right:1px solid #e2e8f0;position:sticky;left:0;z-index:1;background:#f1f5f9;box-shadow:2px 0 4px rgba(0,0,0,.06);">TOTAL (${resumenPagoFilas.length} obras)</td>
-  <td colspan="13" style="padding:4px 4px;border-right:1px solid #e2e8f0;"></td>
+  <td colspan="5" style="padding:4px 4px;border-right:1px solid #e2e8f0;"></td>
   <td style="padding:4px 4px;text-align:right;font-size:10px;font-family:monospace;border-right:1px solid #e2e8f0;">${fmtUF2d(gCont)}</td>
   <td style="padding:4px 4px;text-align:right;font-size:10px;font-family:monospace;color:#16a34a;border-right:1px solid #e2e8f0;">${fmtUF2d(gPag)}</td>
   <td style="padding:4px 4px;text-align:right;font-size:10px;font-family:monospace;color:#b45309;border-right:1px solid #e2e8f0;">${fmtUF2d(gTram)}</td>
