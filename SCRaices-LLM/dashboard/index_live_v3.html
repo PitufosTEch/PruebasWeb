@@ -4682,7 +4682,7 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
             const n=vivs.filter(v=>v.flags&&v.flags[cp.key]).length;
             const pct=tot?Math.round(n/tot*100):0;
             const col=n===tot?'#16a34a':n>0?'#2563eb':'#6b7280';
-            sCk += `<div class="sc" style="flex-direction:column;align-items:center;text-align:center;padding:4px;"><div class="scl" style="margin-bottom:2px;">${cp.label}</div><div style="font-size:11px;font-weight:700;color:${col};">${n}<span style="font-size:9px;font-weight:400;color:#94a3b8;"> / ${tot}</span></div><div style="font-size:9px;color:#94a3b8;">${pct}%</div></div>`;
+            sCk += `<div class="sc"><div class="scl">${cp.label}</div><div class="scv" style="color:${col};">${n}<span class="scd"> / ${tot} · ${pct}%</span></div></div>`;
         });
         sCk += `</div><div class="tc"><table style="table-layout:fixed;width:100%;"><colgroup><col style="width:26%">${CP_OBR.map(()=>'<col>').join('')}<col></colgroup>
 <thead><tr><th>Beneficiario</th>${CP_OBR.map(cp=>`<th style="text-align:center;">${cp.label}</th>`).join('')}<th style="text-align:center;">Recep.</th></tr></thead><tbody>`;
@@ -4905,7 +4905,7 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
         let sCk='';
         proyData.forEach(d=>{
             sCk+=`<div class="blk" style="border-left:4px solid #0f172a;">${prjHdr(d.nombre)}<div class="sg" style="grid-template-columns:repeat(${CP_OBR.length},1fr);margin-bottom:16px;">`;
-            CP_OBR.forEach(cp=>{const n=d.vivs.filter(v=>v.flags&&v.flags[cp.key]).length;const pct=d.tot?Math.round(n/d.tot*100):0;const col=n===d.tot?'#16a34a':n>0?'#2563eb':'#6b7280';sCk+=`<div class="sc" style="flex-direction:column;align-items:center;text-align:center;padding:4px;"><div class="scl" style="margin-bottom:2px;">${cp.label}</div><div style="font-size:11px;font-weight:700;color:${col};">${n}<span style="font-size:9px;font-weight:400;color:#94a3b8;"> / ${d.tot}</span></div><div style="font-size:9px;color:#94a3b8;">${pct}%</div></div>`;});
+            CP_OBR.forEach(cp=>{const n=d.vivs.filter(v=>v.flags&&v.flags[cp.key]).length;const pct=d.tot?Math.round(n/d.tot*100):0;const col=n===d.tot?'#16a34a':n>0?'#2563eb':'#6b7280';sCk+=`<div class="sc"><div class="scl">${cp.label}</div><div class="scv" style="color:${col};">${n}<span class="scd"> / ${d.tot} · ${pct}%</span></div></div>`;});
             sCk+=`</div><div class="tc"><table style="table-layout:fixed;width:100%;"><colgroup><col style="width:26%">${CP_OBR.map(()=>'<col>').join('')}<col></colgroup><thead><tr><th>Beneficiario</th>${CP_OBR.map(cp=>`<th style="text-align:center;">${cp.label}</th>`).join('')}<th style="text-align:center;">Recep.</th></tr></thead><tbody>`;
             d.vivs.forEach(v=>{const p=v.pctTotal,pT=p!=null?`${p}%`:'—',pC=p==null?'#94a3b8':p>=80?'#16a34a':p>=50?'#2563eb':'#dc2626';const rfOk=!!v.fecha_recepcion||!!(cierresForzados[v.ID_Benef]);const nm=esc((v.NOMBRES||'')+' '+(v.APELLIDOS||''));sCk+=`<tr${rfOk?' style="background:#f0fdf4;"':''}><td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${nm}">${nm} <span style="font-size:10px;font-weight:700;color:${pC};">${pT}</span></td>${CP_OBR.map(cp=>`<td style="text-align:center;">${ck(v.flags&&v.flags[cp.key])}</td>`).join('')}<td style="text-align:center;">${ck(rfOk)}</td></tr>`;});
             sCk+=`</tbody></table></div></div>`;
