@@ -5221,8 +5221,8 @@ function jumpToObra(idx){
 }
 ` + jsClose2;
 
-        const tabKeys2 = ['resumen','checkpoints','curvas','viviendas','despachos'];
-        const tabLabels2 = {resumen:'Resumen',checkpoints:'Checkpoints',curvas:'Curvas S',viviendas:'Viviendas',despachos:'Despachos'};
+        const tabKeys2 = ['resumen','curvas','viviendas','despachos'];
+        const tabLabels2 = {resumen:'Resumen',curvas:'Curvas S',viviendas:'Viviendas',despachos:'Despachos'};
 
         const tabsAdq = `<div class="tabs">
 ${tabKeys2.map((t,i)=>`<button class="tab-btn${i===0?' active':''}" onclick="mostrar('${t}',this)">${tabLabels2[t]}</button>`).join('\n')}
