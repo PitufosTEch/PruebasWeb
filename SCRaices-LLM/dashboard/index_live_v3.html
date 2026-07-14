@@ -4453,7 +4453,7 @@ ${comentariosHtml}`;
     // Helper: genera sección HTML de despachos del período actual (mes1).
     // data = {titulo, meses, beneficiarios:[{nombre,capataz,mes1}]}
     // capatazFiltro = string para filtrar (Capataz), null para todos (Residente)
-    const _generarSeccionDespachos = (data, capatazFiltro, soloSol = false) => {
+    const _generarSeccionDespachos = (data, capatazFiltro, soloSol = false, tituloOverride = null) => {
         if (!data || !data.beneficiarios || !data.beneficiarios.length) return '';
         const _norm = s => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 
@@ -4495,9 +4495,9 @@ ${comentariosHtml}`;
             return `${fmt(lun)} al ${fmt(vie)}`;
         })();
 
-        const titulo = capatazFiltro
+        const titulo = tituloOverride || (capatazFiltro
             ? `Despachos planificados — Capataz: ${capatazFiltro}`
-            : `Despachos planificados — ${data.titulo || ''}`;
+            : `Despachos planificados — ${data.titulo || ''}`);
         const colCapTh = mostrarCap
             ? '<th style="padding:7px 8px;background:#334155;color:#cbd5e1;font-size:10px;text-align:center;white-space:nowrap;">Capataz</th>'
             : '';
@@ -5147,8 +5147,9 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
                 viviendas:   renderTabAdq(idx, 'viviendas'),
                 despachos: (() => {
                     const dSem = despachosDataRaw[o.ID_proy] || null;
+                    const tituloDesp = `${o.nombre.replace(' · ', ' - ')} - Despachos planificados`;
                     const secSem = (dSem && dSem.beneficiarios && dSem.beneficiarios.length)
-                        ? (_generarSeccionDespachos(dSem, null, false) || '')
+                        ? (_generarSeccionDespachos(dSem, null, false, tituloDesp) || '')
                         : '';
                     const secHtml = despachosHtmlRaw[o.ID_proy] || '';
                     return secSem + (secHtml ? `<div style="margin-top:20px;">${secHtml}</div>` : '')

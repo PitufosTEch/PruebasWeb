@@ -177,7 +177,7 @@ def _parsear_etapas(texto: str) -> list:
     return resultado
 
 
-def _resumen_por_etapa(bens: list, meses: list) -> str:
+def _resumen_por_etapa(bens: list, meses: list, titulo: str = "") -> str:
     """Genera tabla HTML de resumen: etapa × mes → cantidad de beneficiarios."""
     from collections import defaultdict
     conteo = defaultdict(lambda: [0, 0, 0])  # (cod, nombre) → [mes1, mes2, mes3]
@@ -245,10 +245,10 @@ def _resumen_por_etapa(bens: list, meses: list) -> str:
 
     return (
         '<div style="margin-top:24px;">'
-        '<div style="background:#0f172a;border-radius:8px 8px 0 0;padding:10px 16px;">'
-        '<div style="font-size:11px;font-weight:700;color:#e2e8f0;letter-spacing:.05em;'
-        'text-transform:uppercase;">Resumen por etapa · Beneficiarios a despachar</div>'
-        '</div>'
+        f'<div style="background:#0f172a;border-radius:8px 8px 0 0;padding:10px 16px;">'
+        f'<div style="font-size:12px;font-weight:700;color:#f1f5f9;">'
+        f'{"Obra " + titulo + " — " if titulo else ""}Resumen de etapas a despachar próximos 3 meses</div>'
+        f'</div>'
         '<div style="overflow-x:auto;border:1px solid #e2e8f0;border-radius:0 0 8px 8px;">'
         '<table style="border-collapse:collapse;width:100%;min-width:500px;">'
         '<thead><tr>'
@@ -306,7 +306,7 @@ def _generar_html_proyecto(datos: dict) -> str:
     header = (
         f'<div style="background:#1e293b;border-radius:8px 8px 0 0;'
         f'padding:12px 18px;margin-bottom:0;">'
-        f'<div style="font-size:12px;font-weight:700;color:#f1f5f9;">{titulo}</div>'
+        f'<div style="font-size:12px;font-weight:700;color:#f1f5f9;">Obra {titulo} — Proyección de despachos a 3 meses</div>'
         f'<div style="font-size:11px;color:#94a3b8;margin-top:3px;">'
         f'{datos["meta"]}&nbsp;&nbsp;'
         f'<span style="background:#16a34a;color:#fff;border-radius:4px;'
@@ -423,7 +423,7 @@ def _generar_html_proyecto(datos: dict) -> str:
         f'{leyenda}</div>'
     )
 
-    resumen_etapas = _resumen_por_etapa(bens, meses)
+    resumen_etapas = _resumen_por_etapa(bens, meses, titulo)
 
     return header + tabla + resumen_etapas
 
