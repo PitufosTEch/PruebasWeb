@@ -139,8 +139,9 @@ JS_EXTRACT = r"""
         }
     }
 
-    // ── 7. Filtrar registros en ventana ───────────────────────────────────
-    var registros = [];
+    // ── 7. Filtrar registros en ventana + vencidos pendientes ────────────────
+    var registros = [];   // dentro de la semana actual (excepto Despachado)
+    var vencidos  = [];   // fecha < lunes actual, Estado=Pendiente
     if (solIdx >= 0 && campoFecha) {
         var tblSol = AppModel.Tables[solIdx];
         Object.values(tblSol.Rows).forEach(function(row) {
@@ -148,30 +149,45 @@ JS_EXTRACT = r"""
             var fd = parseDate(fv);
             if (!fd) return;
             fd.setHours(0,0,0,0);
-            if (fd < limIni || fd > limFin) return;
 
-            // Excluir solicitudes ya despachadas
             var est1 = String(row['Estado']   || '').trim().toLowerCase();
             var est2 = String(row['Estado 2'] || '').trim().toLowerCase();
+            // Nunca incluir los ya completamente despachados
             if (est1 === 'despachado' || est2 === 'despachado') return;
 
-            var idB  = String(row['ID_Benef'] || row['ID_benef'] || '');
-            var idP  = String(row['ID_proy']  || row['ID_Proy']  || '');
-            var tipo = campoTipo ? String(row[campoTipo] || '').trim() : '';
-            var ben  = benMap[idB] || {};
-            var nom  = String(row['Nombre'] || ben.nombre || idB).trim();
+            var idB      = String(row['ID_Benef'] || row['ID_benef'] || '');
+            var idP      = String(row['ID_proy']  || row['ID_Proy']  || '');
+            var tipo     = campoTipo ? String(row[campoTipo] || '').trim() : '';
+            var ben      = benMap[idB] || {};
+            var nom      = String(row['Nombre'] || ben.nombre || idB).trim();
             if (!nom) nom = ben.nombre || idB;
             if (!idP && ben.ID_proy) idP = ben.ID_proy;
             var fechaStr = fd.toISOString().substring(0, 10);
+            var desc     = String(row['Elemento pendiente'] || row['elemento_pendiente'] || '').trim();
 
-            registros.push({
-                IDU:      String(row['IDU_soldesp'] || ''),
-                ID_Benef: idB,
-                ID_proy:  idP,
-                nombre:   nom,
-                tipo:     tipo,
-                fecha:    fechaStr
-            });
+            if (fd >= limIni && fd <= limFin) {
+                // Despacho programado para esta semana
+                registros.push({
+                    IDU:         String(row['IDU_soldesp'] || ''),
+                    ID_Benef:    idB,
+                    ID_proy:     idP,
+                    nombre:      nom,
+                    tipo:        tipo,
+                    fecha:       fechaStr,
+                    descripcion: desc
+                });
+            } else if (fd < limIni && (est1 === 'pendiente' || est2 === 'pendiente')) {
+                // Pendiente vencido: debió despacharse antes de esta semana
+                vencidos.push({
+                    IDU:         String(row['IDU_soldesp'] || ''),
+                    ID_Benef:    idB,
+                    ID_proy:     idP,
+                    nombre:      nom,
+                    tipo:        tipo,
+                    fecha:       fechaStr,
+                    descripcion: desc
+                });
+            }
         });
     }
 
@@ -183,7 +199,8 @@ JS_EXTRACT = r"""
         muestraFila:       muestraFila,
         limIni:            limIni ? limIni.toISOString().substring(0,10) : null,
         limFin:            limFin ? limFin.toISOString().substring(0,10) : null,
-        registros:         registros
+        registros:         registros,
+        vencidos:          vencidos
     };
 }
 """
@@ -286,9 +303,9 @@ def _normalizar_tipo(tipo: str) -> list:
 
 # ── Construcción payload Firebase ─────────────────────────────────────────────
 
-def construir_payload(registros: list, cap_map: dict, ventana_dias: int) -> dict:
-    hoy    = datetime.date.today()
-    fin    = hoy + datetime.timedelta(days=ventana_dias)
+def construir_payload(registros: list, vencidos: list, cap_map: dict, ventana_dias: int) -> dict:
+    hoy = datetime.date.today()
+    fin = hoy + datetime.timedelta(days=ventana_dias)
 
     def mes_str(d: datetime.date) -> str:
         meses = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"]
@@ -296,45 +313,67 @@ def construir_payload(registros: list, cap_map: dict, ventana_dias: int) -> dict
 
     periodo = mes_str(hoy) if mes_str(hoy) == mes_str(fin) else f"{mes_str(hoy)}–{mes_str(fin)}"
 
-    # Deduplicar por IDU (mismo despacho puede aparecer varias veces)
-    vistos: set = set()
-    registros_uniq = []
-    for r in registros:
-        key = r.get("IDU") or f"{r['ID_Benef']}|{r['tipo']}|{r['fecha']}"
-        if key not in vistos:
-            vistos.add(key)
-            registros_uniq.append(r)
-    registros = registros_uniq
+    def _dedup(lista: list) -> list:
+        vistos: set = set()
+        out = []
+        for r in lista:
+            key = r.get("IDU") or f"{r['ID_Benef']}|{r['tipo']}|{r['fecha']}"
+            if key not in vistos:
+                vistos.add(key)
+                out.append(r)
+        return out
 
-    # pid → id_benef → {nombre, capataz, etapas: set}
+    registros = _dedup(registros)
+    vencidos  = _dedup(vencidos)
+
+    # pid → id_benef → {nombre, capataz, etapas, vencidos_det}
     por_proy: dict = {}
-    for r in registros:
-        pid = r["ID_proy"]
-        idB = r["ID_Benef"]
-        if not pid or not idB:
-            continue
+
+    def _asegurar_ben(pid, idB, nombre):
         if pid not in por_proy:
             por_proy[pid] = {}
         if idB not in por_proy[pid]:
             por_proy[pid][idB] = {
-                "nombre":  r["nombre"] or idB,
-                "capataz": cap_map.get(idB, ""),
-                "etapas":  []
+                "nombre":       nombre or idB,
+                "capataz":      cap_map.get(idB, ""),
+                "etapas":       [],
+                "vencidos_det": []
             }
+
+    for r in registros:
+        pid = r["ID_proy"]; idB = r["ID_Benef"]
+        if not pid or not idB:
+            continue
+        _asegurar_ben(pid, idB, r["nombre"])
         for et in _normalizar_tipo(r["tipo"]):
             if et not in por_proy[pid][idB]["etapas"]:
                 por_proy[pid][idB]["etapas"].append(et)
+
+    for r in vencidos:
+        pid = r["ID_proy"]; idB = r["ID_Benef"]
+        if not pid or not idB:
+            continue
+        _asegurar_ben(pid, idB, r["nombre"])
+        entry = {
+            "fecha":      r["fecha"],
+            "tipo":       r["tipo"],
+            "descripcion": r.get("descripcion", "")
+        }
+        por_proy[pid][idB]["vencidos_det"].append(entry)
 
     payload = {}
     for pid, bens in por_proy.items():
         bens_list = []
         for idB, info in bens.items():
-            etapas_str = ", ".join(f"[SOL] {e}" for e in info["etapas"]) if info["etapas"] else "[SOL] Despacho programado"
-            bens_list.append({
+            etapas_str = ", ".join(f"[SOL] {e}" for e in info["etapas"]) if info["etapas"] else ""
+            ben_entry: dict = {
                 "nombre":  info["nombre"],
                 "capataz": info["capataz"],
                 "mes1":    etapas_str
-            })
+            }
+            if info["vencidos_det"]:
+                ben_entry["vencidos"] = info["vencidos_det"]
+            bens_list.append(ben_entry)
         payload[pid] = {
             "titulo":        pid,
             "meses":         [periodo],
@@ -395,8 +434,9 @@ def main():
             sys.exit(1)
         return
 
+    log.info(f"Vencidos encontrados:  {len(data.get('vencidos', []))}")
     cap_map = _cargar_capataz_map()
-    payload = construir_payload(data["registros"], cap_map, args.ventana)
+    payload = construir_payload(data["registros"], data.get("vencidos", []), cap_map, args.ventana)
     n_bens  = sum(len(v["beneficiarios"]) for v in payload.values())
     log.info(f"Payload construido: {len(payload)} proyectos, {n_bens} beneficiarios")
 
