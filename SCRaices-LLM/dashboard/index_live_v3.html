@@ -432,7 +432,7 @@ const ETAPAS_CONFIG_FULL = {
             .map(p => {
                 const est = (p.estado_general || '').toLowerCase();
                 return {
-                    ID_proy: String(p.ID_proy || ''),
+                    ID_proy: (s => /^\d+$/.test(s) ? 'P' + s : s)(String(p.ID_proy || '')),
                     NOMBRE_PROYECTO: String(p.NOMBRE_PROYECTO || ''),
                     COMUNA: String(p.COMUNA || ''),
                     fecha_inicio: parseDate(p.fecha_inicio) || '',
