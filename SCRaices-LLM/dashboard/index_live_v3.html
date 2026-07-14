@@ -5005,21 +5005,23 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
         const obrasConCurva = PROYECTOS_DATA.filter(p => (CURVAS_S_CONFIG[p.ID_proy] || []).length > 0);
         if (obrasConCurva.length === 0) { alert('No hay obras activas con curvas S configuradas.'); return; }
 
-        let ganttRaw = {}, gruposRaw = {}, obsRaw = {}, avanceGanttRaw = {}, despachosHtmlRaw = {};
+        let ganttRaw = {}, gruposRaw = {}, obsRaw = {}, avanceGanttRaw = {}, despachosHtmlRaw = {}, despachosDataRaw = {};
         try {
-            const [rGantt, rGrupos, rObs, rAvGantt, rDesp] = await Promise.all([
+            const [rGantt, rGrupos, rObs, rAvGantt, rDesp, rDespData] = await Promise.all([
                 fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/gantt_programa.json'),
                 fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/grupos.json'),
                 fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/observaciones.json'),
                 fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/avance_gantt.json'),
-                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/despachos_html.json')
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/despachos_html.json'),
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/despachos_data.json')
             ]);
-            ganttRaw        = (await rGantt.json())  || {};
-            gruposRaw       = (await rGrupos.json()) || {};
-            obsRaw          = (await rObs.json())    || {};
-            avanceGanttRaw  = (await rAvGantt.json())|| {};
-            despachosHtmlRaw= (await rDesp.json())   || {};
-        } catch(e) { ganttRaw = {}; gruposRaw = {}; obsRaw = {}; avanceGanttRaw = {}; despachosHtmlRaw = {}; }
+            ganttRaw        = (await rGantt.json())    || {};
+            gruposRaw       = (await rGrupos.json())   || {};
+            obsRaw          = (await rObs.json())      || {};
+            avanceGanttRaw  = (await rAvGantt.json())  || {};
+            despachosHtmlRaw= (await rDesp.json())     || {};
+            despachosDataRaw= (await rDespData.json()) || {};
+        } catch(e) { ganttRaw = {}; gruposRaw = {}; obsRaw = {}; avanceGanttRaw = {}; despachosHtmlRaw = {}; despachosDataRaw = {}; }
 
         const getCapataz = (idProy, curvaLabel) => {
             const gList = gruposRaw[idProy] || [];
@@ -5143,7 +5145,15 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
                 checkpoints: renderTabAdq(idx, 'checkpoints'),
                 curvas:      renderTabAdq(idx, 'curvas'),
                 viviendas:   renderTabAdq(idx, 'viviendas'),
-                despachos:   despachosHtmlRaw[o.ID_proy] || '<p style="padding:32px;text-align:center;color:#94a3b8;font-size:14px;">Sin datos de despachos disponibles</p>'
+                despachos: (() => {
+                    const dSem = despachosDataRaw[o.ID_proy] || null;
+                    const secSem = (dSem && dSem.beneficiarios && dSem.beneficiarios.length)
+                        ? (_generarSeccionDespachos(dSem, null, false) || '')
+                        : '';
+                    const secHtml = despachosHtmlRaw[o.ID_proy] || '';
+                    return secSem + (secHtml ? `<div style="margin-top:20px;">${secHtml}</div>` : '')
+                        || '<p style="padding:32px;text-align:center;color:#94a3b8;font-size:14px;">Sin datos de despachos disponibles</p>';
+                })()
             };
         });
 
