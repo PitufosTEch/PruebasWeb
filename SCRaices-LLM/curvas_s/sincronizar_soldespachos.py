@@ -48,8 +48,8 @@ JS_WAIT = r"""
 # Usa raw string (r"""...""") para evitar warning de Python con \d en JS.
 JS_EXTRACT = r"""
 (ventanaDias) => {
-    // ── 1. Encontrar tabla con campo Fecha y Tipo_despacho ────────────────
-    var despIdx = -1;
+    // ── 1. Encontrar tabla soldepacho (IDU_soldesp) ───────────────────────
+    var solIdx = -1;
     var camposDisponibles = [];
     var muestraFila = null;
 
@@ -59,25 +59,22 @@ JS_EXTRACT = r"""
         var keys = Object.keys(tbl.Rows);
         if (keys.length === 0) continue;
         var row0 = tbl.Rows[keys[0]];
-        // Buscar tabla con IDU_desp O IDU_soldesp
-        if ('IDU_desp' in row0 || 'IDU_soldesp' in row0) {
-            if (despIdx < 0) {
-                despIdx = i;
-                camposDisponibles = Object.keys(row0);
-                muestraFila = row0;
-            }
+        if ('IDU_soldesp' in row0) {
+            solIdx = i;
+            camposDisponibles = Object.keys(row0);
+            muestraFila = row0;
+            break;
         }
     }
 
-    // ── 2. Leer Beneficiario (tabla 4) para nombre ────────────────────────
+    // ── 2. Leer Beneficiario (tabla 4) para nombre y proyecto ────────────
     var benMap = {};
     var tblBen = AppModel.Tables[4];
     if (tblBen && tblBen.Rows) {
         Object.values(tblBen.Rows).forEach(function(b) {
             var idB = String(b.ID_Benef || b.IDU_ben || '');
             if (!idB) return;
-            var nom = String(b['Nombre completo'] || '').trim();
-            if (!nom) nom = ((b.APELLIDOS || '') + ' ' + (b.NOMBRES || '')).toUpperCase().trim();
+            var nom = ((b.APELLIDOS || '') + ' ' + (b.NOMBRES || '')).toUpperCase().trim();
             benMap[idB] = {
                 nombre: nom,
                 ID_proy: String(b.ID_Proy || b.ID_proy || '')
@@ -95,7 +92,6 @@ JS_EXTRACT = r"""
             d = new Date(s.substring(0, 10));
         } else if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) {
             var p = s.split('/');
-            // DD/MM/YYYY (formato chileno)
             d = new Date(p[2] + '-' + p[1] + '-' + p[0]);
             if (isNaN(d.getTime())) d = new Date(p[2] + '-' + p[0] + '-' + p[1]);
         } else {
@@ -104,35 +100,75 @@ JS_EXTRACT = r"""
         return isNaN(d.getTime()) ? null : d;
     }
 
-    // ── 4. Filtrar registros futuros ───────────────────────────────────────
+    // ── 4. Ventana: lunes al viernes de la semana actual ──────────────────
     var hoy = new Date();
     hoy.setHours(0,0,0,0);
-    var limFin = new Date(hoy.getTime() + ventanaDias * 86400000);
+    // Si ventanaDias > 0 → usar ventana genérica; si = 0 → semana actual (lun-vie)
+    var limIni, limFin;
+    if (ventanaDias === 0) {
+        var dow = hoy.getDay();  // 0=dom,1=lun,...,6=sab
+        var diffLun = (dow === 0) ? -6 : 1 - dow;
+        limIni = new Date(hoy.getTime() + diffLun * 86400000);
+        limFin = new Date(limIni.getTime() + 4 * 86400000);  // viernes
+    } else {
+        limIni = hoy;
+        limFin = new Date(hoy.getTime() + ventanaDias * 86400000);
+    }
 
+    // ── 5. Identificar campo "Fecha a despachar" ──────────────────────────
+    var CANDIDATOS_FECHA = [
+        'Fecha a despachar', 'Fecha_a_despachar', 'fecha_a_despachar',
+        'Fecha_despacho', 'fecha_despacho', 'FechaDespacho',
+        'fecha_programada', 'Fecha_programada', 'Fecha', 'fecha'
+    ];
+    var campoFecha = null;
+    for (var ci = 0; ci < CANDIDATOS_FECHA.length; ci++) {
+        if (camposDisponibles.indexOf(CANDIDATOS_FECHA[ci]) >= 0) {
+            campoFecha = CANDIDATOS_FECHA[ci];
+            break;
+        }
+    }
+
+    // ── 6. Identificar campo tipo de despacho ─────────────────────────────
+    var CANDIDATOS_TIPO = ['Tipo_despacho', 'tipo_despacho', 'etapa', 'Etapa', 'Tipo', 'tipo'];
+    var campoTipo = null;
+    for (var ti = 0; ti < CANDIDATOS_TIPO.length; ti++) {
+        if (camposDisponibles.indexOf(CANDIDATOS_TIPO[ti]) >= 0) {
+            campoTipo = CANDIDATOS_TIPO[ti];
+            break;
+        }
+    }
+
+    // ── 7. Filtrar registros en ventana ───────────────────────────────────
     var registros = [];
-    if (despIdx >= 0) {
-        var tblDesp = AppModel.Tables[despIdx];
-        Object.values(tblDesp.Rows).forEach(function(row) {
-            var fv = row['Fecha'];
+    if (solIdx >= 0 && campoFecha) {
+        var tblSol = AppModel.Tables[solIdx];
+        Object.values(tblSol.Rows).forEach(function(row) {
+            var fv = row[campoFecha];
             var fd = parseDate(fv);
             if (!fd) return;
-            if (fd < hoy || fd > limFin) return;
+            fd.setHours(0,0,0,0);
+            if (fd < limIni || fd > limFin) return;
 
-            var idB  = String(row['ID_Benef'] || '');
-            var idP  = String(row['ID_proy']  || row['ID_Proy'] || '');
-            var tipo = String(row['Tipo_despacho'] || '').trim();
-            var nom  = String(row['Nombre completo'] || '').trim();
-            if (!nom && benMap[idB]) nom = benMap[idB].nombre;
-            if (!idP && benMap[idB]) idP = benMap[idB].ID_proy;
-            var nomProy = String(row['Nombre proyecto'] || '').trim();
+            // Excluir solicitudes ya despachadas
+            var est1 = String(row['Estado']   || '').trim().toLowerCase();
+            var est2 = String(row['Estado 2'] || '').trim().toLowerCase();
+            if (est1 === 'despachado' || est2 === 'despachado') return;
+
+            var idB  = String(row['ID_Benef'] || row['ID_benef'] || '');
+            var idP  = String(row['ID_proy']  || row['ID_Proy']  || '');
+            var tipo = campoTipo ? String(row[campoTipo] || '').trim() : '';
+            var ben  = benMap[idB] || {};
+            var nom  = String(row['Nombre'] || ben.nombre || idB).trim();
+            if (!nom) nom = ben.nombre || idB;
+            if (!idP && ben.ID_proy) idP = ben.ID_proy;
             var fechaStr = fd.toISOString().substring(0, 10);
 
             registros.push({
-                IDU: String(row['IDU_desp'] || row['IDU_soldesp'] || ''),
+                IDU:      String(row['IDU_soldesp'] || ''),
                 ID_Benef: idB,
                 ID_proy:  idP,
                 nombre:   nom,
-                nombre_proy: nomProy,
                 tipo:     tipo,
                 fecha:    fechaStr
             });
@@ -140,9 +176,13 @@ JS_EXTRACT = r"""
     }
 
     return {
-        despIdx:           despIdx,
+        solIdx:            solIdx,
         camposDisponibles: camposDisponibles,
+        campoFecha:        campoFecha,
+        campoTipo:         campoTipo,
         muestraFila:       muestraFila,
+        limIni:            limIni ? limIni.toISOString().substring(0,10) : null,
+        limFin:            limFin ? limFin.toISOString().substring(0,10) : null,
         registros:         registros
     };
 }
@@ -323,30 +363,35 @@ def escribir_firebase(payload: dict) -> bool:
 def main():
     parser = argparse.ArgumentParser(description="Sincronizar despachos futuros AppSheet → Firebase")
     parser.add_argument("--inspect",  action="store_true", help="Solo inspecciona; no escribe Firebase")
-    parser.add_argument("--ventana",  type=int, default=VENTANA_DIAS_DEFAULT,
-                        help=f"Días hacia adelante (default: {VENTANA_DIAS_DEFAULT})")
+    parser.add_argument("--ventana",  type=int, default=0,
+                        help="Días hacia adelante (default: 0 = semana actual lun-vie)")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s  %(levelname)-8s  %(message)s")
 
-    log.info(f"Extrayendo despachos futuros (ventana: {args.ventana} días)...")
+    ventana_label = f"semana actual (lun-vie)" if args.ventana == 0 else f"{args.ventana} días"
+    log.info(f"Extrayendo soldespachos (ventana: {ventana_label})...")
     data = extraer_despachos(args.ventana)
 
-    log.info(f"Tabla despachos en índice AppModel: {data['despIdx']}")
-    log.info(f"Registros encontrados en ventana:   {len(data['registros'])}")
+    log.info(f"Tabla soldepacho en índice AppModel: {data.get('solIdx', -1)}")
+    log.info(f"Campo fecha identificado: {data.get('campoFecha')}")
+    log.info(f"Ventana: {data.get('limIni')} a {data.get('limFin')}")
+    log.info(f"Registros encontrados: {len(data['registros'])}")
 
-    if args.inspect or data["despIdx"] < 0:
+    if args.inspect or data.get("solIdx", -1) < 0:
         print("\n=== INSPECCIÓN ===")
-        print(f"Índice tabla: {data['despIdx']}")
-        print(f"Campos: {json.dumps(data['camposDisponibles'], ensure_ascii=False, indent=2)}")
-        if data["muestraFila"]:
-            safe = {k: str(v) for k, v in (data["muestraFila"] or {}).items()}
+        print(f"Tabla soldepacho en índice: {data.get('solIdx', -1)}")
+        print(f"Campo fecha: {data.get('campoFecha')} | Campo tipo: {data.get('campoTipo')}")
+        print(f"Ventana: {data.get('limIni')} a {data.get('limFin')}")
+        print(f"Campos disponibles: {json.dumps(data['camposDisponibles'], ensure_ascii=False, indent=2)}")
+        if data.get("muestraFila"):
+            safe = {k: str(v) for k, v in data["muestraFila"].items()}
             print(f"\nMuestra (primer registro):\n{json.dumps(safe, ensure_ascii=False, indent=2)}")
         print(f"\nPrimeros 5 registros en ventana:")
         for r in data["registros"][:5]:
             print(f"  {json.dumps(r, ensure_ascii=False)}")
-        if data["despIdx"] < 0:
-            log.error("No se encontró tabla de despachos en AppModel")
+        if data.get("solIdx", -1) < 0:
+            log.error("No se encontró tabla soldepacho en AppModel — verifica que AppSheet cargó correctamente")
             sys.exit(1)
         return
 

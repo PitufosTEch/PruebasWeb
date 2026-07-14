@@ -210,7 +210,7 @@ jobs:
         env:
           APPSHEET_COOKIES_B64: ${{ secrets.APPSHEET_COOKIES_B64 }}
           FIREBASE_URL:         https://scraices-dashboard-default-rtdb.firebaseio.com
-        run: python sincronizar_soldespachos.py --ventana 60
+        run: python sincronizar_soldespachos.py --ventana 0
 
       - name: Resumen en caso de error
         if: failure()
