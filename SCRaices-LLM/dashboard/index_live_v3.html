@@ -4483,7 +4483,18 @@ ${comentariosHtml}`;
         if (!bens.length && !bensVenc.length) return '';
 
         const mostrarCap = !capatazFiltro;
-        const nombreMes = (data.meses && data.meses[0]) || 'Período actual';
+
+        // Calcular rango lunes–viernes de la semana actual
+        const _semRango = (() => {
+            const hoy = new Date(); hoy.setHours(0,0,0,0);
+            const dow = hoy.getDay();
+            const diffLun = dow === 0 ? -6 : 1 - dow;
+            const lun = new Date(hoy.getTime() + diffLun * 86400000);
+            const vie = new Date(lun.getTime() + 4 * 86400000);
+            const fmt = d => `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`;
+            return `${fmt(lun)} al ${fmt(vie)}`;
+        })();
+
         const titulo = capatazFiltro
             ? `Despachos planificados — Capataz: ${capatazFiltro}`
             : `Despachos planificados — ${data.titulo || ''}`;
@@ -4514,9 +4525,9 @@ ${comentariosHtml}`;
             const leyenda = soloSol
                 ? `<span><span style="background:#ccfbf1;color:#0f766e;border-radius:3px;padding:1px 5px;font-weight:600;">[SOL]</span> Solicitud confirmada</span>`
                 : `<span><span style="background:#ccfbf1;color:#0f766e;border-radius:3px;padding:1px 5px;font-weight:600;">[SOL]</span> Solicitud confirmada</span><span><span style="background:#fef3c7;color:#92400e;border-radius:3px;padding:1px 5px;font-weight:600;">[MC]</span> Proyección Monte Carlo</span>`;
-            htmlSemana = `<div style="background:#1e293b;border-radius:8px 8px 0 0;padding:10px 16px;"><div style="font-size:12px;font-weight:700;color:#f1f5f9;">${titulo}</div><div style="font-size:11px;color:#94a3b8;margin-top:2px;">Período: ${nombreMes} · ${bens.length} beneficiario(s) con despacho planificado</div></div><div style="overflow-x:auto;border:1px solid #e2e8f0;border-radius:0 0 8px 8px;"><table style="border-collapse:collapse;width:100%;"><thead><tr><th style="padding:7px 12px;background:#334155;color:#cbd5e1;font-size:10px;text-align:left;min-width:160px;">Beneficiario</th>${colCapTh}<th style="padding:7px 8px;background:#334155;color:#cbd5e1;font-size:10px;text-align:left;">Etapas a despachar</th></tr></thead><tbody>${filas}</tbody></table><div style="padding:8px 12px;background:#f8fafc;border-top:1px solid #e2e8f0;font-size:10px;color:#6b7280;display:flex;gap:12px;flex-wrap:wrap;">${leyenda}</div></div>`;
+            htmlSemana = `<div style="background:#1e293b;border-radius:8px 8px 0 0;padding:10px 16px;"><div style="font-size:12px;font-weight:700;color:#f1f5f9;">${titulo}</div><div style="font-size:11px;color:#94a3b8;margin-top:2px;">Semana del ${_semRango} · ${bens.length} beneficiario(s) con despacho planificado</div></div><div style="overflow-x:auto;border:1px solid #e2e8f0;border-radius:0 0 8px 8px;"><table style="border-collapse:collapse;width:100%;"><thead><tr><th style="padding:7px 12px;background:#334155;color:#cbd5e1;font-size:10px;text-align:left;min-width:160px;">Beneficiario</th>${colCapTh}<th style="padding:7px 8px;background:#334155;color:#cbd5e1;font-size:10px;text-align:left;">Etapas a despachar</th></tr></thead><tbody>${filas}</tbody></table><div style="padding:8px 12px;background:#f8fafc;border-top:1px solid #e2e8f0;font-size:10px;color:#6b7280;display:flex;gap:12px;flex-wrap:wrap;">${leyenda}</div></div>`;
         } else {
-            htmlSemana = `<div style="background:#1e293b;border-radius:8px 8px 0 0;padding:10px 16px;"><div style="font-size:12px;font-weight:700;color:#f1f5f9;">${titulo}</div><div style="font-size:11px;color:#94a3b8;margin-top:2px;">Período: ${nombreMes} · Sin despachos programados esta semana</div></div>`;
+            htmlSemana = `<div style="background:#1e293b;border-radius:8px 8px 0 0;padding:10px 16px;"><div style="font-size:12px;font-weight:700;color:#f1f5f9;">${titulo}</div><div style="font-size:11px;color:#94a3b8;margin-top:2px;">Semana del ${_semRango} · Sin despachos programados</div></div>`;
         }
 
         // ── Tabla pendientes vencidos ──────────────────────────────────────
