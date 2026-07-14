@@ -6520,7 +6520,7 @@ ${gars.length ? `<div class="summary-grid">${gars.map(g => {
                 const m = String(e.Fecha).substring(0,7);
                 const est = (e.Estado||'').toLowerCase();
                 if (est.includes('pagado')) pagadoByMes[m] = (pagadoByMes[m]||0) + e.Monto;
-                if (est.includes('pagado') || est.includes('tramitaci')) emitidoByMes[m] = (emitidoByMes[m]||0) + e.Monto;
+                if (est.includes('pagado') || est.includes('ingresado') || est.includes('tramitaci')) emitidoByMes[m] = (emitidoByMes[m]||0) + e.Monto;
             });
             const serieAvReal = (AVANCE_MENSUAL_DATA[pid]?.serie) || [];
             const mesSet = new Set([...Object.keys(pagadoByMes), ...Object.keys(emitidoByMes), ...serieAvReal.map(s=>s.mes)]);
