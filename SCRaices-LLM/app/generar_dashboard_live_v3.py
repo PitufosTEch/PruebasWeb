@@ -383,7 +383,15 @@ def get_data_loader_js(apps_script_url):
 
             Object.entries(CIERRE_COLS).forEach(([col, label]) => {{
                 const val = String(e[col] || '').trim().toLowerCase();
-                if (val && val !== 'nan') inspMap[idB].cierre[label] = val === 'terminado' ? 1 : 0;
+                if (val && val !== 'nan') {{
+                    if (val === 'terminado') {{
+                        inspMap[idB].cierre[label] = 1;
+                    }} else if (val === 'n/a' || val === 'no aplica') {{
+                        if (inspMap[idB].cierre[label] !== 1) inspMap[idB].cierre[label] = -1;
+                    }} else if (inspMap[idB].cierre[label] !== 1 && inspMap[idB].cierre[label] !== -1) {{
+                        inspMap[idB].cierre[label] = 0;
+                    }}
+                }}
             }});
         }});
 

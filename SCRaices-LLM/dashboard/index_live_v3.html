@@ -666,9 +666,12 @@ const ETAPAS_CONFIG_FULL = {
                 const val = String(e[col] || '').trim().toLowerCase();
                 if (val && val !== 'nan') {
                     if (val === 'terminado') {
-                        inspMap[idB].cierre[label] = 1;          // verde gana: no se puede sobreescribir
-                    } else if (inspMap[idB].cierre[label] !== 1) {
-                        inspMap[idB].cierre[label] = 0;          // rojo solo si aún no está verde
+                        inspMap[idB].cierre[label] = 1;           // verde gana siempre
+                    } else if (val === 'n/a' || val === 'no aplica') {
+                        if (inspMap[idB].cierre[label] !== 1)
+                            inspMap[idB].cierre[label] = -1;      // N/A gana sobre pendiente
+                    } else if (inspMap[idB].cierre[label] !== 1 && inspMap[idB].cierre[label] !== -1) {
+                        inspMap[idB].cierre[label] = 0;           // rojo solo si aún no está verde ni N/A
                     }
                 }
                 // Sin valor → clave no presente en cierre → gris (sin datos)
@@ -2045,15 +2048,19 @@ const ViviendaCard = ({ beneficiario, estadoEtapas, expanded, onToggle, grupoCol
                             <div className="flex gap-0.5 mt-1.5" title="Verificación de cierre — AppSheet">
                                 {CIERRE_BADGES.map(({label, key}) => {
                                     const val = insp && insp.cierre != null && key in insp.cierre ? insp.cierre[key] : undefined;
+                                    const isNA = val === -1;
                                     const cls = val === 1
                                         ? "bg-green-500 text-white border-green-600 shadow-sm"
-                                        : val === 0
-                                            ? "bg-red-100 text-red-500 border-red-300"
-                                            : "bg-gray-100 text-gray-300 border-gray-200";
-                                    const ttl = val === 1 ? `${label}: Terminado` : val === 0 ? `${label}: Pendiente` : `${label}: Sin datos`;
+                                        : isNA
+                                            ? "border-gray-400 text-gray-100"
+                                            : val === 0
+                                                ? "bg-red-100 text-red-500 border-red-300"
+                                                : "bg-gray-100 text-gray-300 border-gray-200";
+                                    const naStyle = isNA ? {background:'repeating-linear-gradient(45deg,#64748b,#64748b 2px,#94a3b8 2px,#94a3b8 6px)'} : {};
+                                    const ttl = val === 1 ? `${label}: Terminado` : isNA ? `${label}: No aplica` : val === 0 ? `${label}: Pendiente` : `${label}: Sin datos`;
                                     return (
-                                        <span key={key} className={`w-6 h-6 rounded text-[7px] leading-tight font-bold border flex items-center justify-center ${cls}`} title={ttl}>
-                                            {label.substring(0, 2)}
+                                        <span key={key} className={`w-6 h-6 rounded text-[7px] leading-tight font-bold border flex items-center justify-center ${cls}`} style={naStyle} title={ttl}>
+                                            {isNA ? '—' : label.substring(0, 2)}
                                         </span>
                                     );
                                 })}
@@ -2206,8 +2213,10 @@ const ViviendaCard = ({ beneficiario, estadoEtapas, expanded, onToggle, grupoCol
                                 <span className="text-gray-400 font-medium text-[10px]">Verif. cierre:</span>
                                 {CIERRE_BADGES.map(({label, key}) => {
                                     const val = insp && insp.cierre != null && key in insp.cierre ? insp.cierre[key] : undefined;
-                                    const cls = val === 1 ? "bg-green-500 text-white" : val === 0 ? "bg-red-100 text-red-400 border border-red-200" : "bg-gray-100 text-gray-300 border border-gray-200";
-                                    return <span key={key} className={`inline-flex items-center justify-center w-6 h-5 rounded text-[9px] font-bold ${cls}`} title={val === 1 ? `${label}: Terminado` : val === 0 ? `${label}: Pendiente` : `${label}: Sin datos`}>{label.substring(0,2)}</span>;
+                                    const isNA = val === -1;
+                                    const cls = val === 1 ? "bg-green-500 text-white" : isNA ? "border border-gray-400 text-gray-100" : val === 0 ? "bg-red-100 text-red-400 border border-red-200" : "bg-gray-100 text-gray-300 border border-gray-200";
+                                    const naStyle = isNA ? {background:'repeating-linear-gradient(45deg,#64748b,#64748b 2px,#94a3b8 2px,#94a3b8 6px)'} : {};
+                                    return <span key={key} className={`inline-flex items-center justify-center w-6 h-5 rounded text-[9px] font-bold ${cls}`} style={naStyle} title={val === 1 ? `${label}: Terminado` : isNA ? `${label}: No aplica` : val === 0 ? `${label}: Pendiente` : `${label}: Sin datos`}>{isNA ? '—' : label.substring(0,2)}</span>;
                                 })}
                             </div>
                         </div>
