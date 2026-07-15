@@ -623,7 +623,6 @@ const ETAPAS_CONFIG_FULL = {
         }
 
         const ejRaw = raw.Ejecucion?.rows || [];
-        window._rawEj = ejRaw; // debug: inspeccionar desde consola
         const inspMap = {};
         const hasBarno = ejRaw.length > 0 && 'A_Art_Bano' in ejRaw[0] && !('A_Art_Baño' in ejRaw[0]);
         const sampleRow = ejRaw.length > 0 ? ejRaw[0] : {};
