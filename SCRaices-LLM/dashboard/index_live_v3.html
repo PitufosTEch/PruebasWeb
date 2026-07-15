@@ -678,9 +678,6 @@ const ETAPAS_CONFIG_FULL = {
             });
         });
 
-        // Debug: loguear valores únicos de cierre para detectar el formato exacto
-        { const _uv = new Set(); ejRaw.forEach(e => { Object.keys(CIERRE_COLS).forEach(col => { const v = String(e[col]??'').trim(); if(v && v.toLowerCase()!=='nan') _uv.add(v); }); }); console.log('[CIERRE-DEBUG] Valores únicos en cols cierre:', [..._uv].slice(0,30)); }
-
         INSPECCIONES_DATA = Object.values(inspMap).map(insp => {
             let pct_viv = 0;
             Object.entries(VIV_COLUMNS).forEach(([col, info]) => {
