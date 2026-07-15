@@ -386,7 +386,7 @@ def get_data_loader_js(apps_script_url):
                 if (val && val !== 'nan') {{
                     if (val === 'terminado') {{
                         inspMap[idB].cierre[label] = 1;
-                    }} else if (val === 'n/a' || val === 'no aplica') {{
+                    }} else if (/^(n\/?a\.?|no[\s_]?aplica\.?)$/.test(val)) {{
                         if (inspMap[idB].cierre[label] !== 1) inspMap[idB].cierre[label] = -1;
                     }} else if (inspMap[idB].cierre[label] !== 1 && inspMap[idB].cierre[label] !== -1) {{
                         inspMap[idB].cierre[label] = 0;

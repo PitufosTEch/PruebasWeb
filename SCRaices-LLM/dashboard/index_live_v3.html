@@ -667,7 +667,7 @@ const ETAPAS_CONFIG_FULL = {
                 if (val && val !== 'nan') {
                     if (val === 'terminado') {
                         inspMap[idB].cierre[label] = 1;           // verde gana siempre
-                    } else if (val === 'n/a' || val === 'no aplica') {
+                    } else if (val === 'n/a' || val === 'na' || val === 'n.a.' || val === 'no aplica' || val === 'no_aplica' || val === 'no aplica' || val === 'no aplica.') {
                         if (inspMap[idB].cierre[label] !== 1)
                             inspMap[idB].cierre[label] = -1;      // N/A gana sobre pendiente
                     } else if (inspMap[idB].cierre[label] !== 1 && inspMap[idB].cierre[label] !== -1) {
