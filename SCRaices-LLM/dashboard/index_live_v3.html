@@ -4579,6 +4579,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .tab-btn{background:none;border:none;color:#94a3b8;font-size:12px;font-weight:600;padding:11px 16px;cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;}
 .tab-btn.active{color:#fff;border-bottom-color:#3b82f6;}
 .tab-btn:hover:not(.active){color:#e2e8f0;}
+.obra-jumper-wrap{position:relative;margin-left:auto;align-self:center;max-width:240px;}
+.obra-jumper-input{width:100%;background:#0f172a;color:#cbd5e1;border:1px solid #334155;border-radius:6px;padding:5px 28px 5px 10px;font-size:11px;font-weight:600;outline:none;box-sizing:border-box;cursor:pointer;}
+.obra-jumper-input::placeholder{color:#64748b;font-weight:400;}
+.obra-jumper-input:focus{border-color:#3b82f6;}
+.obra-jumper-arrow{position:absolute;right:8px;top:50%;transform:translateY(-50%);pointer-events:none;color:#64748b;font-size:9px;}
+.obra-jumper-list{display:none;position:absolute;top:calc(100% + 2px);right:0;min-width:100%;max-width:340px;background:#1e293b;border:1px solid #334155;border-radius:6px;max-height:280px;overflow-y:auto;z-index:999;box-shadow:0 4px 16px rgba(0,0,0,.4);list-style:none;margin:0;padding:0;}
+.obra-jumper-list.open{display:block;}
+.obra-jumper-item{padding:7px 10px;font-size:11px;color:#e2e8f0;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.obra-jumper-item:hover,.obra-jumper-item.oj-active{background:#334155;color:#fff;}
+.obra-jumper-item.oj-hidden{display:none;}
 .sec{display:none;}.sec.active{display:block;}
 .blk{background:#fff;margin:12px;border-radius:10px;padding:20px 24px;border:1px solid #e2e8f0;}
 .ftr{background:#f8fafc;border-top:1px solid #e2e8f0;padding:12px 24px;display:flex;gap:8px;justify-content:flex-end;align-items:center;flex-wrap:wrap;}
@@ -4604,10 +4614,10 @@ table th:first-child{background:#f8fafc;z-index:3;}
 table tr:hover td:first-child{background:#f8fafc;}
 h3.sh{font-size:13px;color:#333;margin:18px 0 9px;display:flex;align-items:center;gap:8px;}
 h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
-@media (max-width:768px){.tabs{padding:0 8px;}.tab-btn{font-size:11px;padding:9px 10px;flex:1 1 auto;text-align:center;min-width:0;}.blk{margin:8px;padding:14px 12px;}.sg{grid-template-columns:1fr 1fr;}}
+@media (max-width:768px){.tabs{padding:0 8px;flex-wrap:wrap;}.tab-btn{font-size:11px;padding:9px 10px;flex:1 1 auto;text-align:center;min-width:0;}.obra-jumper-wrap{margin-left:0;width:calc(100% - 16px);max-width:100%;margin:4px 8px 6px;}.blk{margin:8px;padding:14px 12px;}.sg{grid-template-columns:1fr 1fr;}}
 @media print{.ftr{display:none;}.tabs{display:none;}.sec{display:block!important;}.blk{page-break-after:always;border:none;border-radius:0;margin:0;}}
 </style>`;
-    const _JS_INF = '<scr'+'ipt>function mst(t,b){document.querySelectorAll(\'.sec\').forEach(s=>s.classList.remove(\'active\'));document.querySelectorAll(\'.tab-btn\').forEach(x=>x.classList.remove(\'active\'));document.getElementById(\'s-\'+t).classList.add(\'active\');b.classList.add(\'active\');}</scr'+'ipt>';
+    const _JS_INF = '<scr'+'ipt>function mst(t,b){document.querySelectorAll(\'.sec\').forEach(s=>s.classList.remove(\'active\'));document.querySelectorAll(\'.tab-btn\').forEach(x=>x.classList.remove(\'active\'));document.getElementById(\'s-\'+t).classList.add(\'active\');b.classList.add(\'active\');}function jumpToObra(idx){if(idx===\'\')return;var sec=document.querySelector(\'.sec.active\');var block=sec&&sec.querySelector(\'.obra-block[data-obra="\'+idx+\'"]\');if(block)block.scrollIntoView({behavior:\'smooth\',block:\'start\'});}(function(){var w=document.getElementById(\'ojWrap\'),inp=document.getElementById(\'ojInput\'),lst=document.getElementById(\'ojList\');if(!w)return;function openL(){lst.classList.add(\'open\');}function closeL(){lst.classList.remove(\'open\');inp.value=\'\';}inp.addEventListener(\'focus\',openL);inp.addEventListener(\'click\',openL);inp.addEventListener(\'input\',function(){var q=this.value.toLowerCase();lst.querySelectorAll(\'.obra-jumper-item\').forEach(function(li){li.classList.toggle(\'oj-hidden\',q&&!li.textContent.toLowerCase().includes(q));});openL();});lst.addEventListener(\'click\',function(e){var li=e.target.closest(\'.obra-jumper-item\');if(!li)return;jumpToObra(li.dataset.idx);closeL();});document.addEventListener(\'click\',function(e){if(!w.contains(e.target))closeL();});})();</scr'+'ipt>';
 
     // ── Construye las 6 secciones de tabs para residente o capataz ────────────────────────────
     const _buildSecciones = (vivs, grps, curvasFiltro, capatazDesp, ganttRaw, despachosData) => {
@@ -4752,15 +4762,16 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
     };
 
     // ── Ensambla HTML completo y dispara descarga + nueva pestaña ─────────────────────────────
-    const _emitirInformeHTML = (titulo, subtitulo, semana, fechaGen, secs) => {
+    const _emitirInformeHTML = (titulo, subtitulo, semana, fechaGen, secs, obras=[]) => {
         const TABS=[['resumen','Resumen'],['checkpoints','Checkpoints'],['curvas','Curvas S'],['ritmos','Ritmos y comentarios'],['viviendas','Viviendas'],['despachos','Despachos']];
         const tabsHtml=TABS.map(([k,l],i)=>`<button class="tab-btn${i===0?' active':''}" onclick="mst('${k}',this)">${l}</button>`).join('');
+        const ojHtml=obras.length>1?`<div class="obra-jumper-wrap" id="ojWrap"><input class="obra-jumper-input" id="ojInput" type="text" placeholder="&#128269; Ir a obra..." autocomplete="off"><span class="obra-jumper-arrow">&#9660;</span><ul class="obra-jumper-list" id="ojList">${obras.map((o,i)=>`<li class="obra-jumper-item" data-idx="${i}">${esc(o.nombre)}</li>`).join('')}</ul></div>`:'';
         const secsHtml=TABS.map(([k],i)=>`<div class="sec${i===0?' active':''}" id="s-${k}">${secs[i]}</div>`).join('');
         const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>${titulo} — Sem ${semana}</title>${_CSS_INF}</head><body>
 <div class="cnt">
   <div class="hdr"><span style="font-size:20px;">🏗️</span><h1>${titulo}</h1><span class="hdr-sub">${subtitulo}</span></div>
-  <div class="tabs">${tabsHtml}</div>
+  <div class="tabs">${tabsHtml}${ojHtml}</div>
   <div class="content">${secsHtml}</div>
   <div class="ftr"><span style="font-size:11px;color:#94a3b8;">Generado: ${fechaGen}</span><button class="btn btn-dark" onclick="window.print();">🖨️ Imprimir / PDF</button></div>
 </div>${_JS_INF}</body></html>`;
@@ -4918,9 +4929,9 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
         sR+=`</tbody></table></div></div>`;
 
         // Bloque detallado por obra
-        proyData.forEach(d=>{
+        proyData.forEach((d,pi)=>{
             const agC=agColor(d.agPct),avC=avColor(d.avPct),avB=d.avPct>=80?'#16a34a':d.avPct>=50?'#3b82f6':d.avPct>=25?'#f59e0b':'#ef4444';
-            sR+=`<div class="blk" style="border-left:4px solid #0f172a;">${prjHdr(d.nombre)}
+            sR+=`<div class="obra-block blk" data-obra="${pi}" style="border-left:4px solid #0f172a;">${prjHdr(d.nombre)}
 <div class="sg" style="margin-bottom:14px;">
 <div class="sc" style="border-left:3px solid ${agC};"><div class="scl">Avance Real (Gantt)</div><div class="scv" style="color:${agC};">${d.agPct!=null?d.agPct+'%':'—'}</div><div class="scd">${d._ag?d._ag.n+'/'+d._ag.total+' benef.':'Sin datos'}</div></div>
 <div class="sc" style="border-left:3px solid ${avC};"><div class="scl">Avance Insp.</div><div class="scv" style="color:${avC};">${d.avPct}%</div><div class="scd">${d.conInsp}/${d.tot} inspeccionadas</div></div>
@@ -4954,8 +4965,8 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
 
         // ── CHECKPOINTS por obra ─────────────────────────────────────────────────────────────
         let sCk='';
-        proyData.forEach(d=>{
-            sCk+=`<div class="blk" style="border-left:4px solid #0f172a;">${prjHdr(d.nombre)}<div class="sg" style="grid-template-columns:repeat(${CP_OBR.length},1fr);margin-bottom:16px;">`;
+        proyData.forEach((d,pi)=>{
+            sCk+=`<div class="obra-block blk" data-obra="${pi}" style="border-left:4px solid #0f172a;">${prjHdr(d.nombre)}<div class="sg" style="grid-template-columns:repeat(${CP_OBR.length},1fr);margin-bottom:16px;">`;
             CP_OBR.forEach(cp=>{const n=d.vivs.filter(v=>v.flags&&v.flags[cp.key]).length;const pct=d.tot?Math.round(n/d.tot*100):0;const col=n===d.tot?'#16a34a':n>0?'#2563eb':'#6b7280';sCk+=`<div class="sc"><div class="scl">${cp.label}</div><div class="scv" style="color:${col};">${n}<span class="scd"> / ${d.tot} · ${pct}%</span></div></div>`;});
             sCk+=`</div><div class="tc"><table style="table-layout:fixed;width:100%;"><colgroup><col style="width:26%">${CP_OBR.map(()=>'<col>').join('')}<col></colgroup><thead><tr><th>Beneficiario</th>${CP_OBR.map(cp=>`<th style="text-align:center;">${cp.label}</th>`).join('')}<th style="text-align:center;">Recep.</th></tr></thead><tbody>`;
             d.vivs.forEach(v=>{const p=v.pctTotal,pT=p!=null?`${p}%`:'—',pC=p==null?'#94a3b8':p>=80?'#16a34a':p>=50?'#2563eb':'#dc2626';const rfOk=!!v.fecha_recepcion||!!(cierresForzados[v.ID_Benef]);const nm=esc((v.NOMBRES||'')+' '+(v.APELLIDOS||''));sCk+=`<tr${rfOk?' style="background:#f0fdf4;"':''}><td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${nm}">${nm} <span style="font-size:10px;font-weight:700;color:${pC};">${pT}</span></td>${CP_OBR.map(cp=>`<td style="text-align:center;">${ck(v.flags&&v.flags[cp.key])}</td>`).join('')}<td style="text-align:center;">${ck(rfOk)}</td></tr>`;});
@@ -4964,8 +4975,8 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
 
         // ── CURVAS S por obra ────────────────────────────────────────────────────────────────
         let sCurv='';
-        proyData.forEach(d=>{
-            sCurv+=`<div class="blk" style="border-left:4px solid #0f172a;">${prjHdr(d.nombre)}`;
+        proyData.forEach((d,pi)=>{
+            sCurv+=`<div class="obra-block blk" data-obra="${pi}" style="border-left:4px solid #0f172a;">${prjHdr(d.nombre)}`;
             if(d.curvas.length>0){sCurv+=`<div class="cg">`;d.curvas.forEach(c=>{sCurv+=`<div class="cc"><div class="ch">${esc(c.label)}</div><img src="https://drive.google.com/thumbnail?id=${c.id}&sz=w800" style="width:100%;display:block;" alt="${esc(c.label)}" loading="lazy"/></div>`;});sCurv+=`</div>`;}
             else sCurv+=`<div style="color:#94a3b8;font-size:13px;padding:16px;text-align:center;">Sin curvas S configuradas.</div>`;
             sCurv+=`</div>`;
@@ -4973,7 +4984,7 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
 
         // ── RITMOS Y COMENTARIOS por obra ────────────────────────────────────────────────────
         let sRit='';
-        proyData.forEach(d=>{
+        proyData.forEach((d,pi)=>{
             const bMO={};d.vivs.forEach(v=>(v.pagosBenef||[]).forEach(p=>{if(!p.fecha)return;const mm=p.fecha.match(/^(\d{4})-(\d{2})-(\d{2})/);if(!mm)return;let yr=parseInt(mm[1]),mo=parseInt(mm[2]),dy=parseInt(mm[3]);if(dy>=25){mo++;if(mo>12){mo=1;yr++;}}const ym=`${yr}-${String(mo).padStart(2,'0')}`;bMO[ym]=(bMO[ym]||0)+p.monto;}));
             const oMO=Object.keys(bMO).sort().slice(-12);
             const bD={};d.vivs.forEach(v=>DESPACHOS_DATA.filter(x=>String(x.ID_Benef)===String(v.ID_Benef)).forEach(x=>{if(!x.Fecha)return;const ym=x.Fecha.substring(0,7);bD[ym]=(bD[ym]||0)+1;}));
@@ -4987,21 +4998,21 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
                     if(!v.obsPublicas||!v.obsPublicas.length){const obsV=d.obs[String(v.ID_Benef)]||{};Object.values(obsV).filter(o=>o.destacar||o.starred).forEach(o=>{const fch=(o.fecha||'').toString().substring(0,10);items.push(`<div style="padding:6px 12px;margin-bottom:5px;font-size:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;"><span style="font-weight:600;color:#1a1a2e;">${esc((v.NOMBRES||'')+' '+(v.APELLIDOS||''))}</span> <span style="font-size:10px;color:#94a3b8;">${fch}</span><div style="color:#374151;margin-top:1px;">${esc(o.texto||o.comentario||'')}</div></div>`);})}
                 });
                 if(items.length)comH+=`<div style="margin-bottom:14px;"><div style="font-size:13px;font-weight:700;color:#1a1a2e;margin-bottom:6px;">${esc(g.nombre||'Sin Asignar')}</div>${items.join('')}</div>`;});
-            sRit+=`<div class="blk" style="border-left:4px solid #0f172a;">${prjHdr(d.nombre)}<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;"><div><div style="font-size:12px;font-weight:600;color:#333;margin-bottom:8px;">Ritmo M.O. (ciclo 25-25)</div>${svgMO}</div><div><div style="font-size:12px;font-weight:600;color:#333;margin-bottom:8px;">Ritmo Despachos</div>${svgD}</div></div><h3 class="sh">⭐ Comentarios Destacados</h3>${comH||`<div style="color:#94a3b8;font-size:12px;padding:16px;text-align:center;border:1px dashed #e2e8f0;border-radius:8px;">Sin comentarios destacados.</div>`}</div>`;
+            sRit+=`<div class="obra-block blk" data-obra="${pi}" style="border-left:4px solid #0f172a;">${prjHdr(d.nombre)}<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;"><div><div style="font-size:12px;font-weight:600;color:#333;margin-bottom:8px;">Ritmo M.O. (ciclo 25-25)</div>${svgMO}</div><div><div style="font-size:12px;font-weight:600;color:#333;margin-bottom:8px;">Ritmo Despachos</div>${svgD}</div></div><h3 class="sh">⭐ Comentarios Destacados</h3>${comH||`<div style="color:#94a3b8;font-size:12px;padding:16px;text-align:center;border:1px dashed #e2e8f0;border-radius:8px;">Sin comentarios destacados.</div>`}</div>`;
         });
 
         // ── VIVIENDAS por obra ───────────────────────────────────────────────────────────────
         let sViv='';
-        proyData.forEach(d=>{
-            sViv+=`<div class="blk" style="border-left:4px solid #0f172a;">${prjHdr(d.nombre)}`;
+        proyData.forEach((d,pi)=>{
+            sViv+=`<div class="obra-block blk" data-obra="${pi}" style="border-left:4px solid #0f172a;">${prjHdr(d.nombre)}`;
             d.grps.forEach(g=>{if(!g.viviendas||g.viviendas.length===0)return;sViv+=`<div style="margin-bottom:24px;"><div style="font-size:12px;font-weight:700;color:#1a1a2e;background:#f1f5f9;border:1px solid #e2e8f0;padding:7px 12px;border-radius:7px;margin-bottom:8px;">${esc(g.nombre||'Sin Asignar')}${g.capataz?` · <span style="font-weight:400;color:#64748b;">Capataz: ${esc(g.capataz)}</span>`:''} <span style="font-weight:400;color:#94a3b8;">(${g.viviendas.length} viv.)</span></div><div class="tc"><table style="table-layout:fixed;width:100%;"><colgroup><col style="width:28%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:9%"></colgroup><thead><tr><th>Beneficiario</th><th>Avance</th><th style="text-align:center;">HPC</th><th style="text-align:center;">TE1</th><th style="text-align:center;">R.AS</th><th style="text-align:center;">F1</th><th style="text-align:center;">Artef.</th><th style="text-align:center;">Empalme</th><th style="text-align:center;">Recep.</th></tr></thead><tbody>`;g.viviendas.forEach(v=>{const p=v.pctTotal,pT=p!=null?`${p}%`:'—',pC=p==null?'#94a3b8':p>=80?'#16a34a':p>=50?'#2563eb':'#dc2626';const fl=v.flags||{};const rfOk=!!v.fecha_recepcion||!!(cierresForzados[v.ID_Benef]);const nm=esc((v.NOMBRES||'')+' '+(v.APELLIDOS||''));sViv+=`<tr${rfOk?' style="background:#f0fdf4;"':''}><td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${nm}">${nm}</td><td style="font-weight:700;color:${pC};">${pT}</td><td style="text-align:center;">${ck(fl.hpc)}</td><td style="text-align:center;">${ck(fl.te1)}</td><td style="text-align:center;">${ck(fl.resol_as)}</td><td style="text-align:center;">${ck(fl.fecha_f1)}</td><td style="text-align:center;">${ck(fl.artefactado)}</td><td style="text-align:center;">${ck(fl.empalme)}</td><td style="text-align:center;">${ck(rfOk)}</td></tr>`;});sViv+=`</tbody></table></div></div>`;});
             sViv+=`</div>`;
         });
 
         // ── DESPACHOS por obra (solo SOL) ────────────────────────────────────────────────────
         let sDesp='';
-        proyData.forEach(d=>{
-            sDesp+=`<div class="blk" style="border-left:4px solid #0f172a;">${prjHdr(d.nombre)}`;
+        proyData.forEach((d,pi)=>{
+            sDesp+=`<div class="obra-block blk" data-obra="${pi}" style="border-left:4px solid #0f172a;">${prjHdr(d.nombre)}`;
             if(d.despachos&&d.despachos.beneficiarios&&d.despachos.beneficiarios.length)sDesp+=_generarSeccionDespachos(d.despachos,null,true)||`<p style="color:#94a3b8;text-align:center;padding:16px;">Sin despachos programados.</p>`;
             else sDesp+=`<p style="color:#94a3b8;font-size:13px;text-align:center;padding:16px;">Sin datos de despachos disponibles.</p>`;
             sDesp+=`</div>`;
@@ -5010,7 +5021,7 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
         // Emitir
         const titulo = resNombre ? `Reporte Residente: ${resNombre}` : `Reporte Residente — ${proyectoSel}`;
         const subtitulo = `${proysList.length>1?proysList.length+' obras':proysList[0]?.ID_proy||proyectoSel} · Semana ${sem} · ${fechaGen}`;
-        const html = _emitirInformeHTML(titulo, subtitulo, sem, fechaGen, [sR, sCk, sCurv, sRit, sViv, sDesp]);
+        const html = _emitirInformeHTML(titulo, subtitulo, sem, fechaGen, [sR, sCk, sCurv, sRit, sViv, sDesp], proyData);
         const _rNom=(resNombre||proyectoSel).replace(/[^a-zA-Z0-9À-ſ]/g,'_');
         const _fn=`Reporte_Residente_${_rNom}_Sem${sem}.html`;
         const _bl=new Blob([html],{type:'text/html;charset=utf-8'});const _ul=URL.createObjectURL(_bl);
