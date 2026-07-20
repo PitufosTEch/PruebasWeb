@@ -5721,6 +5721,7 @@ ${mProy>0?`<tr style="font-weight:700;color:#7c3aed;background:#f5f3ff;"><td col
             const av = tot ? Math.round(obra.viviendas.reduce((s,v)=>{ const i=getInspeccion(v.ID_Benef); return s+(i?i.pct_total:0); },0)/tot) : 0;
             const _ag = avanceGanttRaw[obra.ID_proy];
             const agPct = _ag ? (_ag.pct_prog ?? _ag.pct) : null;
+            const avReal = _ag ? _ag.pct : null;
             const proyRec = PROYECTOS_DATA.find(p => p.ID_proy === obra.ID_proy);
             const cIni = proyRec ? proyRec.fecha_inicio : null;
             const cDur = proyRec ? (proyRec.duracion || 0) : 0;
@@ -5731,8 +5732,8 @@ ${mProy>0?`<tr style="font-weight:700;color:#7c3aed;background:#f5f3ff;"><td col
             const progDiasR = pg&&pg.finProg ? Math.floor((new Date(pg.finProg)-new Date())/86400000) : null;
             const habilitadas = obra.viviendas.filter(v=>v.habil).length;
             const enEjecucion = obra.viviendas.filter(v=>vivConDespacho.has(String(v.ID_Benef))).length;
-            const diff = (agPct!==null) ? Math.round((av-agPct)*100)/100 : null;
-            return { obra, tot, av, agPct, cPctTr, cDiasR, cDur, pg, progDiasR, habilitadas, enEjecucion, diff };
+            const diff = (avReal!==null&&agPct!==null) ? Math.round((avReal-agPct)*100)/100 : null;
+            return { obra, tot, av, avReal, agPct, cPctTr, cDiasR, cDur, pg, progDiasR, habilitadas, enEjecucion, diff };
         });
 
         const resumenTablaHtml = (() => {
@@ -5779,7 +5780,7 @@ ${mProy>0?`<tr style="font-weight:700;color:#7c3aed;background:#f5f3ff;"><td col
   <td style="padding:5px 6px;border-right:1px solid #f1f5f9;font-size:10px;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.obra.nombre}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${r.cPctTr!==null?Number(r.cPctTr).toFixed(2)+'%':'—'}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${r.agPct!==null?Number(r.agPct).toFixed(2)+'%':'—'}</td>
-  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${Number(r.av).toFixed(2)}%</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:${r.avReal!==null?(r.avReal>=80?'#16a34a':r.avReal>=50?'#2563eb':'#dc2626'):'#94a3b8'};">${r.avReal!==null?Number(r.avReal).toFixed(2)+'%':'—'}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;font-weight:700;color:${dCol};background:${dBg};">${dTxt}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${fmtD2(r.pg&&r.pg.inicio)}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${fmtD2(r.pg&&r.pg.finProg)}</td>
@@ -6264,6 +6265,7 @@ function jumpToObra(idx){
             const av = tot ? Math.round(obra.viviendas.reduce((s,v)=>{ const i=getInspeccion(v.ID_Benef); return s+(i?i.pct_total:0); },0)/tot) : 0;
             const _ag = avanceGanttRaw[obra.ID_proy];
             const agPct = _ag ? (_ag.pct_prog ?? _ag.pct) : null;
+            const avReal = _ag ? _ag.pct : null;
             const proyRec = PROYECTOS_DATA.find(p => p.ID_proy === obra.ID_proy);
             const cIni = proyRec ? proyRec.fecha_inicio : null;
             const cDur = proyRec ? (proyRec.duracion || 0) : 0;
@@ -6274,8 +6276,8 @@ function jumpToObra(idx){
             const progDiasR = pg&&pg.finProg ? Math.floor((new Date(pg.finProg)-new Date())/86400000) : null;
             const habilitadas = obra.viviendas.filter(v=>v.habil).length;
             const enEjecucion = obra.viviendas.filter(v=>vivConDespacho.has(String(v.ID_Benef))).length;
-            const diff = (agPct!==null) ? Math.round((av-agPct)*100)/100 : null;
-            return { obra, tot, av, agPct, cPctTr, cDiasR, cDur, pg, progDiasR, habilitadas, enEjecucion, diff };
+            const diff = (avReal!==null&&agPct!==null) ? Math.round((avReal-agPct)*100)/100 : null;
+            return { obra, tot, av, avReal, agPct, cPctTr, cDiasR, cDur, pg, progDiasR, habilitadas, enEjecucion, diff };
         });
         const resumenTablaHtml = (() => {
             let t = `<div style="background:#fff;margin:12px 12px 0;border-radius:10px;padding:14px 16px;border:1px solid #e2e8f0;overflow-x:auto;">
@@ -6321,7 +6323,7 @@ function jumpToObra(idx){
   <td style="padding:5px 6px;border-right:1px solid #f1f5f9;font-size:10px;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.obra.nombre}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${r.cPctTr!==null?Number(r.cPctTr).toFixed(2)+'%':'—'}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${r.agPct!==null?Number(r.agPct).toFixed(2)+'%':'—'}</td>
-  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${Number(r.av).toFixed(2)}%</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:${r.avReal!==null?(r.avReal>=80?'#16a34a':r.avReal>=50?'#2563eb':'#dc2626'):'#94a3b8'};">${r.avReal!==null?Number(r.avReal).toFixed(2)+'%':'—'}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;font-weight:700;color:${dCol};background:${dBg};">${dTxt}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${fmtD2(r.pg&&r.pg.inicio)}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${fmtD2(r.pg&&r.pg.finProg)}</td>
