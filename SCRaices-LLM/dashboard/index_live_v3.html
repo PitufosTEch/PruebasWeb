@@ -4853,7 +4853,7 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
             const obs=obsRaw[pr.ID_proy]||{};
             const habilitadas=vivs.filter(v=>v.habil).length;
             const enEjecucion=vivs.filter(v=>DESPACHOS_DATA.some(d=>String(d.ID_Benef)===String(v.ID_Benef))).length;
-            const diff=agPct!==null?Math.round((avPct-agPct)*100)/100:null;
+            const diff=agPct!==null&&pg?Math.round((agPct-pgPct)*100)/100:null;
             return {pr,vivs,grps,curvas,tot,avPct,conInsp,terminadas,_ag,agPct,pg,pgDR,pgPct,cIni,cDur,cFin,cDR,cPct,despachos:despMap[pr.ID_proy],nombre,obs,esCurrent,habilitadas,enEjecucion,diff};
         });
 
@@ -4899,8 +4899,8 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
 </tr>
 <tr style="background:#f8fafc;">
   <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;" title="% Avance de contrato">% Cont.</th>
-  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;" title="% Avance de programa de obra">% Prog.</th>
-  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;" title="% Avance real (inspeccionado)">% Real</th>
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;" title="% Avance según programa de obra (por fechas Gantt)">% Prog.</th>
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;" title="% Avance real (Curvas S)">% Real</th>
 </tr>
 </thead><tbody>`;
         proyData.forEach(d=>{
@@ -4912,8 +4912,8 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
             sR+=`<tr style="border-bottom:1px solid #f1f5f9;">
   <td style="padding:5px 6px;border-right:1px solid #f1f5f9;font-size:10px;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(d.nombre)}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${d.cPct!==null?Number(d.cPct).toFixed(1)+'%':'—'}</td>
-  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${d.agPct!==null?Number(d.agPct).toFixed(1)+'%':'—'}</td>
-  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:${avColor(d.avPct)};">${Number(d.avPct).toFixed(1)}%</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${d.pg?Number(d.pgPct).toFixed(1)+'%':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:${avColor(d.agPct)};">${d.agPct!==null?Number(d.agPct).toFixed(1)+'%':'—'}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;font-weight:700;color:${dCol};background:${dBg};">${dTxt}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${fF(d.pg?.inicio||null)}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${fF(d.pg?.finProg||null)}</td>
@@ -5765,8 +5765,8 @@ ${mProy>0?`<tr style="font-weight:700;color:#7c3aed;background:#f5f3ff;"><td col
 </tr>
 <tr style="background:#f8fafc;">
   <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;" title="% Avance de contrato">% Cont.</th>
-  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;" title="% Avance de programa de obra">% Prog.</th>
-  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;" title="% Avance real (inspeccionado)">% Real</th>
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;" title="% Avance según programa de obra (por fechas Gantt)">% Prog.</th>
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;" title="% Avance real (Curvas S)">% Real</th>
 </tr>
 </thead><tbody>`;
             resumenFilas.forEach(r => {
@@ -6307,8 +6307,8 @@ function jumpToObra(idx){
 </tr>
 <tr style="background:#f8fafc;">
   <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;" title="% Avance de contrato">% Cont.</th>
-  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;" title="% Avance de programa de obra">% Prog.</th>
-  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;" title="% Avance real (inspeccionado)">% Real</th>
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;" title="% Avance según programa de obra (por fechas Gantt)">% Prog.</th>
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;" title="% Avance real (Curvas S)">% Real</th>
 </tr>
 </thead><tbody>`;
             resumenFilas.forEach(r => {
