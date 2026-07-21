@@ -452,6 +452,8 @@ const ETAPAS_CONFIG_FULL = {
         // 2. BENEFICIARIOS
         const benRaw = raw.Beneficiario?.rows || [];
         const estadosValidos = ['ejecuci', 'subsidiad', 'preparaci', 'terminad'];
+        // Normaliza IDs como "122" → "P122" para compatibilidad con AppSheet
+        const normPrId = id => { const s=String(id||'').trim(); return /^\d+$/.test(s)?('P'+s):s; };
 
         // Tipologias dict
         const tipRaw = raw.Tipologias?.rows || [];
@@ -473,7 +475,7 @@ const ETAPAS_CONFIG_FULL = {
 
         BENEFICIARIOS_DATA = benRaw
             .filter(b => {
-                const proy = String(b.ID_Proy || '');
+                const proy = normPrId(b.ID_Proy);
                 const estado = (b.Estado || '').toLowerCase();
                 return idsProyActivos.has(proy) && estadosValidos.some(e => estado.includes(e));
             })
@@ -519,7 +521,7 @@ const ETAPAS_CONFIG_FULL = {
 
                 return {
                     ID_Benef: String(b.ID_Benef || b.IDU_Benef || ''),
-                    ID_Proy: String(b.ID_Proy || ''),
+                    ID_Proy: normPrId(b.ID_Proy),
                     NOMBRES: String(b.NOMBRES || ''),
                     APELLIDOS: String(b.APELLIDOS || ''),
                     tipologia: tipLabel,
