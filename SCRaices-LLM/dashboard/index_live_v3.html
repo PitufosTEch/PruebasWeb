@@ -4767,7 +4767,7 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
     const _emitirInformeHTML = (titulo, subtitulo, semana, fechaGen, secs, obras=[]) => {
         const TABS=[['resumen','Resumen'],['checkpoints','Checkpoints'],['curvas','Curvas S'],['ritmos','Ritmos y comentarios'],['viviendas','Viviendas'],['despachos','Despachos']];
         const tabsHtml=TABS.map(([k,l],i)=>`<button class="tab-btn${i===0?' active':''}" onclick="mst('${k}',this)">${l}</button>`).join('');
-        const ojHtml=obras.length>1?`<div class="obra-jumper-wrap" id="ojWrap"><input class="obra-jumper-input" id="ojInput" type="text" placeholder="&#128269; Ir a obra..." autocomplete="off"><span class="obra-jumper-arrow">&#9660;</span><ul class="obra-jumper-list" id="ojList">${obras.map((o,i)=>`<li class="obra-jumper-item" data-idx="${i}">${esc(o.nombre)}</li>`).join('')}</ul></div>`:'';
+        const ojHtml=obras.length>1?`<div class="obra-jumper-wrap" id="ojWrap"><input class="obra-jumper-input" id="ojInput" type="text" placeholder="&#128269; Ir a obra..." autocomplete="off"><span class="obra-jumper-arrow">&#9660;</span><ul class="obra-jumper-list" id="ojList">${obras.map((o,i)=>`<li class="obra-jumper-item" data-idx="${i}">${escapeHtmlBasic(o.nombre)}</li>`).join('')}</ul></div>`:'';
         const secsHtml=TABS.map(([k],i)=>`<div class="sec${i===0?' active':''}" id="s-${k}">${secs[i]}</div>`).join('');
         const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>${titulo} — Sem ${semana}</title>${_CSS_INF}</head><body>
