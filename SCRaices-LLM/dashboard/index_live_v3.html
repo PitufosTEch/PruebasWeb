@@ -3497,6 +3497,87 @@ const MOAvanceChart = ({ timeline, patronTimeline, totalPres, compact = false })
     );
 };
 
+// ===== GRÁFICO % M.O. PAGADO vs % AVANCE REAL =====
+const MOPctChart = ({ timeline, totalPres, avanceSerie }) => {
+    if (!timeline || timeline.length === 0) return null;
+    const H = 185, W = 700;
+    const ML = 44, MR = 12, MT = 26, MB = 28;
+    const cW = W - ML - MR, cH = H - MT - MB;
+    const moMap = {};
+    timeline.forEach(t => { moMap[t.mk] = totalPres > 0 ? Math.min(100, t.cumul / totalPres * 100) : 0; });
+    const lastMOMk = timeline[timeline.length - 1].mk;
+    const avMap = {};
+    (avanceSerie || []).forEach(t => { avMap[t.mes] = t.avance; });
+    const lastAvMk = avanceSerie?.length ? avanceSerie[avanceSerie.length - 1].mes : null;
+    const allMks = [...new Set([...timeline.map(t => t.mk), ...(avanceSerie || []).map(t => t.mes)])].sort();
+    const n = allMks.length; if (!n) return null;
+    const mnames = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+    const mkLabel = mk => { const [y, m] = mk.split('-'); return mnames[parseInt(m)-1] + '-' + y.slice(2); };
+    const moPts = [], avPts = [];
+    let carryMO = 0, carryAv = 0;
+    allMks.forEach((mk, i) => {
+        if (moMap[mk] !== undefined) carryMO = moMap[mk];
+        if (mk <= lastMOMk) moPts.push({ idx: i, pct: carryMO });
+        if (avMap[mk] !== undefined) carryAv = avMap[mk];
+        if (lastAvMk && mk <= lastAvMk) avPts.push({ idx: i, pct: carryAv });
+    });
+    const xStep = n > 1 ? cW / (n - 1) : cW;
+    const sx = i => ML + i * xStep;
+    const sy = pct => MT + cH - Math.max(0, Math.min(1, pct / 100)) * cH;
+    const smoothCubic = (points) => {
+        if (!points.length) return '';
+        if (points.length === 1) return `M${sx(points[0].idx).toFixed(1)},${sy(points[0].pct).toFixed(1)}`;
+        const T = 0.38;
+        let d = `M${sx(points[0].idx).toFixed(1)},${sy(points[0].pct).toFixed(1)}`;
+        for (let i = 0; i < points.length - 1; i++) {
+            const p0 = points[Math.max(0, i-1)], p1 = points[i], p2 = points[i+1], p3 = points[Math.min(points.length-1, i+2)];
+            const cp1x = sx(p1.idx) + (sx(p2.idx) - sx(p0.idx)) * T;
+            const cp1y = sy(p1.pct) + (sy(p2.pct) - sy(p0.pct)) * T;
+            const cp2x = sx(p2.idx) - (sx(p3.idx) - sx(p1.idx)) * T;
+            const cp2y = sy(p2.pct) - (sy(p3.pct) - sy(p1.pct)) * T;
+            d += ` C${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${sx(p2.idx).toFixed(1)},${sy(p2.pct).toFixed(1)}`;
+        }
+        return d;
+    };
+    const moPath = smoothCubic(moPts);
+    const avPath = avPts.length > 1 ? smoothCubic(avPts) : null;
+    const moArea = moPath && moPts.length ? moPath + ` L${sx(moPts[moPts.length-1].idx).toFixed(1)},${(MT+cH).toFixed(1)} L${sx(moPts[0].idx).toFixed(1)},${(MT+cH).toFixed(1)} Z` : null;
+    const yTicks = [0, 25, 50, 75, 100];
+    const labelEvery = n > 24 ? 4 : n > 14 ? 2 : 1;
+    const curMO = moPts.length ? Math.round(moPts[moPts.length-1].pct) : 0;
+    const curAv = avPts.length ? Math.round(avPts[avPts.length-1].pct) : 0;
+    return (
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{height:`${H}px`}}>
+            {yTicks.map((v, i) => (
+                <g key={i}>
+                    <line x1={ML} y1={sy(v)} x2={W-MR} y2={sy(v)} stroke={v===100?'#e5e7eb':'#f3f4f6'} strokeWidth="1"/>
+                    <text x={ML-4} y={sy(v)+3} textAnchor="end" fontSize={8} fill="#9ca3af">{v}%</text>
+                </g>
+            ))}
+            {moArea && <path d={moArea} fill="#7c3aed" fillOpacity="0.07"/>}
+            {avPath && <path d={avPath} fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>}
+            {moPath && <path d={moPath} fill="none" stroke="#7c3aed" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>}
+            {moPts.length > 0 && <circle cx={sx(moPts[moPts.length-1].idx)} cy={sy(moPts[moPts.length-1].pct)} r="4" fill="#7c3aed" stroke="white" strokeWidth="1.5"/>}
+            {avPts.length > 0 && <circle cx={sx(avPts[avPts.length-1].idx)} cy={sy(avPts[avPts.length-1].pct)} r="3.5" fill="#10b981" stroke="white" strokeWidth="1.5"/>}
+            {allMks.map((mk, i) => i % labelEvery === 0 ? (
+                <text key={mk} x={sx(i)} y={H-3} textAnchor="middle" fontSize={7} fill="#9ca3af">{mkLabel(mk)}</text>
+            ) : null)}
+            <line x1={ML} y1={MT} x2={ML} y2={MT+cH} stroke="#e5e7eb" strokeWidth="1"/>
+            <line x1={ML} y1={MT+cH} x2={W-MR} y2={MT+cH} stroke="#e5e7eb" strokeWidth="1"/>
+            <g>
+                <line x1={ML+4} y1={MT-10} x2={ML+18} y2={MT-10} stroke="#7c3aed" strokeWidth="2.5"/>
+                <circle cx={ML+22} cy={MT-10} r="2.5" fill="#7c3aed"/>
+                <text x={ML+26} y={MT-7} fontSize="7" fill="#6b7280">% M.O. pagado ({curMO}%)</text>
+                {avPath && <>
+                    <line x1={ML+124} y1={MT-10} x2={ML+138} y2={MT-10} stroke="#10b981" strokeWidth="2.5"/>
+                    <circle cx={ML+142} cy={MT-10} r="2.5" fill="#10b981"/>
+                    <text x={ML+146} y={MT-7} fontSize="7" fill="#6b7280">% Avance real ({curAv}%)</text>
+                </>}
+            </g>
+        </svg>
+    );
+};
+
 // ===== MANO DE OBRA =====
 const ManoDeObraTab = ({ viviendas }) => {
     const [expandido, setExpandido] = React.useState(null);
@@ -3612,7 +3693,8 @@ const ManoDeObraTab = ({ viviendas }) => {
             const totalPaid = pagos.reduce((s, p) => s + p.monto, 0);
             return { benef: v, totalPres, timeline, patronTimeline, totalPaid };
         });
-        return { proyTimeline, proyTotalPres, proyPatronTimeline, porBenef };
+        const avanceSerie = (AVANCE_MENSUAL_DATA[proyId] || {}).serie || [];
+        return { proyTimeline, proyTotalPres, proyPatronTimeline, porBenef, avanceSerie };
     }, [viviendas, ganttProg]);
 
     return (
@@ -3636,22 +3718,34 @@ const ManoDeObraTab = ({ viviendas }) => {
                 </div>
             </div>
 
-            {/* Curva S — Resumen Proyecto */}
+            {/* Curvas S — Resumen Proyecto (2 gráficos lado a lado) */}
             {avanceData.proyTimeline.length > 0 && (
-            <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-                <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-                    <h3 className="text-sm font-semibold text-gray-700">Curvas S de Pagos M.O. — Proyecto</h3>
-                    <div className="flex flex-wrap gap-4 mt-1 text-[10px] text-gray-500">
-                        <span>Presupuesto: <strong className="text-gray-700">{formatPeso(avanceData.proyTotalPres)}</strong></span>
-                        <span>Real pagado: <strong className="text-violet-700">{formatPeso(avanceData.proyTimeline[avanceData.proyTimeline.length-1]?.cumul || 0)}</strong></span>
-                        <span><strong className="text-violet-600">{avanceData.proyTotalPres > 0 ? Math.round((avanceData.proyTimeline[avanceData.proyTimeline.length-1]?.cumul||0)/avanceData.proyTotalPres*100) : 0}%</strong> ejecutado</span>
-                        {avanceData.proyPatronTimeline.length > 0 && (
-                            <span>Patrón actual: <strong className="text-amber-600">{formatPeso(avanceData.proyPatronTimeline[avanceData.proyPatronTimeline.length-1]?.cumul || 0)}</strong></span>
-                        )}
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                {/* Gráfico 1: CLP Real vs Patrón */}
+                <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                    <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+                        <h3 className="text-sm font-semibold text-gray-700">M.O. Real vs Patrón</h3>
+                        <div className="flex flex-wrap gap-3 mt-1 text-[10px] text-gray-500">
+                            <span>Presup.: <strong className="text-gray-700">{formatPeso(avanceData.proyTotalPres)}</strong></span>
+                            <span>Real: <strong className="text-violet-700">{formatPeso(avanceData.proyTimeline[avanceData.proyTimeline.length-1]?.cumul || 0)}</strong></span>
+                            {avanceData.proyPatronTimeline.length > 0 && (
+                                <span>Patrón hoy: <strong className="text-amber-600">{formatPeso(avanceData.proyPatronTimeline.find(p => p.mk <= new Date().toISOString().slice(0,7))?.cumul || avanceData.proyPatronTimeline[avanceData.proyPatronTimeline.length-1]?.cumul || 0)}</strong></span>
+                            )}
+                        </div>
+                    </div>
+                    <div className="px-3 pb-3 pt-1">
+                        <MOAvanceChart timeline={avanceData.proyTimeline} patronTimeline={avanceData.proyPatronTimeline} totalPres={avanceData.proyTotalPres}/>
                     </div>
                 </div>
-                <div className="px-3 pb-3 pt-1">
-                    <MOAvanceChart timeline={avanceData.proyTimeline} patronTimeline={avanceData.proyPatronTimeline} totalPres={avanceData.proyTotalPres}/>
+                {/* Gráfico 2: % M.O. pagado vs % Avance real */}
+                <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                    <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+                        <h3 className="text-sm font-semibold text-gray-700">% M.O. Pagado vs % Avance Real</h3>
+                        <p className="text-[10px] text-gray-400 mt-0.5">Comparación porcentual acumulada — escala 0–100%</p>
+                    </div>
+                    <div className="px-3 pb-3 pt-1">
+                        <MOPctChart timeline={avanceData.proyTimeline} totalPres={avanceData.proyTotalPres} avanceSerie={avanceData.avanceSerie}/>
+                    </div>
                 </div>
             </div>
             )}
@@ -5486,6 +5580,58 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
             return svg;
         };
 
+        // SVG: % M.O. pagado vs % Avance real (curvas S porcentuales)
+        const svgMOComparePctS = (timeline, totalPres, avanceSerie, W=680, H=165) => {
+            if (!timeline || timeline.length === 0) return '<div style="color:#94a3b8;font-size:12px;padding:16px;text-align:center;border:1px dashed #e2e8f0;border-radius:8px;">Sin datos</div>';
+            const ML=46, MR=14, MT=22, MB=26, cW=W-ML-MR, cH=H-MT-MB;
+            const moMap={}; timeline.forEach(t=>{moMap[t.mk]=totalPres>0?Math.min(100,t.cumul/totalPres*100):0;});
+            const lastMOMk=timeline[timeline.length-1].mk;
+            const avMap={}; (avanceSerie||[]).forEach(t=>{avMap[t.mes]=t.avance;});
+            const lastAvMk=avanceSerie?.length?avanceSerie[avanceSerie.length-1].mes:null;
+            const allMks=[...new Set([...timeline.map(t=>t.mk),...(avanceSerie||[]).map(t=>t.mes)])].sort();
+            const n=allMks.length; if(!n)return'';
+            const MNS=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+            const mkLbl=mk=>{const[y,m]=mk.split('-');return MNS[parseInt(m)-1]+'-'+y.slice(2);};
+            const moPts=[],avPts=[]; let carryMO=0,carryAv=0;
+            allMks.forEach((mk,i)=>{
+                if(moMap[mk]!==undefined)carryMO=moMap[mk];
+                if(mk<=lastMOMk)moPts.push({i,p:carryMO});
+                if(avMap[mk]!==undefined)carryAv=avMap[mk];
+                if(lastAvMk&&mk<=lastAvMk)avPts.push({i,p:carryAv});
+            });
+            const xStep=n>1?cW/(n-1):cW;
+            const sxN=i=>ML+i*xStep, syN=p=>MT+cH-Math.max(0,Math.min(1,p/100))*cH;
+            const f1=v=>v.toFixed(1);
+            const cubicPath=pts=>{
+                if(!pts.length)return''; if(pts.length===1)return`M${f1(sxN(pts[0].i))},${f1(syN(pts[0].p))}`;
+                const T=0.38; let d=`M${f1(sxN(pts[0].i))},${f1(syN(pts[0].p))}`;
+                for(let k=0;k<pts.length-1;k++){
+                    const p0=pts[Math.max(0,k-1)],p1=pts[k],p2=pts[k+1],p3=pts[Math.min(pts.length-1,k+2)];
+                    d+=` C${f1(sxN(p1.i)+(sxN(p2.i)-sxN(p0.i))*T)},${f1(syN(p1.p)+(syN(p2.p)-syN(p0.p))*T)} ${f1(sxN(p2.i)-(sxN(p3.i)-sxN(p1.i))*T)},${f1(syN(p2.p)-(syN(p3.p)-syN(p1.p))*T)} ${f1(sxN(p2.i))},${f1(syN(p2.p))}`;
+                }
+                return d;
+            };
+            const moPath=cubicPath(moPts), avPath=avPts.length>1?cubicPath(avPts):null;
+            const aPath=moPath&&moPts.length?moPath+` L${f1(sxN(moPts[moPts.length-1].i))},${f1(MT+cH)} L${f1(sxN(moPts[0].i))},${f1(MT+cH)} Z`:'';
+            const lbEvery=n>24?4:n>14?2:1;
+            const curMO=moPts.length?Math.round(moPts[moPts.length-1].p):0;
+            const curAv=avPts.length?Math.round(avPts[avPts.length-1].p):0;
+            let svg=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:${H}px;display:block;">`;
+            [0,25,50,75,100].forEach(v=>{svg+=`<line x1="${ML}" y1="${f1(syN(v))}" x2="${W-MR}" y2="${f1(syN(v))}" stroke="${v===100?'#e5e7eb':'#f3f4f6'}" stroke-width="1"/>`;svg+=`<text x="${ML-4}" y="${f1(syN(v)+3)}" text-anchor="end" font-size="8" fill="#9ca3af">${v}%</text>`;});
+            if(aPath)svg+=`<path d="${aPath}" fill="#7c3aed" fill-opacity="0.07"/>`;
+            if(avPath)svg+=`<path d="${avPath}" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+            if(moPath)svg+=`<path d="${moPath}" fill="none" stroke="#7c3aed" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+            if(moPts.length){const lp=moPts[moPts.length-1];svg+=`<circle cx="${f1(sxN(lp.i))}" cy="${f1(syN(lp.p))}" r="4" fill="#7c3aed" stroke="white" stroke-width="1.5"/>`;}
+            if(avPts.length){const lp=avPts[avPts.length-1];svg+=`<circle cx="${f1(sxN(lp.i))}" cy="${f1(syN(lp.p))}" r="3.5" fill="#10b981" stroke="white" stroke-width="1.5"/>`;}
+            allMks.forEach((mk,i)=>{if(i%lbEvery===0)svg+=`<text x="${f1(sxN(i))}" y="${H-3}" text-anchor="middle" font-size="7" fill="#9ca3af">${mkLbl(mk)}</text>`;});
+            svg+=`<line x1="${ML}" y1="${MT}" x2="${ML}" y2="${f1(MT+cH)}" stroke="#e5e7eb" stroke-width="1"/>`;
+            svg+=`<line x1="${ML}" y1="${f1(MT+cH)}" x2="${W-MR}" y2="${f1(MT+cH)}" stroke="#e5e7eb" stroke-width="1"/>`;
+            svg+=`<line x1="${ML+4}" y1="${MT-10}" x2="${ML+18}" y2="${MT-10}" stroke="#7c3aed" stroke-width="2.5"/><circle cx="${ML+22}" cy="${MT-10}" r="2.5" fill="#7c3aed"/><text x="${ML+26}" y="${MT-7}" font-size="7" fill="#6b7280">% M.O. pagado (${curMO}%)</text>`;
+            if(avPath)svg+=`<line x1="${ML+128}" y1="${MT-10}" x2="${ML+142}" y2="${MT-10}" stroke="#10b981" stroke-width="2.5"/><circle cx="${ML+146}" cy="${MT-10}" r="2.5" fill="#10b981"/><text x="${ML+150}" y="${MT-7}" font-size="7" fill="#6b7280">% Avance real (${curAv}%)</text>`;
+            svg+='</svg>';
+            return svg;
+        };
+
         const buildPatronMO = (pg, totalPres) => {
             if (!pg || !pg.inicio || (!pg.finProg && !pg.plazo) || totalPres <= 0) return [];
             const inicio=new Date(pg.inicio); if(isNaN(inicio.getTime()))return[];
@@ -5564,8 +5710,8 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
 <div class="sc" style="border-left:3px solid #7c3aed;"><div class="scl">Total Pagado</div><div class="scv" style="color:#7c3aed;">${fcr(proyTotalPaid)}</div><div class="scd">${pctPag}% del presupuesto</div></div>
 ${kpiPatron}${kpiDesv}
 </div>
-<h3 class="sh">📈 Curvas S — Mano de Obra (Patrón vs Real)</h3>
-${proyTimeline.length?svgMOCurvaS(proyTimeline,proyPatron,proyTotalPres):'<div style="color:#94a3b8;font-size:12px;padding:16px;text-align:center;border:1px dashed #e2e8f0;border-radius:8px;">Sin pagos M.O. registrados en este proyecto</div>'}
+<h3 class="sh">📈 Curvas S — Mano de Obra</h3>
+${(()=>{const _avs=(AVANCE_MENSUAL_DATA[String(d.pr.ID_proy)]||{}).serie||[];const _g1=proyTimeline.length?svgMOCurvaS(proyTimeline,proyPatron,proyTotalPres):'<div style="color:#94a3b8;font-size:12px;padding:16px;text-align:center;border:1px dashed #e2e8f0;border-radius:8px;">Sin pagos M.O. registrados</div>';const _g2=svgMOComparePctS(proyTimeline,proyTotalPres,_avs);return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'+_g1+_g2+'</div>';})()}
 <h3 class="sh" style="margin-top:14px;">📋 Detalle por Beneficiario</h3>
 <div class="tc"><table style="width:100%;table-layout:fixed;">
 <colgroup><col style="width:30%"><col style="width:14%"><col style="width:14%"><col style="width:12%"><col style="width:12%"><col style="width:12%"></colgroup>
