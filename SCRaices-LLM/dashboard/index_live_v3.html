@@ -3589,7 +3589,8 @@ const ManoDeObraTab = ({ viviendas }) => {
             while (cur <= endMonth) {
                 const eom = new Date(cur.getFullYear(), cur.getMonth() + 1, 0); // último día del mes
                 const diasTranscurridos = Math.max(0, (eom - inicio) / 86400000);
-                const pct = Math.min(100, diasTranscurridos / plazo * 100);
+                const t = Math.min(1, diasTranscurridos / plazo); // 0→1 a lo largo del programa
+                const pct = (1 - Math.cos(Math.PI * t)) / 2 * 100; // S-curve cosenoidal
                 const cumul = totalPres * pct / 100;
                 const mk = `${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}`;
                 const label = mnames[cur.getMonth()] + '-' + String(cur.getFullYear()).slice(2);
