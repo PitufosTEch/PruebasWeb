@@ -792,9 +792,8 @@ const ETAPAS_CONFIG_FULL = {
             .map(s => {
                 const tipRaw = String(s.Tipologia || s['Tipología'] || s.tipologia || s.Tipo_pago || '');
                 const tl = tipRaw.toLowerCase();
-                const tipShort = tl.includes('bodega') ? 'Bodega'
-                               : tl.includes('vivienda') ? 'Vivienda'
-                               : tl.includes('r.c') || tl.includes(' rc') || tl.includes('recinto') ? 'R.C.'
+                const tipShort = tl.includes('vivienda') ? 'Vivienda'
+                               : (tl.includes('bodega') || tl.includes('r.c') || tl.includes(' rc') || tl.includes('recinto')) ? 'R.C.'
                                : tipRaw || '—';
                 return {
                     ID_Benef: String(s.ID_Benef || ''),
