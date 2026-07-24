@@ -1496,7 +1496,11 @@ const getPagosPorFamilia = (idBenef) => {
     // Clave compuesta: "Familia_pago|||tipologia" para desglosar Vivienda / Bodega / R.C.
     const porFam = {};
     pagos.forEach(p => {
-        if (FAMILIAS_EXCLUIDAS.has(p.Familia_pago)) return;
+        if (p.Familia_pago === '07 - Eléctricidad') {
+            if (!p.Tipo_pago.toLowerCase().includes('postes')) return;
+        } else if (FAMILIAS_EXCLUIDAS.has(p.Familia_pago)) {
+            return;
+        }
         const key = `${p.Familia_pago}|||${p.tipologia}`;
         if (!porFam[key]) porFam[key] = { familia: p.Familia_pago, tipologia: p.tipologia, total: 0, count: 0, maestros: new Set() };
         porFam[key].total += p.monto;
