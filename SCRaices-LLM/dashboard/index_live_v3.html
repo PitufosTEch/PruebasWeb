@@ -5176,7 +5176,7 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
 
     // ── Ensambla HTML completo y dispara descarga + nueva pestaña ─────────────────────────────
     const _emitirInformeHTML = (titulo, subtitulo, semana, fechaGen, secs, obras=[]) => {
-        const TABS=[['resumen','Resumen'],['checkpoints','Checkpoints'],['curvas','Curvas S'],['ritmos','Ritmos y comentarios'],['viviendas','Viviendas'],['despachos','Despachos']];
+        const TABS=[['resumen','Resumen'],['checkpoints','Checkpoints'],['curvas','Curvas S'],['ritmos','Ritmos y comentarios'],['viviendas','Viviendas'],['despachos','Despachos'],['mo','M.O.']];
         const tabsHtml=TABS.map(([k,l],i)=>`<button class="tab-btn${i===0?' active':''}" onclick="mst('${k}',this)">${l}</button>`).join('');
         const ojHtml=obras.length>1?`<div class="obra-jumper-wrap" id="ojWrap"><input class="obra-jumper-input" id="ojInput" type="text" placeholder="&#128269; Ir a obra..." autocomplete="off"><span class="obra-jumper-arrow">&#9660;</span><ul class="obra-jumper-list" id="ojList">${obras.map((o,i)=>`<li class="obra-jumper-item" data-idx="${i}">${escapeHtmlBasic(o.nombre)}</li>`).join('')}</ul></div>`:'';
         const secsHtml=TABS.map(([k],i)=>`<div class="sec${i===0?' active':''}" id="s-${k}">${secs[i]}</div>`).join('');
@@ -5431,10 +5431,152 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
             sDesp+=`</div>`;
         });
 
+        // ── MANO DE OBRA por obra ────────────────────────────────────────────────────────────
+        // Genera SVG curva S (real + patrón) como string
+        const svgMOCurvaS = (timeline, patronTimeline, totalPres, W=680, H=165) => {
+            if (!timeline || timeline.length === 0) return '<div style="color:#94a3b8;font-size:12px;padding:16px;text-align:center;border:1px dashed #e2e8f0;border-radius:8px;">Sin pagos M.O. registrados</div>';
+            const ML=56, MR=14, MT=22, MB=26, cW=W-ML-MR, cH=H-MT-MB;
+            const allMks=[...new Set([...timeline.map(t=>t.mk),...(patronTimeline||[]).map(t=>t.mk)])].sort();
+            const n=allMks.length; if(!n)return'';
+            const MNS=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+            const mkLbl=mk=>{const[y,m]=mk.split('-');return MNS[parseInt(m)-1]+'-'+y.slice(2);};
+            const realMap={}; timeline.forEach(t=>{realMap[t.mk]=t.cumul;});
+            const lastRealMk=timeline[timeline.length-1].mk;
+            const realPts=[]; let carry=0;
+            allMks.forEach((mk,i)=>{if(realMap[mk]!==undefined)carry=realMap[mk];if(mk<=lastRealMk)realPts.push({i,c:carry});});
+            const patMap={}; (patronTimeline||[]).forEach(t=>{patMap[t.mk]=t.cumul;});
+            const patPts=allMks.map((mk,i)=>({i,c:patMap[mk]})).filter(p=>p.c!==undefined);
+            const maxVal=Math.max(...realPts.map(p=>p.c),...patPts.map(p=>p.c),totalPres||0,1)*1.06;
+            const xStep=n>1?cW/(n-1):cW;
+            const sxN=i=>ML+i*xStep, syN=v=>MT+cH-Math.max(0,Math.min(1,v/maxVal))*cH;
+            const f1=v=>v.toFixed(1);
+            const shortP=v=>{const a=Math.abs(v);if(a>=1e6)return(v/1e6).toFixed(1)+'M';if(a>=1e3)return Math.round(v/1e3)+'k';return String(Math.round(v));};
+            const cubicPath=pts=>{
+                if(!pts.length)return'';
+                if(pts.length===1)return`M${f1(sxN(pts[0].i))},${f1(syN(pts[0].c))}`;
+                const T=0.38; let d=`M${f1(sxN(pts[0].i))},${f1(syN(pts[0].c))}`;
+                for(let k=0;k<pts.length-1;k++){
+                    const p0=pts[Math.max(0,k-1)],p1=pts[k],p2=pts[k+1],p3=pts[Math.min(pts.length-1,k+2)];
+                    const cp1x=f1(sxN(p1.i)+(sxN(p2.i)-sxN(p0.i))*T);
+                    const cp1y=f1(syN(p1.c)+(syN(p2.c)-syN(p0.c))*T);
+                    const cp2x=f1(sxN(p2.i)-(sxN(p3.i)-sxN(p1.i))*T);
+                    const cp2y=f1(syN(p2.c)-(syN(p3.c)-syN(p1.c))*T);
+                    d+=` C${cp1x},${cp1y} ${cp2x},${cp2y} ${f1(sxN(p2.i))},${f1(syN(p2.c))}`;
+                }
+                return d;
+            };
+            const rPath=cubicPath(realPts);
+            const pPath=patPts.length>1?cubicPath(patPts):null;
+            const aPath=rPath&&realPts.length?rPath+` L${f1(sxN(realPts[realPts.length-1].i))},${f1(MT+cH)} L${f1(sxN(realPts[0].i))},${f1(MT+cH)} Z`:'';
+            const yTks=[0,.25,.5,.75,1].map(f=>maxVal*f);
+            const lbEvery=n>24?4:n>14?2:1;
+            let svg=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:${H}px;display:block;">`;
+            yTks.forEach(v=>{svg+=`<line x1="${ML}" y1="${f1(syN(v))}" x2="${W-MR}" y2="${f1(syN(v))}" stroke="#f3f4f6" stroke-width="1"/>`;svg+=`<text x="${ML-4}" y="${f1(syN(v)+3)}" text-anchor="end" font-size="8" fill="#9ca3af">${shortP(v)}</text>`;});
+            if(totalPres>0)svg+=`<line x1="${ML}" y1="${f1(syN(totalPres))}" x2="${W-MR}" y2="${f1(syN(totalPres))}" stroke="#c4b5fd" stroke-width="1" stroke-dasharray="5,4" opacity="0.7"/>`;
+            if(aPath)svg+=`<path d="${aPath}" fill="#7c3aed" fill-opacity="0.07"/>`;
+            if(pPath)svg+=`<path d="${pPath}" fill="none" stroke="#f59e0b" stroke-width="2" stroke-dasharray="7,3" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>`;
+            if(rPath)svg+=`<path d="${rPath}" fill="none" stroke="#7c3aed" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+            if(realPts.length){const lp=realPts[realPts.length-1];svg+=`<circle cx="${f1(sxN(lp.i))}" cy="${f1(syN(lp.c))}" r="4" fill="#7c3aed" stroke="white" stroke-width="1.5"/>`;}
+            if(patPts.length){const lp=patPts[patPts.length-1];svg+=`<circle cx="${f1(sxN(lp.i))}" cy="${f1(syN(lp.c))}" r="3.5" fill="#f59e0b" stroke="white" stroke-width="1.5"/>`;}
+            allMks.forEach((mk,i)=>{if(i%lbEvery===0)svg+=`<text x="${f1(sxN(i))}" y="${H-3}" text-anchor="middle" font-size="7" fill="#9ca3af">${mkLbl(mk)}</text>`;});
+            svg+=`<line x1="${ML}" y1="${MT}" x2="${ML}" y2="${f1(MT+cH)}" stroke="#e5e7eb" stroke-width="1"/>`;
+            svg+=`<line x1="${ML}" y1="${f1(MT+cH)}" x2="${W-MR}" y2="${f1(MT+cH)}" stroke="#e5e7eb" stroke-width="1"/>`;
+            if(pPath){svg+=`<line x1="${ML+4}" y1="${MT-10}" x2="${ML+18}" y2="${MT-10}" stroke="#7c3aed" stroke-width="2.5"/><circle cx="${ML+22}" cy="${MT-10}" r="2.5" fill="#7c3aed"/><text x="${ML+26}" y="${MT-7}" font-size="7" fill="#6b7280">Real</text>`;svg+=`<line x1="${ML+54}" y1="${MT-10}" x2="${ML+68}" y2="${MT-10}" stroke="#f59e0b" stroke-width="2" stroke-dasharray="6,3"/><circle cx="${ML+72}" cy="${MT-10}" r="2.5" fill="#f59e0b"/><text x="${ML+76}" y="${MT-7}" font-size="7" fill="#6b7280">Patrón (% plazo × presup.)</text>`;}
+            svg+='</svg>';
+            return svg;
+        };
+
+        const buildPatronMO = (pg, totalPres) => {
+            if (!pg || !pg.inicio || (!pg.finProg && !pg.plazo) || totalPres <= 0) return [];
+            const inicio=new Date(pg.inicio); if(isNaN(inicio.getTime()))return[];
+            const finProg=pg.finProg?new Date(pg.finProg):new Date(inicio.getTime()+pg.plazo*86400000);
+            if(isNaN(finProg.getTime()))return[];
+            const plazo=Math.round((finProg-inicio)/86400000); if(plazo<=0)return[];
+            const MNS=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+            const result=[]; let cur=new Date(inicio.getFullYear(),inicio.getMonth(),1);
+            const endM=new Date(finProg.getFullYear(),finProg.getMonth(),1);
+            while(cur<=endM){
+                const eom=new Date(cur.getFullYear(),cur.getMonth()+1,0);
+                const diasT=Math.max(0,(eom-inicio)/86400000);
+                const t=Math.min(1,diasT/plazo);
+                const cumul=totalPres*(1-Math.cos(Math.PI*t))/2;
+                const mk=`${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}`;
+                const label=MNS[cur.getMonth()]+'-'+String(cur.getFullYear()).slice(2);
+                result.push({mk,label,cumul});
+                cur=new Date(cur.getFullYear(),cur.getMonth()+1,1);
+            }
+            return result;
+        };
+
+        let sMO='';
+        proyData.forEach((d,pi)=>{
+            const fcr=v=>{const a=Math.abs(v);if(a>=1e6)return(v/1e6).toFixed(2)+'M';if(a>=1e3)return(v/1e3).toFixed(0)+'k';return String(Math.round(v));};
+            const dCol=v=>v===null?'#94a3b8':v>=0?'#16a34a':'#dc2626';
+
+            // Datos del proyecto
+            const proyTotalPres=d.vivs.reduce((s,v)=>s+getBenefPresupuestoTotal(v),0);
+            const allPagosMO=d.vivs.flatMap(v=>getBenefPaidFiltered(v.ID_Benef));
+            const proyTimeline=buildMonthlyPayments(allPagosMO);
+            const proyPatron=buildPatronMO(d.pg,proyTotalPres);
+            const proyTotalPaid=allPagosMO.reduce((s,p)=>s+p.monto,0);
+            const pctPag=proyTotalPres>0?Math.round(proyTotalPaid/proyTotalPres*100):0;
+            const patronNow=proyPatron.length?proyPatron[proyPatron.length-1].cumul:null;
+            const pctPat=proyTotalPres>0&&patronNow!==null?Math.round(patronNow/proyTotalPres*100):null;
+            const desv=pctPat!==null?pctPag-pctPat:null;
+
+            // KPIs
+            const kpiPatron=patronNow!==null?`<div class="sc" style="border-left:3px solid #f59e0b;"><div class="scl">Patrón actual</div><div class="scv" style="color:#f59e0b;">${fcr(patronNow)}</div><div class="scd">${pctPat}% del presupuesto</div></div>`:'';
+            const kpiDesv=desv!==null?`<div class="sc" style="border-left:3px solid ${dCol(desv)};"><div class="scl">Desviación</div><div class="scv" style="color:${dCol(desv)};">${desv>=0?'+':''}${desv}%</div><div class="scd">Real vs Patrón</div></div>`:'';
+
+            // Tabla por beneficiario
+            let filas=d.vivs.map(v=>{
+                const tp=getBenefPresupuestoTotal(v);
+                const pgos=getBenefPaidFiltered(v.ID_Benef);
+                const paid=pgos.reduce((s,p)=>s+p.monto,0);
+                const ppag=tp>0?Math.round(paid/tp*100):0;
+                const pat=buildPatronMO(d.pg,tp);
+                const patV=pat.length?pat[pat.length-1].cumul:null;
+                const ppat=tp>0&&patV!==null?Math.round(patV/tp*100):null;
+                const dv=ppat!==null?ppag-ppat:null;
+                const nm=esc(`${v.NOMBRES||''} ${v.APELLIDOS||''}`);
+                const dvTxt=dv!==null?`${dv>=0?'+':''}${dv}%`:'—';
+                return `<tr style="border-bottom:1px solid #f1f5f9;">
+<td style="padding:4px 6px;font-size:10px;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${nm}">${nm}</td>
+<td style="padding:4px;text-align:right;font-size:10px;font-family:monospace;">${fcr(tp)}</td>
+<td style="padding:4px;text-align:right;font-size:10px;font-family:monospace;color:#7c3aed;font-weight:600;">${fcr(paid)}</td>
+<td style="padding:4px;text-align:center;font-size:10px;font-weight:700;color:#7c3aed;">${ppag}%</td>
+<td style="padding:4px;text-align:center;font-size:10px;color:#f59e0b;">${ppat!==null?ppat+'%':'—'}</td>
+<td style="padding:4px;text-align:center;font-size:10px;font-weight:700;color:${dCol(dv)};">${dvTxt}</td>
+</tr>`;
+            }).join('');
+            filas+=`<tr style="background:#f1f5f9;border-top:2px solid #e2e8f0;font-weight:700;">
+<td style="padding:5px 6px;font-size:10px;color:#0f172a;">TOTAL</td>
+<td style="padding:4px;text-align:right;font-size:10px;font-family:monospace;">${fcr(proyTotalPres)}</td>
+<td style="padding:4px;text-align:right;font-size:10px;font-family:monospace;color:#7c3aed;">${fcr(proyTotalPaid)}</td>
+<td style="padding:4px;text-align:center;font-size:10px;color:#7c3aed;">${pctPag}%</td>
+<td style="padding:4px;text-align:center;font-size:10px;color:#f59e0b;">${pctPat!==null?pctPat+'%':'—'}</td>
+<td style="padding:4px;text-align:center;font-size:10px;color:${dCol(desv)};">${desv!==null?(desv>=0?'+':'')+desv+'%':'—'}</td>
+</tr>`;
+
+            sMO+=`<div class="obra-block blk" data-obra="${pi}" style="border-left:4px solid #0f172a;">${prjHdr(d.nombre)}
+<div class="sg" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr));margin-bottom:14px;">
+<div class="sc"><div class="scl">Presupuesto M.O.</div><div class="scv">${fcr(proyTotalPres)}</div></div>
+<div class="sc" style="border-left:3px solid #7c3aed;"><div class="scl">Total Pagado</div><div class="scv" style="color:#7c3aed;">${fcr(proyTotalPaid)}</div><div class="scd">${pctPag}% del presupuesto</div></div>
+${kpiPatron}${kpiDesv}
+</div>
+<h3 class="sh">📈 Curvas S — Mano de Obra (Patrón vs Real)</h3>
+${proyTimeline.length?svgMOCurvaS(proyTimeline,proyPatron,proyTotalPres):'<div style="color:#94a3b8;font-size:12px;padding:16px;text-align:center;border:1px dashed #e2e8f0;border-radius:8px;">Sin pagos M.O. registrados en este proyecto</div>'}
+<h3 class="sh" style="margin-top:14px;">📋 Detalle por Beneficiario</h3>
+<div class="tc"><table style="width:100%;table-layout:fixed;">
+<colgroup><col style="width:30%"><col style="width:14%"><col style="width:14%"><col style="width:12%"><col style="width:12%"><col style="width:12%"></colgroup>
+<thead><tr><th style="text-align:left;">Beneficiario</th><th style="text-align:right;">Presupuesto</th><th style="text-align:right;">Pagado</th><th style="text-align:center;">% Pagado</th><th style="text-align:center;">% Patrón</th><th style="text-align:center;">Desviación</th></tr></thead>
+<tbody>${filas}</tbody></table></div></div>`;
+        });
+
         // Emitir
         const titulo = resNombre ? `Reporte Residente: ${resNombre}` : `Reporte Residente — ${proyectoSel}`;
         const subtitulo = `${proysList.length>1?proysList.length+' obras':proysList[0]?.ID_proy||proyectoSel} · Semana ${sem} · ${fechaGen}`;
-        const html = _emitirInformeHTML(titulo, subtitulo, sem, fechaGen, [sR, sCk, sCurv, sRit, sViv, sDesp], proyData);
+        const html = _emitirInformeHTML(titulo, subtitulo, sem, fechaGen, [sR, sCk, sCurv, sRit, sViv, sDesp, sMO], proyData);
         const _rNom=(resNombre||proyectoSel).replace(/[^a-zA-Z0-9À-ſ]/g,'_');
         const _fn=`Reporte_Residente_${_rNom}_Sem${sem}.html`;
         const _bl=new Blob([html],{type:'text/html;charset=utf-8'});const _ul=URL.createObjectURL(_bl);
