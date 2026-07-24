@@ -789,15 +789,25 @@ const ETAPAS_CONFIG_FULL = {
                 const estado = String(s.Estado || '').toLowerCase();
                 return estado.includes('aprobad') && idsBenef.has(String(s.ID_Benef || ''));
             })
-            .map(s => ({
-                ID_Benef: String(s.ID_Benef || ''),
-                Familia_pago: String(s.Familia_pago || ''),
-                Tipo_pago: String(s.Tipo_pago || ''),
-                monto: parseMonto(s.monto),
-                fecha: parseDate(s.fecha || s.Fecha) || '',
-                maestro: String(s.maestro || s.IDU_maestros || ''),
-                Estado: 'Aprobado'
-            }));
+            .map(s => {
+                const tipRaw = String(s.Tipologia || s['Tipología'] || s.tipologia || s.Tipo_pago || '');
+                const tl = tipRaw.toLowerCase();
+                const tipShort = tl.includes('bodega') ? 'Bodega'
+                               : tl.includes('vivienda') ? 'Vivienda'
+                               : tl.includes('r.c') || tl.includes(' rc') || tl.includes('recinto') ? 'R.C.'
+                               : tipRaw || '—';
+                return {
+                    ID_Benef: String(s.ID_Benef || ''),
+                    Familia_pago: String(s.Familia_pago || ''),
+                    Tipo_pago: String(s.Tipo_pago || ''),
+                    tipologia: tipShort,
+                    tipologia_full: tipRaw,
+                    monto: parseMonto(s.monto),
+                    fecha: parseDate(s.fecha || s.Fecha) || '',
+                    maestro: String(s.maestro || s.IDU_maestros || ''),
+                    Estado: 'Aprobado'
+                };
+            });
 
         updateLoading('Procesando seguimiento de cierre...', 78);
 
@@ -1481,12 +1491,14 @@ const getInspeccion = (idBenef) => INSPECCIONES_DATA.find(i => String(i.ID_Benef
 
 const getPagosPorFamilia = (idBenef) => {
     const pagos = getSolpago(idBenef);
+    // Clave compuesta: "Familia_pago|||tipologia" para desglosar Vivienda / Bodega / R.C.
     const porFam = {};
     pagos.forEach(p => {
-        if (!porFam[p.Familia_pago]) porFam[p.Familia_pago] = { total: 0, count: 0, maestros: new Set() };
-        porFam[p.Familia_pago].total += p.monto;
-        porFam[p.Familia_pago].count++;
-        if (p.maestro && p.maestro !== 'nan') porFam[p.Familia_pago].maestros.add(getMaestroNombre(p.maestro));
+        const key = `${p.Familia_pago}|||${p.tipologia}`;
+        if (!porFam[key]) porFam[key] = { familia: p.Familia_pago, tipologia: p.tipologia, total: 0, count: 0, maestros: new Set() };
+        porFam[key].total += p.monto;
+        porFam[key].count++;
+        if (p.maestro && p.maestro !== 'nan') porFam[key].maestros.add(getMaestroNombre(p.maestro));
     });
     return porFam;
 };
@@ -2231,10 +2243,18 @@ const ViviendaCard = ({ beneficiario, estadoEtapas, expanded, onToggle, grupoCol
                         return (
                             <div className="mt-4 pt-3 border-t border-gray-200">
                                 <h4 className="text-sm font-medium text-gray-700 mb-2">Pagos por Familia</h4>
-                                <table className="w-full text-sm"><thead><tr className="text-left text-gray-500 border-b border-gray-200 bg-white"><th className="py-1.5 px-2 text-xs">Familia</th><th className="py-1.5 px-2 text-xs text-right">Total</th><th className="py-1.5 px-2 text-xs text-center">#</th><th className="py-1.5 px-2 text-xs">Maestro</th></tr></thead>
-                                <tbody>{entries.map(([fam, data]) => (
-                                    <tr key={fam} className="border-b border-gray-100"><td className="py-1.5 px-2 font-medium text-gray-700">{fam}</td><td className="py-1.5 px-2 text-right font-mono font-bold text-violet-700">{formatPeso(data.total)}</td><td className="py-1.5 px-2 text-center text-gray-500">{data.count}</td><td className="py-1.5 px-2 text-gray-500 text-xs">{[...data.maestros].join(", ")}</td></tr>
-                                ))}</tbody></table>
+                                <table className="w-full text-sm"><thead><tr className="text-left text-gray-500 border-b border-gray-200 bg-white"><th className="py-1.5 px-2 text-xs">Familia</th><th className="py-1.5 px-2 text-xs">Tipología</th><th className="py-1.5 px-2 text-xs text-right">Total</th><th className="py-1.5 px-2 text-xs text-center">#</th><th className="py-1.5 px-2 text-xs">Maestro</th></tr></thead>
+                                <tbody>{entries.map(([key, data]) => {
+                                    const tipColor = data.tipologia === 'Bodega' ? 'text-amber-600 bg-amber-50' : data.tipologia === 'R.C.' ? 'text-blue-600 bg-blue-50' : 'text-green-700 bg-green-50';
+                                    return (
+                                    <tr key={key} className="border-b border-gray-100">
+                                        <td className="py-1.5 px-2 font-medium text-gray-700">{data.familia}</td>
+                                        <td className="py-1.5 px-2"><span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${tipColor}`}>{data.tipologia}</span></td>
+                                        <td className="py-1.5 px-2 text-right font-mono font-bold text-violet-700">{formatPeso(data.total)}</td>
+                                        <td className="py-1.5 px-2 text-center text-gray-500">{data.count}</td>
+                                        <td className="py-1.5 px-2 text-gray-500 text-xs">{[...data.maestros].join(", ")}</td>
+                                    </tr>);
+                                })}</tbody></table>
                             </div>
                         );
                     })()}
