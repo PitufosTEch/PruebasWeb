@@ -1118,11 +1118,10 @@ const ETAPAS_CONFIG_FULL = {
         const tpRaw = raw.Tabla_pago?.rows || [];
         PRESUPUESTO_DATA = {};
         PRESUPUESTO_PARTIDA_DATA = {};
-        if (tpRaw.length > 0) window._tpSample = tpRaw[0]; // diagnóstico temporal
         tpRaw.forEach(tp => {
             const tipol = String(tp.IDU_Tipol || '').trim();
             const familia = String(tp.familia_pago || '').trim();
-            const partida = String(tp.partida || tp.Partida || '').trim();
+            const partida = String(tp.tipo_pago || '').trim();
             let monto = 0;
             try { monto = parseFloat(tp.monto) || 0; } catch(e) { monto = parseMonto(tp.monto); }
             if (tipol && tipol !== 'nan' && familia && familia !== 'nan') {
