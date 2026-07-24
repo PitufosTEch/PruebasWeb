@@ -3373,95 +3373,73 @@ const FinancieroTab = ({ viviendas }) => {
     );
 };
 
-// ===== GRÁFICO AVANCE PAGOS M.O. =====
-const MOAvanceChart = ({ timeline, earnedSerie, totalPres, compact = false }) => {
-    const H = compact ? 130 : 200;
+// ===== GRÁFICO AVANCE PAGOS M.O. — Curva S suavizada =====
+const MOAvanceChart = ({ timeline, totalPres, compact = false }) => {
+    if (!timeline || timeline.length === 0) return null;
+
+    const H = compact ? 118 : 185;
     const W = 700;
-    const ML = 58, MR = 8, MT = 8, MB = compact ? 28 : 36;
+    const ML = 56, MR = 12, MT = 10, MB = compact ? 22 : 28;
     const cW = W - ML - MR, cH = H - MT - MB;
 
-    // Unir meses de ambas series
-    const allMonths = [...new Set([
-        ...(timeline || []).map(t => t.mk),
-        ...(earnedSerie || []).map(s => s.mes)
-    ])].sort();
-
-    if (allMonths.length === 0) return null;
-
-    // Construir datos por mes
-    const tMap = {};
-    (timeline || []).forEach(t => { tMap[t.mk] = t; });
-    const eMap = {};
-    (earnedSerie || []).forEach(s => { eMap[s.mes] = s.avance; });
-
-    // Interpolar earned value
-    let lastAvance = 0;
-    const rows = allMonths.map(mk => {
-        const t = tMap[mk] || null;
-        if (eMap[mk] !== undefined) lastAvance = eMap[mk];
-        const earned = (lastAvance / 100) * totalPres;
-        return { mk, label: t?.label || (mk.split('-').reverse().join('-').slice(0,5).replace('-','-')), cumul: t?.cumul || 0, amount: t?.amount || 0, earned };
-    });
-
-    // Carry forward cumul for months with no payment
-    let lastCumul = 0;
-    rows.forEach(r => { if (r.cumul > 0) lastCumul = r.cumul; else r.cumul = lastCumul; });
-
-    const maxVal = Math.max(...rows.map(r => Math.max(r.cumul, r.earned)), totalPres, 1) * 1.08;
-    const n = rows.length;
-    const barW = cW / (n + 0.5);
-    const sx = (i) => ML + (i + 0.5) * barW;
+    const n = timeline.length;
+    const maxVal = Math.max(...timeline.map(t => t.cumul), totalPres || 0, 1) * 1.06;
+    const xStep = n > 1 ? cW / (n - 1) : cW;
+    const sx = (i) => ML + i * xStep;
     const sy = (v) => MT + cH - Math.max(0, Math.min(1, v / maxVal)) * cH;
 
-    // Y-axis ticks
-    const yTicks = [0, 0.25, 0.5, 0.75, 1].map(f => maxVal * f);
+    // Smooth monotone cubic bezier interpolation
+    const pts = timeline.map((t, i) => ({ x: sx(i), y: sy(t.cumul) }));
+    const smoothCubic = (points) => {
+        if (points.length === 1) return `M${points[0].x.toFixed(1)},${points[0].y.toFixed(1)}`;
+        const tension = 0.38;
+        let d = `M${points[0].x.toFixed(1)},${points[0].y.toFixed(1)}`;
+        for (let i = 0; i < points.length - 1; i++) {
+            const p0 = points[Math.max(0, i - 1)];
+            const p1 = points[i];
+            const p2 = points[i + 1];
+            const p3 = points[Math.min(points.length - 1, i + 2)];
+            const cp1x = p1.x + (p2.x - p0.x) * tension;
+            const cp1y = p1.y + (p2.y - p0.y) * tension;
+            const cp2x = p2.x - (p3.x - p1.x) * tension;
+            const cp2y = p2.y - (p3.y - p1.y) * tension;
+            d += ` C${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
+        }
+        return d;
+    };
 
-    // Label every Nth month to avoid crowding
-    const labelEvery = n > 24 ? 4 : n > 12 ? 2 : 1;
+    const linePath = smoothCubic(pts);
+    const areaPath = linePath + ` L${sx(n-1).toFixed(1)},${(MT+cH).toFixed(1)} L${sx(0).toFixed(1)},${(MT+cH).toFixed(1)} Z`;
+
+    const yTicks = [0, 0.25, 0.5, 0.75, 1].map(f => maxVal * f);
+    const labelEvery = n > 24 ? 4 : n > 14 ? 2 : 1;
 
     return (
         <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{height:`${H}px`}}>
-            {/* Grid */}
+            {/* Grid lines */}
             {yTicks.map((v, i) => (
                 <g key={i}>
                     <line x1={ML} y1={sy(v)} x2={W-MR} y2={sy(v)} stroke="#f3f4f6" strokeWidth="1"/>
                     <text x={ML-4} y={sy(v)+3} textAnchor="end" fontSize={compact?7:8} fill="#9ca3af">{shortPeso(v)}</text>
                 </g>
             ))}
-            {/* Presupuesto line */}
-            {totalPres > 0 && <>
-                <line x1={ML} y1={sy(totalPres)} x2={W-MR} y2={sy(totalPres)} stroke="#d1d5db" strokeWidth="1" strokeDasharray="3,3"/>
-                <text x={W-MR-2} y={sy(totalPres)-3} textAnchor="end" fontSize={6} fill="#9ca3af">Pres.</text>
-            </>}
-            {/* Bars */}
-            {rows.map((r, i) => {
-                const bh = cH - (sy(r.amount) - MT);
-                return bh > 0 ? (
-                    <rect key={r.mk} x={sx(i)-barW*0.35} y={sy(r.amount)} width={barW*0.7} height={bh} fill="#a78bfa" opacity="0.45" rx="1"/>
-                ) : null;
-            })}
-            {/* Earned value line */}
-            <polyline points={rows.map((r, i) => `${sx(i)},${sy(r.earned)}`).join(' ')} fill="none" stroke="#10b981" strokeWidth={compact?1.5:2} strokeDasharray="4,2"/>
-            {/* Cumulative actual line */}
-            <polyline points={rows.map((r, i) => `${sx(i)},${sy(r.cumul)}`).join(' ')} fill="none" stroke="#7c3aed" strokeWidth={compact?1.5:2}/>
-            {/* Dots on cumulative */}
-            {rows.map((r, i) => r.amount > 0 ? <circle key={r.mk} cx={sx(i)} cy={sy(r.cumul)} r={compact?2:2.5} fill="#7c3aed"/> : null)}
-            {/* X labels */}
-            {rows.map((r, i) => i % labelEvery === 0 ? (
-                <text key={r.mk} x={sx(i)} y={H-4} textAnchor="middle" fontSize={compact?6:7} fill="#6b7280">{r.label}</text>
+            {/* Presupuesto ceiling */}
+            {totalPres > 0 && (
+                <line x1={ML} y1={sy(totalPres)} x2={W-MR} y2={sy(totalPres)} stroke="#c4b5fd" strokeWidth="1" strokeDasharray="5,4" opacity="0.7"/>
+            )}
+            {/* Area under curve */}
+            <path d={areaPath} fill="#7c3aed" fillOpacity="0.07"/>
+            {/* S-curve */}
+            <path d={linePath} fill="none" stroke="#7c3aed" strokeWidth={compact ? 2 : 2.5} strokeLinecap="round" strokeLinejoin="round"/>
+            {/* Endpoint dot */}
+            <circle cx={sx(n-1)} cy={sy(timeline[n-1].cumul)} r={compact ? 3 : 4} fill="#7c3aed" stroke="white" strokeWidth="1.5"/>
+            {/* X-axis labels */}
+            {timeline.map((t, i) => i % labelEvery === 0 ? (
+                <text key={t.mk} x={sx(i)} y={H-3} textAnchor="middle" fontSize={compact ? 6 : 7} fill="#9ca3af">{t.label}</text>
             ) : null)}
             {/* Axes */}
             <line x1={ML} y1={MT} x2={ML} y2={MT+cH} stroke="#e5e7eb" strokeWidth="1"/>
             <line x1={ML} y1={MT+cH} x2={W-MR} y2={MT+cH} stroke="#e5e7eb" strokeWidth="1"/>
-            {/* Legend */}
-            {!compact && <>
-                <rect x={ML} y={H-MB+4} width={8} height={5} fill="#a78bfa" opacity="0.5" rx="1"/>
-                <text x={ML+10} y={H-MB+9} fontSize={7} fill="#6b7280">Pago mensual</text>
-                <line x1={ML+70} y1={H-MB+6.5} x2={ML+82} y2={H-MB+6.5} stroke="#7c3aed" strokeWidth="1.5"/>
-                <text x={ML+84} y={H-MB+9} fontSize={7} fill="#6b7280">Pagado acumulado</text>
-                <line x1={ML+170} y1={H-MB+6.5} x2={ML+182} y2={H-MB+6.5} stroke="#10b981" strokeWidth="1.5" strokeDasharray="4,2"/>
-                <text x={ML+184} y={H-MB+9} fontSize={7} fill="#6b7280">Valor ganado (avance % × presupuesto)</text>
-            </>}
         </svg>
     );
 };
@@ -3523,25 +3501,17 @@ const ManoDeObraTab = ({ viviendas }) => {
 
     // Datos de avance de pagos M.O.
     const avanceData = React.useMemo(() => {
-        const proyId = viviendas[0]?.ID_Proy;
-        // Presupuesto total del proyecto
         const proyTotalPres = viviendas.reduce((s, v) => s + getBenefPresupuestoTotal(v), 0);
-        // Timeline pagos proyecto (filtrando familias excluidas)
         const allPagos = viviendas.flatMap(v => getBenefPaidFiltered(v.ID_Benef));
         const proyTimeline = buildMonthlyPayments(allPagos);
-        // Serie de avance del proyecto (AVANCE_MENSUAL_DATA)
-        const proyAvanceSerie = (AVANCE_MENSUAL_DATA[proyId] || {}).serie || [];
-        // Por beneficiario
         const porBenef = viviendas.map(v => {
-            const insp = getInspeccion(v.ID_Benef);
             const totalPres = getBenefPresupuestoTotal(v);
             const pagos = getBenefPaidFiltered(v.ID_Benef);
             const timeline = buildMonthlyPayments(pagos);
-            const earnedValue = insp ? (insp.pct_total / 100) * totalPres : 0;
             const totalPaid = pagos.reduce((s, p) => s + p.monto, 0);
-            return { benef: v, totalPres, timeline, earnedValue, totalPaid, pct_total: insp?.pct_total || 0 };
+            return { benef: v, totalPres, timeline, totalPaid };
         });
-        return { proyTimeline, proyAvanceSerie, proyTotalPres, porBenef };
+        return { proyTimeline, proyTotalPres, porBenef };
     }, [viviendas]);
 
     return (
@@ -3565,50 +3535,43 @@ const ManoDeObraTab = ({ viviendas }) => {
                 </div>
             </div>
 
-            {/* Gráfico Avance de Pagos M.O. — Resumen Proyecto */}
+            {/* Curva S — Resumen Proyecto */}
             {avanceData.proyTimeline.length > 0 && (
             <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
                 <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-                    <h3 className="text-sm font-semibold text-gray-700">Avance de Pagos M.O. — Resumen Proyecto</h3>
+                    <h3 className="text-sm font-semibold text-gray-700">Curva S de Pagos M.O. — Proyecto</h3>
                     <div className="flex gap-4 mt-1 text-[10px] text-gray-500">
-                        <span>Presupuesto total: <strong className="text-gray-700">{formatPeso(avanceData.proyTotalPres)}</strong></span>
-                        <span>Pagado acumulado: <strong className="text-violet-700">{formatPeso(avanceData.proyTimeline[avanceData.proyTimeline.length-1]?.cumul || 0)}</strong></span>
-                        <span>Valor ganado actual: <strong className="text-green-600">{formatPeso(Math.round((avanceData.proyAvanceSerie[avanceData.proyAvanceSerie.length-1]?.avance||0)/100*avanceData.proyTotalPres))}</strong></span>
+                        <span>Presupuesto: <strong className="text-gray-700">{formatPeso(avanceData.proyTotalPres)}</strong></span>
+                        <span>Pagado: <strong className="text-violet-700">{formatPeso(avanceData.proyTimeline[avanceData.proyTimeline.length-1]?.cumul || 0)}</strong></span>
+                        <span><strong className="text-violet-600">{avanceData.proyTotalPres > 0 ? Math.round((avanceData.proyTimeline[avanceData.proyTimeline.length-1]?.cumul||0)/avanceData.proyTotalPres*100) : 0}%</strong> ejecutado</span>
                     </div>
                 </div>
-                <div className="p-3">
-                    <MOAvanceChart timeline={avanceData.proyTimeline} earnedSerie={avanceData.proyAvanceSerie} totalPres={avanceData.proyTotalPres}/>
+                <div className="px-3 pb-3 pt-1">
+                    <MOAvanceChart timeline={avanceData.proyTimeline} totalPres={avanceData.proyTotalPres}/>
                 </div>
             </div>
             )}
 
-            {/* Gráfico por Beneficiario */}
-            {avanceData.porBenef.some(d => d.timeline.length > 0 || d.totalPres > 0) && (
+            {/* Curva S por Beneficiario */}
+            {avanceData.porBenef.some(d => d.timeline.length > 0) && (
             <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
                 <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-                    <h3 className="text-sm font-semibold text-gray-700">Avance de Pagos M.O. — Por Beneficiario</h3>
-                    <p className="text-[10px] text-gray-400">Línea morada: pagado acumulado · Línea verde: valor ganado (avance insp. × presupuesto)</p>
+                    <h3 className="text-sm font-semibold text-gray-700">Curva S de Pagos M.O. — Por Beneficiario</h3>
+                    <p className="text-[10px] text-gray-400">Acumulado pagado · línea punteada = presupuesto</p>
                 </div>
                 <div className="p-3 grid grid-cols-1 lg:grid-cols-2 gap-3">
-                    {avanceData.porBenef.filter(d => d.timeline.length > 0 || d.totalPres > 0).map(d => {
-                        const pctPagado = d.totalPres > 0 ? Math.round(d.totalPaid / d.totalPres * 100) : 0;
-                        // Earned serie as static point for per-benef (no historical per-benef avance)
-                        const hoy = new Date().toISOString().substring(0, 7);
-                        const earnedSerie = d.pct_total > 0 ? [{ mes: hoy, avance: d.pct_total }] : [];
+                    {avanceData.porBenef.filter(d => d.timeline.length > 0).map(d => {
+                        const pctPag = d.totalPres > 0 ? Math.round(d.totalPaid / d.totalPres * 100) : 0;
                         return (
                         <div key={d.benef.ID_Benef} className="border border-gray-100 rounded-lg p-2">
                             <div className="flex items-center justify-between mb-1">
-                                <span className="text-[11px] font-semibold text-gray-700 truncate max-w-[55%]">{d.benef.NOMBRES} {d.benef.APELLIDOS}</span>
+                                <span className="text-[11px] font-semibold text-gray-700 truncate max-w-[60%]">{d.benef.NOMBRES} {d.benef.APELLIDOS}</span>
                                 <div className="flex gap-3 text-[9px]">
                                     <span className="text-violet-600 font-mono">{formatPeso(d.totalPaid)}</span>
-                                    <span className="text-green-600 font-mono">{d.pct_total}% insp.</span>
-                                    <span className="text-gray-400 font-mono">{pctPagado}% pag.</span>
+                                    <span className="text-gray-400 font-mono">{pctPag}% pag.</span>
                                 </div>
                             </div>
-                            {d.timeline.length > 0
-                                ? <MOAvanceChart timeline={d.timeline} earnedSerie={earnedSerie} totalPres={d.totalPres} compact={true}/>
-                                : <div className="text-[9px] text-gray-300 text-center py-4">Sin pagos registrados · Presupuesto: {formatPeso(d.totalPres)}</div>
-                            }
+                            <MOAvanceChart timeline={d.timeline} totalPres={d.totalPres} compact={true}/>
                         </div>
                         );
                     })}
