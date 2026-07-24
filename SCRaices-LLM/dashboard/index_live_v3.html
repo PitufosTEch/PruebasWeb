@@ -3500,6 +3500,14 @@ const MOAvanceChart = ({ timeline, patronTimeline, totalPres, compact = false })
 // ===== MANO DE OBRA =====
 const ManoDeObraTab = ({ viviendas }) => {
     const [expandido, setExpandido] = React.useState(null);
+    const [ganttProg, setGanttProg] = React.useState({});
+
+    React.useEffect(() => {
+        fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/gantt_programa.json')
+            .then(r => r.json())
+            .then(d => setGanttProg(d || {}))
+            .catch(() => {});
+    }, []);
 
     const { maestros, casasProyArr } = React.useMemo(() => {
         const idsProyecto = new Set(viviendas.map(v => String(v.ID_Benef)));
@@ -3555,28 +3563,33 @@ const ManoDeObraTab = ({ viviendas }) => {
     // Datos de avance de pagos M.O.
     const avanceData = React.useMemo(() => {
         const proyId = viviendas.length > 0 ? String(viviendas[0].ID_Proy) : null;
-        const proyData = proyId ? PROYECTOS_DATA.find(p => String(p.ID_proy) === proyId) : null;
         const proyTotalPres = viviendas.reduce((s, v) => s + getBenefPresupuestoTotal(v), 0);
 
-        // Curva patrón: presupuesto × (días transcurridos / plazo total) por mes
-        // Se extiende desde fecha_inicio hasta el FIN del contrato (fecha_inicio + duracion días)
-        // para mostrar la trayectoria completa que alcanza el 100% del presupuesto al vencimiento.
+        // Curva patrón: presupuesto × (días transcurridos / plazo de programa Gantt) por mes.
+        // Usa fechas del Gantt de control (Firebase gantt_programa.json: pg.inicio, pg.plazo, pg.finProg),
+        // NO el plazo de contrato. La curva se extiende hasta pg.finProg para mostrar
+        // la trayectoria completa que alcanza el 100% del presupuesto al término de programa.
         const buildPatronTimeline = (totalPres) => {
-            if (!proyData || !proyData.fecha_inicio || !proyData.duracion || totalPres <= 0) return [];
-            const inicio = new Date(proyData.fecha_inicio);
+            if (totalPres <= 0 || !proyId) return [];
+            const pg = ganttProg[proyId];
+            if (!pg || !pg.inicio || (!pg.finProg && !pg.plazo)) return [];
+            const inicio = new Date(pg.inicio);
             if (isNaN(inicio.getTime())) return [];
-            const duracion = proyData.duracion; // días de plazo contractual
-            if (duracion <= 0) return [];
-            const contratoFin = new Date(inicio.getTime() + duracion * 86400000);
+            // Fin de programa: preferir finProg, o bien inicio + plazo días
+            const finProg = pg.finProg
+                ? new Date(pg.finProg)
+                : new Date(inicio.getTime() + pg.plazo * 86400000);
+            if (isNaN(finProg.getTime())) return [];
+            const plazo = Math.round((finProg - inicio) / 86400000); // días totales del programa
+            if (plazo <= 0) return [];
             const mnames = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
             const result = [];
             let cur = new Date(inicio.getFullYear(), inicio.getMonth(), 1);
-            // Extender hasta el mes del fin de contrato (independiente de si ya pasó o no)
-            const endMonth = new Date(contratoFin.getFullYear(), contratoFin.getMonth(), 1);
+            const endMonth = new Date(finProg.getFullYear(), finProg.getMonth(), 1);
             while (cur <= endMonth) {
                 const eom = new Date(cur.getFullYear(), cur.getMonth() + 1, 0); // último día del mes
                 const diasTranscurridos = Math.max(0, (eom - inicio) / 86400000);
-                const pct = Math.min(100, diasTranscurridos / duracion * 100);
+                const pct = Math.min(100, diasTranscurridos / plazo * 100);
                 const cumul = totalPres * pct / 100;
                 const mk = `${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}`;
                 const label = mnames[cur.getMonth()] + '-' + String(cur.getFullYear()).slice(2);
@@ -3599,7 +3612,7 @@ const ManoDeObraTab = ({ viviendas }) => {
             return { benef: v, totalPres, timeline, patronTimeline, totalPaid };
         });
         return { proyTimeline, proyTotalPres, proyPatronTimeline, porBenef };
-    }, [viviendas]);
+    }, [viviendas, ganttProg]);
 
     return (
         <div className="space-y-6">
