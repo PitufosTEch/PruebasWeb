@@ -3559,15 +3559,20 @@ const ManoDeObraTab = ({ viviendas }) => {
         const proyTotalPres = viviendas.reduce((s, v) => s + getBenefPresupuestoTotal(v), 0);
 
         // Curva patrón: presupuesto × (días transcurridos / plazo total) por mes
+        // Se extiende desde fecha_inicio hasta el FIN del contrato (fecha_inicio + duracion días)
+        // para mostrar la trayectoria completa que alcanza el 100% del presupuesto al vencimiento.
         const buildPatronTimeline = (totalPres) => {
             if (!proyData || !proyData.fecha_inicio || !proyData.duracion || totalPres <= 0) return [];
             const inicio = new Date(proyData.fecha_inicio);
+            if (isNaN(inicio.getTime())) return [];
             const duracion = proyData.duracion; // días de plazo contractual
-            const hoy = new Date();
+            if (duracion <= 0) return [];
+            const contratoFin = new Date(inicio.getTime() + duracion * 86400000);
             const mnames = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
             const result = [];
             let cur = new Date(inicio.getFullYear(), inicio.getMonth(), 1);
-            const endMonth = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+            // Extender hasta el mes del fin de contrato (independiente de si ya pasó o no)
+            const endMonth = new Date(contratoFin.getFullYear(), contratoFin.getMonth(), 1);
             while (cur <= endMonth) {
                 const eom = new Date(cur.getFullYear(), cur.getMonth() + 1, 0); // último día del mes
                 const diasTranscurridos = Math.max(0, (eom - inicio) / 86400000);
