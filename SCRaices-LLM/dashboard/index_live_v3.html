@@ -1119,18 +1119,21 @@ const ETAPAS_CONFIG_FULL = {
         PRESUPUESTO_DATA = {};
         PRESUPUESTO_PARTIDA_DATA = {};
         tpRaw.forEach(tp => {
-            const tipol = String(tp.IDU_Tipol || '').trim();
+            const proy   = String(tp.ID_proy || '').trim();
+            const tipol  = String(tp.IDU_Tipol || '').trim();
             const familia = String(tp.familia_pago || '').trim();
             const partida = String(tp.tipo_pago || '').trim();
             let monto = 0;
             try { monto = parseFloat(tp.monto) || 0; } catch(e) { monto = parseMonto(tp.monto); }
-            if (tipol && tipol !== 'nan' && familia && familia !== 'nan') {
-                if (!PRESUPUESTO_DATA[tipol]) PRESUPUESTO_DATA[tipol] = {};
-                PRESUPUESTO_DATA[tipol][familia] = (PRESUPUESTO_DATA[tipol][familia] || 0) + monto;
+            if (proy && tipol && tipol !== 'nan' && familia && familia !== 'nan') {
+                if (!PRESUPUESTO_DATA[proy]) PRESUPUESTO_DATA[proy] = {};
+                if (!PRESUPUESTO_DATA[proy][tipol]) PRESUPUESTO_DATA[proy][tipol] = {};
+                PRESUPUESTO_DATA[proy][tipol][familia] = (PRESUPUESTO_DATA[proy][tipol][familia] || 0) + monto;
                 if (partida && partida !== 'nan') {
-                    if (!PRESUPUESTO_PARTIDA_DATA[tipol]) PRESUPUESTO_PARTIDA_DATA[tipol] = {};
-                    if (!PRESUPUESTO_PARTIDA_DATA[tipol][familia]) PRESUPUESTO_PARTIDA_DATA[tipol][familia] = {};
-                    PRESUPUESTO_PARTIDA_DATA[tipol][familia][partida] = (PRESUPUESTO_PARTIDA_DATA[tipol][familia][partida] || 0) + monto;
+                    if (!PRESUPUESTO_PARTIDA_DATA[proy]) PRESUPUESTO_PARTIDA_DATA[proy] = {};
+                    if (!PRESUPUESTO_PARTIDA_DATA[proy][tipol]) PRESUPUESTO_PARTIDA_DATA[proy][tipol] = {};
+                    if (!PRESUPUESTO_PARTIDA_DATA[proy][tipol][familia]) PRESUPUESTO_PARTIDA_DATA[proy][tipol][familia] = {};
+                    PRESUPUESTO_PARTIDA_DATA[proy][tipol][familia][partida] = (PRESUPUESTO_PARTIDA_DATA[proy][tipol][familia][partida] || 0) + monto;
                 }
             }
         });
@@ -2256,10 +2259,12 @@ const ViviendaCard = ({ beneficiario, estadoEtapas, expanded, onToggle, grupoCol
                     {(() => {
                         const pagosFam = getPagosPorFamilia(b.ID_Benef);
                         // Presupuesto por familia (Vivienda + R.C.) — debe calcularse antes del filtro
-                        const presViv = PRESUPUESTO_DATA[b.tipologia_viv_id] || {};
-                        const presRC  = PRESUPUESTO_DATA[b.tipologia_rc_id] || {};
+                        const _presProy = PRESUPUESTO_DATA[b.ID_Proy] || {};
+                        const presViv = _presProy[b.tipologia_viv_id] || {};
+                        const presRC  = _presProy[b.tipologia_rc_id] || {};
+                        const _presPartProy = PRESUPUESTO_PARTIDA_DATA[b.ID_Proy] || {};
                         const getPresPartida = (tipId, fam, keyword) => {
-                            const byPart = (PRESUPUESTO_PARTIDA_DATA[tipId] || {})[fam] || {};
+                            const byPart = (_presPartProy[tipId] || {})[fam] || {};
                             return Object.entries(byPart).filter(([p]) => p.toLowerCase().includes(keyword)).reduce((s,[,v]) => s+v, 0);
                         };
                         const getPresFam = (fam) => {
@@ -10145,8 +10150,9 @@ const App = () => {
             const tipViv = v.tipologia_viv_id;
             const tipRC = v.tipologia_rc_id;
             if (!tipViv && !tipRC) return;
-            const presViv = PRESUPUESTO_DATA[tipViv] || {};
-            const presRC = PRESUPUESTO_DATA[tipRC] || {};
+            const _presProyC6 = PRESUPUESTO_DATA[v.ID_Proy] || {};
+            const presViv = _presProyC6[tipViv] || {};
+            const presRC  = _presProyC6[tipRC] || {};
 
             // Unir familias de ambas tipologías
             const todasFamilias = new Set([...Object.keys(presViv), ...Object.keys(presRC)]);
