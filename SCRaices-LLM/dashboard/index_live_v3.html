@@ -2255,37 +2255,32 @@ const ViviendaCard = ({ beneficiario, estadoEtapas, expanded, onToggle, grupoCol
                                 <table className="w-full text-sm">
                                 <thead><tr className="text-left text-gray-500 border-b border-gray-200 bg-white">
                                     <th className="py-1.5 px-2 text-xs">Familia</th>
-                                    <th className="py-1.5 px-2 text-xs">Tipología</th>
                                     <th className="py-1.5 px-2 text-xs text-right">Total</th>
                                     <th className="py-1.5 px-2 text-xs text-center">#</th>
                                     <th className="py-1.5 px-2 text-xs">Maestro</th>
                                 </tr></thead>
                                 <tbody>
-                                {entries.map(([key, data]) => {
-                                    const isRC = data.tipologia === 'R.C.';
-                                    const tipColor = isRC ? 'text-blue-600 bg-blue-50' : 'text-green-700 bg-green-50';
-                                    return (
-                                    <tr key={key} className={`border-b border-gray-100 ${isRC ? 'bg-blue-50/30' : ''}`}>
+                                {entries.map(([key, data]) => (
+                                    <tr key={key} className="border-b border-gray-100">
                                         <td className="py-1.5 px-2 font-medium text-gray-700">{data.familia}</td>
-                                        <td className="py-1.5 px-2"><span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${tipColor}`}>{data.tipologia}</span></td>
                                         <td className="py-1.5 px-2 text-right font-mono font-bold text-violet-700">{formatPeso(data.total)}</td>
                                         <td className="py-1.5 px-2 text-center text-gray-500">{data.count}</td>
                                         <td className="py-1.5 px-2 text-gray-500 text-xs">{[...data.maestros].join(", ")}</td>
-                                    </tr>);
-                                })}
+                                    </tr>
+                                ))}
                                 {/* Filas de totales */}
                                 {totalViv > 0 && <tr className="border-t-2 border-green-200 bg-green-50">
-                                    <td className="py-1.5 px-2 font-semibold text-green-800 text-xs" colSpan={2}>Total Vivienda</td>
+                                    <td className="py-1.5 px-2 font-semibold text-green-800 text-xs">Total Vivienda</td>
                                     <td className="py-1.5 px-2 text-right font-mono font-bold text-green-800">{formatPeso(totalViv)}</td>
                                     <td colSpan={2}></td>
                                 </tr>}
                                 {totalRC > 0 && <tr className="bg-blue-50">
-                                    <td className="py-1.5 px-2 font-semibold text-blue-800 text-xs" colSpan={2}>Total R.C.</td>
+                                    <td className="py-1.5 px-2 font-semibold text-blue-800 text-xs">Total R.C.</td>
                                     <td className="py-1.5 px-2 text-right font-mono font-bold text-blue-800">{formatPeso(totalRC)}</td>
                                     <td colSpan={2}></td>
                                 </tr>}
                                 <tr className="border-t-2 border-gray-300 bg-gray-100">
-                                    <td className="py-2 px-2 font-bold text-gray-900 text-xs" colSpan={2}>TOTAL GENERAL</td>
+                                    <td className="py-2 px-2 font-bold text-gray-900 text-xs">TOTAL GENERAL</td>
                                     <td className="py-2 px-2 text-right font-mono font-bold text-gray-900">{formatPeso(totalGen)}</td>
                                     <td colSpan={2}></td>
                                 </tr>
