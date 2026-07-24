@@ -2261,18 +2261,23 @@ const ViviendaCard = ({ beneficiario, estadoEtapas, expanded, onToggle, grupoCol
                                     <th className="py-1.5 px-2 text-xs">Familia</th>
                                     <th className="py-1.5 px-2 text-xs text-right">Por Presupuesto</th>
                                     <th className="py-1.5 px-2 text-xs text-right">Total Pagado</th>
+                                    <th className="py-1.5 px-2 text-xs text-right">Diferencia</th>
                                     <th className="py-1.5 px-2 text-xs text-center">#</th>
                                     <th className="py-1.5 px-2 text-xs">Maestro</th>
                                 </tr></thead>
                                 <tbody>
                                 {entries.map(([key, data]) => {
                                     const pres = getPresFam(data.familia);
-                                    const overBudget = pres > 0 && data.total > pres;
+                                    const diff = pres > 0 ? pres - data.total : null;
+                                    const overBudget = diff !== null && diff < 0;
                                     return (
                                     <tr key={key} className={`border-b border-gray-100 ${overBudget ? 'bg-red-50' : ''}`}>
                                         <td className="py-1.5 px-2 font-medium text-gray-700">{data.familia}</td>
                                         <td className="py-1.5 px-2 text-right font-mono text-gray-500">{pres > 0 ? formatPeso(pres) : <span className="text-gray-300">—</span>}</td>
                                         <td className={`py-1.5 px-2 text-right font-mono font-bold ${overBudget ? 'text-red-600' : 'text-violet-700'}`}>{formatPeso(data.total)}</td>
+                                        <td className={`py-1.5 px-2 text-right font-mono font-bold ${diff === null ? 'text-gray-300' : diff < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                            {diff === null ? '—' : formatPeso(diff)}
+                                        </td>
                                         <td className="py-1.5 px-2 text-center text-gray-500">{data.count}</td>
                                         <td className="py-1.5 px-2 text-gray-500 text-xs">{[...data.maestros].join(", ")}</td>
                                     </tr>);
@@ -2282,18 +2287,21 @@ const ViviendaCard = ({ beneficiario, estadoEtapas, expanded, onToggle, grupoCol
                                     <td className="py-1.5 px-2 font-semibold text-green-800 text-xs">Total Vivienda</td>
                                     <td></td>
                                     <td className="py-1.5 px-2 text-right font-mono font-bold text-green-800">{formatPeso(totalViv)}</td>
-                                    <td colSpan={2}></td>
+                                    <td colSpan={3}></td>
                                 </tr>}
                                 {totalRC > 0 && <tr className="bg-blue-50">
                                     <td className="py-1.5 px-2 font-semibold text-blue-800 text-xs">Total R.C.</td>
                                     <td></td>
                                     <td className="py-1.5 px-2 text-right font-mono font-bold text-blue-800">{formatPeso(totalRC)}</td>
-                                    <td colSpan={2}></td>
+                                    <td colSpan={3}></td>
                                 </tr>}
                                 <tr className="border-t-2 border-gray-300 bg-gray-100">
                                     <td className="py-2 px-2 font-bold text-gray-900 text-xs">TOTAL GENERAL</td>
                                     <td className="py-2 px-2 text-right font-mono text-gray-500">{totalPresGen > 0 ? formatPeso(totalPresGen) : ''}</td>
                                     <td className="py-2 px-2 text-right font-mono font-bold text-gray-900">{formatPeso(totalGen)}</td>
+                                    <td className={`py-2 px-2 text-right font-mono font-bold ${totalPresGen > 0 ? (totalPresGen - totalGen < 0 ? 'text-red-600' : 'text-green-600') : 'text-gray-300'}`}>
+                                        {totalPresGen > 0 ? formatPeso(totalPresGen - totalGen) : '—'}
+                                    </td>
                                     <td colSpan={2}></td>
                                 </tr>
                                 </tbody></table>
