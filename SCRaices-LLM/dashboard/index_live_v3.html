@@ -80,6 +80,7 @@ let INSPECCIONES_DATA = [];
 let SOLPAGO_DATA = [];
 let MAESTROS_DATA = {};
 let PRESUPUESTO_DATA = {};
+let PRESUPUESTO_PARTIDA_DATA = {}; // tipol → familia → partida → monto
 let GARANTIAS_DATA = [];
 let EEPP_DATA = [];
 let COMENTARIOS_BENEF_DATA = [];
@@ -1116,14 +1117,21 @@ const ETAPAS_CONFIG_FULL = {
         // 8. PRESUPUESTO (Tabla_pago por tipologia)
         const tpRaw = raw.Tabla_pago?.rows || [];
         PRESUPUESTO_DATA = {};
+        PRESUPUESTO_PARTIDA_DATA = {};
         tpRaw.forEach(tp => {
             const tipol = String(tp.IDU_Tipol || '').trim();
             const familia = String(tp.familia_pago || '').trim();
+            const partida = String(tp.partida || tp.Partida || '').trim();
             let monto = 0;
             try { monto = parseFloat(tp.monto) || 0; } catch(e) { monto = parseMonto(tp.monto); }
             if (tipol && tipol !== 'nan' && familia && familia !== 'nan') {
                 if (!PRESUPUESTO_DATA[tipol]) PRESUPUESTO_DATA[tipol] = {};
                 PRESUPUESTO_DATA[tipol][familia] = (PRESUPUESTO_DATA[tipol][familia] || 0) + monto;
+                if (partida && partida !== 'nan') {
+                    if (!PRESUPUESTO_PARTIDA_DATA[tipol]) PRESUPUESTO_PARTIDA_DATA[tipol] = {};
+                    if (!PRESUPUESTO_PARTIDA_DATA[tipol][familia]) PRESUPUESTO_PARTIDA_DATA[tipol][familia] = {};
+                    PRESUPUESTO_PARTIDA_DATA[tipol][familia][partida] = (PRESUPUESTO_PARTIDA_DATA[tipol][familia][partida] || 0) + monto;
+                }
             }
         });
 
@@ -1251,6 +1259,7 @@ const ETAPAS_CONFIG_FULL = {
                 SOLPAGO_DATA,
                 MAESTROS_DATA,
                 PRESUPUESTO_DATA,
+                PRESUPUESTO_PARTIDA_DATA,
                 GARANTIAS_DATA,
                 EEPP_DATA,
                 COMENTARIOS_BENEF_DATA,
@@ -1302,6 +1311,7 @@ const ETAPAS_CONFIG_FULL = {
         SOLPAGO_DATA = cache.SOLPAGO_DATA || [];
         MAESTROS_DATA = cache.MAESTROS_DATA || {};
         PRESUPUESTO_DATA = cache.PRESUPUESTO_DATA || {};
+        PRESUPUESTO_PARTIDA_DATA = cache.PRESUPUESTO_PARTIDA_DATA || {};
         GARANTIAS_DATA = cache.GARANTIAS_DATA || [];
         EEPP_DATA = cache.EEPP_DATA || [];
         COMENTARIOS_BENEF_DATA = cache.COMENTARIOS_BENEF_DATA || [];
@@ -2259,7 +2269,16 @@ const ViviendaCard = ({ beneficiario, estadoEtapas, expanded, onToggle, grupoCol
                         // Presupuesto por familia (Vivienda + R.C.)
                         const presViv = PRESUPUESTO_DATA[b.tipologia_viv_id] || {};
                         const presRC  = PRESUPUESTO_DATA[b.tipologia_rc_id] || {};
-                        const getPresFam = (fam) => FAMILIAS_EXCLUIDAS.has(fam) ? 0 : (presViv[fam] || 0) + (presRC[fam] || 0);
+                        const getPresPartida = (tipId, fam, keyword) => {
+                            const byPart = (PRESUPUESTO_PARTIDA_DATA[tipId] || {})[fam] || {};
+                            return Object.entries(byPart).filter(([p]) => p.toLowerCase().includes(keyword)).reduce((s,[,v]) => s+v, 0);
+                        };
+                        const getPresFam = (fam) => {
+                            if (fam === '07 - Eléctricidad') {
+                                return getPresPartida(b.tipologia_viv_id, fam, 'postes') + getPresPartida(b.tipologia_rc_id, fam, 'postes');
+                            }
+                            return FAMILIAS_EXCLUIDAS.has(fam) ? 0 : (presViv[fam] || 0) + (presRC[fam] || 0);
+                        };
                         const totalPresGen = entries.reduce((s,[,d]) => s + getPresFam(d.familia), 0);
                         return (
                             <div className="mt-4 pt-3 border-t border-gray-200">
