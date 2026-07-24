@@ -1504,6 +1504,62 @@ const getInspeccion = (idBenef) => INSPECCIONES_DATA.find(i => String(i.ID_Benef
 // Familias excluidas de presupuesto y pagados (electricidad gestionada aparte)
 const FAMILIAS_EXCLUIDAS = new Set(['07 - Eléctricidad']);
 
+// Helpers para gráficos de avance M.O.
+const shortPeso = (v) => {
+    if (!v && v !== 0) return '';
+    const abs = Math.abs(v);
+    if (abs >= 1000000) return '$' + (v / 1000000).toFixed(1).replace('.', ',') + 'M';
+    if (abs >= 1000) return '$' + Math.round(v / 1000) + 'K';
+    return '$' + v;
+};
+
+const getBenefPresupuestoTotal = (benef) => {
+    const pBenef = PRESUPUESTO_DATA[benef.ID_Proy] || {};
+    const presViv = pBenef[benef.tipologia_viv_id] || {};
+    const presRC  = pBenef[benef.tipologia_rc_id] || {};
+    const ppBenef = PRESUPUESTO_PARTIDA_DATA[benef.ID_Proy] || {};
+    const allFams = new Set([...Object.keys(presViv), ...Object.keys(presRC)]);
+    let total = 0;
+    allFams.forEach(fam => {
+        if (fam === '07 - Eléctricidad') {
+            ['tipologia_viv_id', 'tipologia_rc_id'].forEach(tipKey => {
+                const byPart = (ppBenef[benef[tipKey]] || {})[fam] || {};
+                total += Object.entries(byPart)
+                    .filter(([p]) => p.toLowerCase().includes('postes'))
+                    .reduce((s, [, v]) => s + v, 0);
+            });
+        } else if (!FAMILIAS_EXCLUIDAS.has(fam)) {
+            total += (presViv[fam] || 0) + (presRC[fam] || 0);
+        }
+    });
+    return total;
+};
+
+const getBenefPaidFiltered = (idBenef) => {
+    const pagos = SOLPAGO_DATA.filter(p => p.ID_Benef === String(idBenef));
+    return pagos.filter(p => {
+        if (p.Familia_pago === '07 - Eléctricidad') return p.Tipo_pago.toLowerCase().includes('postes');
+        return !FAMILIAS_EXCLUIDAS.has(p.Familia_pago);
+    });
+};
+
+const buildMonthlyPayments = (pagos) => {
+    const byMonth = {};
+    pagos.forEach(p => {
+        if (!p.fecha) return;
+        const mk = p.fecha.substring(0, 7);
+        byMonth[mk] = (byMonth[mk] || 0) + p.monto;
+    });
+    const sorted = Object.entries(byMonth).sort(([a], [b]) => a.localeCompare(b));
+    let cumul = 0;
+    return sorted.map(([mk, amount]) => {
+        cumul += amount;
+        const [y, m] = mk.split('-');
+        const mnames = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+        return { mk, label: mnames[parseInt(m) - 1] + '-' + y.slice(2), amount, cumul };
+    });
+};
+
 const getPagosPorFamilia = (idBenef) => {
     const pagos = getSolpago(idBenef);
     // Clave compuesta: "Familia_pago|||tipologia" para desglosar Vivienda / Bodega / R.C.
@@ -3317,6 +3373,99 @@ const FinancieroTab = ({ viviendas }) => {
     );
 };
 
+// ===== GRÁFICO AVANCE PAGOS M.O. =====
+const MOAvanceChart = ({ timeline, earnedSerie, totalPres, compact = false }) => {
+    const H = compact ? 130 : 200;
+    const W = 700;
+    const ML = 58, MR = 8, MT = 8, MB = compact ? 28 : 36;
+    const cW = W - ML - MR, cH = H - MT - MB;
+
+    // Unir meses de ambas series
+    const allMonths = [...new Set([
+        ...(timeline || []).map(t => t.mk),
+        ...(earnedSerie || []).map(s => s.mes)
+    ])].sort();
+
+    if (allMonths.length === 0) return null;
+
+    // Construir datos por mes
+    const tMap = {};
+    (timeline || []).forEach(t => { tMap[t.mk] = t; });
+    const eMap = {};
+    (earnedSerie || []).forEach(s => { eMap[s.mes] = s.avance; });
+
+    // Interpolar earned value
+    let lastAvance = 0;
+    const rows = allMonths.map(mk => {
+        const t = tMap[mk] || null;
+        if (eMap[mk] !== undefined) lastAvance = eMap[mk];
+        const earned = (lastAvance / 100) * totalPres;
+        return { mk, label: t?.label || (mk.split('-').reverse().join('-').slice(0,5).replace('-','-')), cumul: t?.cumul || 0, amount: t?.amount || 0, earned };
+    });
+
+    // Carry forward cumul for months with no payment
+    let lastCumul = 0;
+    rows.forEach(r => { if (r.cumul > 0) lastCumul = r.cumul; else r.cumul = lastCumul; });
+
+    const maxVal = Math.max(...rows.map(r => Math.max(r.cumul, r.earned)), totalPres, 1) * 1.08;
+    const n = rows.length;
+    const barW = cW / (n + 0.5);
+    const sx = (i) => ML + (i + 0.5) * barW;
+    const sy = (v) => MT + cH - Math.max(0, Math.min(1, v / maxVal)) * cH;
+
+    // Y-axis ticks
+    const yTicks = [0, 0.25, 0.5, 0.75, 1].map(f => maxVal * f);
+
+    // Label every Nth month to avoid crowding
+    const labelEvery = n > 24 ? 4 : n > 12 ? 2 : 1;
+
+    return (
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{height:`${H}px`}}>
+            {/* Grid */}
+            {yTicks.map((v, i) => (
+                <g key={i}>
+                    <line x1={ML} y1={sy(v)} x2={W-MR} y2={sy(v)} stroke="#f3f4f6" strokeWidth="1"/>
+                    <text x={ML-4} y={sy(v)+3} textAnchor="end" fontSize={compact?7:8} fill="#9ca3af">{shortPeso(v)}</text>
+                </g>
+            ))}
+            {/* Presupuesto line */}
+            {totalPres > 0 && <>
+                <line x1={ML} y1={sy(totalPres)} x2={W-MR} y2={sy(totalPres)} stroke="#d1d5db" strokeWidth="1" strokeDasharray="3,3"/>
+                <text x={W-MR-2} y={sy(totalPres)-3} textAnchor="end" fontSize={6} fill="#9ca3af">Pres.</text>
+            </>}
+            {/* Bars */}
+            {rows.map((r, i) => {
+                const bh = cH - (sy(r.amount) - MT);
+                return bh > 0 ? (
+                    <rect key={r.mk} x={sx(i)-barW*0.35} y={sy(r.amount)} width={barW*0.7} height={bh} fill="#a78bfa" opacity="0.45" rx="1"/>
+                ) : null;
+            })}
+            {/* Earned value line */}
+            <polyline points={rows.map((r, i) => `${sx(i)},${sy(r.earned)}`).join(' ')} fill="none" stroke="#10b981" strokeWidth={compact?1.5:2} strokeDasharray="4,2"/>
+            {/* Cumulative actual line */}
+            <polyline points={rows.map((r, i) => `${sx(i)},${sy(r.cumul)}`).join(' ')} fill="none" stroke="#7c3aed" strokeWidth={compact?1.5:2}/>
+            {/* Dots on cumulative */}
+            {rows.map((r, i) => r.amount > 0 ? <circle key={r.mk} cx={sx(i)} cy={sy(r.cumul)} r={compact?2:2.5} fill="#7c3aed"/> : null)}
+            {/* X labels */}
+            {rows.map((r, i) => i % labelEvery === 0 ? (
+                <text key={r.mk} x={sx(i)} y={H-4} textAnchor="middle" fontSize={compact?6:7} fill="#6b7280">{r.label}</text>
+            ) : null)}
+            {/* Axes */}
+            <line x1={ML} y1={MT} x2={ML} y2={MT+cH} stroke="#e5e7eb" strokeWidth="1"/>
+            <line x1={ML} y1={MT+cH} x2={W-MR} y2={MT+cH} stroke="#e5e7eb" strokeWidth="1"/>
+            {/* Legend */}
+            {!compact && <>
+                <rect x={ML} y={H-MB+4} width={8} height={5} fill="#a78bfa" opacity="0.5" rx="1"/>
+                <text x={ML+10} y={H-MB+9} fontSize={7} fill="#6b7280">Pago mensual</text>
+                <line x1={ML+70} y1={H-MB+6.5} x2={ML+82} y2={H-MB+6.5} stroke="#7c3aed" strokeWidth="1.5"/>
+                <text x={ML+84} y={H-MB+9} fontSize={7} fill="#6b7280">Pagado acumulado</text>
+                <line x1={ML+170} y1={H-MB+6.5} x2={ML+182} y2={H-MB+6.5} stroke="#10b981" strokeWidth="1.5" strokeDasharray="4,2"/>
+                <text x={ML+184} y={H-MB+9} fontSize={7} fill="#6b7280">Valor ganado (avance % × presupuesto)</text>
+            </>}
+        </svg>
+    );
+};
+
 // ===== MANO DE OBRA =====
 const ManoDeObraTab = ({ viviendas }) => {
     const [expandido, setExpandido] = React.useState(null);
@@ -3372,6 +3521,29 @@ const ManoDeObraTab = ({ viviendas }) => {
     const inactivos = maestros.filter(m => m.inactivo);
     const totalPagadoMO = maestros.reduce((s, m) => s + m.totalPagado, 0);
 
+    // Datos de avance de pagos M.O.
+    const avanceData = React.useMemo(() => {
+        const proyId = viviendas[0]?.ID_Proy;
+        // Presupuesto total del proyecto
+        const proyTotalPres = viviendas.reduce((s, v) => s + getBenefPresupuestoTotal(v), 0);
+        // Timeline pagos proyecto (filtrando familias excluidas)
+        const allPagos = viviendas.flatMap(v => getBenefPaidFiltered(v.ID_Benef));
+        const proyTimeline = buildMonthlyPayments(allPagos);
+        // Serie de avance del proyecto (AVANCE_MENSUAL_DATA)
+        const proyAvanceSerie = (AVANCE_MENSUAL_DATA[proyId] || {}).serie || [];
+        // Por beneficiario
+        const porBenef = viviendas.map(v => {
+            const insp = getInspeccion(v.ID_Benef);
+            const totalPres = getBenefPresupuestoTotal(v);
+            const pagos = getBenefPaidFiltered(v.ID_Benef);
+            const timeline = buildMonthlyPayments(pagos);
+            const earnedValue = insp ? (insp.pct_total / 100) * totalPres : 0;
+            const totalPaid = pagos.reduce((s, p) => s + p.monto, 0);
+            return { benef: v, totalPres, timeline, earnedValue, totalPaid, pct_total: insp?.pct_total || 0 };
+        });
+        return { proyTimeline, proyAvanceSerie, proyTotalPres, porBenef };
+    }, [viviendas]);
+
     return (
         <div className="space-y-6">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -3392,6 +3564,57 @@ const ManoDeObraTab = ({ viviendas }) => {
                     <p className={`font-bold text-violet-700 font-mono ${totalPagadoMO >= 100000000 ? "text-xs" : totalPagadoMO >= 10000000 ? "text-sm" : "text-lg"}`}>{formatPeso(totalPagadoMO)}</p>
                 </div>
             </div>
+
+            {/* Gráfico Avance de Pagos M.O. — Resumen Proyecto */}
+            {avanceData.proyTimeline.length > 0 && (
+            <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+                    <h3 className="text-sm font-semibold text-gray-700">Avance de Pagos M.O. — Resumen Proyecto</h3>
+                    <div className="flex gap-4 mt-1 text-[10px] text-gray-500">
+                        <span>Presupuesto total: <strong className="text-gray-700">{formatPeso(avanceData.proyTotalPres)}</strong></span>
+                        <span>Pagado acumulado: <strong className="text-violet-700">{formatPeso(avanceData.proyTimeline[avanceData.proyTimeline.length-1]?.cumul || 0)}</strong></span>
+                        <span>Valor ganado actual: <strong className="text-green-600">{formatPeso(Math.round((avanceData.proyAvanceSerie[avanceData.proyAvanceSerie.length-1]?.avance||0)/100*avanceData.proyTotalPres))}</strong></span>
+                    </div>
+                </div>
+                <div className="p-3">
+                    <MOAvanceChart timeline={avanceData.proyTimeline} earnedSerie={avanceData.proyAvanceSerie} totalPres={avanceData.proyTotalPres}/>
+                </div>
+            </div>
+            )}
+
+            {/* Gráfico por Beneficiario */}
+            {avanceData.porBenef.some(d => d.timeline.length > 0 || d.totalPres > 0) && (
+            <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+                    <h3 className="text-sm font-semibold text-gray-700">Avance de Pagos M.O. — Por Beneficiario</h3>
+                    <p className="text-[10px] text-gray-400">Línea morada: pagado acumulado · Línea verde: valor ganado (avance insp. × presupuesto)</p>
+                </div>
+                <div className="p-3 grid grid-cols-1 lg:grid-cols-2 gap-3">
+                    {avanceData.porBenef.filter(d => d.timeline.length > 0 || d.totalPres > 0).map(d => {
+                        const pctPagado = d.totalPres > 0 ? Math.round(d.totalPaid / d.totalPres * 100) : 0;
+                        // Earned serie as static point for per-benef (no historical per-benef avance)
+                        const hoy = new Date().toISOString().substring(0, 7);
+                        const earnedSerie = d.pct_total > 0 ? [{ mes: hoy, avance: d.pct_total }] : [];
+                        return (
+                        <div key={d.benef.ID_Benef} className="border border-gray-100 rounded-lg p-2">
+                            <div className="flex items-center justify-between mb-1">
+                                <span className="text-[11px] font-semibold text-gray-700 truncate max-w-[55%]">{d.benef.NOMBRES} {d.benef.APELLIDOS}</span>
+                                <div className="flex gap-3 text-[9px]">
+                                    <span className="text-violet-600 font-mono">{formatPeso(d.totalPaid)}</span>
+                                    <span className="text-green-600 font-mono">{d.pct_total}% insp.</span>
+                                    <span className="text-gray-400 font-mono">{pctPagado}% pag.</span>
+                                </div>
+                            </div>
+                            {d.timeline.length > 0
+                                ? <MOAvanceChart timeline={d.timeline} earnedSerie={earnedSerie} totalPres={d.totalPres} compact={true}/>
+                                : <div className="text-[9px] text-gray-300 text-center py-4">Sin pagos registrados · Presupuesto: {formatPeso(d.totalPres)}</div>
+                            }
+                        </div>
+                        );
+                    })}
+                </div>
+            </div>
+            )}
 
             <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
                 <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
