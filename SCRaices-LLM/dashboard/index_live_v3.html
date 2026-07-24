@@ -3373,43 +3373,78 @@ const FinancieroTab = ({ viviendas }) => {
     );
 };
 
-// ===== GRÁFICO AVANCE PAGOS M.O. — Curva S suavizada =====
-const MOAvanceChart = ({ timeline, totalPres, compact = false }) => {
+// ===== GRÁFICO AVANCE PAGOS M.O. — Curvas S patrón + real =====
+const MOAvanceChart = ({ timeline, patronTimeline, totalPres, compact = false }) => {
     if (!timeline || timeline.length === 0) return null;
 
     const H = compact ? 118 : 185;
     const W = 700;
-    const ML = 56, MR = 12, MT = 10, MB = compact ? 22 : 28;
+    const ML = 56, MR = 12, MT = compact ? 10 : 26, MB = compact ? 22 : 28;
     const cW = W - ML - MR, cH = H - MT - MB;
 
-    const n = timeline.length;
-    const maxVal = Math.max(...timeline.map(t => t.cumul), totalPres || 0, 1) * 1.06;
+    // Unify month axis from both timelines
+    const allMks = [...new Set([
+        ...timeline.map(t => t.mk),
+        ...(patronTimeline || []).map(t => t.mk)
+    ])].sort();
+    const n = allMks.length;
+    if (n === 0) return null;
+
+    const mnames = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+    const mkLabel = (mk) => { const [y, m] = mk.split('-'); return mnames[parseInt(m)-1] + '-' + y.slice(2); };
+
+    // Map real payments: carry-forward up to last payment month
+    const realMap = {};
+    timeline.forEach(t => { realMap[t.mk] = t.cumul; });
+    const lastRealMk = timeline[timeline.length - 1].mk;
+    const realPoints = [];
+    let carry = 0;
+    allMks.forEach((mk, i) => {
+        if (realMap[mk] !== undefined) carry = realMap[mk];
+        if (mk <= lastRealMk) realPoints.push({ idx: i, cumul: carry });
+    });
+
+    // Map patron (programmed) points
+    const patronMap = {};
+    (patronTimeline || []).forEach(t => { patronMap[t.mk] = t.cumul; });
+    const patronPoints = allMks
+        .map((mk, i) => ({ idx: i, cumul: patronMap[mk] }))
+        .filter(p => p.cumul !== undefined);
+
+    const maxVal = Math.max(
+        ...realPoints.map(p => p.cumul),
+        ...patronPoints.map(p => p.cumul),
+        totalPres || 0, 1
+    ) * 1.06;
+
     const xStep = n > 1 ? cW / (n - 1) : cW;
     const sx = (i) => ML + i * xStep;
     const sy = (v) => MT + cH - Math.max(0, Math.min(1, v / maxVal)) * cH;
 
-    // Smooth monotone cubic bezier interpolation
-    const pts = timeline.map((t, i) => ({ x: sx(i), y: sy(t.cumul) }));
     const smoothCubic = (points) => {
-        if (points.length === 1) return `M${points[0].x.toFixed(1)},${points[0].y.toFixed(1)}`;
+        if (points.length === 0) return '';
+        if (points.length === 1) return `M${sx(points[0].idx).toFixed(1)},${sy(points[0].cumul).toFixed(1)}`;
         const tension = 0.38;
-        let d = `M${points[0].x.toFixed(1)},${points[0].y.toFixed(1)}`;
+        let d = `M${sx(points[0].idx).toFixed(1)},${sy(points[0].cumul).toFixed(1)}`;
         for (let i = 0; i < points.length - 1; i++) {
-            const p0 = points[Math.max(0, i - 1)];
+            const p0 = points[Math.max(0, i-1)];
             const p1 = points[i];
-            const p2 = points[i + 1];
-            const p3 = points[Math.min(points.length - 1, i + 2)];
-            const cp1x = p1.x + (p2.x - p0.x) * tension;
-            const cp1y = p1.y + (p2.y - p0.y) * tension;
-            const cp2x = p2.x - (p3.x - p1.x) * tension;
-            const cp2y = p2.y - (p3.y - p1.y) * tension;
-            d += ` C${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
+            const p2 = points[i+1];
+            const p3 = points[Math.min(points.length-1, i+2)];
+            const cp1x = sx(p1.idx) + (sx(p2.idx) - sx(p0.idx)) * tension;
+            const cp1y = sy(p1.cumul) + (sy(p2.cumul) - sy(p0.cumul)) * tension;
+            const cp2x = sx(p2.idx) - (sx(p3.idx) - sx(p1.idx)) * tension;
+            const cp2y = sy(p2.cumul) - (sy(p3.cumul) - sy(p1.cumul)) * tension;
+            d += ` C${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${sx(p2.idx).toFixed(1)},${sy(p2.cumul).toFixed(1)}`;
         }
         return d;
     };
 
-    const linePath = smoothCubic(pts);
-    const areaPath = linePath + ` L${sx(n-1).toFixed(1)},${(MT+cH).toFixed(1)} L${sx(0).toFixed(1)},${(MT+cH).toFixed(1)} Z`;
+    const realPath  = smoothCubic(realPoints);
+    const patronPath = patronPoints.length > 1 ? smoothCubic(patronPoints) : null;
+    const areaPath = realPath && realPoints.length > 0
+        ? realPath + ` L${sx(realPoints[realPoints.length-1].idx).toFixed(1)},${(MT+cH).toFixed(1)} L${sx(realPoints[0].idx).toFixed(1)},${(MT+cH).toFixed(1)} Z`
+        : null;
 
     const yTicks = [0, 0.25, 0.5, 0.75, 1].map(f => maxVal * f);
     const labelEvery = n > 24 ? 4 : n > 14 ? 2 : 1;
@@ -3427,19 +3462,37 @@ const MOAvanceChart = ({ timeline, totalPres, compact = false }) => {
             {totalPres > 0 && (
                 <line x1={ML} y1={sy(totalPres)} x2={W-MR} y2={sy(totalPres)} stroke="#c4b5fd" strokeWidth="1" strokeDasharray="5,4" opacity="0.7"/>
             )}
-            {/* Area under curve */}
-            <path d={areaPath} fill="#7c3aed" fillOpacity="0.07"/>
-            {/* S-curve */}
-            <path d={linePath} fill="none" stroke="#7c3aed" strokeWidth={compact ? 2 : 2.5} strokeLinecap="round" strokeLinejoin="round"/>
-            {/* Endpoint dot */}
-            <circle cx={sx(n-1)} cy={sy(timeline[n-1].cumul)} r={compact ? 3 : 4} fill="#7c3aed" stroke="white" strokeWidth="1.5"/>
+            {/* Area under real curve */}
+            {areaPath && <path d={areaPath} fill="#7c3aed" fillOpacity="0.07"/>}
+            {/* Curva patrón (programada) */}
+            {patronPath && (
+                <path d={patronPath} fill="none" stroke="#f59e0b" strokeWidth={compact ? 1.5 : 2} strokeDasharray="7,3" strokeLinecap="round" strokeLinejoin="round" opacity="0.9"/>
+            )}
+            {/* Curva real */}
+            {realPath && (
+                <path d={realPath} fill="none" stroke="#7c3aed" strokeWidth={compact ? 2 : 2.5} strokeLinecap="round" strokeLinejoin="round"/>
+            )}
+            {/* Endpoint dots */}
+            {realPoints.length > 0 && <circle cx={sx(realPoints[realPoints.length-1].idx)} cy={sy(realPoints[realPoints.length-1].cumul)} r={compact ? 3 : 4} fill="#7c3aed" stroke="white" strokeWidth="1.5"/>}
+            {patronPoints.length > 0 && <circle cx={sx(patronPoints[patronPoints.length-1].idx)} cy={sy(patronPoints[patronPoints.length-1].cumul)} r={compact ? 2.5 : 3.5} fill="#f59e0b" stroke="white" strokeWidth="1.5"/>}
             {/* X-axis labels */}
-            {timeline.map((t, i) => i % labelEvery === 0 ? (
-                <text key={t.mk} x={sx(i)} y={H-3} textAnchor="middle" fontSize={compact ? 6 : 7} fill="#9ca3af">{t.label}</text>
+            {allMks.map((mk, i) => i % labelEvery === 0 ? (
+                <text key={mk} x={sx(i)} y={H-3} textAnchor="middle" fontSize={compact ? 6 : 7} fill="#9ca3af">{mkLabel(mk)}</text>
             ) : null)}
             {/* Axes */}
             <line x1={ML} y1={MT} x2={ML} y2={MT+cH} stroke="#e5e7eb" strokeWidth="1"/>
             <line x1={ML} y1={MT+cH} x2={W-MR} y2={MT+cH} stroke="#e5e7eb" strokeWidth="1"/>
+            {/* Legend (solo en modo normal) */}
+            {!compact && patronPath && (
+                <g>
+                    <line x1={ML+4} y1={MT-10} x2={ML+18} y2={MT-10} stroke="#7c3aed" strokeWidth="2.5"/>
+                    <circle cx={ML+22} cy={MT-10} r="2.5" fill="#7c3aed"/>
+                    <text x={ML+26} y={MT-7} fontSize="7" fill="#6b7280">Real</text>
+                    <line x1={ML+54} y1={MT-10} x2={ML+68} y2={MT-10} stroke="#f59e0b" strokeWidth="2" strokeDasharray="6,3"/>
+                    <circle cx={ML+72} cy={MT-10} r="2.5" fill="#f59e0b"/>
+                    <text x={ML+76} y={MT-7} fontSize="7" fill="#6b7280">Patrón (% plazo × presup.)</text>
+                </g>
+            )}
         </svg>
     );
 };
@@ -3501,17 +3554,46 @@ const ManoDeObraTab = ({ viviendas }) => {
 
     // Datos de avance de pagos M.O.
     const avanceData = React.useMemo(() => {
+        const proyId = viviendas.length > 0 ? String(viviendas[0].ID_Proy) : null;
+        const proyData = proyId ? PROYECTOS_DATA.find(p => String(p.ID_proy) === proyId) : null;
         const proyTotalPres = viviendas.reduce((s, v) => s + getBenefPresupuestoTotal(v), 0);
+
+        // Curva patrón: presupuesto × (días transcurridos / plazo total) por mes
+        const buildPatronTimeline = (totalPres) => {
+            if (!proyData || !proyData.fecha_inicio || !proyData.duracion || totalPres <= 0) return [];
+            const inicio = new Date(proyData.fecha_inicio);
+            const duracion = proyData.duracion; // días de plazo contractual
+            const hoy = new Date();
+            const mnames = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+            const result = [];
+            let cur = new Date(inicio.getFullYear(), inicio.getMonth(), 1);
+            const endMonth = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+            while (cur <= endMonth) {
+                const eom = new Date(cur.getFullYear(), cur.getMonth() + 1, 0); // último día del mes
+                const diasTranscurridos = Math.max(0, (eom - inicio) / 86400000);
+                const pct = Math.min(100, diasTranscurridos / duracion * 100);
+                const cumul = totalPres * pct / 100;
+                const mk = `${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}`;
+                const label = mnames[cur.getMonth()] + '-' + String(cur.getFullYear()).slice(2);
+                result.push({ mk, label, cumul });
+                cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
+            }
+            return result;
+        };
+
         const allPagos = viviendas.flatMap(v => getBenefPaidFiltered(v.ID_Benef));
         const proyTimeline = buildMonthlyPayments(allPagos);
+        const proyPatronTimeline = buildPatronTimeline(proyTotalPres);
+
         const porBenef = viviendas.map(v => {
             const totalPres = getBenefPresupuestoTotal(v);
             const pagos = getBenefPaidFiltered(v.ID_Benef);
             const timeline = buildMonthlyPayments(pagos);
+            const patronTimeline = buildPatronTimeline(totalPres);
             const totalPaid = pagos.reduce((s, p) => s + p.monto, 0);
-            return { benef: v, totalPres, timeline, totalPaid };
+            return { benef: v, totalPres, timeline, patronTimeline, totalPaid };
         });
-        return { proyTimeline, proyTotalPres, porBenef };
+        return { proyTimeline, proyTotalPres, proyPatronTimeline, porBenef };
     }, [viviendas]);
 
     return (
@@ -3539,15 +3621,18 @@ const ManoDeObraTab = ({ viviendas }) => {
             {avanceData.proyTimeline.length > 0 && (
             <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
                 <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-                    <h3 className="text-sm font-semibold text-gray-700">Curva S de Pagos M.O. — Proyecto</h3>
-                    <div className="flex gap-4 mt-1 text-[10px] text-gray-500">
+                    <h3 className="text-sm font-semibold text-gray-700">Curvas S de Pagos M.O. — Proyecto</h3>
+                    <div className="flex flex-wrap gap-4 mt-1 text-[10px] text-gray-500">
                         <span>Presupuesto: <strong className="text-gray-700">{formatPeso(avanceData.proyTotalPres)}</strong></span>
-                        <span>Pagado: <strong className="text-violet-700">{formatPeso(avanceData.proyTimeline[avanceData.proyTimeline.length-1]?.cumul || 0)}</strong></span>
+                        <span>Real pagado: <strong className="text-violet-700">{formatPeso(avanceData.proyTimeline[avanceData.proyTimeline.length-1]?.cumul || 0)}</strong></span>
                         <span><strong className="text-violet-600">{avanceData.proyTotalPres > 0 ? Math.round((avanceData.proyTimeline[avanceData.proyTimeline.length-1]?.cumul||0)/avanceData.proyTotalPres*100) : 0}%</strong> ejecutado</span>
+                        {avanceData.proyPatronTimeline.length > 0 && (
+                            <span>Patrón actual: <strong className="text-amber-600">{formatPeso(avanceData.proyPatronTimeline[avanceData.proyPatronTimeline.length-1]?.cumul || 0)}</strong></span>
+                        )}
                     </div>
                 </div>
                 <div className="px-3 pb-3 pt-1">
-                    <MOAvanceChart timeline={avanceData.proyTimeline} totalPres={avanceData.proyTotalPres}/>
+                    <MOAvanceChart timeline={avanceData.proyTimeline} patronTimeline={avanceData.proyPatronTimeline} totalPres={avanceData.proyTotalPres}/>
                 </div>
             </div>
             )}
@@ -3562,16 +3647,18 @@ const ManoDeObraTab = ({ viviendas }) => {
                 <div className="p-3 grid grid-cols-1 lg:grid-cols-2 gap-3">
                     {avanceData.porBenef.filter(d => d.timeline.length > 0).map(d => {
                         const pctPag = d.totalPres > 0 ? Math.round(d.totalPaid / d.totalPres * 100) : 0;
+                        const patronNow = d.patronTimeline.length > 0 ? d.patronTimeline[d.patronTimeline.length-1].cumul : null;
                         return (
                         <div key={d.benef.ID_Benef} className="border border-gray-100 rounded-lg p-2">
                             <div className="flex items-center justify-between mb-1">
-                                <span className="text-[11px] font-semibold text-gray-700 truncate max-w-[60%]">{d.benef.NOMBRES} {d.benef.APELLIDOS}</span>
-                                <div className="flex gap-3 text-[9px]">
+                                <span className="text-[11px] font-semibold text-gray-700 truncate max-w-[55%]">{d.benef.NOMBRES} {d.benef.APELLIDOS}</span>
+                                <div className="flex gap-2 text-[9px]">
                                     <span className="text-violet-600 font-mono">{formatPeso(d.totalPaid)}</span>
                                     <span className="text-gray-400 font-mono">{pctPag}% pag.</span>
+                                    {patronNow !== null && <span className="text-amber-500 font-mono">{d.totalPres > 0 ? Math.round(patronNow/d.totalPres*100) : 0}% patrón</span>}
                                 </div>
                             </div>
-                            <MOAvanceChart timeline={d.timeline} totalPres={d.totalPres} compact={true}/>
+                            <MOAvanceChart timeline={d.timeline} patronTimeline={d.patronTimeline} totalPres={d.totalPres} compact={true}/>
                         </div>
                         );
                     })}
