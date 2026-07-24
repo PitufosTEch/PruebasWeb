@@ -2279,6 +2279,11 @@ const ViviendaCard = ({ beneficiario, estadoEtapas, expanded, onToggle, grupoCol
                                 pagosFam[fam + '|||—'] = { familia: fam, tipologia: '—', total: 0, count: 0, maestros: new Set() };
                             }
                         });
+                        // 07-Eléctricidad está en FAMILIAS_EXCLUIDAS (excluida del loop arriba)
+                        // pero tiene presupuesto de postes: agregar fila si no hay pagos de postes
+                        if (!familiasConPago.has('07 - Eléctricidad') && getPresFam('07 - Eléctricidad') > 0) {
+                            pagosFam['07 - Eléctricidad|||—'] = { familia: '07 - Eléctricidad', tipologia: '—', total: 0, count: 0, maestros: new Set() };
+                        }
                         const entries = Object.entries(pagosFam)
                             .filter(([,d]) => d.total > 0 || getPresFam(d.familia) > 0)
                             .sort(([,a],[,b2]) => {
