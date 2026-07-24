@@ -1291,7 +1291,7 @@ const ETAPAS_CONFIG_FULL = {
             const stored = localStorage.getItem(CACHE_KEY);
             if (!stored) return null;
             const payload = JSON.parse(stored);
-            if (Date.now() - payload.ts > CACHE_MAX_AGE) {
+            if (Date.now() - payload.ts > CACHE_MAX_AGE || !payload.PRESUPUESTO_PARTIDA_DATA) {
                 localStorage.removeItem(CACHE_KEY);
                 return null;
             }
