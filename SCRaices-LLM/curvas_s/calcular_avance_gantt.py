@@ -29,7 +29,8 @@ import curvas_cloud_utils as _ccu
 # ─────────────────────────────────────────────────────────────────────────────
 # CONFIG
 # ─────────────────────────────────────────────────────────────────────────────
-FIREBASE_URL = "https://scraices-dashboard-default-rtdb.firebaseio.com/avance_gantt.json"
+FIREBASE_URL       = "https://scraices-dashboard-default-rtdb.firebaseio.com/avance_gantt.json"
+FIREBASE_GANTT_URL = "https://scraices-dashboard-default-rtdb.firebaseio.com/gantt_programa.json"
 
 # Spreadsheet ID de cada Gantt de control (mismos que actualizar_gantt_programa.py)
 PROYECTOS = {
@@ -189,7 +190,7 @@ def _calc_pct_prog(inicios: list, hoy: date, pct_semana: list) -> float | None:
 # Lectura Datos Control
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _leer_datos_control(sheets_svc, spreadsheet_id, pid) -> dict | None:
+def _leer_datos_control(sheets_svc, spreadsheet_id, pid, gantt_inicio: date | None = None) -> dict | None:
     """
     Lee la hoja 'Datos Control':
       col A = grupo, col B = nombre, col C = inicio, col D = % real
@@ -271,6 +272,12 @@ def _leer_datos_control(sheets_svc, spreadsheet_id, pid) -> dict | None:
             f"  {pid}: real={promedio}%  prog={pct_prog}%  "
             f"({len(inicios_validos)}/{len(valores_real)} benef. con inicio)"
         )
+    elif curvas_cfg and gantt_inicio:
+        # Fallback: col C vacía → usar fecha inicio del proyecto (gantt_programa)
+        pct_prog = round(_pct_programada((hoy - gantt_inicio).days, curvas_cfg["pct_semana"]), 1)
+        log.info(
+            f"  {pid}: real={promedio}%  prog={pct_prog}% [fallback inicio proyecto {gantt_inicio}]"
+        )
     else:
         log.info(
             f"  {pid}: [{hoja}] {len(valores_real)} benef. | "
@@ -295,10 +302,27 @@ def main():
     creds = _ccu.get_credentials()
     sheets_svc = build("sheets", "v4", credentials=creds)
 
+    # Leer fechas de inicio de gantt_programa (fallback cuando col C está vacía)
+    try:
+        gp_raw = requests.get(FIREBASE_GANTT_URL, timeout=15).json() or {}
+    except Exception as e:
+        log.warning(f"No se pudo leer gantt_programa: {e}")
+        gp_raw = {}
+
+    def _gantt_inicio(pid) -> date | None:
+        node = gp_raw.get(pid, {})
+        ini = node.get("inicio") if isinstance(node, dict) else None
+        if not ini:
+            return None
+        try:
+            return datetime.strptime(str(ini)[:10], "%Y-%m-%d").date()
+        except Exception:
+            return None
+
     resultado = {}
     for pid, sid in PROYECTOS.items():
         log.info(f"Leyendo {pid}...")
-        datos = _leer_datos_control(sheets_svc, sid, pid)
+        datos = _leer_datos_control(sheets_svc, sid, pid, gantt_inicio=_gantt_inicio(pid))
         if datos:
             resultado[pid] = datos
 
