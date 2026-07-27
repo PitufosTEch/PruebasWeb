@@ -48,8 +48,9 @@ PROYECTOS = [
 ]
 
 # Informes PDF estándar por proyecto (sin capataz — se maneja aparte)
+# Nota: el botón "Reporte ejecutivo (Curvas S)" fue eliminado del dashboard.
+# El informe ejecutivo ahora es el HTML multi-obras capturado en INFORMES_HTML.
 INFORMES_PDF = [
-    ("Ejecutivo", "Reporte ejecutivo (Curvas S)"),
     ("Residente", "Reporte residente"),
 ]
 
@@ -146,11 +147,18 @@ def instalar_interceptor(page):
 
 
 def instalar_interceptor_multi(page):
-    """Intercepta window.open() acumulando múltiples HTMLs en un array."""
+    """Intercepta window.open() acumulando múltiples HTMLs en un array.
+    Soporta tanto document.write() como blob: URLs (usadas por el Reporte Capataz)."""
     page.evaluate("""
         window._capturedHTMLs = [];
         window.open = function(url, name, features) {
             if (url && typeof url === 'string' && url.startsWith('blob:')) {
+                const idx = window._capturedHTMLs.length;
+                window._capturedHTMLs.push({done: false, html: ''});
+                fetch(url).then(r => r.text()).then(t => {
+                    window._capturedHTMLs[idx].html = t;
+                    window._capturedHTMLs[idx].done = true;
+                });
                 return { focus(){}, close(){} };
             }
             const idx = window._capturedHTMLs.length;
@@ -201,7 +209,7 @@ def disparar_boton_multi(page, texto_boton, expected: int):
     try:
         page.wait_for_function(
             f"() => window._capturedHTMLs.filter(x => x.done).length >= {expected}",
-            timeout=90000,
+            timeout=150000,
         )
     except Exception as e:
         print(f"    Timeout esperando {expected} capturas: {e}")
