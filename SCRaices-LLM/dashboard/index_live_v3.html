@@ -1633,10 +1633,9 @@ const clasificarDespachoFino = (segmento) => {
     if (t.includes('ventana')) return ['ventana'];
     if (t.includes('eifs') || t.includes('aislacion fund')) return ['eifs'];
     if (t.includes('2da')) return ['2da'];
-    if (t.includes('piso') && t.includes('ceram')) return ['ceramica_piso'];
-    if (t.includes('07-') && t.includes('piso')) return ['ceramica_piso'];
-    if (t.includes('muro') && t.includes('ceram')) return ['ceramica_muro'];
-    if (t.includes('08-') && t.includes('muro')) return ['ceramica_muro'];
+    // Ceramico piso (07-) cubre ambas partidas: en obra llegan juntos piso y muro
+    if ((t.includes('piso') && t.includes('ceram')) || (t.includes('07-') && t.includes('piso'))) return ['ceramica_piso', 'ceramica_muro'];
+    if ((t.includes('muro') && t.includes('ceram')) || (t.includes('08-') && t.includes('muro'))) return ['ceramica_muro'];
     if (t.includes('pintura int') || t.includes('10-')) return ['pintura_int'];
     if (t.includes('pintura')) return ['pintura_ext']; // ext, r.c. o generico
     if (t.includes('sol. ac') || t.includes('sol ac') || t.includes('cocina') || t.includes('calefon')) return ['sol_ac'];
