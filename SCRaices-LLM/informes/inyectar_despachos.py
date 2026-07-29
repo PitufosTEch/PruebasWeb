@@ -164,13 +164,16 @@ def _avance_color(av_str: str) -> str:
 
 
 def _parsear_etapas(texto: str) -> list:
-    """'[MC] 05 Ap. Exterior, [SOL] 02 1era...' → [('05','Ap. Exterior'), ...]"""
+    """'[SOL] 02 1era..., [MC] 05 Ap. Exterior' → [('02','1era...')] (solo SOL)"""
     import re
     if not texto or texto == "—":
         return []
     resultado = []
     for parte in texto.split(","):
-        parte = re.sub(r"^\[(MC|SOL)\]\s*", "", parte.strip()).strip()
+        parte = parte.strip()
+        if parte.startswith("[MC]"):
+            continue  # ignorar proyecciones Monte Carlo
+        parte = re.sub(r"^\[SOL\]\s*", "", parte).strip()
         m = re.match(r"^(\d+)\s+(.+)$", parte)
         if m:
             resultado.append((m.group(1).zfill(2), m.group(2).strip()))
@@ -267,20 +270,18 @@ def _resumen_por_etapa(bens: list, meses: list, titulo: str = "") -> str:
 
 
 def _formatear_etapas(texto: str) -> str:
-    """Convierte '[MC] 05 Ap. Exterior, [SOL] 02 1era...' en badges HTML."""
+    """Convierte '[SOL] 02 1era...' en badges HTML. Ignora entradas [MC]."""
     if not texto or texto == "—":
         return '<span style="color:#d1d5db;">—</span>'
     partes = [p.strip() for p in texto.split(",") if p.strip()]
     html = ""
     for p in partes:
+        if p.startswith("[MC]"):
+            continue  # ignorar proyecciones Monte Carlo
         if p.startswith("[SOL]"):
             color = "#0f766e"
             bg    = "#ccfbf1"
             label = p[5:].strip()
-        elif p.startswith("[MC]"):
-            color = "#92400e"
-            bg    = "#fef3c7"
-            label = p[4:].strip()
         else:
             color = "#374151"
             bg    = "#f3f4f6"
@@ -290,7 +291,7 @@ def _formatear_etapas(texto: str) -> str:
             f'border-radius:4px;background:{bg};color:{color};font-size:10px;'
             f'white-space:nowrap;">{label}</span>'
         )
-    return html
+    return html or '<span style="color:#d1d5db;">—</span>'
 
 
 def _generar_html_proyecto(datos: dict) -> str:
@@ -621,7 +622,10 @@ def _generar_seccion_semana(bens: list, meses: list, titulo: str,
     Solo incluye beneficiarios con alguna etapa en mes1.
     """
     nombre_mes = meses[0] if meses else "Período actual"
-    con_desp = [b for b in bens if b.get("mes1") and b["mes1"] not in ("—", "")]
+    # Solo beneficiarios con solicitudes confirmadas [SOL] en mes1 (excluye [MC])
+    con_desp = [b for b in bens
+                if b.get("mes1") and b["mes1"] not in ("—", "")
+                and "[SOL]" in b["mes1"]]
     if not con_desp:
         return ""
 
@@ -667,11 +671,9 @@ def _generar_seccion_semana(bens: list, meses: list, titulo: str,
         '</tr></thead>'
         f'<tbody>{filas}</tbody></table>'
         '<div style="padding:8px 12px;background:#f8fafc;border-top:1px solid #e2e8f0;'
-        'font-size:10px;color:#6b7280;display:flex;gap:12px;flex-wrap:wrap;">'
+        'font-size:10px;color:#6b7280;">'
         '<span><span style="background:#ccfbf1;color:#0f766e;border-radius:3px;'
-        'padding:1px 5px;font-weight:600;">[SOL]</span> Solicitud confirmada</span>'
-        '<span><span style="background:#fef3c7;color:#92400e;border-radius:3px;'
-        'padding:1px 5px;font-weight:600;">[MC]</span> Proyección Monte Carlo</span>'
+        'padding:1px 5px;font-weight:600;">[SOL]</span> Solicitud confirmada en soldepacho</span>'
         '</div></div></div>'
     )
 

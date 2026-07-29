@@ -238,6 +238,29 @@ def html_a_pdf(context, html, pdf_path):
     p.close()
 
 
+def _extraer_nombre_residente(html: str) -> str:
+    """Extrae el nombre del residente desde el <title>.
+    Formato: <title>Reporte Residente: {nombre} — Sem N</title>
+             <title>Reporte Residente — {proyecto} — Sem N</title>
+    """
+    m = re.search(r"<title>Reporte Residente: (.+?) —", html)
+    if not m:
+        m = re.search(r"<title>Reporte Residente: (.+?)</title>", html)
+    return m.group(1).strip() if m else ""
+
+
+def _inyectar_en_tab_despachos(html: str, seccion: str) -> str:
+    """Inyecta `seccion` dentro del div id='s-despachos', no fuera del sistema de tabs."""
+    target = 'id="s-despachos">'
+    pos = html.find(target)
+    if pos != -1:
+        insert_pos = pos + len(target)
+        return html[:insert_pos] + seccion + html[insert_pos:]
+    # Fallback: antes del cierre body
+    pos = html.rfind("</body>")
+    return (html[:pos] + seccion + html[pos:]) if pos != -1 else html + seccion
+
+
 def _extraer_nombre_capataz(html: str) -> str:
     """Extrae el nombre del capataz desde el <title> del HTML generado.
     Formato esperado: <title>Reporte Capataz: {nombre} — {proyecto} — Sem N</title>
@@ -337,7 +360,10 @@ def main(output_dir: Path = None) -> Path:
             print(f"  ERROR capturando HTMLs globales: {e}")
             total_err += 1
 
-        # ── HTMLs por proyecto ─────────────────────────────────────────────────
+        # ── HTMLs por proyecto (multi-obra: un archivo por residente/capataz) ───
+        residentes_generados = {}   # nombre_residente → Path
+        capataces_generados  = {}   # nombre_capataz   → Path
+
         for pid, nombre in PROYECTOS:
             print(f"\n[{pid}] {nombre}")
             try:
@@ -350,9 +376,8 @@ def main(output_dir: Path = None) -> Path:
                 time.sleep(3)
                 activar_tab_estado_general(page)
 
-                # HTMLs por proyecto (Residente)
+                # HTML Residente (multi-obra: el dashboard incluye todas las obras del residente)
                 for sufijo, texto in INFORMES_PDF:
-                    html_path = output_dir / f"Informe_{sufijo}_{pid}_{nombre}_{fecha}.html"
                     print(f"  [{sufijo}] Generando '{texto}'...")
                     instalar_interceptor(page)
                     html = disparar_boton(page, texto)
@@ -361,45 +386,70 @@ def main(output_dir: Path = None) -> Path:
                         total_err += 1
                         continue
                     print(f"    HTML: {len(html):,} chars")
-                    # Inyectar despachos del período actual en Informe Residente
+
+                    # Deduplicar por nombre del residente (el informe ya es multi-obra)
+                    nombre_res = _extraer_nombre_residente(html)
+                    if nombre_res and nombre_res in residentes_generados:
+                        print(f"    [{sufijo}] Multi-obra ya generado para {nombre_res} — omitiendo")
+                        continue
+
+                    # Inyectar despachos [SOL] en pestaña Despachos
                     if sufijo == "Residente" and _despachos.get(pid):
                         seccion = _gen_residente(_despachos[pid])
                         if seccion:
-                            pos = html.rfind("</body>")
-                            html = (html[:pos] + seccion + html[pos:]) if pos != -1 else html + seccion
-                            print(f"    [Despachos] Seccion despachos inyectada en Residente {pid}")
+                            html = _inyectar_en_tab_despachos(html, seccion)
+                            print(f"    [Despachos] Inyectado en tab Despachos ({pid})")
+
+                    # Nombre de archivo por residente (multi-obra)
+                    if nombre_res:
+                        slug_res = _slug(nombre_res)
+                        html_path = output_dir / f"Informe_{sufijo}_{slug_res}_{fecha}.html"
+                    else:
+                        html_path = output_dir / f"Informe_{sufijo}_{pid}_{nombre}_{fecha}.html"
+
                     html_path.write_text(html, encoding="utf-8")
                     print(f"    HTML: {html_path.name} ({html_path.stat().st_size:,} bytes)")
+                    if nombre_res:
+                        residentes_generados[nombre_res] = html_path
                     total_ok += 1
 
-                # HTMLs de capataz — uno por capataz individual
+                # HTMLs Capataz (multi-obra: un archivo por capataz, primera aparición)
                 caps = capataces_por_proy.get(pid, [])
                 if caps:
-                    print(f"  [Capataz] Generando {len(caps)} reporte(s): {caps}")
-                    instalar_interceptor_multi(page)
-                    htmls = disparar_boton_multi(page, "Reporte Capataz", expected=len(caps))
-                    if not htmls:
-                        print(f"  [Capataz] ERROR: no se capturó ningún HTML")
-                        total_err += 1
+                    # Solo los capataces no generados aún
+                    caps_nuevos = [c for c in caps if c not in capataces_generados]
+                    if not caps_nuevos:
+                        print(f"  [Capataz] Todos ya generados — omitiendo {pid}")
                     else:
-                        for html_cap in htmls:
-                            nombre_cap = _extraer_nombre_capataz(html_cap)
-                            if not nombre_cap:
-                                print("  [Capataz] ADVERTENCIA: no se pudo extraer nombre del capataz")
-                                total_err += 1
-                                continue
-                            # Inyectar despachos del período actual filtrados por este capataz
-                            if _despachos.get(pid):
-                                seccion = _gen_capataz(_despachos[pid], nombre_cap)
-                                if seccion:
-                                    pos = html_cap.rfind("</body>")
-                                    html_cap = (html_cap[:pos] + seccion + html_cap[pos:]) if pos != -1 else html_cap + seccion
-                                    print(f"    [Despachos] Seccion despachos inyectada -> {nombre_cap}")
-                            slug = _slug(nombre_cap)
-                            html_path = output_dir / f"Informe_Capataz_{pid}_{nombre}_{slug}_{fecha}.html"
-                            html_path.write_text(html_cap, encoding="utf-8")
-                            print(f"    HTML: {html_path.name} ({html_path.stat().st_size:,} bytes)")
-                            total_ok += 1
+                        print(f"  [Capataz] Generando {len(caps_nuevos)} reporte(s): {caps_nuevos}")
+                        instalar_interceptor_multi(page)
+                        htmls = disparar_boton_multi(page, "Reporte Capataz", expected=len(caps))
+                        if not htmls:
+                            print(f"  [Capataz] ERROR: no se capturó ningún HTML")
+                            total_err += 1
+                        else:
+                            for html_cap in htmls:
+                                nombre_cap = _extraer_nombre_capataz(html_cap)
+                                if not nombre_cap:
+                                    print("  [Capataz] ADVERTENCIA: no se pudo extraer nombre")
+                                    total_err += 1
+                                    continue
+                                if nombre_cap in capataces_generados:
+                                    continue  # ya generado en proyecto anterior
+
+                                # Inyectar despachos [SOL] en pestaña Despachos
+                                if _despachos.get(pid):
+                                    seccion = _gen_capataz(_despachos[pid], nombre_cap)
+                                    if seccion:
+                                        html_cap = _inyectar_en_tab_despachos(html_cap, seccion)
+                                        print(f"    [Despachos] Inyectado en tab Despachos -> {nombre_cap}")
+
+                                slug = _slug(nombre_cap)
+                                html_path = output_dir / f"Informe_Capataz_{slug}_{fecha}.html"
+                                html_path.write_text(html_cap, encoding="utf-8")
+                                print(f"    HTML: {html_path.name} ({html_path.stat().st_size:,} bytes)")
+                                capataces_generados[nombre_cap] = html_path
+                                total_ok += 1
                 else:
                     print(f"  [Capataz] Sin capataces registrados en Firebase/grupos — omitiendo")
 
