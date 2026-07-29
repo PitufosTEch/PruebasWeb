@@ -1628,7 +1628,9 @@ const clasificarDespachoFino = (segmento) => {
     if (!t.includes('exterior') && !t.includes(' ext') && ((t.includes('agua') && t.includes('potab')) || t.includes('red agua') || t.includes('ap interior') || t.includes('ap. interior') || t.includes('agua pot'))) {
         return ['ap_interior'];
     }
-    if (t.includes('fundacion') && !t.includes('eifs') && !t.includes('aislacion')) return ['fundacion'];
+    // Fundaciones incluye alcantarillado interior (planta): se instalan juntos.
+    // Consistente con CHECK1_FAMILIA_TAGS donde ambos respaldan "01 - Fundaciones".
+    if (t.includes('fundacion') && !t.includes('eifs') && !t.includes('aislacion')) return ['fundacion', 'alc_interior'];
     if (t.includes('1era')) return ['1era'];
     if (t.includes('ventana')) return ['ventana'];
     if (t.includes('eifs') || t.includes('aislacion fund')) return ['eifs'];
