@@ -5292,15 +5292,16 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
 
         const normStr = s => (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();
 
-        // Fetch Firebase: gantt, grupos, observaciones
-        let ganttRaw={}, gruposRaw={}, obsRaw={};
+        // Fetch Firebase: gantt, grupos, observaciones, avance_gantt
+        let ganttRaw={}, gruposRaw={}, obsRaw={}, avGanttLocal={};
         try {
-            const [rG,rGr,rObs] = await Promise.all([
+            const [rG,rGr,rObs,rAg] = await Promise.all([
                 fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/gantt_programa.json'),
                 fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/grupos.json'),
-                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/observaciones.json')
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/observaciones.json'),
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/avance_gantt.json')
             ]);
-            ganttRaw=(await rG.json())||{}; gruposRaw=(await rGr.json())||{}; obsRaw=(await rObs.json())||{};
+            ganttRaw=(await rG.json())||{}; gruposRaw=(await rGr.json())||{}; obsRaw=(await rObs.json())||{}; avGanttLocal=(await rAg.json())||{};
         } catch(_e){}
 
         // Nombre del residente: desde grupos del proyecto actual en Firebase
@@ -5346,7 +5347,7 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
             const avPct=tot?Math.round(vivs.reduce((s,v)=>s+(v.pctTotal||0),0)/tot):0;
             const conInsp=vivs.filter(v=>v.pctTotal!=null).length;
             const terminadas=vivs.filter(v=>!!v.fecha_recepcion||!!(cierresForzados[v.ID_Benef])).length;
-            const _ag=avanceGanttData[pr.ID_proy]||null; const agPct=_ag?_ag.pct:null;
+            const _ag=avGanttLocal[pr.ID_proy]||avanceGanttData[pr.ID_proy]||null; const agPct=_ag?_ag.pct:null;
             const pg=ganttRaw[pr.ID_proy]||null;
             const pgDR=pg&&pg.finProg?Math.floor((new Date(pg.finProg)-hoy)/86400000):null;
             const pgPct=pg&&pg.plazo>0?Math.min(100,Math.round((pg.plazo-Math.max(0,pgDR||0))/pg.plazo*100)):0;
