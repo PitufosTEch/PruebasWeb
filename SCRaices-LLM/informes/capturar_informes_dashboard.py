@@ -337,7 +337,7 @@ def main(output_dir: Path = None) -> Path:
             print(f"  ERROR capturando HTMLs globales: {e}")
             total_err += 1
 
-        # ── PDFs por proyecto ──────────────────────────────────────────────────
+        # ── HTMLs por proyecto ─────────────────────────────────────────────────
         for pid, nombre in PROYECTOS:
             print(f"\n[{pid}] {nombre}")
             try:
@@ -350,9 +350,9 @@ def main(output_dir: Path = None) -> Path:
                 time.sleep(3)
                 activar_tab_estado_general(page)
 
-                # PDFs estándar (Ejecutivo y Residente)
+                # HTMLs por proyecto (Residente)
                 for sufijo, texto in INFORMES_PDF:
-                    pdf_path = output_dir / f"Informe_{sufijo}_{pid}_{nombre}_{fecha}.pdf"
+                    html_path = output_dir / f"Informe_{sufijo}_{pid}_{nombre}_{fecha}.html"
                     print(f"  [{sufijo}] Generando '{texto}'...")
                     instalar_interceptor(page)
                     html = disparar_boton(page, texto)
@@ -367,12 +367,12 @@ def main(output_dir: Path = None) -> Path:
                         if seccion:
                             pos = html.rfind("</body>")
                             html = (html[:pos] + seccion + html[pos:]) if pos != -1 else html + seccion
-                            print(f"    [Despachos] Sección despachos inyectada en Residente {pid}")
-                    html_a_pdf(context, html, pdf_path)
-                    print(f"    PDF: {pdf_path.name} ({pdf_path.stat().st_size:,} bytes)")
+                            print(f"    [Despachos] Seccion despachos inyectada en Residente {pid}")
+                    html_path.write_text(html, encoding="utf-8")
+                    print(f"    HTML: {html_path.name} ({html_path.stat().st_size:,} bytes)")
                     total_ok += 1
 
-                # PDFs de capataz — uno por capataz individual
+                # HTMLs de capataz — uno por capataz individual
                 caps = capataces_por_proy.get(pid, [])
                 if caps:
                     print(f"  [Capataz] Generando {len(caps)} reporte(s): {caps}")
@@ -396,9 +396,9 @@ def main(output_dir: Path = None) -> Path:
                                     html_cap = (html_cap[:pos] + seccion + html_cap[pos:]) if pos != -1 else html_cap + seccion
                                     print(f"    [Despachos] Seccion despachos inyectada -> {nombre_cap}")
                             slug = _slug(nombre_cap)
-                            pdf_path = output_dir / f"Informe_Capataz_{pid}_{nombre}_{slug}_{fecha}.pdf"
-                            html_a_pdf(context, html_cap, pdf_path)
-                            print(f"    PDF: {pdf_path.name} ({pdf_path.stat().st_size:,} bytes)")
+                            html_path = output_dir / f"Informe_Capataz_{pid}_{nombre}_{slug}_{fecha}.html"
+                            html_path.write_text(html_cap, encoding="utf-8")
+                            print(f"    HTML: {html_path.name} ({html_path.stat().st_size:,} bytes)")
                             total_ok += 1
                 else:
                     print(f"  [Capataz] Sin capataces registrados en Firebase/grupos — omitiendo")
