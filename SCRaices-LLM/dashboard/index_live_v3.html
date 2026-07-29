@@ -1124,6 +1124,9 @@ const ETAPAS_CONFIG_FULL = {
         const tpRaw = raw.Tabla_pago?.rows || [];
         PRESUPUESTO_DATA = {};
         PRESUPUESTO_PARTIDA_DATA = {};
+        // DEBUG TEMPORAL P12 — ver formato raw de monto
+        const _p12rows = tpRaw.filter(r => String(r.ID_proy||'').trim() === 'P12').slice(0, 5);
+        if (_p12rows.length) console.log('[DEBUG P12] monto raw (5 primeras filas):', _p12rows.map(r => ({ monto: r.monto, tipo: typeof r.monto, familia: r.familia_pago, partida: r.tipo_pago })));
         tpRaw.forEach(tp => {
             const proy   = String(tp.ID_proy || '').trim();
             const tipol  = String(tp.IDU_Tipol || '').trim();
