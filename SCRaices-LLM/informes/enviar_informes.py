@@ -151,21 +151,34 @@ def construir_plan_envio(pdf_dir: Path, fecha: str) -> dict:
             prefijo, ext, es_global, es_capataz_individual = TIPO_ARCHIVO[tipo]
 
             if es_global:
-                # Archivo único con todos los proyectos integrados
+                # Archivo único global con todos los proyectos integrados
                 archivos.extend(_buscar_archivo_global(pdf_dir, prefijo, fecha))
 
             elif es_capataz_individual:
-                # PDF específico del capataz: solo sus proyectos, solo su archivo
-                for pid in sorted(gk_proyectos.get(str(gk), [])):
-                    archivos.extend(_buscar_archivo_capataz(pdf_dir, pid, nombre, fecha))
+                # Multi-obra: un archivo por capataz nombrado por su slug
+                archivos.extend(sorted(pdf_dir.glob(
+                    f"Informe_Capataz_{_slug(nombre)}_{fecha}*.html"
+                )))
+
+            elif tipo == "residente" and rol in ROLES_GLOBALES:
+                # Gerentes/coordinadores: reciben TODOS los reportes Residente
+                archivos.extend(sorted(pdf_dir.glob(
+                    f"Informe_Residente_*_{fecha}*.html"
+                )))
+
+            elif tipo == "residente":
+                # Residente: su archivo multi-obra nombrado por su propio slug
+                archivos.extend(sorted(pdf_dir.glob(
+                    f"Informe_Residente_{_slug(nombre)}_{fecha}*.html"
+                )))
 
             elif rol in ROLES_GLOBALES:
-                # Recibe el informe de TODOS los proyectos
+                # Otros tipos globales: todos los proyectos
                 for pid in PROY_IDS:
                     archivos.extend(_buscar_archivos_proy(pdf_dir, prefijo, pid, fecha))
 
             else:
-                # Solo sus proyectos asignados
+                # Otros tipos por proyecto asignado
                 for pid in sorted(gk_proyectos.get(str(gk), [])):
                     archivos.extend(_buscar_archivos_proy(pdf_dir, prefijo, pid, fecha))
 

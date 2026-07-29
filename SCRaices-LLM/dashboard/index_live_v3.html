@@ -5377,7 +5377,7 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
         const barRow=(ini,pct,fin)=>`<div style="display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;margin:6px 0 3px;"><span>${ini}</span><span style="font-weight:600;">${pct}% transcurrido</span><span>${fin}</span></div><div style="height:8px;background:#e5e7eb;border-radius:6px;overflow:hidden;margin-bottom:12px;"><div style="height:100%;width:${pct}%;background:${bC(pct)};border-radius:6px;"></div></div>`;
 
         // ── RESUMEN: tabla ejecutiva + detalle por obra ──────────────────────────────────────
-        let sR=`<div class="blk"><h3 class="sh">📋 Resumen ejecutivo de proyectos</h3><div style="overflow-x:auto;">
+        let sR=`<div class="blk"><h3 class="sh">📋 Resumen ejecutivo de proyectos</h3><div style="overflow-x:auto;overflow-y:auto;max-height:420px;">
 <table style="width:100%;border-collapse:collapse;font-size:10px;table-layout:fixed;">
 <colgroup>
   <col style="width:18%">
@@ -5388,7 +5388,7 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
   <col style="width:6%"><col style="width:6%">
   <col style="width:4%"><col style="width:4%"><col style="width:5%">
 </colgroup>
-<thead>
+<thead style="position:sticky;top:0;z-index:1;">
 <tr style="background:#f1f5f9;">
   <th rowspan="2" style="padding:5px 6px;border:1px solid #e2e8f0;text-align:left;font-size:9px;text-transform:uppercase;color:#475569;">Proyecto</th>
   <th colspan="3" style="padding:4px 6px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Avance (%)</th>
@@ -6437,7 +6437,7 @@ ${mProy>0?`<tr style="font-weight:700;color:#7c3aed;background:#f5f3ff;"><td col
         });
 
         const resumenTablaHtml = (() => {
-            let t = `<div style="background:#fff;margin:12px 12px 0;border-radius:10px;padding:14px 16px;border:1px solid #e2e8f0;overflow-x:auto;">
+            let t = `<div style="background:#fff;margin:12px 12px 0;border-radius:10px;padding:14px 16px;border:1px solid #e2e8f0;overflow-x:auto;overflow-y:auto;max-height:420px;">
 <div style="font-size:12px;font-weight:700;color:#1e293b;margin-bottom:10px;">📋 Resumen ejecutivo de proyectos</div>
 <table style="width:100%;border-collapse:collapse;font-size:10px;table-layout:fixed;">
 <colgroup>
@@ -6449,7 +6449,7 @@ ${mProy>0?`<tr style="font-weight:700;color:#7c3aed;background:#f5f3ff;"><td col
   <col style="width:6%"><col style="width:6%">
   <col style="width:4%"><col style="width:4%"><col style="width:7%">
 </colgroup>
-<thead>
+<thead style="position:sticky;top:0;z-index:1;">
 <tr style="background:#f1f5f9;">
   <th rowspan="2" style="padding:5px 6px;border:1px solid #e2e8f0;text-align:left;font-size:9px;text-transform:uppercase;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Proyecto</th>
   <th colspan="3" style="padding:4px 6px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Avance (%)</th>
@@ -6980,7 +6980,7 @@ function jumpToObra(idx){
             return { obra, tot, av, avReal, agPct, cPctTr, cDiasR, cDur, pg, progDiasR, habilitadas, enEjecucion, diff };
         });
         const resumenTablaHtml = (() => {
-            let t = `<div style="background:#fff;margin:12px 12px 0;border-radius:10px;padding:14px 16px;border:1px solid #e2e8f0;overflow-x:auto;">
+            let t = `<div style="background:#fff;margin:12px 12px 0;border-radius:10px;padding:14px 16px;border:1px solid #e2e8f0;overflow-x:auto;overflow-y:auto;max-height:420px;">
 <div style="font-size:12px;font-weight:700;color:#1e293b;margin-bottom:10px;">📋 Resumen ejecutivo de proyectos</div>
 <table style="width:100%;border-collapse:collapse;font-size:10px;table-layout:fixed;">
 <colgroup>
@@ -6992,7 +6992,7 @@ function jumpToObra(idx){
   <col style="width:6%"><col style="width:6%">
   <col style="width:4%"><col style="width:4%"><col style="width:7%">
 </colgroup>
-<thead>
+<thead style="position:sticky;top:0;z-index:1;">
 <tr style="background:#f1f5f9;">
   <th rowspan="2" style="padding:5px 6px;border:1px solid #e2e8f0;text-align:left;font-size:9px;text-transform:uppercase;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Proyecto</th>
   <th colspan="3" style="padding:4px 6px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Avance (%)</th>
