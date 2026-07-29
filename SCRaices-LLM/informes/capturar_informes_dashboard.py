@@ -239,10 +239,18 @@ def html_a_pdf(context, html, pdf_path):
 
 
 def _extraer_nombre_capataz(html: str) -> str:
-    """Extrae el nombre del capataz desde el <title> del HTML generado."""
-    m = re.search(r"<title>Reporte Capataz (.+?) —", html)
+    """Extrae el nombre del capataz desde el <title> del HTML generado.
+    Formato esperado: <title>Reporte Capataz: {nombre} — {proyecto} — Sem N</title>
+    """
+    # Intenta primero con el em-dash real (U+2014) y con el en-dash/guión
+    m = re.search(r"<title>Reporte Capataz: (.+?) —", html)
     if not m:
-        m = re.search(r"<title>Reporte Capataz (.+?) -", html)
+        m = re.search(r"<title>Reporte Capataz: (.+?) -", html)
+    if not m:
+        m = re.search(r"<title>Reporte Capataz: (.+?)</title>", html)
+    # Fallback sin dos puntos por compatibilidad con versiones anteriores
+    if not m:
+        m = re.search(r"<title>Reporte Capataz (.+?) —", html)
     if not m:
         m = re.search(r"<title>Reporte Capataz (.+?)</title>", html)
     return m.group(1).strip() if m else ""
@@ -386,7 +394,7 @@ def main(output_dir: Path = None) -> Path:
                                 if seccion:
                                     pos = html_cap.rfind("</body>")
                                     html_cap = (html_cap[:pos] + seccion + html_cap[pos:]) if pos != -1 else html_cap + seccion
-                                    print(f"    [Despachos] Sección despachos inyectada → {nombre_cap}")
+                                    print(f"    [Despachos] Seccion despachos inyectada -> {nombre_cap}")
                             slug = _slug(nombre_cap)
                             pdf_path = output_dir / f"Informe_Capataz_{pid}_{nombre}_{slug}_{fecha}.pdf"
                             html_a_pdf(context, html_cap, pdf_path)
