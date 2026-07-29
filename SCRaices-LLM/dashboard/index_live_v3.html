@@ -322,8 +322,11 @@ const ETAPAS_CONFIG_FULL = {
 
     function parseMonto(val) {
         if (val === null || val === undefined || val === '' || val === 'nan') return 0;
-        let s = String(val).trim().replace(/\$/g, '').replace(/\./g, '');
-        s = s.replace(',', '.');
+        let s = String(val).trim().replace(/\$/g, '').replace(/\s/g, '');
+        // Un solo punto seguido de 1-2 dígitos = punto decimal real (ej. "95200.00")
+        // NO es separador de miles chileno → parseFloat directo para evitar ×100
+        if (/^\d+\.\d{1,2}$/.test(s)) return Math.round(parseFloat(s));
+        s = s.replace(/\./g, '').replace(',', '.');
         const n = parseFloat(s);
         return isNaN(n) ? 0 : Math.round(n);
     }
