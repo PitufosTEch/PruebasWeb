@@ -5,20 +5,20 @@ Lee destinatarios y asignaciones desde Firebase (personal_global + personal_obra
 construye un correo por persona con los archivos que le corresponden según su rol
 y los despacha vía Gmail SMTP.
 
-Regla de envío:
-  curvas_s           → PDF Ejecutivo (Curvas S)  — todos los proyectos (rol global)
-                                                  — solo sus proyectos  (rol no-global)
-  html_navegable     → HTML EjecutivoHTML         — archivo único global
-  residente          → PDF Residente              — solo sus proyectos asignados
-  por_capataz        → PDF Capataz INDIVIDUAL     — solo sus proyectos + solo su PDF
-  adquisiciones_html → HTML Adquisiciones         — archivo único global
+Regla de envío (todos los informes son HTML):
+  html_navegable     → Informe_EjecutivoHTML_{fecha}.html        — archivo único global
+  residente          → Informe_Residente_{pid}_*_{fecha}.html    — solo sus proyectos
+  por_capataz        → Informe_Capataz_{pid}_*_{slug}_{fecha}.html — solo su archivo
+  adquisiciones_html → Informe_Adquisiciones_{fecha}.html        — archivo único global
+  recepciones_html   → Informe_RecepcionesHTML_{fecha}.html      — archivo único global
+  estados_pago_html  → Informe_EstadosPago_{fecha}.html          — archivo único global
 
 Modo local : credenciales desde gmail_config.json
 Modo cloud : credenciales desde env vars GMAIL_EMAIL, GMAIL_APP_PASSWORD
 
 Uso standalone:
     python enviar_informes.py
-    python enviar_informes.py --pdf-dir /ruta/a/archivos
+    python enviar_informes.py --pdf-dir /ruta/a/directorio_html
 """
 
 import io
@@ -42,7 +42,7 @@ import requests
 
 FIREBASE        = "https://scraices-dashboard-default-rtdb.firebaseio.com"
 _LOCAL_GMAIL    = Path(r"C:\Users\rodri\.claude\gmail_config.json")
-_LOCAL_PDF_DIR  = Path(r"C:\Users\rodri\.claude\informes_pdf")
+_LOCAL_HTML_DIR = Path(r"C:\Users\rodri\.claude\informes_pdf")
 
 # Proyectos activos del dashboard (en orden)
 PROYECTOS = [
@@ -67,10 +67,9 @@ ROLES_GLOBALES = {"gerente", "coordinador", "logistica", "rrhh"}
 #   es_global=True        → archivo único sin proyecto
 #   es_capataz_individual → buscar por slug del nombre del capataz en el filename
 TIPO_ARCHIVO = {
-    "curvas_s":          ("Informe_Ejecutivo",    ".pdf",  False, False),
-    "html_navegable":    ("Informe_EjecutivoHTML", ".html", True,  False),
-    "residente":         ("Informe_Residente",     ".pdf",  False, False),
-    "por_capataz":       ("Informe_Capataz",       ".pdf",  False, True),
+    "html_navegable":    ("Informe_EjecutivoHTML",  ".html", True,  False),
+    "residente":         ("Informe_Residente",       ".html", False, False),
+    "por_capataz":       ("Informe_Capataz",         ".html", False, True),
     "adquisiciones_html":("Informe_Adquisiciones",   ".html", True,  False),
     "recepciones_html":  ("Informe_RecepcionesHTML", ".html", True,  False),
     "estados_pago_html": ("Informe_EstadosPago",     ".html", True,  False),
@@ -108,11 +107,11 @@ def _buscar_archivo_global(pdf_dir: Path, prefijo: str, fecha: str) -> list:
 
 def _buscar_archivo_capataz(pdf_dir: Path, pid: str, nombre_capataz: str, fecha: str) -> list:
     """
-    Encuentra el PDF individual del capataz:
-    Informe_Capataz_{pid}__{slug}_{fecha}.pdf
+    Encuentra el HTML individual del capataz:
+    Informe_Capataz_{pid}_*_{slug}_{fecha}.html
     """
     slug = _slug(nombre_capataz)
-    return sorted(pdf_dir.glob(f"Informe_Capataz_{pid}_*_{slug}_{fecha}*.pdf"))
+    return sorted(pdf_dir.glob(f"Informe_Capataz_{pid}_*_{slug}_{fecha}*.html"))
 
 
 def construir_plan_envio(pdf_dir: Path, fecha: str) -> dict:
@@ -238,7 +237,7 @@ Generado automáticamente — Panel de Control v3 SG Raíces.
 
 def main(pdf_dir: Path = None, fecha: str = None, solo_para: str = None):
     if pdf_dir is None:
-        pdf_dir = _LOCAL_PDF_DIR
+        pdf_dir = _LOCAL_HTML_DIR
     pdf_dir = Path(pdf_dir)
 
     remitente, app_pw = _get_gmail()
