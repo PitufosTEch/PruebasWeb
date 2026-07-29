@@ -325,9 +325,9 @@ const ETAPAS_CONFIG_FULL = {
         let s = String(val).trim().replace(/\$/g, '').replace(/\s/g, '');
         // Punto decimal real: un solo punto + 1-2 dígitos al final (ej. "95200.00")
         if (/^\d+\.\d{1,2}$/.test(s)) return Math.round(parseFloat(s));
-        // Coma como separador de miles US: solo dígitos y comas, con coma antes de 3 dígitos
-        // Ej. "150,000" → 150000  /  "1,200,000" → 1200000
-        if (/^[\d,]+$/.test(s) && /,\d{3}/.test(s)) return Math.round(parseFloat(s.replace(/,/g, '')));
+        // Formato US con coma de miles: "150,000" o "150,000.00" o "1,200,000.00"
+        // La coma va seguida de 3 dígitos; el string puede terminar en .NN (decimal US)
+        if (/,\d{3}/.test(s) && /^[\d,]+(\.\d{1,2})?$/.test(s)) return Math.round(parseFloat(s.replace(/,/g, '')));
         // Formato chileno: puntos = miles, coma = decimal (ej. "1.413.510" o "1.413.510,50")
         s = s.replace(/\./g, '').replace(',', '.');
         const n = parseFloat(s);
@@ -1124,9 +1124,6 @@ const ETAPAS_CONFIG_FULL = {
         const tpRaw = raw.Tabla_pago?.rows || [];
         PRESUPUESTO_DATA = {};
         PRESUPUESTO_PARTIDA_DATA = {};
-        // DEBUG TEMPORAL P12 — ver formato raw de monto
-        const _p12rows = tpRaw.filter(r => String(r.ID_proy||'').trim() === 'P12').slice(0, 5);
-        if (_p12rows.length) console.log('[DEBUG P12] monto raw (5 primeras filas):', _p12rows.map(r => ({ monto: r.monto, tipo: typeof r.monto, familia: r.familia_pago, partida: r.tipo_pago })));
         tpRaw.forEach(tp => {
             const proy   = String(tp.ID_proy || '').trim();
             const tipol  = String(tp.IDU_Tipol || '').trim();
