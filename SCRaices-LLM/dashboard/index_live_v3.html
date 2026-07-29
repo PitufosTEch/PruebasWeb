@@ -1595,7 +1595,7 @@ const mapearSegmento = (segmento) => {
     if (t.includes("pintura ext") || t.includes("09-")) return "09_PINTURA_EXT";
     if (t.includes("pintura int") || t.includes("10-")) return "10_PINTURA_INT";
     if (t.includes("pintura") && t.includes("r.c")) return "09_PINTURA_EXT";
-    if (t.includes("gasfiter") || t.includes("sol. ac") || t.includes("artefact") || t.includes("cocina") || t.includes("calefont")) return "13_GASFITERIA";
+    if (t.includes("gasfiter") || t.includes("sol. ac") || t.includes("artefact") || t.includes("cocina") || t.includes("calefont") || t.includes("art.ba") || t.includes("art. ba") || t.includes("baño") || t.includes("bano")) return "13_GASFITERIA";
     if (t.includes("obra") && t.includes("ext")) return "14_OBRAS_EXT";
     if (t.includes("ap ext") || t.includes("05-")) return "14_OBRAS_EXT";
     return null;
@@ -1640,7 +1640,7 @@ const clasificarDespachoFino = (segmento) => {
     if (t.includes('pintura int') || t.includes('10-')) return ['pintura_int'];
     if (t.includes('pintura')) return ['pintura_ext']; // ext, r.c. o generico
     if (t.includes('sol. ac') || t.includes('sol ac') || t.includes('cocina') || t.includes('calefon')) return ['sol_ac'];
-    if (t.includes('gasfiter') || t.includes('artefact')) return ['gasfiteria'];
+    if (t.includes('gasfiter') || t.includes('artefact') || t.includes('art.ba') || t.includes('art. ba') || t.includes('baño') || t.includes('bano')) return ['gasfiteria'];
     return [];
 };
 const despachoTagsDe = (idBenef) => {
@@ -1801,6 +1801,8 @@ const calcCoherencia = (idBenef, estadoEtapas) => {
     const pagos = getSolpago(idBenef);
     const insp = getInspeccion(idBenef);
     const avanceFam = getAvancePorFamilia(idBenef);
+    // Tags de despacho fino para comparacion por partida (igual que CHECK 2)
+    const despachoTags = despachoTagsDe(idBenef);
 
     // Alertas por familia: cruce Despacho + Pago + Inspeccion
     Object.entries(FAMILIA_PAGO_MAP).forEach(([fam, etapasKeys]) => {
@@ -1814,12 +1816,24 @@ const calcCoherencia = (idBenef, estadoEtapas) => {
         if (totalPagado > 0 && tieneDespacho && avPct !== null && avPct < 30) {
             alertas.push({ tipo: "rojo", etapa: FAMILIA_LABELS[fam] || fam, msg: `Desp+Pago pero Insp ${avPct}% en ${FAMILIA_LABELS[fam]}` });
         }
-        // ROJO: Inspeccion alta (>=70%) sin despacho registrado — datos inconsistentes
-        else if (!tieneDespacho && avPct !== null && avPct >= 70 && etapasKeys.length > 0) {
-            alertas.push({ tipo: "rojo", etapa: FAMILIA_LABELS[fam] || fam, msg: `Insp ${avPct}% pero sin despacho en ${FAMILIA_LABELS[fam]}` });
+        // ROJO: Inspeccion alta (>=70%) sin despacho de ESA PARTIDA especifica.
+        // Se evalua por partida (no por promedio familiar) para evitar que "Red Agua Pot."
+        // (despachada con "11 - Viv.Red agua potable", tag ap_interior) infle el promedio
+        // de gasfiteria y dispare la alerta aunque "Art.Baño/Cocina" no estén despachados.
+        else if (avance && avance.partidas && etapasKeys.length > 0) {
+            const sinDespacho = avance.partidas.filter(p => {
+                if (p.valor < 70) return false;
+                const backing = PARTIDA_DESPACHO[p.nombre];
+                if (!backing || backing.length === 0) return false;
+                return !backing.some(t => despachoTags.has(t));
+            });
+            if (sinDespacho.length > 0) {
+                const maxPct = Math.max(...sinDespacho.map(p => p.valor));
+                alertas.push({ tipo: "rojo", etapa: FAMILIA_LABELS[fam] || fam, msg: `Insp ${maxPct}% pero sin despacho en ${FAMILIA_LABELS[fam]}` });
+            }
         }
         // NARANJA: Despacho sin pago en familia critica
-        else if (tieneDespacho && totalPagado === 0 && FAMILIAS_CRITICAS.includes(fam)) {
+        if (tieneDespacho && totalPagado === 0 && FAMILIAS_CRITICAS.includes(fam)) {
             alertas.push({ tipo: "naranja", etapa: FAMILIA_LABELS[fam] || fam, msg: `Despacho sin pago M.O. en ${FAMILIA_LABELS[fam]}` });
         }
     });
@@ -10629,8 +10643,12 @@ const App = () => {
         });
 
         // CHECK 3: Despacho sin Inspección (a nivel DESPACHO)
-        // Por cada despacho del beneficiario (>12 dias), revisa las partidas que ESE material
-        // produce: si todas siguen <10%, marca. Misma logica fina que CHECK 2, al reves.
+        // Por cada despacho del beneficiario, revisa las partidas que ESE material produce:
+        // si todas siguen <10% tras el plazo esperado, marca.
+        // Plazos por tag: ap_interior=7d, gasfiteria=10d, resto=12d.
+        // (Red Agua Pot. debe inspeccionarse ~7d tras "11-Viv.Red agua potable";
+        //  Art.Baño/Cocina ~10d tras "23-Viv.Art.baño / 24-Viv.Art.cocina")
+        const CHECK3_PLAZO = { ap_interior: 7, gasfiteria: 10, sol_ac: 10 };
         const c3 = [];
         viviendas.forEach(v => {
             const insp = getInspeccion(v.ID_Benef);
@@ -10638,19 +10656,20 @@ const App = () => {
             const tagsFecha = despachoTagsFechaDe(v.ID_Benef);
             Object.entries(tagsFecha).forEach(([tag, fecha]) => {
                 const backed = DESPACHO_PARTIDAS[tag];
-                if (!backed || backed.length === 0) return; // despacho que no produce partida evaluable
+                if (!backed || backed.length === 0) return;
                 const dias = Math.floor((new Date() - new Date(fecha)) / (1000*60*60*24));
-                if (dias <= 12) return;
+                const plazo = CHECK3_PLAZO[tag] ?? 12;
+                if (dias <= plazo) return;
                 const maxPct = backed.reduce((m, p) => Math.max(m, partidas[p] || 0), 0);
                 if (maxPct < 10) {
-                    c3.push({ benef: v.NOMBRES + ' ' + v.APELLIDOS, id: v.ID_Benef, material: DESPACHO_LABEL[tag] || tag, dias, pct: maxPct });
+                    c3.push({ benef: v.NOMBRES + ' ' + v.APELLIDOS, id: v.ID_Benef, material: DESPACHO_LABEL[tag] || tag, dias, pct: maxPct, plazo });
                 }
             });
         });
         checks.push({
             id: 'desp_sin_insp',
-            titulo: 'Despacho sin Inspección (+12 días)',
-            desc: 'Se despachó un material hace más de 12 días pero las partidas de inspección que ese material produce siguen bajo 10%. Se evalúa por tipo de despacho (no por familia completa). No se evalúan Electricidad ni Agua Potable exterior.',
+            titulo: 'Despacho sin Inspección',
+            desc: 'Se despachó un material pero las partidas de inspección que produce siguen bajo 10% tras el plazo esperado: Red Agua Pot. = 7 días, Gasfitería/Sol.AC = 10 días, resto = 12 días. Se evalúa por tipo de despacho. No se evalúan Electricidad ni Agua Potable exterior.',
             compara: 'Despacho (fecha entrega, clasificado) vs Inspección de las partidas que produce',
             tipo: 'naranja',
             items: c3,
