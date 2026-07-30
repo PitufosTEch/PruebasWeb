@@ -5196,8 +5196,9 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
             const dR=Math.floor((new Date(pg.finProg)-hoy)/86400000);
             const pgE=dR<0?`Vencido (${Math.abs(dR)}d)`:`${dR}d restantes`;
             const pgC=dR<0?'#dc2626':dR<30?'#b45309':'#16a34a';
-            const pgP=pg.plazo>0?Math.min(100,Math.round((pg.plazo-Math.max(0,dR))/pg.plazo*100)):0;
-            const pgB=pgP>=100?'#ef4444':pgP>=80?'#f59e0b':pgP>=50?'#3b82f6':'#22c55e';
+            const pgProg = _ag != null ? Math.min(100, _ag.pct_prog ?? _ag.pct ?? 0) : null;
+            const pgP = pgProg !== null ? pgProg : (pg.plazo>0?Math.min(100,Math.round((pg.plazo-Math.max(0,dR))/pg.plazo*100)):0);
+            const pgB = pgP>=100?'#ef4444':pgP>=80?'#f59e0b':pgP>=50?'#3b82f6':'#22c55e';
             sR += `<h3 class="sh">📋 Programa de Obra</h3>
 <div class="sg" style="grid-template-columns:repeat(4,1fr);">
 <div class="sc"><div class="scl">Inicio</div><div style="font-size:11px;font-weight:700;">${fF(pg.inicio)}</div></div>
@@ -5205,7 +5206,7 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
 <div class="sc"><div class="scl">Término</div><div style="font-size:11px;font-weight:700;">${fF(pg.finProg)}</div></div>
 <div class="sc"><div class="scl">Estado</div><div style="font-size:11px;font-weight:700;color:${pgC};">${pgE}</div></div>
 </div>
-<div style="display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;margin:6px 0 3px;"><span>${fF(pg.inicio)}</span><span style="font-weight:600;">${pgP}% transcurrido</span><span>${fF(pg.finProg)}</span></div>
+<div style="display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;margin:6px 0 3px;"><span>${fF(pg.inicio)}</span><span style="font-weight:600;">${pgProg !== null ? Number(pgProg).toFixed(1) + '% programado' : '—'}</span><span>${fF(pg.finProg)}</span></div>
 <div style="height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden;margin-bottom:12px;"><div style="height:100%;width:${pgP}%;background:${pgB};border-radius:6px;"></div></div>`;
         } else {
             sR += `<h3 class="sh">📋 Programa de Obra</h3><p style="color:#94a3b8;font-size:12px;padding:6px 0 12px;">Sin datos de programa disponibles.</p>`;
@@ -5372,6 +5373,7 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
             const pg=ganttRaw[pr.ID_proy]||null;
             const pgDR=pg&&pg.finProg?Math.floor((new Date(pg.finProg)-hoy)/86400000):null;
             const pgPct=pg&&pg.plazo>0?Math.min(100,Math.round((pg.plazo-Math.max(0,pgDR||0))/pg.plazo*100)):0;
+            const pgProgPct=_ag!=null?Math.min(100,_ag.pct_prog??_ag.pct??0):null;
             const cIni=pr.fecha_inicio||null,cDur=pr.duracion||0;
             const cFin=(cIni&&cDur>0)?(()=>{const d=new Date(cIni);d.setDate(d.getDate()+cDur);return d.toISOString().substring(0,10);})():null;
             const cDR=cFin?Math.floor((new Date(cFin)-hoy)/86400000):null;
@@ -5382,7 +5384,7 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
             const habilitadas=vivs.filter(v=>v.habil).length;
             const enEjecucion=vivs.filter(v=>DESPACHOS_DATA.some(d=>String(d.ID_Benef)===String(v.ID_Benef))).length;
             const diff=agPct!==null&&pg?Math.round((agPct-pgPct)*100)/100:null;
-            return {pr,vivs,grps,curvas,tot,avPct,conInsp,terminadas,_ag,agPct,pg,pgDR,pgPct,cIni,cDur,cFin,cDR,cPct,despachos:despMap[pr.ID_proy],nombre,obs,esCurrent,habilitadas,enEjecucion,diff};
+            return {pr,vivs,grps,curvas,tot,avPct,conInsp,terminadas,_ag,agPct,pg,pgDR,pgPct,pgProgPct,cIni,cDur,cFin,cDR,cPct,despachos:despMap[pr.ID_proy],nombre,obs,esCurrent,habilitadas,enEjecucion,diff};
         });
 
         // Helpers de render
@@ -5396,7 +5398,7 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
         const agColor=p=>p==null?'#94a3b8':p>=80?'#16a34a':p>=50?'#2563eb':'#dc2626';
         const avColor=p=>p>=80?'#16a34a':p>=50?'#2563eb':'#dc2626';
         const prjHdr=nm=>`<div style="background:#0f172a;color:#f1f5f9;font-size:12px;font-weight:700;padding:8px 12px;border-radius:7px;margin-bottom:12px;">🏗️ ${esc(nm)}</div>`;
-        const barRow=(ini,pct,fin)=>`<div style="display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;margin:6px 0 3px;"><span>${ini}</span><span style="font-weight:600;">${pct}% transcurrido</span><span>${fin}</span></div><div style="height:8px;background:#e5e7eb;border-radius:6px;overflow:hidden;margin-bottom:12px;"><div style="height:100%;width:${pct}%;background:${bC(pct)};border-radius:6px;"></div></div>`;
+        const barRow=(ini,pct,fin,lbl)=>`<div style="display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;margin:6px 0 3px;"><span>${ini}</span><span style="font-weight:600;">${lbl||pct+'% transcurrido'}</span><span>${fin}</span></div><div style="height:8px;background:#e5e7eb;border-radius:6px;overflow:hidden;margin-bottom:12px;"><div style="height:100%;width:${pct}%;background:${bC(pct)};border-radius:6px;"></div></div>`;
 
         // ── RESUMEN: tabla ejecutiva + detalle por obra ──────────────────────────────────────
         let sR=`<div class="blk"><h3 class="sh">📋 Resumen ejecutivo de proyectos</h3><div style="overflow-x:auto;overflow-y:auto;max-height:420px;-webkit-overflow-scrolling:touch;">
@@ -5470,7 +5472,7 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
 <div class="sc"><div class="scl">Término</div><div style="font-size:11px;font-weight:700;">${fF(d.pg.finProg)}</div></div>
 <div class="sc"><div class="scl">Plazo</div><div style="font-size:11px;font-weight:700;">${d.pg.plazo} días</div></div>
 <div class="sc"><div class="scl">Estado</div><div style="font-size:11px;font-weight:700;color:${pgC};">${pgE}</div></div>
-</div>${barRow(fF(d.pg.inicio),d.pgPct,fF(d.pg.finProg))}`;}
+</div>${barRow(fF(d.pg.inicio),d.pgProgPct!==null?d.pgProgPct:d.pgPct,fF(d.pg.finProg),d.pgProgPct!==null?Number(d.pgProgPct).toFixed(1)+'% programado':null)}`;}
             sR+=`<h3 class="sh">📊 Avance real a la fecha (Inspecciones)</h3>
 <div class="sg" style="grid-template-columns:repeat(auto-fit,minmax(110px,1fr));">
 <div class="sc" style="border-left:3px solid ${avC};"><div class="scl">Avance Real</div><div class="scv" style="color:${avC};">${d.avPct}%</div></div>
