@@ -5417,9 +5417,9 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
   <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;text-transform:uppercase;color:#475569;" title="Con al menos 1 despacho realizado">Viv. en<br>Ejec.</th>
 </tr>
 <tr style="background:#f8fafc;">
-  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;width:60px;" title="% Avance de contrato">% Cont.</th>
-  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;width:60px;" title="% Avance según programa de obra (por fechas Gantt)">% Prog.</th>
-  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;width:60px;" title="% Avance real (Curvas S)">% Real</th>
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;width:72px;min-width:72px;" title="% Avance de contrato">% Cont.</th>
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;width:72px;min-width:72px;" title="% Avance según programa de obra (por fechas Gantt)">% Prog.</th>
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;width:72px;min-width:72px;" title="% Avance real (Curvas S)">% Real</th>
 </tr>
 </thead><tbody>`;
         proyData.forEach(d=>{
@@ -5897,14 +5897,14 @@ ${(()=>{const _avs=(AVANCE_MENSUAL_DATA[String(d.pr.ID_proy)]||{}).serie||[];con
   ${tituloGrupo}${capLabel} &nbsp;<span style="font-weight:400;color:#94a3b8;">(${grupo.viviendas.length} viv.)</span>
 </div>
 <div class="table-container"><table style="min-width:520px;white-space:nowrap;">
-<thead><tr><th style="overflow:hidden;text-overflow:ellipsis;">Beneficiario</th><th>Avance</th><th>HPC</th><th>TE1</th><th>V.AS</th><th>R.AS</th><th>F1</th><th>Empalme</th><th>Recep.</th></tr></thead><tbody>`;
+<thead><tr><th style="overflow:hidden;text-overflow:ellipsis;">Beneficiario</th><th style="text-align:center;">Avance</th><th style="width:65px;padding:9px 4px;text-align:center;">HPC</th><th style="width:65px;padding:9px 4px;text-align:center;">TE1</th><th style="width:65px;padding:9px 4px;text-align:center;">V.AS</th><th style="width:65px;padding:9px 4px;text-align:center;">R.AS</th><th style="width:65px;padding:9px 4px;text-align:center;">F1</th><th style="width:65px;padding:9px 4px;text-align:center;">Empalme</th><th style="width:65px;padding:9px 4px;text-align:center;">Recep.</th></tr></thead><tbody>`;
                     grupo.viviendas.forEach(v => {
                         const insp = getInspeccion(v.ID_Benef);
                         const pct = insp ? insp.pct_total : null;
                         const fl = getFlags(v);
                         const pctTxt = pct !== null ? `${pct}%` : '—';
                         const pctCol = pct === null ? '#94a3b8' : pct >= 80 ? '#16a34a' : pct >= 50 ? '#2563eb' : '#dc2626';
-                        h += `<tr><td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${v.NOMBRES||''} ${v.APELLIDOS||''}">${v.NOMBRES||''} ${v.APELLIDOS||''}</td><td style="font-weight:700;color:${pctCol};">${pctTxt}</td><td>${ck(fl.hpc)}</td><td>${ck(fl.te1)}</td><td>${ck(fl.visita_as)}</td><td>${ck(fl.resol_as)}</td><td>${ck(fl.fecha_f1)}</td><td>${ck(fl.empalme)}</td><td>${ck(fl.fecha_recep)}</td></tr>`;
+                        h += `<tr><td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${v.NOMBRES||''} ${v.APELLIDOS||''}">${v.NOMBRES||''} ${v.APELLIDOS||''}</td><td style="font-weight:700;color:${pctCol};">${pctTxt}</td><td style="text-align:center;">${ck(fl.hpc)}</td><td style="text-align:center;">${ck(fl.te1)}</td><td style="text-align:center;">${ck(fl.visita_as)}</td><td style="text-align:center;">${ck(fl.resol_as)}</td><td style="text-align:center;">${ck(fl.fecha_f1)}</td><td style="text-align:center;">${ck(fl.empalme)}</td><td style="text-align:center;">${ck(fl.fecha_recep)}</td></tr>`;
                     });
                     h += `</tbody></table></div></div>`;
                 });
@@ -6307,14 +6307,14 @@ ${js2}
   ${tituloGrupo}${capLabel} &nbsp;<span style="font-weight:400;color:#94a3b8;">(${grupo.viviendas.length} viv.)</span>
 </div>
 <div class="table-container"><table style="min-width:520px;white-space:nowrap;">
-<thead><tr><th style="overflow:hidden;text-overflow:ellipsis;">Beneficiario</th><th>Avance</th><th>HPC</th><th>TE1</th><th>V.AS</th><th>R.AS</th><th>F1</th><th>Empalme</th><th>Recep.</th></tr></thead><tbody>`;
+<thead><tr><th style="overflow:hidden;text-overflow:ellipsis;">Beneficiario</th><th style="text-align:center;">Avance</th><th style="width:65px;padding:9px 4px;text-align:center;">HPC</th><th style="width:65px;padding:9px 4px;text-align:center;">TE1</th><th style="width:65px;padding:9px 4px;text-align:center;">V.AS</th><th style="width:65px;padding:9px 4px;text-align:center;">R.AS</th><th style="width:65px;padding:9px 4px;text-align:center;">F1</th><th style="width:65px;padding:9px 4px;text-align:center;">Empalme</th><th style="width:65px;padding:9px 4px;text-align:center;">Recep.</th></tr></thead><tbody>`;
                     grupo.viviendas.forEach(v => {
                         const insp = getInspeccion(v.ID_Benef);
                         const pct = insp ? insp.pct_total : null;
                         const fl = getFlags(v);
                         const pctTxt = pct !== null ? `${pct}%` : '—';
                         const pctCol = pct === null ? '#94a3b8' : pct >= 80 ? '#16a34a' : pct >= 50 ? '#2563eb' : '#dc2626';
-                        h += `<tr><td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${v.NOMBRES||''} ${v.APELLIDOS||''}">${v.NOMBRES||''} ${v.APELLIDOS||''}</td><td style="font-weight:700;color:${pctCol};">${pctTxt}</td><td>${ck(fl.hpc)}</td><td>${ck(fl.te1)}</td><td>${ck(fl.visita_as)}</td><td>${ck(fl.resol_as)}</td><td>${ck(fl.fecha_f1)}</td><td>${ck(fl.empalme)}</td><td>${ck(fl.fecha_recep)}</td></tr>`;
+                        h += `<tr><td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${v.NOMBRES||''} ${v.APELLIDOS||''}">${v.NOMBRES||''} ${v.APELLIDOS||''}</td><td style="font-weight:700;color:${pctCol};">${pctTxt}</td><td style="text-align:center;">${ck(fl.hpc)}</td><td style="text-align:center;">${ck(fl.te1)}</td><td style="text-align:center;">${ck(fl.visita_as)}</td><td style="text-align:center;">${ck(fl.resol_as)}</td><td style="text-align:center;">${ck(fl.fecha_f1)}</td><td style="text-align:center;">${ck(fl.empalme)}</td><td style="text-align:center;">${ck(fl.fecha_recep)}</td></tr>`;
                     });
                     h += `</tbody></table></div></div>`;
                 });
@@ -6467,9 +6467,9 @@ ${mProy>0?`<tr style="font-weight:700;color:#7c3aed;background:#f5f3ff;"><td col
   <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;text-transform:uppercase;color:#475569;cursor:help;" title="Considera en ejecución aquellas con al menos 1 despacho realizado.">Viv. en<br>Ejec.</th>
 </tr>
 <tr style="background:#f8fafc;">
-  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;width:60px;" title="% Avance de contrato">% Cont.</th>
-  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;width:60px;" title="% Avance según programa de obra (por fechas Gantt)">% Prog.</th>
-  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;width:60px;" title="% Avance real (Curvas S)">% Real</th>
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;width:72px;min-width:72px;" title="% Avance de contrato">% Cont.</th>
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;width:72px;min-width:72px;" title="% Avance según programa de obra (por fechas Gantt)">% Prog.</th>
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;width:72px;min-width:72px;" title="% Avance real (Curvas S)">% Real</th>
 </tr>
 </thead><tbody>`;
             resumenFilas.forEach(r => {
@@ -6838,14 +6838,14 @@ ${js}</body></html>`;
   ${tituloGrupo}${capLabel} &nbsp;<span style="font-weight:400;color:#94a3b8;">(${grupo.viviendas.length} viv.)</span>
 </div>
 <div class="table-container"><table style="min-width:520px;white-space:nowrap;">
-<thead><tr><th style="overflow:hidden;text-overflow:ellipsis;">Beneficiario</th><th>Avance</th><th>HPC</th><th>TE1</th><th>V.AS</th><th>R.AS</th><th>F1</th><th>Empalme</th><th>Recep.</th></tr></thead><tbody>`;
+<thead><tr><th style="overflow:hidden;text-overflow:ellipsis;">Beneficiario</th><th style="text-align:center;">Avance</th><th style="width:65px;padding:9px 4px;text-align:center;">HPC</th><th style="width:65px;padding:9px 4px;text-align:center;">TE1</th><th style="width:65px;padding:9px 4px;text-align:center;">V.AS</th><th style="width:65px;padding:9px 4px;text-align:center;">R.AS</th><th style="width:65px;padding:9px 4px;text-align:center;">F1</th><th style="width:65px;padding:9px 4px;text-align:center;">Empalme</th><th style="width:65px;padding:9px 4px;text-align:center;">Recep.</th></tr></thead><tbody>`;
                     grupo.viviendas.forEach(v => {
                         const insp = getInspeccion(v.ID_Benef);
                         const pct = insp ? insp.pct_total : null;
                         const fl = getFlags(v);
                         const pctTxt = pct !== null ? `${pct}%` : '—';
                         const pctCol = pct === null ? '#94a3b8' : pct >= 80 ? '#16a34a' : pct >= 50 ? '#2563eb' : '#dc2626';
-                        h += `<tr><td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${v.NOMBRES||''} ${v.APELLIDOS||''}">${v.NOMBRES||''} ${v.APELLIDOS||''}</td><td style="font-weight:700;color:${pctCol};">${pctTxt}</td><td>${ck(fl.hpc)}</td><td>${ck(fl.te1)}</td><td>${ck(fl.visita_as)}</td><td>${ck(fl.resol_as)}</td><td>${ck(fl.fecha_f1)}</td><td>${ck(fl.empalme)}</td><td>${ck(fl.fecha_recep)}</td></tr>`;
+                        h += `<tr><td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${v.NOMBRES||''} ${v.APELLIDOS||''}">${v.NOMBRES||''} ${v.APELLIDOS||''}</td><td style="font-weight:700;color:${pctCol};">${pctTxt}</td><td style="text-align:center;">${ck(fl.hpc)}</td><td style="text-align:center;">${ck(fl.te1)}</td><td style="text-align:center;">${ck(fl.visita_as)}</td><td style="text-align:center;">${ck(fl.resol_as)}</td><td style="text-align:center;">${ck(fl.fecha_f1)}</td><td style="text-align:center;">${ck(fl.empalme)}</td><td style="text-align:center;">${ck(fl.fecha_recep)}</td></tr>`;
                     });
                     h += `</tbody></table></div></div>`;
                 });
@@ -7000,9 +7000,9 @@ function jumpToObra(idx){
   <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;text-transform:uppercase;color:#475569;cursor:help;" title="Considera en ejecución aquellas con al menos 1 despacho realizado.">Viv. en<br>Ejec.</th>
 </tr>
 <tr style="background:#f8fafc;">
-  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;width:60px;" title="% Avance de contrato">% Cont.</th>
-  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;width:60px;" title="% Avance según programa de obra (por fechas Gantt)">% Prog.</th>
-  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;width:60px;" title="% Avance real (Curvas S)">% Real</th>
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;width:72px;min-width:72px;" title="% Avance de contrato">% Cont.</th>
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;width:72px;min-width:72px;" title="% Avance según programa de obra (por fechas Gantt)">% Prog.</th>
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;width:72px;min-width:72px;" title="% Avance real (Curvas S)">% Real</th>
 </tr>
 </thead><tbody>`;
             resumenFilas.forEach(r => {
