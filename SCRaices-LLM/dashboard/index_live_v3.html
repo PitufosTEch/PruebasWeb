@@ -5848,8 +5848,9 @@ ${(()=>{const _avs=(AVANCE_MENSUAL_DATA[String(d.pr.ID_proy)]||{}).serie||[];con
                     const diasR = Math.floor((new Date(pg.finProg) - new Date()) / 86400000);
                     const estadoTxt = diasR < 0 ? `Vencido (${Math.abs(diasR)}d)` : `${diasR}d restantes`;
                     const estadoCol = diasR < 0 ? '#dc2626' : diasR < 30 ? '#b45309' : '#16a34a';
-                    const pctTr = pg.plazo > 0 ? Math.min(100, Math.round((pg.plazo - Math.max(0,diasR)) / pg.plazo * 100)) : 0;
-                    const barCol = pctTr>=100?'#ef4444':pctTr>=80?'#f59e0b':pctTr>=50?'#3b82f6':'#22c55e';
+                    const pctProg = _ag != null ? Math.min(100, _ag.pct_prog ?? _ag.pct ?? 0) : null;
+                    const barVal  = pctProg !== null ? pctProg : (pg.plazo > 0 ? Math.min(100, Math.round((pg.plazo - Math.max(0, diasR)) / pg.plazo * 100)) : 0);
+                    const barCol  = barVal>=100?'#ef4444':barVal>=80?'#f59e0b':barVal>=50?'#3b82f6':'#22c55e';
                     h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📋 Programa de Obra</h3>
 <div class="summary-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));">
   <div class="summary-card"><div class="summary-card-label">Inicio</div><div style="font-size:11px;font-weight:700;">${fmtFecha(pg.inicio)}</div></div>
@@ -5857,8 +5858,8 @@ ${(()=>{const _avs=(AVANCE_MENSUAL_DATA[String(d.pr.ID_proy)]||{}).serie||[];con
   <div class="summary-card"><div class="summary-card-label">Plazo</div><div style="font-size:11px;font-weight:700;">${pg.plazo} días</div></div>
   <div class="summary-card"><div class="summary-card-label">Estado</div><div style="font-size:11px;font-weight:700;color:${estadoCol};">${estadoTxt}</div></div>
 </div>
-<div style="margin:10px 0 4px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;"><span>${fmtFecha(pg.inicio)}</span><span style="font-weight:600;">${pctTr}% transcurrido</span><span>${fmtFecha(pg.finProg)}</span></div>
-<div style="height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden;"><div style="height:100%;width:${pctTr}%;background:${barCol};border-radius:6px;"></div></div>`;
+<div style="margin:10px 0 4px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;"><span>${fmtFecha(pg.inicio)}</span><span style="font-weight:600;">${pctProg !== null ? Number(pctProg).toFixed(1) + '% programado' : '—'}</span><span>${fmtFecha(pg.finProg)}</span></div>
+<div style="height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden;"><div style="height:100%;width:${barVal}%;background:${barCol};border-radius:6px;"></div></div>`;
                 } else {
                     h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📋 Programa de Obra</h3><p style="color:#94a3b8;font-size:12px;">Sin datos de programa disponibles.</p>`;
                 }
@@ -6198,8 +6199,10 @@ ${js2}
                     const diasR = Math.floor((new Date(pg.finProg) - new Date()) / 86400000);
                     const estadoTxt = diasR < 0 ? `Vencido (${Math.abs(diasR)}d)` : `${diasR}d restantes`;
                     const estadoCol = diasR < 0 ? '#dc2626' : diasR < 30 ? '#b45309' : '#16a34a';
-                    const pctTr = pg.plazo > 0 ? Math.min(100, Math.round((pg.plazo - Math.max(0,diasR)) / pg.plazo * 100)) : 0;
-                    const barCol = pctTr >= 100 ? '#ef4444' : pctTr >= 80 ? '#f59e0b' : pctTr >= 50 ? '#3b82f6' : '#22c55e';
+                    // pctProg: % programado según curva S Gantt (coincide con la columna % Prog. del cuadro)
+                    const pctProg = _ag != null ? Math.min(100, _ag.pct_prog ?? _ag.pct ?? 0) : null;
+                    const barVal  = pctProg !== null ? pctProg : (pg.plazo > 0 ? Math.min(100, Math.round((pg.plazo - Math.max(0, diasR)) / pg.plazo * 100)) : 0);
+                    const barCol  = barVal >= 100 ? '#ef4444' : barVal >= 80 ? '#f59e0b' : barVal >= 50 ? '#3b82f6' : '#22c55e';
                     h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📋 Programa de Obra</h3>
 <div class="summary-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));">
   <div class="summary-card"><div class="summary-card-label">Inicio</div><div style="font-size:11px;font-weight:700;">${fmtFecha(pg.inicio)}</div></div>
@@ -6207,8 +6210,8 @@ ${js2}
   <div class="summary-card"><div class="summary-card-label">Plazo</div><div style="font-size:11px;font-weight:700;">${pg.plazo} días</div></div>
   <div class="summary-card"><div class="summary-card-label">Estado</div><div style="font-size:11px;font-weight:700;color:${estadoCol};">${estadoTxt}</div></div>
 </div>
-<div style="margin:10px 0 4px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;"><span>${fmtFecha(pg.inicio)}</span><span style="font-weight:600;">${pctTr}% transcurrido</span><span>${fmtFecha(pg.finProg)}</span></div>
-<div style="height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden;"><div style="height:100%;width:${pctTr}%;background:${barCol};border-radius:6px;"></div></div>`;
+<div style="margin:10px 0 4px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;"><span>${fmtFecha(pg.inicio)}</span><span style="font-weight:600;">${pctProg !== null ? Number(pctProg).toFixed(1) + '% programado' : '—'}</span><span>${fmtFecha(pg.finProg)}</span></div>
+<div style="height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden;"><div style="height:100%;width:${barVal}%;background:${barCol};border-radius:6px;"></div></div>`;
                 } else {
                     h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📋 Programa de Obra</h3><p style="color:#94a3b8;font-size:12px;">Sin datos de programa disponibles.</p>`;
                 }
@@ -6763,8 +6766,9 @@ ${js}</body></html>`;
                     const diasR = Math.floor((new Date(pg.finProg) - new Date()) / 86400000);
                     const estadoTxt = diasR < 0 ? `Vencido (${Math.abs(diasR)}d)` : `${diasR}d restantes`;
                     const estadoCol = diasR < 0 ? '#dc2626' : diasR < 30 ? '#b45309' : '#16a34a';
-                    const pctTr = pg.plazo > 0 ? Math.min(100, Math.round((pg.plazo - Math.max(0,diasR)) / pg.plazo * 100)) : 0;
-                    const barCol = pctTr >= 100 ? '#ef4444' : pctTr >= 80 ? '#f59e0b' : pctTr >= 50 ? '#3b82f6' : '#22c55e';
+                    const pctProg = _ag != null ? Math.min(100, _ag.pct_prog ?? _ag.pct ?? 0) : null;
+                    const barVal  = pctProg !== null ? pctProg : (pg.plazo > 0 ? Math.min(100, Math.round((pg.plazo - Math.max(0, diasR)) / pg.plazo * 100)) : 0);
+                    const barCol  = barVal >= 100 ? '#ef4444' : barVal >= 80 ? '#f59e0b' : barVal >= 50 ? '#3b82f6' : '#22c55e';
                     h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📋 Programa de Obra</h3>
 <div class="summary-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));">
   <div class="summary-card"><div class="summary-card-label">Inicio</div><div style="font-size:11px;font-weight:700;">${fmtFecha(pg.inicio)}</div></div>
@@ -6772,8 +6776,8 @@ ${js}</body></html>`;
   <div class="summary-card"><div class="summary-card-label">Plazo</div><div style="font-size:11px;font-weight:700;">${pg.plazo} días</div></div>
   <div class="summary-card"><div class="summary-card-label">Estado</div><div style="font-size:11px;font-weight:700;color:${estadoCol};">${estadoTxt}</div></div>
 </div>
-<div style="margin:10px 0 4px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;"><span>${fmtFecha(pg.inicio)}</span><span style="font-weight:600;">${pctTr}% transcurrido</span><span>${fmtFecha(pg.finProg)}</span></div>
-<div style="height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden;"><div style="height:100%;width:${pctTr}%;background:${barCol};border-radius:6px;"></div></div>`;
+<div style="margin:10px 0 4px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;"><span>${fmtFecha(pg.inicio)}</span><span style="font-weight:600;">${pctProg !== null ? Number(pctProg).toFixed(1) + '% programado' : '—'}</span><span>${fmtFecha(pg.finProg)}</span></div>
+<div style="height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden;"><div style="height:100%;width:${barVal}%;background:${barCol};border-radius:6px;"></div></div>`;
                 } else {
                     h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📋 Programa de Obra</h3><p style="color:#94a3b8;font-size:12px;">Sin datos de programa disponibles.</p>`;
                 }
