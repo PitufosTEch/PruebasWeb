@@ -243,3 +243,29 @@ def get_github_token() -> str | None:
             return tok
 
     return None
+
+
+# ─── RETRY SHEETS API ─────────────────────────────────────────────────────────
+def retry_sheets(fn, *args, max_retries=4, base_wait=30, **kwargs):
+    """
+    Llama fn(*args, **kwargs) con reintentos ante error 429 de Sheets API.
+    Esperas exponenciales: 30s, 60s, 120s antes de los reintentos 2, 3 y 4.
+    Usado para proteger insertar_imagenes_en_sheets() cuando todos los proyectos
+    corren en paralelo y saturan el cupo de lecturas por minuto de la API.
+    """
+    import time
+    from googleapiclient.errors import HttpError
+
+    _log = logging.getLogger("curvas_cloud_utils")
+    for attempt in range(max_retries):
+        try:
+            return fn(*args, **kwargs)
+        except HttpError as e:
+            if e.resp.status == 429 and attempt < max_retries - 1:
+                wait = base_wait * (2 ** attempt)
+                _log.warning(
+                    f"Sheets API 429 (quota excedida) — reintento {attempt + 1}/{max_retries - 1} en {wait}s…"
+                )
+                time.sleep(wait)
+            else:
+                raise

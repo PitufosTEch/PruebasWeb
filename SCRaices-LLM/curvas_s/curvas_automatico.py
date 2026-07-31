@@ -886,7 +886,7 @@ def main():
         actualizar_drive(drive_svc, OUTPUT_DIR)
 
         # Insertar/actualizar imagenes directamente en hoja 'Curvas S'
-        insertar_imagenes_en_sheets(sheets_svc)
+        _ccu.retry_sheets(insertar_imagenes_en_sheets, sheets_svc)
 
         # Marcar pendiente para que Apps Script refresque Sheets
         marcar_pendiente(sheets_svc, ts)

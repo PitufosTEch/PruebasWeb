@@ -997,7 +997,7 @@ def main():
         _save_drive_ids(drive_ids_nuevos)   # persistir IDs nuevos
 
         # Actualizar formulas IMAGE() en 'Curvas S'
-        insertar_imagenes_en_sheets(sheets_svc, drive_ids_nuevos, curvas_gid)
+        _ccu.retry_sheets(insertar_imagenes_en_sheets, sheets_svc, drive_ids_nuevos, curvas_gid)
 
         # Marcar pendiente
         marcar_pendiente(sheets_svc, ts)

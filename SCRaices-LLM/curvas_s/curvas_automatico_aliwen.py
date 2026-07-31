@@ -848,7 +848,7 @@ def main():
         _save_drive_ids(drive_ids)
 
         # Insertar/actualizar imagenes en hoja 'Curvas S'
-        insertar_imagenes_en_sheets(sheets_svc, drive_ids)
+        _ccu.retry_sheets(insertar_imagenes_en_sheets, sheets_svc, drive_ids)
 
         # Marcar pendiente
         marcar_pendiente(sheets_svc, ts)
