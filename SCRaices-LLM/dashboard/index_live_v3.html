@@ -6605,8 +6605,81 @@ function jumpToObra(idx){
 })();
 ` + jsClose;
 
-        const tabKeys = ['resumen','checkpoints','curvas','ritmos','viviendas','pagos'];
-        const tabLabels = {resumen:'Resumen',checkpoints:'Checkpoints',curvas:'Curvas S',ritmos:'Ritmos y comentarios',viviendas:'Viviendas',pagos:'Estado de Pago'};
+        // ── Programa Mensual: tabla global filas=obras, columnas=meses ──────────
+        const progMensualHtml = (() => {
+            const MESES_ES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+            const allMonths = new Set();
+            obrasData.forEach(obra => {
+                const m = avanceGanttRaw[obra.ID_proy];
+                if (m && m.mensual) Object.keys(m.mensual).forEach(ym => allMonths.add(ym));
+            });
+            if (allMonths.size === 0) {
+                return `<div class="obra-block"><p class="no-data">Sin datos de programa mensual.<br>Ejecute las curvas S para generar la serie histórica.</p></div>`;
+            }
+            const months = Array.from(allMonths).sort();
+            const hoyYM  = new Date().toISOString().substring(0, 7);
+            const fmtYM  = ym => { const [y,m] = ym.split('-'); return `${MESES_ES[+m-1]}<br><span style="font-size:8px;">${y}</span>`; };
+
+            let th = months.map(ym => {
+                const isCur = ym === hoyYM;
+                const isPast = ym < hoyYM;
+                const bg = isCur ? '#1d4ed8' : isPast ? '#334155' : '#4b5563';
+                const border = isCur ? 'border-bottom:3px solid #60a5fa;' : '';
+                return `<th style="padding:6px 5px;text-align:center;color:${isCur?'#fff':'#cbd5e1'};font-size:9px;font-weight:600;border:1px solid #1e293b;min-width:56px;background:${bg};${border}line-height:1.3;">${fmtYM(ym)}</th>`;
+            }).join('');
+
+            let rows2 = obrasData.map((obra, idx) => {
+                const ag = avanceGanttRaw[obra.ID_proy];
+                const mensual = (ag && ag.mensual) ? ag.mensual : {};
+                const bg = idx % 2 === 0 ? '#fff' : '#f8fafc';
+                let tds = months.map(ym => {
+                    const val = mensual[ym];
+                    if (val === undefined || val === null) {
+                        return `<td style="padding:5px 6px;text-align:center;font-size:9px;color:#e2e8f0;border:1px solid #f1f5f9;">—</td>`;
+                    }
+                    const pct = Number(val).toFixed(2);
+                    const isCur = ym === hoyYM;
+                    const isFut = ym > hoyYM;
+                    const col = val >= 100 ? '#16a34a' : val >= 75 ? '#2563eb' : val >= 50 ? '#7c3aed' : val >= 25 ? '#b45309' : '#64748b';
+                    const bdr = isCur ? 'border-left:2px solid #1d4ed8;border-right:2px solid #1d4ed8;' : '';
+                    const op  = isFut ? 'opacity:0.55;' : '';
+                    return `<td style="padding:5px 6px;text-align:center;font-size:9px;font-weight:${isCur?'700':'500'};color:${col};border:1px solid #f1f5f9;font-family:monospace;${bdr}${op}">${pct}%</td>`;
+                }).join('');
+                return `<tr style="background:${bg};">
+  <td style="padding:6px 10px;font-size:10px;font-weight:600;color:#1e293b;border:1px solid #e2e8f0;position:sticky;left:0;background:${bg};z-index:1;white-space:nowrap;">${obra.nombre}</td>
+  ${tds}
+</tr>`;
+            }).join('');
+
+            return `<div class="obra-block" style="padding:16px 0 8px;">
+<div style="padding:0 16px 10px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+  <div style="font-size:13px;font-weight:700;color:#1e293b;">📅 Programa Mensual Acumulado — todas las obras</div>
+  <div style="font-size:9px;color:#94a3b8;">Columna azul = mes actual · Fuente: Gantt de control</div>
+</div>
+<div style="overflow-x:auto;overflow-y:auto;max-height:580px;-webkit-overflow-scrolling:touch;border-top:1px solid #e2e8f0;">
+<table style="border-collapse:collapse;font-size:10px;white-space:nowrap;min-width:${180 + months.length * 58}px;">
+<thead style="position:sticky;top:0;z-index:3;">
+<tr style="background:#0f172a;">
+  <th style="padding:8px 12px;text-align:left;color:#f1f5f9;font-size:10px;font-weight:700;border:1px solid #1e293b;position:sticky;left:0;z-index:4;background:#0f172a;min-width:180px;">Proyecto</th>
+  ${th}
+</tr>
+</thead>
+<tbody>${rows2}</tbody>
+</table>
+</div>
+<div style="padding:8px 16px 4px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+  <span style="font-size:9px;color:#94a3b8;">% Acumulado programado según Gantt de control:</span>
+  <span style="font-size:9px;color:#16a34a;">● ≥100%</span>
+  <span style="font-size:9px;color:#2563eb;">● ≥75%</span>
+  <span style="font-size:9px;color:#7c3aed;">● ≥50%</span>
+  <span style="font-size:9px;color:#b45309;">● ≥25%</span>
+  <span style="font-size:9px;color:#64748b;">● &lt;25%</span>
+</div>
+</div>`;
+        })();
+
+        const tabKeys = ['resumen','checkpoints','curvas','ritmos','viviendas','pagos','progmensual'];
+        const tabLabels = {resumen:'Resumen',checkpoints:'Checkpoints',curvas:'Curvas S',ritmos:'Ritmos y comentarios',viviendas:'Viviendas',pagos:'Estado de Pago',progmensual:'Prog. Mensual'};
 
         const tabs = `<div class="tabs">
 ${tabKeys.map((t,i)=>`<button class="tab-btn${i===0?' active':''}" onclick="mostrar('${t}',this)">${tabLabels[t]}</button>`).join('\n')}
@@ -6619,9 +6692,14 @@ ${tabKeys.map((t,i)=>`<button class="tab-btn${i===0?' active':''}" onclick="most
 </div>
 </div>`;
 
-        const secs = tabKeys.map(t =>
-            `<div class="section${t==='resumen'?' active':''}" id="sec-${t}">${t==='resumen'?resumenTablaHtml:''}${obrasData.map((o,i)=>`<div class="obra-block" data-obra="${i}">${allSections[i][t]}</div>`).join('')}</div>`
-        ).join('');
+        const secs = tabKeys.map(t => {
+            if (t === 'progmensual') {
+                return `<div class="section" id="sec-progmensual">${progMensualHtml}</div>`;
+            }
+            const pre  = t === 'resumen' ? resumenTablaHtml : '';
+            const body = obrasData.map((o,i) => `<div class="obra-block" data-obra="${i}">${allSections[i][t]}</div>`).join('');
+            return `<div class="section${t==='resumen'?' active':''}" id="sec-${t}">${pre}${body}</div>`;
+        }).join('');
 
         const html = `<!DOCTYPE html>
 <html lang="es">
