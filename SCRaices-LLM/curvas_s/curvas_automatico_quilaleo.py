@@ -813,7 +813,7 @@ def main():
         generar_grafico_todos(grupos, control_date, fines_proy_global, OUTPUT_DIR)
 
         drive_ids = actualizar_drive(drive_svc, OUTPUT_DIR)
-        insertar_imagenes_en_sheets(sheets_svc, drive_ids)
+        _ccu.retry_sheets(insertar_imagenes_en_sheets, sheets_svc, drive_ids)
         marcar_pendiente(sheets_svc, ts)
 
         log.info("=" * 65)
