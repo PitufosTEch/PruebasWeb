@@ -6480,7 +6480,7 @@ ${mProy>0?`<tr style="font-weight:700;color:#7c3aed;background:#f5f3ff;"><td col
             resumenFilas.forEach(r => {
                 const dCol = r.diff===null?'#94a3b8':r.diff>=0?'#16a34a':'#dc2626';
                 const dBg  = r.diff===null?'':r.diff>=0?'#f0fdf4':'#fef2f2';
-                const dTxt = r.diff===null?'—':(r.diff>=0?'+':'')+r.diff+'%';
+                const dTxt = r.diff===null?'—':(r.diff>=0?'+':'')+Number(r.diff).toFixed(2)+'%';
                 const cRCol = r.cDiasR===null?'#94a3b8':r.cDiasR<0?'#dc2626':r.cDiasR<30?'#b45309':'#374151';
                 const pRCol = r.progDiasR===null?'#94a3b8':r.progDiasR<90?'#dc2626':'#374151';
                 t += `<tr style="border-bottom:1px solid #f1f5f9;">
@@ -7014,7 +7014,7 @@ function jumpToObra(idx){
             resumenFilas.forEach(r => {
                 const dCol = r.diff===null?'#94a3b8':r.diff>=0?'#16a34a':'#dc2626';
                 const dBg  = r.diff===null?'':r.diff>=0?'#f0fdf4':'#fef2f2';
-                const dTxt = r.diff===null?'—':(r.diff>=0?'+':'')+r.diff+'%';
+                const dTxt = r.diff===null?'—':(r.diff>=0?'+':'')+Number(r.diff).toFixed(2)+'%';
                 const cRCol = r.cDiasR===null?'#94a3b8':r.cDiasR<0?'#dc2626':r.cDiasR<30?'#b45309':'#374151';
                 const pRCol = r.progDiasR===null?'#94a3b8':r.progDiasR<90?'#dc2626':'#374151';
                 t += `<tr style="border-bottom:1px solid #f1f5f9;">
