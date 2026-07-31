@@ -7683,6 +7683,43 @@ window.addEventListener('resize',updateStickyTops);
         const tabGar     = allSections.map((s,i) => `<div class="obra-block" data-obra="${i}">${s.gar}</div>`).join('');
         const tabCurva   = allSections.map((s,i) => s.curvaHtml.replace('class="obra-block"',`class="obra-block" data-obra="${i}"`)).join('');
 
+        // ── TAB PROG. MENSUAL ────────────────────────────────────────────────
+        const MESES_ES_EP = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+        const hoyYM_EP = new Date().toISOString().substring(0,7);
+        const allYMs_EP = new Set();
+        obras.forEach(p => { const m=(avanceGanttRaw[p.ID_proy]||{}).mensual; if(m)Object.keys(m).forEach(ym=>allYMs_EP.add(ym)); });
+        const sortedYMs_EP = [...allYMs_EP].sort();
+        const tabProgMensual = (() => {
+            if (!sortedYMs_EP.length) return '<p style="color:#94a3b8;font-size:12px;font-style:italic;padding:20px 16px;">Sin datos de programa mensual disponibles. Ejecute las curvas S para poblar este campo.</p>';
+            const cellBg=(v,ym)=>{if(ym>hoyYM_EP)return v>0?'rgba(148,163,184,0.12)':'transparent';if(v>=100)return'#dcfce7';if(v>=75)return'#dbeafe';if(v>=50)return'#ede9fe';if(v>=25)return'#fef3c7';return'#f1f5f9';};
+            const cellFg=(v,ym)=>{if(ym>hoyYM_EP)return'#94a3b8';if(v>=100)return'#16a34a';if(v>=75)return'#1d4ed8';if(v>=50)return'#6d28d9';if(v>=25)return'#b45309';return'#64748b';};
+            let h=`<div style="overflow-x:auto;padding:12px 16px;"><table style="border-collapse:collapse;font-size:10px;white-space:nowrap;"><thead><tr><th style="padding:6px 10px;background:#f1f5f9;border:1px solid #e2e8f0;text-align:left;font-size:9px;color:#475569;position:sticky;left:0;z-index:2;min-width:160px;max-width:200px;">Proyecto</th>`;
+            sortedYMs_EP.forEach(ym=>{
+                const [yr,mo]=ym.split('-');
+                const isCur=ym===hoyYM_EP;
+                h+=`<th style="padding:5px 8px;border:1px solid #e2e8f0;text-align:center;font-size:9px;color:${isCur?'#1d4ed8':'#475569'};background:${isCur?'#eff6ff':'#f1f5f9'};min-width:54px;">${MESES_ES_EP[+mo-1]}<br><span style="font-size:8px;">${yr}</span></th>`;
+            });
+            h+=`</tr></thead><tbody>`;
+            obras.forEach((proy,ri)=>{
+                const pid=proy.ID_proy;
+                const nombre=`${pid} · ${proy.NOMBRE_PROYECTO||pid}`;
+                const mensual=(avanceGanttRaw[pid]||{}).mensual||{};
+                const bg=ri%2?'#f8fafc':'#fff';
+                h+=`<tr><td style="padding:5px 10px;border:1px solid #e2e8f0;font-size:10px;font-weight:600;color:#1e293b;position:sticky;left:0;z-index:1;background:${bg};max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${nombre}">${nombre}</td>`;
+                sortedYMs_EP.forEach(ym=>{
+                    const v=mensual[ym]!=null?mensual[ym]:null;
+                    const isCur=ym===hoyYM_EP;
+                    const isFut=ym>hoyYM_EP;
+                    const cbg=v!==null?cellBg(v,ym):isFut?'transparent':'#f8fafc';
+                    const cfg=v!==null?cellFg(v,ym):'#cbd5e1';
+                    h+=`<td style="padding:5px 8px;border:1px solid #e2e8f0;text-align:center;font-size:10px;font-weight:700;color:${cfg};background:${cbg};opacity:${isFut?'0.6':'1'};${isCur?'outline:2px solid #3b82f6;outline-offset:-2px;':''}">${v!==null?Number(v).toFixed(1)+'%':'—'}</td>`;
+                });
+                h+=`</tr>`;
+            });
+            h+=`</tbody></table></div>`;
+            return h;
+        })();
+
         const htmlEP = `<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Estados de Pago — Multi Obras</title>
@@ -7698,6 +7735,7 @@ ${cssEP}</head><body>
     <button class="tab-btn" onclick="mostrar('ep',this)">Estados de Pago</button>
     <button class="tab-btn" onclick="mostrar('gar',this)">Garantías</button>
     <button class="tab-btn" onclick="mostrar('curva',this)">Curva Cobros/Pagos</button>
+    <button class="tab-btn" onclick="mostrar('progmensual',this)">Prog. Mensual</button>
     <div class="obra-jumper-wrap" id="ojWrap">
       <input class="obra-jumper-input" id="ojInput" type="text" placeholder="&#128269; Ir a obra..." autocomplete="off">
       <span class="obra-jumper-arrow">&#9660;</span>
@@ -7711,6 +7749,7 @@ ${cssEP}</head><body>
     <div class="section" id="sec-ep">${tabEP}</div>
     <div class="section" id="sec-gar">${tabGar}</div>
     <div class="section" id="sec-curva">${tabCurva}</div>
+    <div class="section" id="sec-progmensual">${tabProgMensual}</div>
   </div>
   <div class="footer">
     <button class="btn btn-pdf" onclick="window.print()">&#128196; Imprimir / PDF</button>
