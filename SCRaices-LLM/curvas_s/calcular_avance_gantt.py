@@ -214,14 +214,17 @@ def _leer_pct_prog_gantt(sheets_svc, spreadsheet_id, hoja) -> float | None:
         log.info(f"    Gantt '{hoja}': hoy < inicio → pct_prog=0%")
         return 0.0
 
-    # ── 4. Columna de hoy ─────────────────────────────────────────────────────
-    hoy_col, best_dist = None, 999
-    for ci, v in date_cols:
-        d = abs(v - hoy_ser)
-        if d < best_dist:
-            best_dist = d
-            hoy_col = ci
-    if best_dist > 7:
+    # ── 4. Columna de hoy — preferir la más reciente que no supere hoy ────────
+    # (evita leer valores de semanas futuras cuando hoy cae entre dos columnas)
+    past_cols = [(ci, v) for ci, v in date_cols if v <= hoy_ser]
+    if past_cols:
+        hoy_col = max(past_cols, key=lambda x: x[1])[0]
+        best_dist = hoy_ser - max(v for _, v in past_cols)
+    else:
+        # Todas las columnas son futuras — elegir la más próxima
+        hoy_col = min(date_cols, key=lambda x: abs(x[1] - hoy_ser))[0]
+        best_dist = min(abs(v - hoy_ser) for _, v in date_cols)
+    if best_dist > 14:
         log.warning(f"    Gantt '{hoja}': columna de hoy no encontrada (dist={best_dist})")
         return None
 
@@ -244,7 +247,7 @@ def _leer_pct_prog_gantt(sheets_svc, spreadsheet_id, hoja) -> float | None:
                 if hoy_col < len(row):
                     v = row[hoy_col]
                     if isinstance(v, (int, float)) and v >= 0:
-                        pct = round(float(v) * (100.0 if v <= 1.5 else 1.0), 1)
+                        pct = round(float(v) * (100.0 if v <= 1.5 else 1.0), 2)
                         log.info(
                             f"    Gantt '{hoja}': pct_prog={pct}%  "
                             f"(col={hoy_col} dist={best_dist}d label='{row[ci]}')"
@@ -292,7 +295,7 @@ def _calc_pct_prog_curvas(inicios: list, hoy: date, pct_semana: list) -> float |
     if not inicios:
         return None
     vals = [_pct_programada((hoy - ini).days, pct_semana) for ini in inicios]
-    return round(sum(vals) / len(vals), 1)
+    return round(sum(vals) / len(vals), 2)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -366,7 +369,7 @@ def _leer_datos_control(sheets_svc, spreadsheet_id, pid) -> dict | None:
         return None
 
     n_con_valor = sum(1 for v in valores_real if v > 0)
-    promedio    = round(sum(valores_real) / len(valores_real), 1)
+    promedio    = round(sum(valores_real) / len(valores_real), 2)
 
     return {
         "pct":            promedio,
@@ -439,7 +442,7 @@ def main():
             gi = _gantt_inicio_fb(pid)
             hoy = date.today()
             if curvas_cfg and gi:
-                pct_prog = round(_pct_programada((hoy - gi).days, curvas_cfg["pct_semana"]), 1)
+                pct_prog = round(_pct_programada((hoy - gi).days, curvas_cfg["pct_semana"]), 2)
                 log.info(f"  {pid}: pct_prog={pct_prog}% [fallback inicio proy {gi}]")
 
         if pct_prog is not None:
