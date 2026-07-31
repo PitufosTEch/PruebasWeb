@@ -166,97 +166,129 @@ _SHEETS_BASE = date(1899, 12, 30)
 _PROGRAMA_LABELS = {"programa", "progra", "prog.", "prog"}
 
 
-def _leer_pct_prog_gantt(sheets_svc, spreadsheet_id, hoja) -> float | None:
+def _leer_gantt_datos(sheets_svc, spreadsheet_id, hoja) -> tuple:
     """
-    Lee el % avance programado directamente de la fila 'Programa' del Gantt.
+    Lee la hoja Gantt en una sola llamada y retorna:
+      (pct_actual, mensual)
+    donde:
+      pct_actual : float % programado acumulado a la columna más reciente <= hoy,
+                   o None si no se puede determinar.
+      mensual    : dict {YYYY-MM: float} con el % acumulado al último día de
+                   cada mes presente en el Gantt, o None si no hay datos.
 
-    Lógica:
-      1. Encuentra la columna cuyo serial de fecha es más cercano a hoy (<=7 días).
-      2. Si hoy supera la última fecha del Gantt → proyecto terminado → 100%.
-      3. Si hoy es anterior a la primera fecha → no iniciado → 0%.
-      4. Busca la fila con label 'Programa' (variantes) en cols 0-24.
-      5. Lee el valor numérico en la columna de hoy.
-
-    Retorna float (0-100) o None si no se pudo leer.
+    Lógica de columna actual:
+      - Prefiere la columna pasada más reciente (serial <= hoy).
+      - Si todas son futuras, usa la más próxima.
+      - Si hoy supera el Gantt → pct_actual=100; si es anterior al inicio → 0.
     """
     hoy = date.today()
     hoy_ser = (hoy - _SHEETS_BASE).days
 
-    # ── 1. Leer fila de fechas (row 1) ────────────────────────────────────────
+    # ── Leer toda la hoja en una sola llamada ─────────────────────────────────
     try:
         r = sheets_svc.spreadsheets().values().get(
-            spreadsheetId=spreadsheet_id,
-            range=f"'{hoja}'!A1:EZ1",
-            valueRenderOption="UNFORMATTED_VALUE",
-        ).execute()
-    except Exception as e:
-        log.warning(f"    Gantt '{hoja}': error leyendo fila fechas → {e}")
-        return None
-
-    row1 = r.get("values", [[]])[0]
-    date_cols = [
-        (ci, int(v))
-        for ci, v in enumerate(row1)
-        if isinstance(v, (int, float)) and 44000 < v < 50000
-    ]
-    if not date_cols:
-        log.warning(f"    Gantt '{hoja}': no se encontraron columnas de fecha")
-        return None
-
-    min_ser = min(v for _, v in date_cols)
-    max_ser = max(v for _, v in date_cols)
-
-    # ── 2-3. Casos fuera de rango ──────────────────────────────────────────────
-    if hoy_ser > max_ser + 7:
-        log.info(f"    Gantt '{hoja}': hoy > termino → pct_prog=100%")
-        return 100.0
-    if hoy_ser < min_ser - 7:
-        log.info(f"    Gantt '{hoja}': hoy < inicio → pct_prog=0%")
-        return 0.0
-
-    # ── 4. Columna de hoy — preferir la más reciente que no supere hoy ────────
-    # (evita leer valores de semanas futuras cuando hoy cae entre dos columnas)
-    past_cols = [(ci, v) for ci, v in date_cols if v <= hoy_ser]
-    if past_cols:
-        hoy_col = max(past_cols, key=lambda x: x[1])[0]
-        best_dist = hoy_ser - max(v for _, v in past_cols)
-    else:
-        # Todas las columnas son futuras — elegir la más próxima
-        hoy_col = min(date_cols, key=lambda x: abs(x[1] - hoy_ser))[0]
-        best_dist = min(abs(v - hoy_ser) for _, v in date_cols)
-    if best_dist > 14:
-        log.warning(f"    Gantt '{hoja}': columna de hoy no encontrada (dist={best_dist})")
-        return None
-
-    # ── 5. Leer toda la hoja y buscar fila "Programa" ─────────────────────────
-    try:
-        r2 = sheets_svc.spreadsheets().values().get(
             spreadsheetId=spreadsheet_id,
             range=f"'{hoja}'!A1:EZ120",
             valueRenderOption="UNFORMATTED_VALUE",
         ).execute()
     except Exception as e:
-        log.warning(f"    Gantt '{hoja}': error leyendo datos → {e}")
-        return None
+        log.warning(f"    Gantt '{hoja}': error leyendo hoja → {e}")
+        return None, None
 
-    rows = r2.get("values", [])
+    rows = r.get("values", [])
+    if not rows:
+        return None, None
+
+    # ── Columnas de fecha desde la primera fila ────────────────────────────────
+    row1 = rows[0]
+    date_cols = []  # [(col_idx, date, serial)]
+    for ci, v in enumerate(row1):
+        if isinstance(v, (int, float)) and 44000 < v < 52000:
+            try:
+                d = _SHEETS_BASE + timedelta(days=int(v))
+                date_cols.append((ci, d, int(v)))
+            except Exception:
+                pass
+
+    if not date_cols:
+        log.warning(f"    Gantt '{hoja}': no se encontraron columnas de fecha")
+        return None, None
+
+    serials = [s for _, _, s in date_cols]
+    min_ser, max_ser = min(serials), max(serials)
+
+    # ── Casos fuera de rango ───────────────────────────────────────────────────
+    if hoy_ser > max_ser + 7:
+        log.info(f"    Gantt '{hoja}': hoy > término → pct_prog=100%")
+        return 100.0, None
+    if hoy_ser < min_ser - 7:
+        log.info(f"    Gantt '{hoja}': hoy < inicio → pct_prog=0%")
+        return 0.0, None
+
+    # ── Columna actual: más reciente que no supere hoy ────────────────────────
+    past = [(ci, d, s) for ci, d, s in date_cols if s <= hoy_ser]
+    if past:
+        cur_ci, _, cur_s = max(past, key=lambda x: x[2])
+        best_dist = hoy_ser - cur_s
+    else:
+        cur_ci, _, cur_s = min(date_cols, key=lambda x: abs(x[2] - hoy_ser))
+        best_dist = min(abs(s - hoy_ser) for _, _, s in date_cols)
+
+    if best_dist > 14:
+        log.warning(f"    Gantt '{hoja}': columna actual no encontrada (dist={best_dist})")
+        return None, None
+
+    # ── Buscar fila "Programa" ────────────────────────────────────────────────
+    prog_row = None
+    prog_label = "?"
     for row in rows:
         for ci in range(min(25, len(row))):
             label = str(row[ci]).strip().lower()
             if label in _PROGRAMA_LABELS or "rograma" in label:
-                if hoy_col < len(row):
-                    v = row[hoy_col]
-                    if isinstance(v, (int, float)) and v >= 0:
-                        pct = round(float(v) * (100.0 if v <= 1.5 else 1.0), 2)
-                        log.info(
-                            f"    Gantt '{hoja}': pct_prog={pct}%  "
-                            f"(col={hoy_col} dist={best_dist}d label='{row[ci]}')"
-                        )
-                        return pct
-                break  # label found but value missing — skip row
+                prog_row = row
+                prog_label = row[ci]
+                break
+        if prog_row is not None:
+            break
 
-    log.warning(f"    Gantt '{hoja}': fila 'Programa' no encontrada")
-    return None
+    if prog_row is None:
+        log.warning(f"    Gantt '{hoja}': fila 'Programa' no encontrada")
+        return None, None
+
+    def _parse_val(v):
+        if not isinstance(v, (int, float)) or v < 0:
+            return None
+        return round(float(v) * (100.0 if v <= 1.5 else 1.0), 2)
+
+    # ── pct_actual ────────────────────────────────────────────────────────────
+    pct_actual = None
+    if cur_ci < len(prog_row):
+        pct_actual = _parse_val(prog_row[cur_ci])
+        if pct_actual is not None:
+            log.info(
+                f"    Gantt '{hoja}': pct_prog={pct_actual}%  "
+                f"(dist={best_dist}d label='{prog_label}')"
+            )
+
+    # ── Serie mensual completa ────────────────────────────────────────────────
+    # Para cada mes toma el valor de la columna más tardía dentro del mes.
+    mensual: dict[str, float] = {}
+    for ci, d, _ in date_cols:
+        if ci >= len(prog_row):
+            continue
+        pct = _parse_val(prog_row[ci])
+        if pct is None:
+            continue
+        ym = d.strftime("%Y-%m")
+        mensual[ym] = pct  # última columna del mes sobreescribe las anteriores
+
+    if mensual:
+        log.info(
+            f"    Gantt '{hoja}': mensual {len(mensual)} meses "
+            f"({min(mensual)} → {max(mensual)})"
+        )
+
+    return pct_actual, (mensual if mensual else None)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -423,7 +455,11 @@ def main():
         pct_prog = None
 
         if hoja_gantt:
-            pct_prog = _leer_pct_prog_gantt(sheets_svc, sid, hoja_gantt)
+            pct_prog, mensual = _leer_gantt_datos(sheets_svc, sid, hoja_gantt)
+            if mensual:
+                datos["mensual"] = mensual
+        else:
+            mensual = None
 
         if pct_prog is None:
             # Fallback 1: curva S con fechas de col C
