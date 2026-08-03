@@ -153,6 +153,27 @@ select.v-nook { background: #c0392b !important; color: #fff !important; }
 }
 .eq-nd { color: #bbb; font-weight: normal; font-style: italic; }
 
+/* ── EQUIPO PROPUESTO (editable) ── */
+.td-eq-prop { background: #eaf3fb; vertical-align: middle; padding: 3px 4px; }
+.eq-prop-sel {
+  width: 132px; height: 20px; font-size: 10px; padding: 0 2px;
+  border: 1px solid #93c5fd; border-radius: 3px; background: #fff;
+  color: #555; cursor: pointer;
+}
+.eq-prop-sel.set { color: #1a3a5c; font-weight: 600; border-color: #2980b9; background: #dbeafe; }
+.eq-prop-inp {
+  display: none; width: 132px; margin-top: 3px; height: 20px;
+  font-size: 10px; padding: 0 3px;
+  border: 1px solid #2980b9; border-radius: 3px; background: #fff;
+}
+.td-eq-obs { background: #fffbeb; vertical-align: middle; padding: 3px 4px; }
+.eq-obs-ta {
+  width: 162px; min-height: 36px; font-size: 10px; padding: 2px 4px;
+  border: 1px solid #fde68a; border-radius: 3px; resize: vertical;
+  background: transparent; font-family: Arial, sans-serif; line-height: 1.35;
+  white-space: normal;
+}
+
 /* ── OBSERVACIONES CELL ── */
 .obs-preview {
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
@@ -294,7 +315,7 @@ button.dbtn:hover { background: #922b21; }
   <th colspan="2" class="g-atr">ATRIBUTOS POR OBRA</th>
   <th rowspan="2" class="g-correo-ini" style="min-width:80px">CORREO<br>INICIO<br>OBRA</th>
   <th rowspan="2" class="g-obs"    style="min-width:180px">OBSERVACIONES</th>
-  <th colspan="4" class="g-equipo">EQUIPO</th>
+  <th colspan="7" class="g-equipo">EQUIPO</th>
   <th rowspan="2" class="g-del"    style="min-width:48px">DEL.</th>
 </tr>
 <!-- ROW 2: sub-headers -->
@@ -342,12 +363,15 @@ button.dbtn:hover { background: #922b21; }
   <th class="g-equipo"  style="min-width:110px">Capataz 1</th>
   <th class="g-equipo"  style="min-width:110px">Capataz 2</th>
   <th class="g-equipo"  style="min-width:110px">Capataz 3</th>
+  <th class="g-equipo"  style="min-width:140px">Residente<br>Propuesto</th>
+  <th class="g-equipo"  style="min-width:140px">Capataz<br>Propuesto</th>
+  <th class="g-equipo"  style="min-width:170px">Obs. Equipo</th>
 </tr>
 </thead>
 <tbody id="pb"></tbody>
 <tfoot>
   <tr id="tfoot-add">
-    <td colspan="43" style="padding:8px;border-top:2px solid #2980b9;background:#eaf4fb;text-align:left">
+    <td colspan="46" style="padding:8px;border-top:2px solid #2980b9;background:#eaf4fb;text-align:left">
       <button onclick="addProject()" style="
         padding:7px 18px;background:#27ae60;color:#fff;border:none;
         border-radius:5px;cursor:pointer;font-size:12.5px;font-weight:bold;
@@ -769,6 +793,7 @@ function mkProj(o = {}) {
     correoInicio: "No",
     condicionesEspeciales: "",
     residente: "", capataz1: "", capataz2: "", capataz3: "",
+    residenteProp: "", capatazProp: "", obsEquipo: "",
   }, o);
 }
 
@@ -856,6 +881,20 @@ function lnkCell(id, field, val) {
     <input type="text" data-id="${id}" data-field="${field}" value="${esc(val)}" placeholder="URL Drive…" oninput="onLink(this)">
     <a href="${esc(val||"#")}" target="_blank" class="lbtn" id="lb_${id}_${field}" style="${show}">🔗</a>
   </div>`;
+}
+
+const RESIDENTES_OPTS = ["Arturo Neira","Jairo Alvarez","Ricardo Maldonado"];
+const CAPATACES_OPTS  = ["Alexis Curivil","Angelo Morales","Cristian Millanao","Enrique Lopez","FERNANDO LOPEZ","Juan José Carroza","Nato Peña","William Peña"];
+
+function eqPropSel(id, field, opts, val) {
+  const isCustom = val && !opts.includes(val);
+  let s = '<select class="eq-prop-sel' + (val ? ' set' : '') + '" onchange="onEqPropSel(this,' + id + ',\'' + field + '\')">';
+  s += '<option value="">— seleccionar —</option>';
+  for (const o of opts) s += '<option value="' + esc(o) + '"' + (val === o && !isCustom ? ' selected' : '') + '>' + esc(o) + '</option>';
+  s += '<option value="__custom__"' + (isCustom ? ' selected' : '') + '>-- Escribir nombre... --</option>';
+  s += '</select>';
+  s += '<input class="eq-prop-inp" style="' + (isCustom ? 'display:block' : 'display:none') + '" type="text" value="' + (isCustom ? esc(val) : '') + '" oninput="onEqPropInp(this,' + id + ',\'' + field + '\')" placeholder="Nombre libre...">';
+  return s;
 }
 
 function eBtn(id, dt, estado) {
@@ -980,6 +1019,11 @@ function mkRow(p) {
   <td><div id="eq_capataz2_${id}"  class="eq-display">${esc(p.capataz2)  || '<span class="eq-nd">—</span>'}</div></td>
   <td><div id="eq_capataz3_${id}"  class="eq-display">${esc(p.capataz3)  || '<span class="eq-nd">—</span>'}</div></td>
 
+  <!-- Equipo propuesto (editable) -->
+  <td class="td-eq-prop">${eqPropSel(id, 'residenteProp', RESIDENTES_OPTS, p.residenteProp||'')}</td>
+  <td class="td-eq-prop">${eqPropSel(id, 'capatazProp',   CAPATACES_OPTS,  p.capatazProp||'')}</td>
+  <td class="td-eq-obs"><textarea class="eq-obs-ta" oninput="onEqObs(this,${id})" placeholder="Observaciones...">${esc(p.obsEquipo||'')}</textarea></td>
+
   <!-- Eliminar -->
   <td><button class="dbtn" onclick="delProj(${id})" title="Eliminar">✕</button></td>
   `;
@@ -1057,6 +1101,31 @@ function onLink(el) {
   p[el.dataset.field] = el.value;
   const btn = document.getElementById(`lb_${p.id}_${el.dataset.field}`);
   if (btn) { btn.href = el.value||"#"; btn.style.display = el.value?"":"none"; }
+  scheduleSave();
+}
+function onEqPropSel(sel, id, field) {
+  const p = gp(id); if (!p) return;
+  const inp = sel.nextElementSibling;
+  if (sel.value === '__custom__') {
+    inp.style.display = 'block'; inp.focus();
+    p[field] = inp.value || '';
+  } else {
+    inp.style.display = 'none';
+    p[field] = sel.value;
+    sel.className = 'eq-prop-sel' + (sel.value ? ' set' : '');
+  }
+  scheduleSave();
+}
+function onEqPropInp(inp, id, field) {
+  const p = gp(id); if (!p) return;
+  p[field] = inp.value;
+  const sel = inp.previousElementSibling;
+  if (sel) sel.className = 'eq-prop-sel' + (inp.value ? ' set' : '');
+  scheduleSave();
+}
+function onEqObs(ta, id) {
+  const p = gp(id); if (!p) return;
+  p.obsEquipo = ta.value;
   scheduleSave();
 }
 function onRegion(el) {
@@ -1696,7 +1765,8 @@ function exportExcel() {
     "Atributos Estado","Atributos Link",
     "Correo Inicio Obra",
     "Observaciones",
-    "Residente","Capataz 1","Capataz 2","Capataz 3"];
+    "Residente","Capataz 1","Capataz 2","Capataz 3",
+    "Residente Propuesto","Capataz Propuesto","Obs. Equipo"];
 
   const cell = v => `<td>${String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;')}</td>`;
 
@@ -1715,7 +1785,8 @@ function exportExcel() {
       p.atributosEstado, p.atributosLink,
       p.correoInicio,
       p.condicionesEspeciales,
-      p.residente, p.capataz1, p.capataz2, p.capataz3
+      p.residente, p.capataz1, p.capataz2, p.capataz3,
+      p.residenteProp, p.capatazProp, p.obsEquipo
     ].map(cell).join('');
   });
 
