@@ -155,6 +155,13 @@ select.v-nook { background: #c0392b !important; color: #fff !important; }
 
 /* ── EQUIPO PROPUESTO (editable) ── */
 .td-eq-prop { background: #eaf3fb; vertical-align: middle; padding: 3px 4px; }
+/* ── Filtros de columna en cabecera EQUIPO ── */
+.eq-flt {
+  display: block; width: 100%; font-size: 9px; margin-top: 3px;
+  padding: 1px 2px; border: 1px solid rgba(255,255,255,0.3); border-radius: 3px;
+  background: rgba(255,255,255,0.15); color: #fff; cursor: pointer;
+}
+.eq-flt option { color: #1a1a1a; background: #fff; }
 .eq-prop-sel {
   width: 132px; height: 20px; font-size: 10px; padding: 0 2px;
   border: 1px solid #93c5fd; border-radius: 3px; background: #fff;
@@ -359,12 +366,12 @@ button.dbtn:hover { background: #922b21; }
   <th class="g-atr"     style="min-width:86px">Estado</th>
   <th class="g-atr"     style="min-width:150px">Link Drive</th>
   <!-- Equipo -->
-  <th class="g-equipo"  style="min-width:110px">Residente</th>
-  <th class="g-equipo"  style="min-width:110px">Capataz 1</th>
-  <th class="g-equipo"  style="min-width:110px">Capataz 2</th>
-  <th class="g-equipo"  style="min-width:110px">Capataz 3</th>
-  <th class="g-equipo"  style="min-width:140px">Residente<br>Propuesto</th>
-  <th class="g-equipo"  style="min-width:140px">Capataz<br>Propuesto</th>
+  <th class="g-equipo"  style="min-width:110px">Residente<select id="flt-residente" class="eq-flt" onchange="filterTable()"><option value="">Todos</option></select></th>
+  <th class="g-equipo"  style="min-width:110px">Capataz 1<select id="flt-capataz1" class="eq-flt" onchange="filterTable()"><option value="">Todos</option></select></th>
+  <th class="g-equipo"  style="min-width:110px">Capataz 2<select id="flt-capataz2" class="eq-flt" onchange="filterTable()"><option value="">Todos</option></select></th>
+  <th class="g-equipo"  style="min-width:110px">Capataz 3<select id="flt-capataz3" class="eq-flt" onchange="filterTable()"><option value="">Todos</option></select></th>
+  <th class="g-equipo"  style="min-width:140px">Residente<br>Propuesto<select id="flt-residenteProp" class="eq-flt" onchange="filterTable()"><option value="">Todos</option></select></th>
+  <th class="g-equipo"  style="min-width:140px">Capataz<br>Propuesto<select id="flt-capatazProp" class="eq-flt" onchange="filterTable()"><option value="">Todos</option></select></th>
   <th class="g-equipo"  style="min-width:170px">Obs. Equipo</th>
 </tr>
 </thead>
@@ -924,9 +931,15 @@ function mkRow(p) {
   const norm = calcNorma(p.fechaPermiso);
   const tr   = document.createElement("tr");
   tr.id = `row_${id}`;
-  tr.dataset.obra   = (p.obra  ||"").toLowerCase();
-  tr.dataset.region = (p.region||"").toLowerCase();
-  tr.dataset.comuna = (p.comuna||"").toLowerCase();
+  tr.dataset.obra          = (p.obra         ||"").toLowerCase();
+  tr.dataset.region        = (p.region       ||"").toLowerCase();
+  tr.dataset.comuna        = (p.comuna       ||"").toLowerCase();
+  tr.dataset.residente     = (p.residente    ||"").toLowerCase();
+  tr.dataset.capataz1      = (p.capataz1     ||"").toLowerCase();
+  tr.dataset.capataz2      = (p.capataz2     ||"").toLowerCase();
+  tr.dataset.capataz3      = (p.capataz3     ||"").toLowerCase();
+  tr.dataset.residenteProp = (p.residenteProp||"").toLowerCase();
+  tr.dataset.capatazProp   = (p.capatazProp  ||"").toLowerCase();
 
   tr.innerHTML = `
   <td>${obraSelect(id, p.obra)}</td>
@@ -1574,10 +1587,41 @@ function delProj(id) {
    FILTER
    ════════════════════════════════════════════════ */
 function filterTable() {
-  const q = document.getElementById("searchBox").value.toLowerCase().trim();
+  const q   = document.getElementById("searchBox").value.toLowerCase().trim();
+  const flt = {
+    residente:     (document.getElementById("flt-residente")?.value     || "").toLowerCase(),
+    capataz1:      (document.getElementById("flt-capataz1")?.value      || "").toLowerCase(),
+    capataz2:      (document.getElementById("flt-capataz2")?.value      || "").toLowerCase(),
+    capataz3:      (document.getElementById("flt-capataz3")?.value      || "").toLowerCase(),
+    residenteProp: (document.getElementById("flt-residenteProp")?.value || "").toLowerCase(),
+    capatazProp:   (document.getElementById("flt-capatazProp")?.value   || "").toLowerCase(),
+  };
   document.querySelectorAll("#pb tr").forEach(tr => {
-    const ok = !q || tr.dataset.obra.includes(q) || tr.dataset.region.includes(q) || tr.dataset.comuna.includes(q);
-    tr.style.display = ok ? "" : "none";
+    const d   = tr.dataset;
+    const okQ = !q || d.obra.includes(q) || d.region.includes(q) || d.comuna.includes(q);
+    const okE = (!flt.residente     || d.residente     === flt.residente)
+             && (!flt.capataz1      || d.capataz1      === flt.capataz1)
+             && (!flt.capataz2      || d.capataz2      === flt.capataz2)
+             && (!flt.capataz3      || d.capataz3      === flt.capataz3)
+             && (!flt.residenteProp || d.residenteProp === flt.residenteProp)
+             && (!flt.capatazProp   || d.capatazProp   === flt.capatazProp);
+    tr.style.display = (okQ && okE) ? "" : "none";
+  });
+}
+
+function populateEquipoFilters() {
+  const fields = ["residente","capataz1","capataz2","capataz3","residenteProp","capatazProp"];
+  fields.forEach(f => {
+    const sel = document.getElementById("flt-" + f);
+    if (!sel) return;
+    const prev = sel.value;
+    const vals = new Set();
+    document.querySelectorAll("#pb tr").forEach(tr => {
+      const v = tr.dataset[f];
+      if (v) vals.add(v);
+    });
+    sel.innerHTML = '<option value="">Todos</option>'
+      + [...vals].sort().map(v => `<option value="${v}"${v===prev?" selected":""}>${v}</option>`).join("");
   });
 }
 
@@ -1617,6 +1661,7 @@ function renderAll() {
   tb.innerHTML = "";
   projects.forEach(p => tb.appendChild(mkRow(p)));
   refreshAllObraSelects();
+  populateEquipoFilters();
 }
 
 function normObra(s) {
