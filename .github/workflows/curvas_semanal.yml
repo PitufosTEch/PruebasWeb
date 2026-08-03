@@ -177,6 +177,7 @@ jobs:
     timeout-minutes: 15
     needs: curvas-proyecto
     if: always()
+    continue-on-error: true   # cookies expiradas no deben bloquear el envío de informes
 
     steps:
       - uses: actions/checkout@v4
