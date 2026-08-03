@@ -96,7 +96,15 @@ def _grupos_capataces(pid: str) -> list:
 
 def wait_dashboard_ready(page, timeout=300):
     print("  Esperando carga del dashboard (hasta 5 min)...")
-    page.wait_for_selector("select", timeout=timeout * 1000)
+    # El selector de proyecto es un DIV con React fiber, no un <select> nativo.
+    # Esperamos a que React renderice los botones del menú superior.
+    try:
+        page.wait_for_function(
+            "() => document.querySelectorAll('button').length > 3",
+            timeout=timeout * 1000,
+        )
+    except Exception:
+        print("  (Timeout esperando botones, continuando)")
     try:
         page.wait_for_function(
             "() => { const t=document.body.innerText; "
@@ -107,6 +115,43 @@ def wait_dashboard_ready(page, timeout=300):
         pass
     time.sleep(4)
     print("  Dashboard listo.")
+
+
+def seleccionar_proyecto(page, pid: str):
+    """Selecciona un proyecto en el dropdown del dashboard.
+    Usa div.click() (evento DOM real) para que React procese correctamente.
+    El selector de proyecto es un DIV con onClick que abre un dropdown condicional;
+    no es un <select> nativo.
+    """
+    # 1. Abrir dropdown: click real en la DIV que muestra el proyecto actual
+    page.evaluate("""
+        const div = [...document.querySelectorAll('div')].find(d => {
+            const rk = Object.keys(d).find(k=>k.startsWith('__reactFiber'));
+            return rk && d[rk]?.memoizedProps?.onClick
+                && /^P\\d+/.test(d.textContent.trim())
+                && d.textContent.trim().length < 200;
+        });
+        if(div) div.click();
+    """)
+    # 2. Esperar que el dropdown se abra (input "Buscar proyecto..." visible)
+    try:
+        page.wait_for_selector('input[placeholder="Buscar proyecto..."]', timeout=5000)
+    except Exception:
+        print(f"    [WARN] Dropdown de proyectos no se abrió para {pid}")
+        return
+    # 3. Filtrar por ID para reducir la lista
+    page.fill('input[placeholder="Buscar proyecto..."]', pid)
+    time.sleep(0.3)
+    # 4. Click real en el primer ítem que comienza con el ID del proyecto
+    page.evaluate(f"""
+        const item = [...document.querySelectorAll('div')].find(d => {{
+            const rk = Object.keys(d).find(k=>k.startsWith('__reactFiber'));
+            const t = d.textContent.trim();
+            return rk && d[rk]?.memoizedProps?.onClick && t.startsWith('{pid}') && t.length < 150;
+        }});
+        if(item) item.click();
+    """)
+    time.sleep(2.5)
 
 
 def activar_tab_estado_general(page):
@@ -334,13 +379,7 @@ def main(output_dir: Path = None) -> Path:
         primer_pid, _ = PROYECTOS[0]
         print(f"\n[GLOBAL] Capturando HTMLs globales desde {primer_pid}...")
         try:
-            page.wait_for_selector("select", timeout=15000)
-            page.evaluate(f"""
-                const sel=document.querySelector('select');
-                if(sel){{sel.value='{primer_pid}';
-                sel.dispatchEvent(new Event('change',{{bubbles:true}}));}}
-            """)
-            time.sleep(3)
+            seleccionar_proyecto(page, primer_pid)
             activar_tab_estado_general(page)
 
             for sufijo, texto in INFORMES_HTML:
@@ -367,13 +406,7 @@ def main(output_dir: Path = None) -> Path:
         for pid, nombre in PROYECTOS:
             print(f"\n[{pid}] {nombre}")
             try:
-                page.wait_for_selector("select", timeout=15000)
-                page.evaluate(f"""
-                    const sel=document.querySelector('select');
-                    if(sel){{sel.value='{pid}';
-                    sel.dispatchEvent(new Event('change',{{bubbles:true}}));}}
-                """)
-                time.sleep(3)
+                seleccionar_proyecto(page, pid)
                 activar_tab_estado_general(page)
 
                 # HTML Residente (multi-obra: el dashboard incluye todas las obras del residente)
