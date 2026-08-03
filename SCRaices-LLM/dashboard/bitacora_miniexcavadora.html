@@ -9,56 +9,56 @@
 body{font-family:'IBM Plex Sans',system-ui,sans-serif;background:#fafaf9;color:#1c1917;font-size:13px}
 
 /* ── HEADER ── */
-.header{background:linear-gradient(135deg,#92400e 0%,#b45309 100%);color:#fff;padding:14px 20px;position:sticky;top:0;z-index:20;box-shadow:0 2px 8px rgba(0,0,0,.2);display:flex;align-items:center;gap:16px;flex-wrap:wrap}
-.header-icon{font-size:32px;line-height:1}
-.header-title h1{font-size:17px;font-weight:700;letter-spacing:-.3px}
-.header-title .sub{font-size:11px;opacity:.8;margin-top:2px}
+.header{background:linear-gradient(135deg,#92400e 0%,#b45309 100%);color:#fff;padding:12px 18px;position:sticky;top:0;z-index:20;box-shadow:0 2px 8px rgba(0,0,0,.2);display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.header-icon{font-size:30px;line-height:1;flex-shrink:0}
+.header-title h1{font-size:16px;font-weight:700;letter-spacing:-.3px}
+.header-title .sub{font-size:10px;opacity:.8;margin-top:1px}
 .header-center{flex:1;display:flex;align-items:center;justify-content:center;gap:8px}
 .month-nav{display:flex;align-items:center;gap:8px}
-.month-nav button{background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:14px;font-weight:700;transition:.15s}
+.month-nav button{background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:6px;padding:3px 10px;cursor:pointer;font-size:15px;font-weight:700;line-height:1.4;transition:.15s}
 .month-nav button:hover{background:rgba(255,255,255,.35)}
 #month-label{font-size:15px;font-weight:700;min-width:130px;text-align:center}
-.header-right{display:flex;align-items:center;gap:8px}
-.op-wrap{display:flex;align-items:center;gap:6px;font-size:11px;opacity:.9}
+.header-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.op-wrap{display:flex;align-items:center;gap:5px;font-size:10px;opacity:.9}
 .op-wrap label{white-space:nowrap}
-.op-wrap input{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:5px;padding:3px 7px;font-size:11px;width:140px}
-.op-wrap input::placeholder{color:rgba(255,255,255,.55)}
-.export-btn{background:#fff;color:#92400e;border:none;border-radius:7px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;transition:.15s;white-space:nowrap;display:flex;align-items:center;gap:5px}
+.op-wrap input{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:5px;padding:3px 7px;font-size:10px;width:130px}
+.op-wrap input::placeholder{color:rgba(255,255,255,.5)}
+.load-badge{font-size:10px;background:rgba(255,255,255,.2);border-radius:5px;padding:3px 7px;display:none;align-items:center;gap:4px}
+.load-badge.show{display:flex}
+.spinner{width:11px;height:11px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.export-btn{background:#fff;color:#92400e;border:none;border-radius:7px;padding:5px 11px;font-size:11px;font-weight:700;cursor:pointer;transition:.15s;white-space:nowrap;display:flex;align-items:center;gap:4px}
 .export-btn:hover{background:#fef3c7}
 
 /* ── SUMMARY BAR ── */
-.summary-bar{background:#fffbeb;border-bottom:1px solid #fde68a;padding:8px 20px;display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+.summary-bar{background:#fffbeb;border-bottom:1px solid #fde68a;padding:7px 18px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
 .stat{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600}
 .stat .dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
-.dot-trabajo{background:#16a34a}
-.dot-licencia{background:#ea580c}
-.dot-feriado{background:#dc2626}
-.dot-medico{background:#2563eb}
-.dot-descanso{background:#9ca3af}
+.dot-trabajo{background:#16a34a}.dot-licencia{background:#ea580c}
+.dot-feriado{background:#dc2626}.dot-medico{background:#2563eb}.dot-descanso{background:#9ca3af}
 .stat span.num{font-size:13px;font-weight:800;color:#1c1917}
 
 /* ── TABLE ── */
-.table-wrap{overflow-x:auto;padding:0 0 40px}
-table{width:100%;border-collapse:collapse;min-width:820px}
-thead th{background:#78350f;color:#fff;padding:8px 10px;font-size:11px;font-weight:600;text-align:left;white-space:nowrap;position:sticky;top:0}
-thead th:first-child{width:38px;text-align:center}
+.table-wrap{overflow-x:auto;padding-bottom:48px}
+table{width:100%;border-collapse:collapse;min-width:1020px}
+thead th{background:#78350f;color:#fff;padding:8px 8px;font-size:11px;font-weight:600;text-align:left;white-space:nowrap;position:sticky;top:0;z-index:5}
+thead th:first-child{width:36px;text-align:center}
 tbody tr{border-bottom:1px solid #e7e5e4;transition:background .1s}
-tbody tr:hover{background:#fef9c3}
+tbody tr:hover{background:#fef9c3 !important}
 tbody tr.weekend{background:#f5f5f4}
-tbody tr.weekend:hover{background:#fef9c3}
-tbody tr.today td:first-child{background:#fbbf24;color:#78350f;font-weight:800}
-
-td{padding:5px 8px;vertical-align:middle}
-.td-num{text-align:center;font-weight:700;color:#78350f;font-size:12px;width:36px}
-.td-dia{font-size:11px;color:#57534e;white-space:nowrap;width:76px;font-weight:500}
-.td-fecha{font-size:11px;color:#57534e;white-space:nowrap;width:82px}
-.td-estado{width:130px}
-.td-benef{width:180px}
-.td-desc{width:220px}
-.td-obs{min-width:180px}
+tbody tr.today td.td-num{background:#fbbf24;color:#78350f;font-weight:800;border-radius:3px}
+td{padding:4px 6px;vertical-align:middle}
+.td-num{text-align:center;font-weight:700;color:#78350f;font-size:12px;width:34px}
+.td-dia{font-size:11px;color:#57534e;white-space:nowrap;width:74px;font-weight:500}
+.td-fecha{font-size:11px;color:#57534e;white-space:nowrap;width:80px}
+.td-estado{width:128px}
+.td-proy{width:210px}
+.td-benef{width:175px}
+.td-desc{width:210px}
+.td-obs{min-width:165px}
 td.inactive{background:#f5f5f4 !important}
 
-/* ── ESTADO SELECT ── */
+/* ── SELECTS & INPUTS ── */
 .sel-estado{width:100%;height:24px;border-radius:5px;border:1.5px solid #d6d3d1;font-size:11px;font-weight:600;padding:0 4px;cursor:pointer;background:#fff}
 .sel-estado.e-trabajo{border-color:#86efac;background:#f0fdf4;color:#166534}
 .sel-estado.e-licencia{border-color:#fdba74;background:#fff7ed;color:#9a3412}
@@ -67,12 +67,17 @@ td.inactive{background:#f5f5f4 !important}
 .sel-estado.e-medico{border-color:#93c5fd;background:#eff6ff;color:#1d4ed8}
 .sel-estado.e-empty{border-color:#e5e7eb;background:#fff;color:#9ca3af}
 
-/* ── INPUTS ── */
+.proy-sel{width:100%;height:24px;border-radius:5px;border:1.5px solid #fcd34d;background:#fffbeb;font-size:10.5px;padding:0 4px;cursor:pointer;color:#78350f}
+.proy-sel:focus{outline:none;border-color:#f59e0b}
+
 .field-inp{width:100%;height:24px;border:1.5px solid #d6d3d1;border-radius:4px;padding:0 6px;font-size:11px;background:#fff;color:#1c1917;transition:.15s}
 .field-inp:focus{outline:none;border-color:#f59e0b;background:#fffbeb}
-.field-inp:disabled{background:#f5f5f4;color:#a8a29e;cursor:default;border-color:#e7e5e4}
 
-/* status badge (used inside inactive cells) */
+.benef-sel{width:100%;height:24px;border-radius:5px;border:1.5px solid #a3e635;background:#f7fee7;font-size:10.5px;padding:0 4px;cursor:pointer;color:#166534}
+.benef-sel:focus{outline:none;border-color:#65a30d}
+.benef-inp{width:100%;height:22px;border:1.5px solid #65a30d;border-radius:4px;padding:0 5px;font-size:10.5px;background:#fff;margin-top:2px;display:none}
+.benef-inp.show{display:block}
+
 .badge{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:99px;font-size:10px;font-weight:700;white-space:nowrap}
 .badge-licencia{background:#fff7ed;color:#9a3412;border:1px solid #fdba74}
 .badge-feriado{background:#fef2f2;color:#991b1b;border:1px solid #fca5a5}
@@ -99,23 +104,24 @@ td.inactive{background:#f5f5f4 !important}
     </div>
   </div>
   <div class="header-right">
+    <div class="load-badge" id="load-badge"><div class="spinner"></div><span id="load-msg">Cargando proyectos...</span></div>
     <div class="op-wrap">
       <label for="op-input">Operador:</label>
       <input id="op-input" type="text" placeholder="Nombre operador...">
     </div>
     <button class="export-btn" onclick="exportarExcel()">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M12 3v12m0 0l-4-4m4 4l4-4"/></svg>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M12 3v12m0 0l-4-4m4 4l4-4"/></svg>
       Exportar Excel
     </button>
   </div>
 </div>
 
-<div class="summary-bar" id="summary-bar">
+<div class="summary-bar">
   <div class="stat"><span class="dot dot-trabajo"></span> Trabajados <span class="num" id="cnt-trabajo">0</span></div>
   <div class="stat"><span class="dot dot-licencia"></span> Licencia <span class="num" id="cnt-licencia">0</span></div>
   <div class="stat"><span class="dot dot-feriado"></span> Feriado <span class="num" id="cnt-feriado">0</span></div>
   <div class="stat"><span class="dot dot-medico"></span> Médico <span class="num" id="cnt-medico">0</span></div>
-  <div class="stat"><span class="dot dot-descanso"></span> Descanso / Sin actividad <span class="num" id="cnt-descanso">0</span></div>
+  <div class="stat"><span class="dot dot-descanso"></span> Descanso <span class="num" id="cnt-descanso">0</span></div>
 </div>
 
 <div class="table-wrap">
@@ -126,6 +132,7 @@ td.inactive{background:#f5f5f4 !important}
       <th>Día</th>
       <th>Fecha</th>
       <th>Estado</th>
+      <th>Proyecto</th>
       <th>Beneficiario</th>
       <th>Descripción</th>
       <th>Obra / Observaciones</th>
@@ -152,15 +159,29 @@ td.inactive{background:#f5f5f4 !important}
   <option value="Oficina central">
 </datalist>
 
-<div class="footer" id="footer-info">Datos guardados en este navegador (localStorage)</div>
+<div class="footer" id="footer-info">Cargando datos...</div>
 
 <script>
-const LS_KEY   = 'raices_bitacora_excavadora_v1';
-const LS_OP    = 'raices_bitacora_operador';
-const DIAS     = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
-const MESES    = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+/* ═══════════════════════════════════════════════════════
+   CONSTANTES Y ESTADO GLOBAL
+═══════════════════════════════════════════════════════ */
+const LS_KEY  = 'raices_bitacora_excavadora_v1';
+const LS_OP   = 'raices_bitacora_operador';
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxcJowX3a3XBmSNiKOCesj1jRkQWS1VIsMbvdt-x7ckK8ZXMauI6gRgCGsoT77xYxpP/exec";
+const DIAS    = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+const MESES   = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
-/* ── DATOS SEMILLA (Junio y Julio 2026) ── */
+let PROYECTOS     = [];   // [{id, nombre}]  cargados desde AppSheet
+let BENEF_POR_PROY = {};  // { proyId: ["Nombre Apellido", ...] }
+let dataLoaded    = false;
+
+let db       = {};
+let curYear  = 2026;
+let curMonth = 6;  // 0-based
+
+/* ═══════════════════════════════════════════════════════
+   DATOS SEMILLA — Junio y Julio 2026
+═══════════════════════════════════════════════════════ */
 const SEED = {
   "2026-06-01":{estado:"licencia"},
   "2026-06-02":{estado:"licencia"},
@@ -176,64 +197,60 @@ const SEED = {
   "2026-06-12":{estado:"licencia"},
   "2026-06-13":{estado:"descanso"},
   "2026-06-14":{estado:"descanso"},
-  "2026-06-15":{estado:"trabajo",beneficiario:"Fidelina Pilquian",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
-  "2026-06-16":{estado:"trabajo",beneficiario:"Fidelina Pilquian",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
-  "2026-06-17":{estado:"trabajo",beneficiario:"Juan Catrileo",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
-  "2026-06-18":{estado:"trabajo",beneficiario:"Fidelina Pilquian",descripcion:"Instalación de Fosa",obs:"Obra El maiten"},
-  "2026-06-19":{estado:"trabajo",beneficiario:"Alberto Coña",descripcion:"Traslado/Instalacion de letrero",obs:"Obra El maiten"},
+  "2026-06-15":{estado:"trabajo",proyecto:"P126",beneficiario:"Fidelina Pilquian",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
+  "2026-06-16":{estado:"trabajo",proyecto:"P126",beneficiario:"Fidelina Pilquian",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
+  "2026-06-17":{estado:"trabajo",proyecto:"P126",beneficiario:"Juan Catrileo",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
+  "2026-06-18":{estado:"trabajo",proyecto:"P126",beneficiario:"Fidelina Pilquian",descripcion:"Instalación de Fosa",obs:"Obra El maiten"},
+  "2026-06-19":{estado:"trabajo",proyecto:"P126",beneficiario:"Alberto Coña",descripcion:"Traslado/Instalacion de letrero",obs:"Obra El maiten"},
   "2026-06-20":{estado:"descanso"},
   "2026-06-21":{estado:"descanso"},
-  "2026-06-22":{estado:"trabajo",beneficiario:"Oficina central",descripcion:"Retiro de fosas en oficina central p/El Maiten",obs:"1 viaje AM y 1 viaje PM"},
-  "2026-06-23":{estado:"trabajo",beneficiario:"Fidelina Pilquian",descripcion:"Instalación de Fosa",obs:"Obra El maiten"},
-  "2026-06-24":{estado:"trabajo",beneficiario:"Delia Antilaf",descripcion:"Instalación de Fosa",obs:"Obra El maiten"},
-  "2026-06-25":{estado:"trabajo",beneficiario:"Enomisia Valdebenito",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
-  "2026-06-26":{estado:"trabajo",beneficiario:"Juan Aliante",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
+  "2026-06-22":{estado:"trabajo",proyecto:"",beneficiario:"Oficina central",descripcion:"Retiro de fosas en oficina central p/El Maiten",obs:"1 viaje AM y 1 viaje PM"},
+  "2026-06-23":{estado:"trabajo",proyecto:"P126",beneficiario:"Fidelina Pilquian",descripcion:"Instalación de Fosa",obs:"Obra El maiten"},
+  "2026-06-24":{estado:"trabajo",proyecto:"P126",beneficiario:"Delia Antilaf",descripcion:"Instalación de Fosa",obs:"Obra El maiten"},
+  "2026-06-25":{estado:"trabajo",proyecto:"P126",beneficiario:"Enomisia Valdebenito",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
+  "2026-06-26":{estado:"trabajo",proyecto:"P126",beneficiario:"Juan Aliante",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
   "2026-06-27":{estado:"descanso"},
   "2026-06-28":{estado:"descanso"},
   "2026-06-29":{estado:"feriado"},
-  "2026-06-30":{estado:"trabajo",beneficiario:"José Huilcan",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
-  "2026-07-01":{estado:"trabajo",beneficiario:"Maria Luisa Barahona",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
-  "2026-07-02":{estado:"trabajo",beneficiario:"Maria Luisa Barahona",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
-  "2026-07-03":{estado:"trabajo",beneficiario:"Maria Luisa Barahona",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
+  "2026-06-30":{estado:"trabajo",proyecto:"P126",beneficiario:"José Huilcan",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
+  "2026-07-01":{estado:"trabajo",proyecto:"P126",beneficiario:"Maria Luisa Barahona",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
+  "2026-07-02":{estado:"trabajo",proyecto:"P126",beneficiario:"Maria Luisa Barahona",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
+  "2026-07-03":{estado:"trabajo",proyecto:"P126",beneficiario:"Maria Luisa Barahona",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
   "2026-07-04":{estado:"descanso"},
   "2026-07-05":{estado:"descanso"},
-  "2026-07-06":{estado:"trabajo",beneficiario:"Rodrigo Riffo",descripcion:"Post venta de Newen Ruka",obs:"Confeccion de zanja para evacuacion de aguas lluvias"},
-  "2026-07-07":{estado:"trabajo",beneficiario:"Rodrigo Riffo",descripcion:"Post venta de Newen Ruka",obs:"Confeccion de zanja para evacuacion de aguas lluvias"},
-  "2026-07-08":{estado:"trabajo",beneficiario:"Alberto Coña",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
-  "2026-07-09":{estado:"trabajo",beneficiario:"Oficina central",descripcion:"Oficina",obs:"Máquina a taller / Camion Hino RT"},
-  "2026-07-10":{estado:"trabajo",beneficiario:"Oficina central",descripcion:"Oficina",obs:"Máquina a taller / Camion Hino RT"},
+  "2026-07-06":{estado:"trabajo",proyecto:"",beneficiario:"Rodrigo Riffo",descripcion:"Post venta de Newen Ruka",obs:"Confeccion de zanja para evacuacion de aguas lluvias"},
+  "2026-07-07":{estado:"trabajo",proyecto:"",beneficiario:"Rodrigo Riffo",descripcion:"Post venta de Newen Ruka",obs:"Confeccion de zanja para evacuacion de aguas lluvias"},
+  "2026-07-08":{estado:"trabajo",proyecto:"P126",beneficiario:"Alberto Coña",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
+  "2026-07-09":{estado:"trabajo",proyecto:"",beneficiario:"Oficina central",descripcion:"Oficina",obs:"Máquina a taller / Camion Hino RT"},
+  "2026-07-10":{estado:"trabajo",proyecto:"",beneficiario:"Oficina central",descripcion:"Oficina",obs:"Máquina a taller / Camion Hino RT"},
   "2026-07-11":{estado:"descanso"},
   "2026-07-12":{estado:"descanso"},
-  "2026-07-13":{estado:"trabajo",beneficiario:"Norma Azocar",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
-  "2026-07-14":{estado:"trabajo",beneficiario:"Norma Azocar",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
-  "2026-07-15":{estado:"medico",beneficiario:"Control medico"},
+  "2026-07-13":{estado:"trabajo",proyecto:"P126",beneficiario:"Norma Azocar",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
+  "2026-07-14":{estado:"trabajo",proyecto:"P126",beneficiario:"Norma Azocar",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
+  "2026-07-15":{estado:"medico",proyecto:"",beneficiario:"Control medico"},
   "2026-07-16":{estado:"feriado"},
-  "2026-07-17":{estado:"trabajo",beneficiario:"Norma Azocar",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
+  "2026-07-17":{estado:"trabajo",proyecto:"P126",beneficiario:"Norma Azocar",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
   "2026-07-18":{estado:"descanso"},
   "2026-07-19":{estado:"descanso"},
-  "2026-07-20":{estado:"trabajo",beneficiario:"José Dumulef",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
-  "2026-07-21":{estado:"trabajo",beneficiario:"José Dumulef",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
-  "2026-07-22":{estado:"trabajo",beneficiario:"Juan Aliante",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
-  "2026-07-23":{estado:"trabajo",beneficiario:"Guillermo Lopez",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
-  "2026-07-24":{estado:"trabajo",beneficiario:"Pablo Lefio",descripcion:"Instalación de Fosa",obs:"Ñuke Mapu"},
+  "2026-07-20":{estado:"trabajo",proyecto:"P126",beneficiario:"José Dumulef",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
+  "2026-07-21":{estado:"trabajo",proyecto:"P126",beneficiario:"José Dumulef",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
+  "2026-07-22":{estado:"trabajo",proyecto:"P126",beneficiario:"Juan Aliante",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
+  "2026-07-23":{estado:"trabajo",proyecto:"P126",beneficiario:"Guillermo Lopez",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
+  "2026-07-24":{estado:"trabajo",proyecto:"P119",beneficiario:"Pablo Lefio",descripcion:"Instalación de Fosa",obs:"Ñuke Mapu"},
   "2026-07-25":{estado:"descanso"},
   "2026-07-26":{estado:"descanso"},
-  "2026-07-27":{estado:"trabajo",beneficiario:"Maria Luisa Barahona",descripcion:"Instalación de Fosa",obs:"Obra El maiten"},
-  "2026-07-28":{estado:"trabajo",beneficiario:"Maria Luisa Barahona",descripcion:"Instalación de Fosa",obs:"Obra El maiten"},
-  "2026-07-29":{estado:"medico",beneficiario:"Examenes médicos"},
-  "2026-07-30":{estado:"trabajo",beneficiario:"Isolina Huete",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Ñuke Mapu"},
-  "2026-07-31":{estado:"trabajo",beneficiario:"Isolina Huete",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Ñuke Mapu"},
+  "2026-07-27":{estado:"trabajo",proyecto:"P126",beneficiario:"Maria Luisa Barahona",descripcion:"Instalación de Fosa",obs:"Obra El maiten"},
+  "2026-07-28":{estado:"trabajo",proyecto:"P126",beneficiario:"Maria Luisa Barahona",descripcion:"Instalación de Fosa",obs:"Obra El maiten"},
+  "2026-07-29":{estado:"medico",proyecto:"",beneficiario:"Examenes médicos"},
+  "2026-07-30":{estado:"trabajo",proyecto:"P119",beneficiario:"Isolina Huete",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Ñuke Mapu"},
+  "2026-07-31":{estado:"trabajo",proyecto:"P119",beneficiario:"Isolina Huete",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Ñuke Mapu"},
 };
 
-/* ── STATE ── */
-let db       = {};   // { "yyyy-mm-dd": { estado, beneficiario, descripcion, obs } }
-let curYear  = 2026;
-let curMonth = 7;    // 0-based
-
-/* ── PERSISTENCE ── */
+/* ═══════════════════════════════════════════════════════
+   PERSISTENCIA
+═══════════════════════════════════════════════════════ */
 function loadData() {
   try { db = JSON.parse(localStorage.getItem(LS_KEY) || 'null') || {}; } catch { db = {}; }
-  // merge seed only for dates not yet in db
   for (const [d, v] of Object.entries(SEED)) {
     if (!db[d]) db[d] = { ...v };
   }
@@ -245,113 +262,191 @@ function saveData() {
 function updateFooter() {
   const n = Object.keys(db).length;
   document.getElementById('footer-info').textContent =
-    'Guardado automáticamente en este navegador · ' + n + ' registros · ' + new Date().toLocaleTimeString('es-CL');
+    'Guardado automáticamente · ' + n + ' registros · ' + new Date().toLocaleTimeString('es-CL');
 }
 function getEntry(date) {
   if (!db[date]) db[date] = {};
   return db[date];
 }
 
-/* ── RENDERING ── */
+/* ═══════════════════════════════════════════════════════
+   APPSHEET — CARGA DE PROYECTOS Y BENEFICIARIOS
+═══════════════════════════════════════════════════════ */
+function normId(s) { const str = String(s || ''); return /^\d+$/.test(str) ? 'P' + str : str; }
+
+async function loadAppSheetData() {
+  showLoading(true, 'Cargando proyectos...');
+  try {
+    const url = APPS_SCRIPT_URL + '?tables=' + encodeURIComponent('Proyectos,Beneficiario');
+    const resp = await fetch(url, { redirect: 'follow' });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+
+    // ── Proyectos ──
+    const proyRaw = data['Proyectos'] || [];
+    PROYECTOS = proyRaw
+      .filter(p => {
+        const est = (p.estado_general || '').toLowerCase();
+        return est.includes('ejecuci') || est.includes('finalizado');
+      })
+      .map(p => ({ id: normId(p.ID_proy), nombre: String(p.NOMBRE_PROYECTO || '') }))
+      .filter(p => p.id && p.nombre && !/prueba/i.test(p.nombre))
+      .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
+
+    // ── Beneficiarios por proyecto ──
+    const benRaw = data['Beneficiario'] || [];
+    BENEF_POR_PROY = {};
+    for (const b of benRaw) {
+      const pid = normId(b.ID_Proy);
+      if (!pid) continue;
+      const nombre = ((b.NOMBRES || '') + ' ' + (b.APELLIDOS || '')).trim();
+      if (!nombre || nombre.toLowerCase() === 'nan') continue;
+      if (!BENEF_POR_PROY[pid]) BENEF_POR_PROY[pid] = [];
+      if (!BENEF_POR_PROY[pid].includes(nombre)) BENEF_POR_PROY[pid].push(nombre);
+    }
+    // Ordenar nombres por apellido dentro de cada proyecto
+    for (const pid in BENEF_POR_PROY) BENEF_POR_PROY[pid].sort();
+
+    dataLoaded = true;
+    showLoading(false);
+    renderMonth(); // volver a renderizar con dropdowns correctos
+  } catch (err) {
+    console.warn('[Bitácora] AppSheet fetch falló:', err);
+    showLoading(false, 'Sin conexión — modo texto libre');
+    renderMonth();
+  }
+}
+
+function showLoading(on, msg) {
+  const el = document.getElementById('load-badge');
+  if (on) {
+    el.classList.add('show');
+    if (msg) document.getElementById('load-msg').textContent = msg;
+  } else {
+    el.classList.remove('show');
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   HELPERS DE RENDERIZADO
+═══════════════════════════════════════════════════════ */
 function esc(s) {
-  return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 function fmtFecha(dateStr) {
   const p = dateStr.split('-');
   return p[2] + '/' + p[1] + '/' + p[0];
 }
-function isWeekend(d) { const wd = new Date(d + 'T12:00:00').getDay(); return wd === 0 || wd === 6; }
-function todayStr() { return new Date().toISOString().substring(0,10); }
+function todayStr() { return new Date().toISOString().substring(0, 10); }
 
 function buildEstadoSel(date, estado) {
   const opts = [
-    ['',        '— Sin estado —',    'e-empty'],
-    ['trabajo', '✅ Trabajo',         'e-trabajo'],
-    ['licencia','🏥 Licencia',        'e-licencia'],
-    ['feriado', '🏖️ Feriado',         'e-feriado'],
-    ['descanso','💤 Descanso',        'e-descanso'],
-    ['medico',  '🩺 Médico / Examen', 'e-medico'],
+    ['',        '— Sin estado —', 'e-empty'],
+    ['trabajo', '✅ Trabajo',      'e-trabajo'],
+    ['licencia','🏥 Licencia',     'e-licencia'],
+    ['feriado', '🏖️ Feriado',      'e-feriado'],
+    ['descanso','💤 Descanso',     'e-descanso'],
+    ['medico',  '🩺 Médico',       'e-medico'],
   ];
-  const clsMaps = { trabajo:'e-trabajo', licencia:'e-licencia', feriado:'e-feriado', descanso:'e-descanso', medico:'e-medico', '':'e-empty' };
-  const cls = clsMaps[estado] || 'e-empty';
+  const clsMap = {trabajo:'e-trabajo',licencia:'e-licencia',feriado:'e-feriado',descanso:'e-descanso',medico:'e-medico','':'e-empty'};
+  const cls = clsMap[estado] || 'e-empty';
   let s = '<select class="sel-estado ' + cls + '" data-date="' + date + '" onchange="onEstado(this)">';
   for (const [v, lbl] of opts) {
     s += '<option value="' + v + '"' + (estado === v ? ' selected' : '') + '>' + lbl + '</option>';
+  }
+  return s + '</select>';
+}
+
+function buildProySel(date, proyId) {
+  if (!dataLoaded || PROYECTOS.length === 0) {
+    // fallback: free text
+    return '<input class="field-inp" style="border-color:#fcd34d;background:#fffbeb" type="text" value="' + esc(proyId) + '" placeholder="Proyecto..." data-date="' + date + '" data-field="proyecto" oninput="onField(this)">';
+  }
+  let s = '<select class="proy-sel" data-date="' + date + '" onchange="onProyChange(this)">';
+  s += '<option value="">— Sin proyecto —</option>';
+  for (const p of PROYECTOS) {
+    const lbl = p.id + ' — ' + p.nombre;
+    s += '<option value="' + esc(p.id) + '"' + (proyId === p.id ? ' selected' : '') + '>' + esc(lbl) + '</option>';
   }
   s += '</select>';
   return s;
 }
 
+function buildBenefField(date, proyId, benefNombre) {
+  const opts = proyId ? (BENEF_POR_PROY[proyId] || []) : [];
+
+  if (!dataLoaded || opts.length === 0) {
+    // No hay datos o no hay proyecto: campo libre
+    return '<input class="field-inp" type="text" value="' + esc(benefNombre) + '" placeholder="Beneficiario..." data-date="' + date + '" data-field="beneficiario" oninput="onField(this)">';
+  }
+
+  // Hay opciones: select + opción "Otro..."
+  const isCustom = benefNombre && !opts.includes(benefNombre);
+  let s = '<select class="benef-sel" data-date="' + date + '" onchange="onBenefSel(this)">';
+  s += '<option value="">— seleccionar —</option>';
+  for (const o of opts) {
+    s += '<option value="' + esc(o) + '"' + (benefNombre === o && !isCustom ? ' selected' : '') + '>' + esc(o) + '</option>';
+  }
+  s += '<option value="__otro__"' + (isCustom ? ' selected' : '') + '>Otro / Libre...</option>';
+  s += '</select>';
+  s += '<input class="benef-inp' + (isCustom ? ' show' : '') + '" type="text" value="' + (isCustom ? esc(benefNombre) : '') + '" placeholder="Nombre libre..." data-date="' + date + '" data-field="beneficiario" oninput="onField(this)">';
+  return s;
+}
+
+const BADGES = {
+  licencia: '<span class="badge badge-licencia">🏥 Licencia</span>',
+  feriado:  '<span class="badge badge-feriado">🏖️ Feriado</span>',
+  descanso: '<span class="badge badge-descanso">💤 Descanso</span>',
+};
+
 function buildRow(date) {
-  const d   = new Date(date + 'T12:00:00');
-  const wd  = d.getDay();
-  const num = d.getDate();
-  const dayName = DIAS[wd];
-  const entry = db[date] || {};
-  const estado  = entry.estado || '';
-  const benef   = entry.beneficiario || '';
-  const desc    = entry.descripcion  || '';
-  const obs     = entry.obs          || '';
+  const d      = new Date(date + 'T12:00:00');
+  const wd     = d.getDay();
+  const num    = d.getDate();
+  const entry  = db[date] || {};
+  const estado = entry.estado || '';
+  const proyId = entry.proyecto || '';
+  const benef  = entry.beneficiario || '';
+  const desc   = entry.descripcion  || '';
+  const obs    = entry.obs          || '';
 
   const isTrabajo = estado === 'trabajo';
   const isMedico  = estado === 'medico';
   const weekend   = wd === 0 || wd === 6;
   const isToday   = date === todayStr();
-
-  const rowCls = (weekend ? 'weekend ' : '') + (isToday ? 'today ' : '');
-
-  /* Beneficiario cell */
-  const showBenef = isTrabajo || isMedico;
-  const benefPlaceholder = isMedico ? 'Detalle / Motivo...' : 'Beneficiario...';
-
-  /* Badge for non-work states */
-  const BADGES = {
-    licencia: '<span class="badge badge-licencia">🏥 Licencia</span>',
-    feriado:  '<span class="badge badge-feriado">🏖️ Feriado</span>',
-    descanso: '<span class="badge badge-descanso">💤 Descanso</span>',
-  };
-
-  let benefCell, descCell, obsCell;
-
-  if (isTrabajo) {
-    benefCell = '<input class="field-inp" type="text" value="' + esc(benef) + '" placeholder="Beneficiario..." data-date="' + date + '" data-field="beneficiario" oninput="onField(this)">';
-    descCell  = '<input class="field-inp" type="text" value="' + esc(desc)  + '" placeholder="Descripción..." list="desc-list" data-date="' + date + '" data-field="descripcion" oninput="onField(this)">';
-    obsCell   = '<input class="field-inp" type="text" value="' + esc(obs)   + '" placeholder="Obra / Observaciones..." list="obra-list" data-date="' + date + '" data-field="obs" oninput="onField(this)">';
-  } else if (isMedico) {
-    benefCell = '<input class="field-inp" type="text" value="' + esc(benef) + '" placeholder="' + benefPlaceholder + '" data-date="' + date + '" data-field="beneficiario" oninput="onField(this)">';
-    descCell  = '<td class="inactive"></td>';
-    obsCell   = '<td class="inactive"></td>';
-  } else {
-    const badge = BADGES[estado] || '';
-    benefCell = badge;
-    descCell  = '<td class="inactive"></td>';
-    obsCell   = '<td class="inactive"></td>';
-  }
+  const rowCls    = (weekend ? 'weekend ' : '') + (isToday ? 'today' : '');
 
   let html = '<tr class="' + rowCls + '" id="row_' + date + '">';
   html += '<td class="td-num">' + num + '</td>';
-  html += '<td class="td-dia">' + dayName + '</td>';
+  html += '<td class="td-dia">' + DIAS[wd] + '</td>';
   html += '<td class="td-fecha">' + fmtFecha(date) + '</td>';
   html += '<td class="td-estado">' + buildEstadoSel(date, estado) + '</td>';
 
   if (isTrabajo) {
-    html += '<td class="td-benef">' + benefCell + '</td>';
-    html += '<td class="td-desc">' + descCell + '</td>';
-    html += '<td class="td-obs">'  + obsCell  + '</td>';
+    html += '<td class="td-proy">'   + buildProySel(date, proyId)             + '</td>';
+    html += '<td class="td-benef">'  + buildBenefField(date, proyId, benef)   + '</td>';
+    html += '<td class="td-desc"><input class="field-inp" type="text" value="' + esc(desc) + '" placeholder="Descripción..." list="desc-list" data-date="' + date + '" data-field="descripcion" oninput="onField(this)"></td>';
+    html += '<td class="td-obs"><input class="field-inp" type="text" value="' + esc(obs) + '" placeholder="Obra / Observaciones..." list="obra-list" data-date="' + date + '" data-field="obs" oninput="onField(this)"></td>';
   } else if (isMedico) {
-    html += '<td class="td-benef">' + benefCell + '</td>';
-    html += descCell;
-    html += obsCell;
+    html += '<td class="td-proy inactive"></td>';
+    html += '<td class="td-benef"><input class="field-inp" type="text" value="' + esc(benef) + '" placeholder="Detalle / Motivo..." data-date="' + date + '" data-field="beneficiario" oninput="onField(this)"></td>';
+    html += '<td class="td-desc inactive"></td>';
+    html += '<td class="td-obs inactive"></td>';
   } else {
-    html += '<td class="td-benef">' + benefCell + '</td>';
-    html += descCell;
-    html += obsCell;
+    const badge = BADGES[estado] || '';
+    html += '<td class="td-proy inactive"></td>';
+    html += '<td class="td-benef inactive">' + badge + '</td>';
+    html += '<td class="td-desc inactive"></td>';
+    html += '<td class="td-obs inactive"></td>';
   }
 
   html += '</tr>';
   return html;
 }
 
+/* ═══════════════════════════════════════════════════════
+   RENDERIZADO DEL MES
+═══════════════════════════════════════════════════════ */
 function renderMonth() {
   const label = MESES[curMonth] + ' ' + curYear;
   document.getElementById('month-label').textContent = label;
@@ -359,25 +454,23 @@ function renderMonth() {
   const daysInMonth = new Date(curYear, curMonth + 1, 0).getDate();
   let html = '';
   for (let d = 1; d <= daysInMonth; d++) {
-    const mm = String(curMonth + 1).padStart(2,'0');
-    const dd = String(d).padStart(2,'0');
-    const dateStr = curYear + '-' + mm + '-' + dd;
-    html += buildRow(dateStr);
+    const mm      = String(curMonth + 1).padStart(2, '0');
+    const dd      = String(d).padStart(2, '0');
+    html += buildRow(curYear + '-' + mm + '-' + dd);
   }
   document.getElementById('bitacora-body').innerHTML = html;
   updateSummary();
 }
 
 function updateSummary() {
-  const mm = String(curMonth + 1).padStart(2,'0');
+  const mm = String(curMonth + 1).padStart(2, '0');
   const prefix = curYear + '-' + mm + '-';
   const cnts = { trabajo:0, licencia:0, feriado:0, medico:0, descanso:0, '':0 };
-  const daysInMonth = new Date(curYear, curMonth + 1, 0).getDate();
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dateStr = prefix + String(d).padStart(2,'0');
-    const e = (db[dateStr] || {}).estado || '';
-    if (cnts[e] !== undefined) cnts[e]++;
-    else cnts['']++;
+  const days  = new Date(curYear, curMonth + 1, 0).getDate();
+  for (let d = 1; d <= days; d++) {
+    const ds = prefix + String(d).padStart(2, '0');
+    const e  = (db[ds] || {}).estado || '';
+    if (cnts[e] !== undefined) cnts[e]++; else cnts['']++;
   }
   document.getElementById('cnt-trabajo').textContent  = cnts.trabajo;
   document.getElementById('cnt-licencia').textContent = cnts.licencia;
@@ -386,33 +479,55 @@ function updateSummary() {
   document.getElementById('cnt-descanso').textContent = cnts.descanso + cnts[''];
 }
 
-/* ── HANDLERS ── */
+/* ═══════════════════════════════════════════════════════
+   HANDLERS
+═══════════════════════════════════════════════════════ */
 function onEstado(sel) {
   const date  = sel.dataset.date;
   const nuevo = sel.value;
   const entry = getEntry(date);
   entry.estado = nuevo;
-  // clear detail fields when switching away from trabajo/medico
-  if (nuevo !== 'trabajo' && nuevo !== 'medico') {
-    entry.beneficiario = ''; entry.descripcion = ''; entry.obs = '';
-  }
-  if (nuevo !== 'trabajo') { entry.descripcion = ''; entry.obs = ''; }
+  if (nuevo !== 'trabajo') { entry.proyecto = ''; entry.descripcion = ''; entry.obs = ''; }
+  if (nuevo !== 'trabajo' && nuevo !== 'medico') entry.beneficiario = '';
   saveData();
-  // re-render only this row
   const tr = document.getElementById('row_' + date);
   if (tr) tr.outerHTML = buildRow(date);
   updateSummary();
 }
 
-function onField(inp) {
-  const date  = inp.dataset.date;
-  const field = inp.dataset.field;
+function onProyChange(sel) {
+  const date  = sel.dataset.date;
   const entry = getEntry(date);
-  entry[field] = inp.value;
+  entry.proyecto    = sel.value;
+  entry.beneficiario = '';  // reset al cambiar proyecto
+  saveData();
+  const tr = document.getElementById('row_' + date);
+  if (tr) tr.outerHTML = buildRow(date);
+}
+
+function onBenefSel(sel) {
+  const date  = sel.dataset.date;
+  const entry = getEntry(date);
+  const inp   = sel.nextElementSibling;
+  if (sel.value === '__otro__') {
+    if (inp) inp.classList.add('show');
+    entry.beneficiario = (inp && inp.value) || '';
+  } else {
+    if (inp) inp.classList.remove('show');
+    entry.beneficiario = sel.value;
+  }
   saveData();
 }
 
-/* ── NAVIGATION ── */
+function onField(inp) {
+  const entry = getEntry(inp.dataset.date);
+  entry[inp.dataset.field] = inp.value;
+  saveData();
+}
+
+/* ═══════════════════════════════════════════════════════
+   NAVEGACIÓN DE MES
+═══════════════════════════════════════════════════════ */
 document.getElementById('prev-month').addEventListener('click', () => {
   curMonth--;
   if (curMonth < 0) { curMonth = 11; curYear--; }
@@ -424,77 +539,80 @@ document.getElementById('next-month').addEventListener('click', () => {
   renderMonth();
 });
 
-/* ── OPERADOR ── */
+/* ═══════════════════════════════════════════════════════
+   OPERADOR
+═══════════════════════════════════════════════════════ */
 const opInp = document.getElementById('op-input');
 opInp.value = localStorage.getItem(LS_OP) || '';
 opInp.addEventListener('input', () => localStorage.setItem(LS_OP, opInp.value));
 
-/* ── EXPORT ── */
+/* ═══════════════════════════════════════════════════════
+   EXPORTAR EXCEL
+═══════════════════════════════════════════════════════ */
 function exportarExcel() {
-  const operador = opInp.value || 'Sin especificar';
-  // Build all dates with data, sorted
-  const allDates = Object.keys(db).sort();
+  const operador   = opInp.value || 'Sin especificar';
+  const allDates   = Object.keys(db).sort();
   if (!allDates.length) { alert('No hay datos para exportar.'); return; }
 
-  const cell = v => '<td>' + String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</td>';
-  const ESTADO_LABELS = { trabajo:'Trabajo', licencia:'Licencia', feriado:'Feriado', descanso:'Descanso', medico:'Médico/Examen', '':'—' };
+  const ESTADO_LABELS = {trabajo:'Trabajo',licencia:'Licencia',feriado:'Feriado',descanso:'Descanso',medico:'Médico/Examen','':'—'};
+  const proyNombre = (id) => {
+    if (!id) return '';
+    const p = PROYECTOS.find(x => x.id === id);
+    return p ? p.id + ' — ' + p.nombre : id;
+  };
 
+  const cell = v => '<td>' + String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</td>';
   let rows = '';
   for (const date of allDates) {
-    const d = new Date(date + 'T12:00:00');
+    const d     = new Date(date + 'T12:00:00');
     const entry = db[date] || {};
-    const estado = entry.estado || '';
+    const est   = entry.estado || '';
     rows += '<tr>' +
       cell(DIAS[d.getDay()]) +
       cell(fmtFecha(date)) +
-      cell(ESTADO_LABELS[estado] || estado) +
+      cell(ESTADO_LABELS[est] || est) +
+      cell(proyNombre(entry.proyecto)) +
       cell(entry.beneficiario || '') +
       cell(entry.descripcion  || '') +
       cell(entry.obs          || '') +
       '</tr>';
   }
 
-  const xls = '<?xml version="1.0" encoding="UTF-8"?>' +
-    '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">' +
-    '<Worksheet ss:Name="Bitácora Miniexcavadora"><Table>' +
-    '<Row>' +
-    '<Cell><Data ss:Type="String">BITÁCORA MINIEXCAVADORA — CONSTRUCTORA LAS RAÍCES</Data></Cell>' +
-    '</Row>' +
-    '<Row>' +
-    '<Cell><Data ss:Type="String">Operador: ' + operador + '</Data></Cell>' +
-    '<Cell><Data ss:Type="String">Exportado: ' + new Date().toLocaleString('es-CL') + '</Data></Cell>' +
-    '</Row>' +
-    '<Row></Row>' +
-    '<Row>' +
-    '<Cell ss:StyleID="hdr"><Data ss:Type="String">Día</Data></Cell>' +
-    '<Cell ss:StyleID="hdr"><Data ss:Type="String">Fecha</Data></Cell>' +
-    '<Cell ss:StyleID="hdr"><Data ss:Type="String">Estado</Data></Cell>' +
-    '<Cell ss:StyleID="hdr"><Data ss:Type="String">Beneficiario</Data></Cell>' +
-    '<Cell ss:StyleID="hdr"><Data ss:Type="String">Descripción</Data></Cell>' +
-    '<Cell ss:StyleID="hdr"><Data ss:Type="String">Observaciones / Obra</Data></Cell>' +
-    '</Row>' +
-    rows.replace(/<tr>/g,'<Row>').replace(/<\/tr>/g,'</Row>')
-        .replace(/<td>/g,'<Cell><Data ss:Type="String">').replace(/<\/td>/g,'</Data></Cell>') +
-    '</Table></Worksheet></Workbook>';
+  const xls = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">' +
+    '<head><meta charset="UTF-8"></head><body><table>' +
+    '<tr><td colspan="7"><b>BITÁCORA MINIEXCAVADORA — CONSTRUCTORA LAS RAÍCES</b></td></tr>' +
+    '<tr><td>Operador: ' + operador + '</td><td colspan="6">Exportado: ' + new Date().toLocaleString('es-CL') + '</td></tr>' +
+    '<tr></tr>' +
+    '<tr style="background:#78350f;color:#fff;font-weight:bold">' +
+    '<td>Día</td><td>Fecha</td><td>Estado</td><td>Proyecto</td><td>Beneficiario</td><td>Descripción</td><td>Observaciones / Obra</td>' +
+    '</tr>' + rows + '</table></body></html>';
 
-  const blob = new Blob([xls], { type:'application/vnd.ms-excel;charset=utf-8' });
+  const blob = new Blob(['﻿' + xls], { type: 'application/vnd.ms-excel;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = 'Bitacora_Miniexcavadora_' + new Date().toISOString().substring(0,10) + '.xls';
   a.click();
 }
 
-/* ── INIT ── */
+/* ═══════════════════════════════════════════════════════
+   INICIO
+═══════════════════════════════════════════════════════ */
 loadData();
-// open on current month if it has data, else July 2026
-const todayD = new Date();
-curYear  = todayD.getFullYear();
-curMonth = todayD.getMonth();
-// if today is before June 2026, default to July 2026
+
+// Abrir en el mes actual (o Julio 2026 si es anterior)
+const hoy = new Date();
+curYear  = hoy.getFullYear();
+curMonth = hoy.getMonth();
 if (curYear < 2026 || (curYear === 2026 && curMonth < 5)) {
   curYear = 2026; curMonth = 6;
 }
+
+// Renderizado inicial (sin proyectos AppSheet aún)
 renderMonth();
+updateFooter();
+
+// Fetch asíncrono de proyectos/beneficiarios
+loadAppSheetData();
 </script>
 </body>
 </html>
