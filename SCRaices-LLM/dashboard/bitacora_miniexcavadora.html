@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bitácora Miniexcavadora — Constructora Las Raíces</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'IBM Plex Sans',system-ui,sans-serif;background:#fafaf9;color:#1c1917;font-size:13px}
+
+/* ── HEADER ── */
+.header{background:linear-gradient(135deg,#92400e 0%,#b45309 100%);color:#fff;padding:14px 20px;position:sticky;top:0;z-index:20;box-shadow:0 2px 8px rgba(0,0,0,.2);display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.header-icon{font-size:32px;line-height:1}
+.header-title h1{font-size:17px;font-weight:700;letter-spacing:-.3px}
+.header-title .sub{font-size:11px;opacity:.8;margin-top:2px}
+.header-center{flex:1;display:flex;align-items:center;justify-content:center;gap:8px}
+.month-nav{display:flex;align-items:center;gap:8px}
+.month-nav button{background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:14px;font-weight:700;transition:.15s}
+.month-nav button:hover{background:rgba(255,255,255,.35)}
+#month-label{font-size:15px;font-weight:700;min-width:130px;text-align:center}
+.header-right{display:flex;align-items:center;gap:8px}
+.op-wrap{display:flex;align-items:center;gap:6px;font-size:11px;opacity:.9}
+.op-wrap label{white-space:nowrap}
+.op-wrap input{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:5px;padding:3px 7px;font-size:11px;width:140px}
+.op-wrap input::placeholder{color:rgba(255,255,255,.55)}
+.export-btn{background:#fff;color:#92400e;border:none;border-radius:7px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;transition:.15s;white-space:nowrap;display:flex;align-items:center;gap:5px}
+.export-btn:hover{background:#fef3c7}
+
+/* ── SUMMARY BAR ── */
+.summary-bar{background:#fffbeb;border-bottom:1px solid #fde68a;padding:8px 20px;display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+.stat{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600}
+.stat .dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.dot-trabajo{background:#16a34a}
+.dot-licencia{background:#ea580c}
+.dot-feriado{background:#dc2626}
+.dot-medico{background:#2563eb}
+.dot-descanso{background:#9ca3af}
+.stat span.num{font-size:13px;font-weight:800;color:#1c1917}
+
+/* ── TABLE ── */
+.table-wrap{overflow-x:auto;padding:0 0 40px}
+table{width:100%;border-collapse:collapse;min-width:820px}
+thead th{background:#78350f;color:#fff;padding:8px 10px;font-size:11px;font-weight:600;text-align:left;white-space:nowrap;position:sticky;top:0}
+thead th:first-child{width:38px;text-align:center}
+tbody tr{border-bottom:1px solid #e7e5e4;transition:background .1s}
+tbody tr:hover{background:#fef9c3}
+tbody tr.weekend{background:#f5f5f4}
+tbody tr.weekend:hover{background:#fef9c3}
+tbody tr.today td:first-child{background:#fbbf24;color:#78350f;font-weight:800}
+
+td{padding:5px 8px;vertical-align:middle}
+.td-num{text-align:center;font-weight:700;color:#78350f;font-size:12px;width:36px}
+.td-dia{font-size:11px;color:#57534e;white-space:nowrap;width:76px;font-weight:500}
+.td-fecha{font-size:11px;color:#57534e;white-space:nowrap;width:82px}
+.td-estado{width:130px}
+.td-benef{width:180px}
+.td-desc{width:220px}
+.td-obs{min-width:180px}
+td.inactive{background:#f5f5f4 !important}
+
+/* ── ESTADO SELECT ── */
+.sel-estado{width:100%;height:24px;border-radius:5px;border:1.5px solid #d6d3d1;font-size:11px;font-weight:600;padding:0 4px;cursor:pointer;background:#fff}
+.sel-estado.e-trabajo{border-color:#86efac;background:#f0fdf4;color:#166534}
+.sel-estado.e-licencia{border-color:#fdba74;background:#fff7ed;color:#9a3412}
+.sel-estado.e-feriado{border-color:#fca5a5;background:#fef2f2;color:#991b1b}
+.sel-estado.e-descanso{border-color:#d1d5db;background:#f9fafb;color:#6b7280}
+.sel-estado.e-medico{border-color:#93c5fd;background:#eff6ff;color:#1d4ed8}
+.sel-estado.e-empty{border-color:#e5e7eb;background:#fff;color:#9ca3af}
+
+/* ── INPUTS ── */
+.field-inp{width:100%;height:24px;border:1.5px solid #d6d3d1;border-radius:4px;padding:0 6px;font-size:11px;background:#fff;color:#1c1917;transition:.15s}
+.field-inp:focus{outline:none;border-color:#f59e0b;background:#fffbeb}
+.field-inp:disabled{background:#f5f5f4;color:#a8a29e;cursor:default;border-color:#e7e5e4}
+
+/* status badge (used inside inactive cells) */
+.badge{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:99px;font-size:10px;font-weight:700;white-space:nowrap}
+.badge-licencia{background:#fff7ed;color:#9a3412;border:1px solid #fdba74}
+.badge-feriado{background:#fef2f2;color:#991b1b;border:1px solid #fca5a5}
+.badge-descanso{background:#f9fafb;color:#6b7280;border:1px solid #e5e7eb}
+.badge-medico{background:#eff6ff;color:#1d4ed8;border:1px solid #93c5fd}
+
+/* ── FOOTER ── */
+.footer{position:fixed;bottom:0;left:0;right:0;background:#78350f;color:rgba(255,255,255,.7);text-align:center;font-size:10px;padding:5px;z-index:10}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-icon">🚜</div>
+  <div class="header-title">
+    <h1>Bitácora Miniexcavadora</h1>
+    <div class="sub">Constructora Las Raíces — Registro diario de actividades</div>
+  </div>
+  <div class="header-center">
+    <div class="month-nav">
+      <button id="prev-month">&#8249;</button>
+      <span id="month-label"></span>
+      <button id="next-month">&#8250;</button>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="op-wrap">
+      <label for="op-input">Operador:</label>
+      <input id="op-input" type="text" placeholder="Nombre operador...">
+    </div>
+    <button class="export-btn" onclick="exportarExcel()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M12 3v12m0 0l-4-4m4 4l4-4"/></svg>
+      Exportar Excel
+    </button>
+  </div>
+</div>
+
+<div class="summary-bar" id="summary-bar">
+  <div class="stat"><span class="dot dot-trabajo"></span> Trabajados <span class="num" id="cnt-trabajo">0</span></div>
+  <div class="stat"><span class="dot dot-licencia"></span> Licencia <span class="num" id="cnt-licencia">0</span></div>
+  <div class="stat"><span class="dot dot-feriado"></span> Feriado <span class="num" id="cnt-feriado">0</span></div>
+  <div class="stat"><span class="dot dot-medico"></span> Médico <span class="num" id="cnt-medico">0</span></div>
+  <div class="stat"><span class="dot dot-descanso"></span> Descanso / Sin actividad <span class="num" id="cnt-descanso">0</span></div>
+</div>
+
+<div class="table-wrap">
+<table>
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>Día</th>
+      <th>Fecha</th>
+      <th>Estado</th>
+      <th>Beneficiario</th>
+      <th>Descripción</th>
+      <th>Obra / Observaciones</th>
+    </tr>
+  </thead>
+  <tbody id="bitacora-body"></tbody>
+</table>
+</div>
+
+<datalist id="desc-list">
+  <option value="Mejoramiento/habilitacion de terreno">
+  <option value="Instalación de Fosa">
+  <option value="Traslado/Instalacion de letrero">
+  <option value="Retiro de fosas">
+  <option value="Excavación de zanja">
+  <option value="Nivelación de terreno">
+  <option value="Post venta">
+  <option value="Oficina">
+</datalist>
+<datalist id="obra-list">
+  <option value="Obra El maiten">
+  <option value="Ñuke Mapu">
+  <option value="Newen Ruka">
+  <option value="Oficina central">
+</datalist>
+
+<div class="footer" id="footer-info">Datos guardados en este navegador (localStorage)</div>
+
+<script>
+const LS_KEY   = 'raices_bitacora_excavadora_v1';
+const LS_OP    = 'raices_bitacora_operador';
+const DIAS     = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+const MESES    = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+/* ── DATOS SEMILLA (Junio y Julio 2026) ── */
+const SEED = {
+  "2026-06-01":{estado:"licencia"},
+  "2026-06-02":{estado:"licencia"},
+  "2026-06-03":{estado:"licencia"},
+  "2026-06-04":{estado:"licencia"},
+  "2026-06-05":{estado:"licencia"},
+  "2026-06-06":{estado:"descanso"},
+  "2026-06-07":{estado:"descanso"},
+  "2026-06-08":{estado:"licencia"},
+  "2026-06-09":{estado:"licencia"},
+  "2026-06-10":{estado:"licencia"},
+  "2026-06-11":{estado:"licencia"},
+  "2026-06-12":{estado:"licencia"},
+  "2026-06-13":{estado:"descanso"},
+  "2026-06-14":{estado:"descanso"},
+  "2026-06-15":{estado:"trabajo",beneficiario:"Fidelina Pilquian",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
+  "2026-06-16":{estado:"trabajo",beneficiario:"Fidelina Pilquian",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
+  "2026-06-17":{estado:"trabajo",beneficiario:"Juan Catrileo",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
+  "2026-06-18":{estado:"trabajo",beneficiario:"Fidelina Pilquian",descripcion:"Instalación de Fosa",obs:"Obra El maiten"},
+  "2026-06-19":{estado:"trabajo",beneficiario:"Alberto Coña",descripcion:"Traslado/Instalacion de letrero",obs:"Obra El maiten"},
+  "2026-06-20":{estado:"descanso"},
+  "2026-06-21":{estado:"descanso"},
+  "2026-06-22":{estado:"trabajo",beneficiario:"Oficina central",descripcion:"Retiro de fosas en oficina central p/El Maiten",obs:"1 viaje AM y 1 viaje PM"},
+  "2026-06-23":{estado:"trabajo",beneficiario:"Fidelina Pilquian",descripcion:"Instalación de Fosa",obs:"Obra El maiten"},
+  "2026-06-24":{estado:"trabajo",beneficiario:"Delia Antilaf",descripcion:"Instalación de Fosa",obs:"Obra El maiten"},
+  "2026-06-25":{estado:"trabajo",beneficiario:"Enomisia Valdebenito",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
+  "2026-06-26":{estado:"trabajo",beneficiario:"Juan Aliante",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
+  "2026-06-27":{estado:"descanso"},
+  "2026-06-28":{estado:"descanso"},
+  "2026-06-29":{estado:"feriado"},
+  "2026-06-30":{estado:"trabajo",beneficiario:"José Huilcan",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
+  "2026-07-01":{estado:"trabajo",beneficiario:"Maria Luisa Barahona",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
+  "2026-07-02":{estado:"trabajo",beneficiario:"Maria Luisa Barahona",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
+  "2026-07-03":{estado:"trabajo",beneficiario:"Maria Luisa Barahona",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
+  "2026-07-04":{estado:"descanso"},
+  "2026-07-05":{estado:"descanso"},
+  "2026-07-06":{estado:"trabajo",beneficiario:"Rodrigo Riffo",descripcion:"Post venta de Newen Ruka",obs:"Confeccion de zanja para evacuacion de aguas lluvias"},
+  "2026-07-07":{estado:"trabajo",beneficiario:"Rodrigo Riffo",descripcion:"Post venta de Newen Ruka",obs:"Confeccion de zanja para evacuacion de aguas lluvias"},
+  "2026-07-08":{estado:"trabajo",beneficiario:"Alberto Coña",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
+  "2026-07-09":{estado:"trabajo",beneficiario:"Oficina central",descripcion:"Oficina",obs:"Máquina a taller / Camion Hino RT"},
+  "2026-07-10":{estado:"trabajo",beneficiario:"Oficina central",descripcion:"Oficina",obs:"Máquina a taller / Camion Hino RT"},
+  "2026-07-11":{estado:"descanso"},
+  "2026-07-12":{estado:"descanso"},
+  "2026-07-13":{estado:"trabajo",beneficiario:"Norma Azocar",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
+  "2026-07-14":{estado:"trabajo",beneficiario:"Norma Azocar",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
+  "2026-07-15":{estado:"medico",beneficiario:"Control medico"},
+  "2026-07-16":{estado:"feriado"},
+  "2026-07-17":{estado:"trabajo",beneficiario:"Norma Azocar",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
+  "2026-07-18":{estado:"descanso"},
+  "2026-07-19":{estado:"descanso"},
+  "2026-07-20":{estado:"trabajo",beneficiario:"José Dumulef",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
+  "2026-07-21":{estado:"trabajo",beneficiario:"José Dumulef",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
+  "2026-07-22":{estado:"trabajo",beneficiario:"Juan Aliante",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
+  "2026-07-23":{estado:"trabajo",beneficiario:"Guillermo Lopez",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Obra El maiten"},
+  "2026-07-24":{estado:"trabajo",beneficiario:"Pablo Lefio",descripcion:"Instalación de Fosa",obs:"Ñuke Mapu"},
+  "2026-07-25":{estado:"descanso"},
+  "2026-07-26":{estado:"descanso"},
+  "2026-07-27":{estado:"trabajo",beneficiario:"Maria Luisa Barahona",descripcion:"Instalación de Fosa",obs:"Obra El maiten"},
+  "2026-07-28":{estado:"trabajo",beneficiario:"Maria Luisa Barahona",descripcion:"Instalación de Fosa",obs:"Obra El maiten"},
+  "2026-07-29":{estado:"medico",beneficiario:"Examenes médicos"},
+  "2026-07-30":{estado:"trabajo",beneficiario:"Isolina Huete",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Ñuke Mapu"},
+  "2026-07-31":{estado:"trabajo",beneficiario:"Isolina Huete",descripcion:"Mejoramiento/habilitacion de terreno",obs:"Ñuke Mapu"},
+};
+
+/* ── STATE ── */
+let db       = {};   // { "yyyy-mm-dd": { estado, beneficiario, descripcion, obs } }
+let curYear  = 2026;
+let curMonth = 7;    // 0-based
+
+/* ── PERSISTENCE ── */
+function loadData() {
+  try { db = JSON.parse(localStorage.getItem(LS_KEY) || 'null') || {}; } catch { db = {}; }
+  // merge seed only for dates not yet in db
+  for (const [d, v] of Object.entries(SEED)) {
+    if (!db[d]) db[d] = { ...v };
+  }
+}
+function saveData() {
+  localStorage.setItem(LS_KEY, JSON.stringify(db));
+  updateFooter();
+}
+function updateFooter() {
+  const n = Object.keys(db).length;
+  document.getElementById('footer-info').textContent =
+    'Guardado automáticamente en este navegador · ' + n + ' registros · ' + new Date().toLocaleTimeString('es-CL');
+}
+function getEntry(date) {
+  if (!db[date]) db[date] = {};
+  return db[date];
+}
+
+/* ── RENDERING ── */
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function fmtFecha(dateStr) {
+  const p = dateStr.split('-');
+  return p[2] + '/' + p[1] + '/' + p[0];
+}
+function isWeekend(d) { const wd = new Date(d + 'T12:00:00').getDay(); return wd === 0 || wd === 6; }
+function todayStr() { return new Date().toISOString().substring(0,10); }
+
+function buildEstadoSel(date, estado) {
+  const opts = [
+    ['',        '— Sin estado —',    'e-empty'],
+    ['trabajo', '✅ Trabajo',         'e-trabajo'],
+    ['licencia','🏥 Licencia',        'e-licencia'],
+    ['feriado', '🏖️ Feriado',         'e-feriado'],
+    ['descanso','💤 Descanso',        'e-descanso'],
+    ['medico',  '🩺 Médico / Examen', 'e-medico'],
+  ];
+  const clsMaps = { trabajo:'e-trabajo', licencia:'e-licencia', feriado:'e-feriado', descanso:'e-descanso', medico:'e-medico', '':'e-empty' };
+  const cls = clsMaps[estado] || 'e-empty';
+  let s = '<select class="sel-estado ' + cls + '" data-date="' + date + '" onchange="onEstado(this)">';
+  for (const [v, lbl] of opts) {
+    s += '<option value="' + v + '"' + (estado === v ? ' selected' : '') + '>' + lbl + '</option>';
+  }
+  s += '</select>';
+  return s;
+}
+
+function buildRow(date) {
+  const d   = new Date(date + 'T12:00:00');
+  const wd  = d.getDay();
+  const num = d.getDate();
+  const dayName = DIAS[wd];
+  const entry = db[date] || {};
+  const estado  = entry.estado || '';
+  const benef   = entry.beneficiario || '';
+  const desc    = entry.descripcion  || '';
+  const obs     = entry.obs          || '';
+
+  const isTrabajo = estado === 'trabajo';
+  const isMedico  = estado === 'medico';
+  const weekend   = wd === 0 || wd === 6;
+  const isToday   = date === todayStr();
+
+  const rowCls = (weekend ? 'weekend ' : '') + (isToday ? 'today ' : '');
+
+  /* Beneficiario cell */
+  const showBenef = isTrabajo || isMedico;
+  const benefPlaceholder = isMedico ? 'Detalle / Motivo...' : 'Beneficiario...';
+
+  /* Badge for non-work states */
+  const BADGES = {
+    licencia: '<span class="badge badge-licencia">🏥 Licencia</span>',
+    feriado:  '<span class="badge badge-feriado">🏖️ Feriado</span>',
+    descanso: '<span class="badge badge-descanso">💤 Descanso</span>',
+  };
+
+  let benefCell, descCell, obsCell;
+
+  if (isTrabajo) {
+    benefCell = '<input class="field-inp" type="text" value="' + esc(benef) + '" placeholder="Beneficiario..." data-date="' + date + '" data-field="beneficiario" oninput="onField(this)">';
+    descCell  = '<input class="field-inp" type="text" value="' + esc(desc)  + '" placeholder="Descripción..." list="desc-list" data-date="' + date + '" data-field="descripcion" oninput="onField(this)">';
+    obsCell   = '<input class="field-inp" type="text" value="' + esc(obs)   + '" placeholder="Obra / Observaciones..." list="obra-list" data-date="' + date + '" data-field="obs" oninput="onField(this)">';
+  } else if (isMedico) {
+    benefCell = '<input class="field-inp" type="text" value="' + esc(benef) + '" placeholder="' + benefPlaceholder + '" data-date="' + date + '" data-field="beneficiario" oninput="onField(this)">';
+    descCell  = '<td class="inactive"></td>';
+    obsCell   = '<td class="inactive"></td>';
+  } else {
+    const badge = BADGES[estado] || '';
+    benefCell = badge;
+    descCell  = '<td class="inactive"></td>';
+    obsCell   = '<td class="inactive"></td>';
+  }
+
+  let html = '<tr class="' + rowCls + '" id="row_' + date + '">';
+  html += '<td class="td-num">' + num + '</td>';
+  html += '<td class="td-dia">' + dayName + '</td>';
+  html += '<td class="td-fecha">' + fmtFecha(date) + '</td>';
+  html += '<td class="td-estado">' + buildEstadoSel(date, estado) + '</td>';
+
+  if (isTrabajo) {
+    html += '<td class="td-benef">' + benefCell + '</td>';
+    html += '<td class="td-desc">' + descCell + '</td>';
+    html += '<td class="td-obs">'  + obsCell  + '</td>';
+  } else if (isMedico) {
+    html += '<td class="td-benef">' + benefCell + '</td>';
+    html += descCell;
+    html += obsCell;
+  } else {
+    html += '<td class="td-benef">' + benefCell + '</td>';
+    html += descCell;
+    html += obsCell;
+  }
+
+  html += '</tr>';
+  return html;
+}
+
+function renderMonth() {
+  const label = MESES[curMonth] + ' ' + curYear;
+  document.getElementById('month-label').textContent = label;
+
+  const daysInMonth = new Date(curYear, curMonth + 1, 0).getDate();
+  let html = '';
+  for (let d = 1; d <= daysInMonth; d++) {
+    const mm = String(curMonth + 1).padStart(2,'0');
+    const dd = String(d).padStart(2,'0');
+    const dateStr = curYear + '-' + mm + '-' + dd;
+    html += buildRow(dateStr);
+  }
+  document.getElementById('bitacora-body').innerHTML = html;
+  updateSummary();
+}
+
+function updateSummary() {
+  const mm = String(curMonth + 1).padStart(2,'0');
+  const prefix = curYear + '-' + mm + '-';
+  const cnts = { trabajo:0, licencia:0, feriado:0, medico:0, descanso:0, '':0 };
+  const daysInMonth = new Date(curYear, curMonth + 1, 0).getDate();
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = prefix + String(d).padStart(2,'0');
+    const e = (db[dateStr] || {}).estado || '';
+    if (cnts[e] !== undefined) cnts[e]++;
+    else cnts['']++;
+  }
+  document.getElementById('cnt-trabajo').textContent  = cnts.trabajo;
+  document.getElementById('cnt-licencia').textContent = cnts.licencia;
+  document.getElementById('cnt-feriado').textContent  = cnts.feriado;
+  document.getElementById('cnt-medico').textContent   = cnts.medico;
+  document.getElementById('cnt-descanso').textContent = cnts.descanso + cnts[''];
+}
+
+/* ── HANDLERS ── */
+function onEstado(sel) {
+  const date  = sel.dataset.date;
+  const nuevo = sel.value;
+  const entry = getEntry(date);
+  entry.estado = nuevo;
+  // clear detail fields when switching away from trabajo/medico
+  if (nuevo !== 'trabajo' && nuevo !== 'medico') {
+    entry.beneficiario = ''; entry.descripcion = ''; entry.obs = '';
+  }
+  if (nuevo !== 'trabajo') { entry.descripcion = ''; entry.obs = ''; }
+  saveData();
+  // re-render only this row
+  const tr = document.getElementById('row_' + date);
+  if (tr) tr.outerHTML = buildRow(date);
+  updateSummary();
+}
+
+function onField(inp) {
+  const date  = inp.dataset.date;
+  const field = inp.dataset.field;
+  const entry = getEntry(date);
+  entry[field] = inp.value;
+  saveData();
+}
+
+/* ── NAVIGATION ── */
+document.getElementById('prev-month').addEventListener('click', () => {
+  curMonth--;
+  if (curMonth < 0) { curMonth = 11; curYear--; }
+  renderMonth();
+});
+document.getElementById('next-month').addEventListener('click', () => {
+  curMonth++;
+  if (curMonth > 11) { curMonth = 0; curYear++; }
+  renderMonth();
+});
+
+/* ── OPERADOR ── */
+const opInp = document.getElementById('op-input');
+opInp.value = localStorage.getItem(LS_OP) || '';
+opInp.addEventListener('input', () => localStorage.setItem(LS_OP, opInp.value));
+
+/* ── EXPORT ── */
+function exportarExcel() {
+  const operador = opInp.value || 'Sin especificar';
+  // Build all dates with data, sorted
+  const allDates = Object.keys(db).sort();
+  if (!allDates.length) { alert('No hay datos para exportar.'); return; }
+
+  const cell = v => '<td>' + String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</td>';
+  const ESTADO_LABELS = { trabajo:'Trabajo', licencia:'Licencia', feriado:'Feriado', descanso:'Descanso', medico:'Médico/Examen', '':'—' };
+
+  let rows = '';
+  for (const date of allDates) {
+    const d = new Date(date + 'T12:00:00');
+    const entry = db[date] || {};
+    const estado = entry.estado || '';
+    rows += '<tr>' +
+      cell(DIAS[d.getDay()]) +
+      cell(fmtFecha(date)) +
+      cell(ESTADO_LABELS[estado] || estado) +
+      cell(entry.beneficiario || '') +
+      cell(entry.descripcion  || '') +
+      cell(entry.obs          || '') +
+      '</tr>';
+  }
+
+  const xls = '<?xml version="1.0" encoding="UTF-8"?>' +
+    '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">' +
+    '<Worksheet ss:Name="Bitácora Miniexcavadora"><Table>' +
+    '<Row>' +
+    '<Cell><Data ss:Type="String">BITÁCORA MINIEXCAVADORA — CONSTRUCTORA LAS RAÍCES</Data></Cell>' +
+    '</Row>' +
+    '<Row>' +
+    '<Cell><Data ss:Type="String">Operador: ' + operador + '</Data></Cell>' +
+    '<Cell><Data ss:Type="String">Exportado: ' + new Date().toLocaleString('es-CL') + '</Data></Cell>' +
+    '</Row>' +
+    '<Row></Row>' +
+    '<Row>' +
+    '<Cell ss:StyleID="hdr"><Data ss:Type="String">Día</Data></Cell>' +
+    '<Cell ss:StyleID="hdr"><Data ss:Type="String">Fecha</Data></Cell>' +
+    '<Cell ss:StyleID="hdr"><Data ss:Type="String">Estado</Data></Cell>' +
+    '<Cell ss:StyleID="hdr"><Data ss:Type="String">Beneficiario</Data></Cell>' +
+    '<Cell ss:StyleID="hdr"><Data ss:Type="String">Descripción</Data></Cell>' +
+    '<Cell ss:StyleID="hdr"><Data ss:Type="String">Observaciones / Obra</Data></Cell>' +
+    '</Row>' +
+    rows.replace(/<tr>/g,'<Row>').replace(/<\/tr>/g,'</Row>')
+        .replace(/<td>/g,'<Cell><Data ss:Type="String">').replace(/<\/td>/g,'</Data></Cell>') +
+    '</Table></Worksheet></Workbook>';
+
+  const blob = new Blob([xls], { type:'application/vnd.ms-excel;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'Bitacora_Miniexcavadora_' + new Date().toISOString().substring(0,10) + '.xls';
+  a.click();
+}
+
+/* ── INIT ── */
+loadData();
+// open on current month if it has data, else July 2026
+const todayD = new Date();
+curYear  = todayD.getFullYear();
+curMonth = todayD.getMonth();
+// if today is before June 2026, default to July 2026
+if (curYear < 2026 || (curYear === 2026 && curMonth < 5)) {
+  curYear = 2026; curMonth = 6;
+}
+renderMonth();
+</script>
+</body>
+</html>
