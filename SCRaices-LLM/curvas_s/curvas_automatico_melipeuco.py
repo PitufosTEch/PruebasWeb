@@ -354,11 +354,14 @@ def leer_datos_control(sheets_svc):
             nombre_norm = _normalizar_nombre(nombre)
             pct = avance_appsheet.get(nombre_norm)
             if pct is None:
-                apellido = nombre_norm.split()[0] if nombre_norm else ""
+                tokens = set(nombre_norm.split())
+                best_key, best_score = None, 0
                 for k, v in avance_appsheet.items():
-                    if apellido and apellido in k:
-                        pct = v
-                        break
+                    score = len(tokens & set(k.split()))
+                    if score > best_score:
+                        best_score, best_key = score, k
+                if best_key is not None and best_score >= max(2, len(tokens) - 1):
+                    pct = avance_appsheet[best_key]
             if pct is None:
                 sin_match.append(nombre)
                 try:
