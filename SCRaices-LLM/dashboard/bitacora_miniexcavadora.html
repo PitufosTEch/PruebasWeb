@@ -170,6 +170,7 @@ td.inactive{background:#f5f5f4 !important}
 const LS_KEY  = 'raices_bitacora_excavadora_v1';
 const LS_OP   = 'raices_bitacora_operador';
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxcJowX3a3XBmSNiKOCesj1jRkQWS1VIsMbvdt-x7ckK8ZXMauI6gRgCGsoT77xYxpP/exec";
+const SNAPSHOT_URL   = "https://raw.githubusercontent.com/PitufosTEch/PruebasWeb/data-snapshot/data_snapshot.json";
 const DIAS    = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
 const MESES   = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
@@ -276,79 +277,73 @@ function getEntry(date) {
 ═══════════════════════════════════════════════════════ */
 function normId(s) { const str = String(s || ''); return /^\d+$/.test(str) ? 'P' + str : str; }
 
+function parsePrData(raw) {
+  // Acepta tanto formato snapshot {rows:[...]} como array directo
+  const proyRaw = raw?.Proyectos?.rows || raw?.Proyectos || [];
+  const benRaw  = raw?.Beneficiario?.rows || raw?.Beneficiario || [];
+
+  const lista = proyRaw
+    .filter(p => {
+      const est = String(p.estado_general || '').toLowerCase();
+      return (est.includes('ejecuci') || est.includes('finaliz')) && !/prueba/i.test(p.NOMBRE_PROYECTO || '');
+    })
+    .map(p => ({ id: normId(p.ID_proy), nombre: String(p.NOMBRE_PROYECTO || '') }))
+    .filter(p => p.id && p.nombre)
+    .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
+
+  const benef = {};
+  for (const b of benRaw) {
+    const pid = normId(b.ID_Proy);
+    if (!pid) continue;
+    const nombre = ((b.NOMBRES || '') + ' ' + (b.APELLIDOS || '')).trim();
+    if (!nombre || nombre.toLowerCase() === 'nan') continue;
+    if (!benef[pid]) benef[pid] = [];
+    if (!benef[pid].includes(nombre)) benef[pid].push(nombre);
+  }
+  for (const pid in benef) benef[pid].sort();
+
+  return { proyectos: lista, beneficiarios: benef };
+}
+
 async function loadAppSheetData() {
   showLoading(true, 'Cargando obras...');
 
-  // ── 1. Proyectos desde Firebase (rápido y confiable) ──
+  // ── 1. Snapshot de GitHub (mismo CDN que usa el dashboard principal) ──
   try {
-    const resp = await fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/estado_proyectos.json');
-    if (resp.ok) {
-      const fbData = await resp.json();
-      if (fbData) {
-        const arr = Array.isArray(fbData) ? fbData : Object.values(fbData);
-        const lista = arr
-          .filter(p => {
-            const est = String(p.estado_general || '').toLowerCase();
-            return est.includes('ejecuci') || est.includes('finaliz') || est.includes('activ');
-          })
-          .map(p => ({ id: normId(p.ID_proy), nombre: String(p.NOMBRE_PROYECTO || '') }))
-          .filter(p => p.id && p.nombre && !/prueba/i.test(p.nombre))
-          .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
-        if (lista.length > 0) {
-          PROYECTOS = lista;
-          dataLoaded = true;
-          showLoading(false);
-          renderMonth();
-        }
-      }
+    const resp = await fetch(SNAPSHOT_URL + '?t=' + Date.now(), { cache: 'no-store' });
+    if (!resp.ok) throw new Error('Snapshot HTTP ' + resp.status);
+    const raw = await resp.json();
+    const { proyectos, beneficiarios } = parsePrData(raw);
+    if (proyectos.length > 0) {
+      PROYECTOS      = proyectos;
+      BENEF_POR_PROY = beneficiarios;
+      dataLoaded     = true;
+      showLoading(false);
+      renderMonth();
+      return;   // snapshot OK: no hace falta AppSheet
     }
   } catch (e) {
-    console.warn('[Bitácora] Firebase proyectos error:', e);
+    console.warn('[Bitácora] Snapshot error:', e);
   }
 
-  // ── 2. Beneficiarios desde AppSheet (puede tardar o fallar) ──
-  if (dataLoaded) showLoading(true, 'Cargando beneficiarios...');
+  // ── 2. AppSheet directo (fallback si el snapshot falla) ──
   try {
     const url = APPS_SCRIPT_URL + '?tables=' + encodeURIComponent('Proyectos,Beneficiario');
     const resp = await fetch(url, { redirect: 'follow' });
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const appData = await resp.json();
-
-    // Si Firebase no cargó proyectos, intentar desde AppSheet
-    if (!dataLoaded) {
-      const proyRaw = appData['Proyectos'] || [];
-      const lista = proyRaw
-        .filter(p => {
-          const est = (p.estado_general || '').toLowerCase();
-          return est.includes('ejecuci') || est.includes('finalizado');
-        })
-        .map(p => ({ id: normId(p.ID_proy), nombre: String(p.NOMBRE_PROYECTO || '') }))
-        .filter(p => p.id && p.nombre && !/prueba/i.test(p.nombre))
-        .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
-      if (lista.length > 0) { PROYECTOS = lista; dataLoaded = true; }
+    const raw = await resp.json();
+    const { proyectos, beneficiarios } = parsePrData(raw);
+    if (proyectos.length > 0) {
+      PROYECTOS      = proyectos;
+      BENEF_POR_PROY = beneficiarios;
+      dataLoaded     = true;
     }
-
-    // Beneficiarios por proyecto
-    const benRaw = appData['Beneficiario'] || [];
-    BENEF_POR_PROY = {};
-    for (const b of benRaw) {
-      const pid = normId(b.ID_Proy);
-      if (!pid) continue;
-      const nombre = ((b.NOMBRES || '') + ' ' + (b.APELLIDOS || '')).trim();
-      if (!nombre || nombre.toLowerCase() === 'nan') continue;
-      if (!BENEF_POR_PROY[pid]) BENEF_POR_PROY[pid] = [];
-      if (!BENEF_POR_PROY[pid].includes(nombre)) BENEF_POR_PROY[pid].push(nombre);
-    }
-    for (const pid in BENEF_POR_PROY) BENEF_POR_PROY[pid].sort();
-
-    dataLoaded = true;
-    showLoading(false);
-    renderMonth();
   } catch (err) {
     console.warn('[Bitácora] AppSheet fetch falló:', err);
-    showLoading(false, dataLoaded ? '' : 'Sin conexión — modo texto libre');
-    if (!dataLoaded) renderMonth();
   }
+
+  showLoading(false, dataLoaded ? '' : 'Sin conexión — modo texto libre');
+  renderMonth();
 }
 
 function showLoading(on, msg) {
