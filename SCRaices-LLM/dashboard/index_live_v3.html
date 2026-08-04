@@ -5555,7 +5555,7 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
 <div class="sc"><div class="scl">Plazo</div><div style="font-size:11px;font-weight:700;">${d.pg.plazo} días</div></div>
 <div class="sc"><div class="scl">Estado</div><div style="font-size:11px;font-weight:700;color:${pgC};">${pgE}</div></div>
 </div>${barRow(fF(d.pg.inicio),d.pgProgPct!==null?d.pgProgPct:d.pgPct,fF(d.pg.finProg),d.pgProgPct!==null?Number(d.pgProgPct).toFixed(2)+'% programado':null)}`;}
-            sR+=`<h3 class="sh">📊 Avance real a la fecha (Inspecciones)</h3>
+            sR+=`<h3 class="sh">📊 Avance real a la fecha</h3>
 <div class="sg" style="grid-template-columns:repeat(auto-fit,minmax(110px,1fr));">
 <div class="sc" style="border-left:3px solid ${agC};"><div class="scl">Avance Real</div><div class="scv" style="color:${agC};">${d.agPct!=null?Number(d.agPct).toFixed(2)+'%':'—'}</div></div>
 <div class="sc"><div class="scl">Inspeccionadas</div><div class="scv">${d.conInsp}/${d.tot}</div><div class="scd">viviendas</div></div>
@@ -5948,7 +5948,7 @@ ${(()=>{const _avs=(AVANCE_MENSUAL_DATA[String(d.pr.ID_proy)]||{}).serie||[];con
                     h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📋 Programa de Obra</h3><p style="color:#94a3b8;font-size:12px;">Sin datos de programa disponibles.</p>`;
                 }
                 const agBarCol = (agPct??0)>=80?'#16a34a':(agPct??0)>=50?'#3b82f6':(agPct??0)>=25?'#f59e0b':'#ef4444';
-                h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📊 Avance real a la fecha (Curvas S)</h3>
+                h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📊 Avance real a la fecha</h3>
 <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;"><span style="font-size:14px;font-weight:800;color:${agBarCol};font-family:monospace;">${agPct != null ? Number(agPct).toFixed(2) : '—'}%</span><span style="font-size:11px;color:#94a3b8;">${_ag ? _ag.n+'/'+_ag.total+' con avance' : 'Sin datos Curvas S'}</span></div>
 <div style="height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden;"><div style="height:100%;width:${agPct??0}%;background:${agBarCol};border-radius:6px;"></div></div>`;
             } else if (tab === 'checkpoints') {
@@ -6300,15 +6300,15 @@ ${js2}
                     h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📋 Programa de Obra</h3><p style="color:#94a3b8;font-size:12px;">Sin datos de programa disponibles.</p>`;
                 }
                 // Avance real a la fecha
-                const avBarCol = av >= 80 ? '#16a34a' : av >= 50 ? '#3b82f6' : av >= 25 ? '#f59e0b' : '#ef4444';
-                h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📊 Avance real a la fecha (Inspecciones)</h3>
+                
+                h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📊 Avance real a la fecha</h3>
 <div class="summary-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));">
-  <div class="summary-card"><div class="summary-card-label">Avance Real</div><div style="font-size:14px;font-weight:800;color:${avBarCol};">${av}%</div></div>
+  <div class="summary-card"><div class="summary-card-label">Avance Real</div><div style="font-size:14px;font-weight:800;color:${agCol};">${agPct != null ? Number(agPct).toFixed(2) : '—'}%</div></div>
   <div class="summary-card"><div class="summary-card-label">Inspeccionadas</div><div style="font-size:11px;font-weight:700;">${conInsp} / ${tot}</div><div style="font-size:11px;color:#94a3b8;">viviendas</div></div>
   <div class="summary-card"><div class="summary-card-label">Terminadas</div><div style="font-size:11px;font-weight:700;color:#16a34a;">${term}</div><div style="font-size:11px;color:#94a3b8;">con recepción</div></div>
 </div>
-<div style="margin:8px 0 4px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;"><span>0%</span><span style="font-weight:600;color:${avBarCol};">${av}% completado</span><span>100%</span></div>
-<div style="height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden;margin-bottom:4px;"><div style="height:100%;width:${av}%;background:${avBarCol};border-radius:6px;transition:width 0.5s;"></div></div>`;
+<div style="margin:8px 0 4px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;"><span>0%</span><span style="font-weight:600;color:${agCol};">${agPct != null ? Number(agPct).toFixed(2) : '0.00'}% completado</span><span>100%</span></div>
+<div style="height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden;margin-bottom:4px;"><div style="height:100%;width:${agPct ?? 0}%;background:${agCol};border-radius:6px;transition:width 0.5s;"></div></div>`;
             } else if (tab === 'checkpoints') {
                 h += `Checkpoints del Proyecto</div><div class="summary-grid" style="grid-template-columns:repeat(auto-fill,minmax(55px,1fr));">`;
                 const tot = obra.viviendas.length;
@@ -6943,15 +6943,15 @@ ${js}</body></html>`;
                 } else {
                     h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📋 Programa de Obra</h3><p style="color:#94a3b8;font-size:12px;">Sin datos de programa disponibles.</p>`;
                 }
-                const avBarCol = av >= 80 ? '#16a34a' : av >= 50 ? '#3b82f6' : av >= 25 ? '#f59e0b' : '#ef4444';
-                h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📊 Avance real a la fecha (Inspecciones)</h3>
+                
+                h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📊 Avance real a la fecha</h3>
 <div class="summary-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));">
-  <div class="summary-card"><div class="summary-card-label">Avance Real</div><div style="font-size:14px;font-weight:800;color:${avBarCol};">${av}%</div></div>
+  <div class="summary-card"><div class="summary-card-label">Avance Real</div><div style="font-size:14px;font-weight:800;color:${agCol};">${agPct != null ? Number(agPct).toFixed(2) : '—'}%</div></div>
   <div class="summary-card"><div class="summary-card-label">Inspeccionadas</div><div style="font-size:11px;font-weight:700;">${conInsp} / ${tot}</div><div style="font-size:11px;color:#94a3b8;">viviendas</div></div>
   <div class="summary-card"><div class="summary-card-label">Terminadas</div><div style="font-size:11px;font-weight:700;color:#16a34a;">${term}</div><div style="font-size:11px;color:#94a3b8;">con recepción</div></div>
 </div>
-<div style="margin:8px 0 4px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;"><span>0%</span><span style="font-weight:600;color:${avBarCol};">${av}% completado</span><span>100%</span></div>
-<div style="height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden;margin-bottom:4px;"><div style="height:100%;width:${av}%;background:${avBarCol};border-radius:6px;transition:width 0.5s;"></div></div>`;
+<div style="margin:8px 0 4px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;"><span>0%</span><span style="font-weight:600;color:${agCol};">${agPct != null ? Number(agPct).toFixed(2) : '0.00'}% completado</span><span>100%</span></div>
+<div style="height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden;margin-bottom:4px;"><div style="height:100%;width:${agPct ?? 0}%;background:${agCol};border-radius:6px;transition:width 0.5s;"></div></div>`;
             } else if (tab === 'checkpoints') {
                 h += `Checkpoints del Proyecto</div><div class="summary-grid" style="grid-template-columns:repeat(auto-fill,minmax(55px,1fr));">`;
                 const tot = obra.viviendas.length;
