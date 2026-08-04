@@ -2622,7 +2622,7 @@ const HeaderProyecto = ({ proy, garantiasProy, eeppResumen, kpis, avanceInsp = 0
                                         <div className="absolute top-0 left-0 h-full bg-blue-400" style={{width:`${Math.min(Number(avanceGantt.pct_prog),100)}%`}}></div>
                                         <div className="absolute top-0 h-full bg-green-500" style={{left:`${Math.min(Number(avanceGantt.pct_prog),100)}%`,width:`${Math.min(Number(avanceGantt.pct),100)-Math.min(Number(avanceGantt.pct_prog),100)}%`}}></div>
                                         <div className="absolute top-0 bottom-0 flex items-center" style={{left:`${Math.min(Number(avanceGantt.pct_prog),100)}%`}}>
-                                            <div className="w-0.5 h-5 bg-indigo-700 rounded-full" style={{marginTop:"-4px"}} title={`Prog: ${Number(avanceGantt.pct_prog).toFixed(1)}%`}></div>
+                                            <div className="w-0.5 h-5 bg-indigo-700 rounded-full" style={{marginTop:"-4px"}} title={`Prog: ${Number(avanceGantt.pct_prog).toFixed(2)}%`}></div>
                                         </div>
                                       </React.Fragment>
                                     : <React.Fragment>
@@ -2630,7 +2630,7 @@ const HeaderProyecto = ({ proy, garantiasProy, eeppResumen, kpis, avanceInsp = 0
                                         <div className="absolute top-0 left-0 h-full bg-green-500" style={{width:`${Math.min(Number(avanceGantt.pct),100)}%`}}></div>
                                         <div className="absolute top-0 h-full bg-red-300" style={{left:`${Math.min(Number(avanceGantt.pct),100)}%`,width:`${Math.min(Number(avanceGantt.pct_prog),100)-Math.min(Number(avanceGantt.pct),100)}%`}}></div>
                                         <div className="absolute top-0 bottom-0 flex items-center" style={{left:`${Math.min(Number(avanceGantt.pct_prog),100)}%`}}>
-                                            <div className="w-0.5 h-5 bg-red-700 rounded-full" style={{marginTop:"-4px"}} title={`Prog: ${Number(avanceGantt.pct_prog).toFixed(1)}%`}></div>
+                                            <div className="w-0.5 h-5 bg-red-700 rounded-full" style={{marginTop:"-4px"}} title={`Prog: ${Number(avanceGantt.pct_prog).toFixed(2)}%`}></div>
                                         </div>
                                       </React.Fragment>
                                 : <React.Fragment>
@@ -2641,12 +2641,12 @@ const HeaderProyecto = ({ proy, garantiasProy, eeppResumen, kpis, avanceInsp = 0
                         </div>
                         {avanceGantt && (avanceGantt.pct != null || avanceGantt.pct_prog != null) && (
                             <div className="mt-1 flex items-center gap-2 text-[9px] flex-wrap">
-                                {avanceGantt.pct != null && <span className="text-green-700 font-semibold">&#9632; Real: {Number(avanceGantt.pct).toFixed(1)}%</span>}
-                                {avanceGantt.pct_prog != null && <span className="text-blue-600 font-semibold">&#9632; Prog: {Number(avanceGantt.pct_prog).toFixed(1)}%</span>}
+                                {avanceGantt.pct != null && <span className="text-green-700 font-semibold">&#9632; Real: {Number(avanceGantt.pct).toFixed(2)}%</span>}
+                                {avanceGantt.pct_prog != null && <span className="text-blue-600 font-semibold">&#9632; Prog: {Number(avanceGantt.pct_prog).toFixed(2)}%</span>}
                                 {avanceGantt.pct != null && avanceGantt.pct_prog != null && (
                                     Number(avanceGantt.pct) >= Number(avanceGantt.pct_prog)
-                                    ? <span className="font-bold text-green-600">+{(Number(avanceGantt.pct)-Number(avanceGantt.pct_prog)).toFixed(1)}% adelanto</span>
-                                    : <span className="font-bold text-red-600">{(Number(avanceGantt.pct)-Number(avanceGantt.pct_prog)).toFixed(1)}% atraso</span>
+                                    ? <span className="font-bold text-green-600">+{(Number(avanceGantt.pct)-Number(avanceGantt.pct_prog)).toFixed(2)}% adelanto</span>
+                                    : <span className="font-bold text-red-600">{(Number(avanceGantt.pct)-Number(avanceGantt.pct_prog)).toFixed(2)}% atraso</span>
                                 )}
                                 {avanceGantt.actualizado && <span className="text-gray-400 ml-auto">Act: {formatFecha(avanceGantt.actualizado)}</span>}
                             </div>
@@ -5288,7 +5288,7 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
 <div class="sc"><div class="scl">Término</div><div style="font-size:11px;font-weight:700;">${fF(pg.finProg)}</div></div>
 <div class="sc"><div class="scl">Estado</div><div style="font-size:11px;font-weight:700;color:${pgC};">${pgE}</div></div>
 </div>
-<div style="display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;margin:6px 0 3px;"><span>${fF(pg.inicio)}</span><span style="font-weight:600;">${pgProg !== null ? Number(pgProg).toFixed(1) + '% programado' : '—'}</span><span>${fF(pg.finProg)}</span></div>
+<div style="display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;margin:6px 0 3px;"><span>${fF(pg.inicio)}</span><span style="font-weight:600;">${pgProg !== null ? Number(pgProg).toFixed(2) + '% programado' : '—'}</span><span>${fF(pg.finProg)}</span></div>
 <div style="height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden;margin-bottom:12px;"><div style="height:100%;width:${pgP}%;background:${pgB};border-radius:6px;"></div></div>`;
         } else {
             sR += `<h3 class="sh">📋 Programa de Obra</h3><p style="color:#94a3b8;font-size:12px;padding:6px 0 12px;">Sin datos de programa disponibles.</p>`;
@@ -5509,14 +5509,14 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
         proyData.forEach(d=>{
             const dCol=d.diff===null?'#94a3b8':d.diff>=0?'#16a34a':'#dc2626';
             const dBg=d.diff===null?'':d.diff>=0?'#f0fdf4':'#fef2f2';
-            const dTxt=d.diff===null?'—':(d.diff>=0?'+':'')+d.diff+'%';
+            const dTxt=d.diff===null?'—':(d.diff>=0?'+':'')+Number(d.diff).toFixed(2)+'%';
             const cRCol=d.cDR===null?'#94a3b8':d.cDR<0?'#dc2626':d.cDR<30?'#b45309':'#374151';
             const pRCol=d.pgDR===null?'#94a3b8':d.pgDR<90?'#dc2626':'#374151';
             sR+=`<tr style="border-bottom:1px solid #f1f5f9;">
   <td style="padding:5px 6px;border-right:1px solid #f1f5f9;font-size:10px;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(d.nombre)}</td>
-  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${d.cPct!==null?Number(d.cPct).toFixed(1)+'%':'—'}</td>
-  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${d.pg?Number(d.pgPct).toFixed(1)+'%':'—'}</td>
-  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:${d.diff!==null?(d.diff>=5?'#16a34a':d.diff>=0?'#2563eb':'#dc2626'):'#94a3b8'};">${d.agPct!==null?Number(d.agPct).toFixed(1)+'%':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${d.cPct!==null?Number(d.cPct).toFixed(2)+'%':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${d.pg?Number(d.pgPct).toFixed(2)+'%':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:${d.diff!==null?(d.diff>=5?'#16a34a':d.diff>=0?'#2563eb':'#dc2626'):'#94a3b8'};">${d.agPct!==null?Number(d.agPct).toFixed(2)+'%':'—'}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;font-weight:700;color:${dCol};background:${dBg};">${dTxt}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${fF(d.pg?.inicio||null)}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${fF(d.pg?.finProg||null)}</td>
@@ -5554,7 +5554,7 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
 <div class="sc"><div class="scl">Término</div><div style="font-size:11px;font-weight:700;">${fF(d.pg.finProg)}</div></div>
 <div class="sc"><div class="scl">Plazo</div><div style="font-size:11px;font-weight:700;">${d.pg.plazo} días</div></div>
 <div class="sc"><div class="scl">Estado</div><div style="font-size:11px;font-weight:700;color:${pgC};">${pgE}</div></div>
-</div>${barRow(fF(d.pg.inicio),d.pgProgPct!==null?d.pgProgPct:d.pgPct,fF(d.pg.finProg),d.pgProgPct!==null?Number(d.pgProgPct).toFixed(1)+'% programado':null)}`;}
+</div>${barRow(fF(d.pg.inicio),d.pgProgPct!==null?d.pgProgPct:d.pgPct,fF(d.pg.finProg),d.pgProgPct!==null?Number(d.pgProgPct).toFixed(2)+'% programado':null)}`;}
             sR+=`<h3 class="sh">📊 Avance real a la fecha (Inspecciones)</h3>
 <div class="sg" style="grid-template-columns:repeat(auto-fit,minmax(110px,1fr));">
 <div class="sc" style="border-left:3px solid ${avC};"><div class="scl">Avance Real</div><div class="scv" style="color:${avC};">${d.avPct}%</div></div>
@@ -5942,7 +5942,7 @@ ${(()=>{const _avs=(AVANCE_MENSUAL_DATA[String(d.pr.ID_proy)]||{}).serie||[];con
   <div class="summary-card"><div class="summary-card-label">Plazo</div><div style="font-size:11px;font-weight:700;">${pg.plazo} días</div></div>
   <div class="summary-card"><div class="summary-card-label">Estado</div><div style="font-size:11px;font-weight:700;color:${estadoCol};">${estadoTxt}</div></div>
 </div>
-<div style="margin:10px 0 4px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;"><span>${fmtFecha(pg.inicio)}</span><span style="font-weight:600;">${pctProg !== null ? Number(pctProg).toFixed(1) + '% programado' : '—'}</span><span>${fmtFecha(pg.finProg)}</span></div>
+<div style="margin:10px 0 4px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;"><span>${fmtFecha(pg.inicio)}</span><span style="font-weight:600;">${pctProg !== null ? Number(pctProg).toFixed(2) + '% programado' : '—'}</span><span>${fmtFecha(pg.finProg)}</span></div>
 <div style="height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden;"><div style="height:100%;width:${barVal}%;background:${barCol};border-radius:6px;"></div></div>`;
                 } else {
                     h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📋 Programa de Obra</h3><p style="color:#94a3b8;font-size:12px;">Sin datos de programa disponibles.</p>`;
@@ -6294,7 +6294,7 @@ ${js2}
   <div class="summary-card"><div class="summary-card-label">Plazo</div><div style="font-size:11px;font-weight:700;">${pg.plazo} días</div></div>
   <div class="summary-card"><div class="summary-card-label">Estado</div><div style="font-size:11px;font-weight:700;color:${estadoCol};">${estadoTxt}</div></div>
 </div>
-<div style="margin:10px 0 4px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;"><span>${fmtFecha(pg.inicio)}</span><span style="font-weight:600;">${pctProg !== null ? Number(pctProg).toFixed(1) + '% programado' : '—'}</span><span>${fmtFecha(pg.finProg)}</span></div>
+<div style="margin:10px 0 4px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;"><span>${fmtFecha(pg.inicio)}</span><span style="font-weight:600;">${pctProg !== null ? Number(pctProg).toFixed(2) + '% programado' : '—'}</span><span>${fmtFecha(pg.finProg)}</span></div>
 <div style="height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden;"><div style="height:100%;width:${barVal}%;background:${barCol};border-radius:6px;"></div></div>`;
                 } else {
                     h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📋 Programa de Obra</h3><p style="color:#94a3b8;font-size:12px;">Sin datos de programa disponibles.</p>`;
@@ -6938,7 +6938,7 @@ ${js}</body></html>`;
   <div class="summary-card"><div class="summary-card-label">Plazo</div><div style="font-size:11px;font-weight:700;">${pg.plazo} días</div></div>
   <div class="summary-card"><div class="summary-card-label">Estado</div><div style="font-size:11px;font-weight:700;color:${estadoCol};">${estadoTxt}</div></div>
 </div>
-<div style="margin:10px 0 4px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;"><span>${fmtFecha(pg.inicio)}</span><span style="font-weight:600;">${pctProg !== null ? Number(pctProg).toFixed(1) + '% programado' : '—'}</span><span>${fmtFecha(pg.finProg)}</span></div>
+<div style="margin:10px 0 4px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;"><span>${fmtFecha(pg.inicio)}</span><span style="font-weight:600;">${pctProg !== null ? Number(pctProg).toFixed(2) + '% programado' : '—'}</span><span>${fmtFecha(pg.finProg)}</span></div>
 <div style="height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden;"><div style="height:100%;width:${barVal}%;background:${barCol};border-radius:6px;"></div></div>`;
                 } else {
                     h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📋 Programa de Obra</h3><p style="color:#94a3b8;font-size:12px;">Sin datos de programa disponibles.</p>`;
