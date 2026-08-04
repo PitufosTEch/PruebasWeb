@@ -386,7 +386,7 @@ def actualizar_pct_en_hoja(sheets_svc, grupos):
     for g in orden_grupos:
         if g in grupos:
             for _, _, pct in grupos[g]:
-                valores.append([round(pct)])
+                valores.append([round(pct, 2)])
     if not valores:
         return
     n = len(valores)
