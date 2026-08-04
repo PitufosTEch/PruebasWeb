@@ -35,7 +35,7 @@ body{font-family:'IBM Plex Sans',system-ui,sans-serif;background:#fafaf9;color:#
 .stat{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600}
 .stat .dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
 .dot-trabajo{background:#16a34a}.dot-licencia{background:#ea580c}
-.dot-feriado{background:#dc2626}.dot-medico{background:#2563eb}.dot-descanso{background:#9ca3af}
+.dot-feriado{background:#dc2626}.dot-medico{background:#2563eb}.dot-descanso{background:#9ca3af}.dot-taller{background:#f59e0b}
 .stat span.num{font-size:13px;font-weight:800;color:#1c1917}
 
 /* ── TABLE ── */
@@ -66,6 +66,7 @@ td.inactive{background:#f5f5f4 !important}
 .sel-estado.e-descanso{border-color:#d1d5db;background:#f9fafb;color:#6b7280}
 .sel-estado.e-medico{border-color:#93c5fd;background:#eff6ff;color:#1d4ed8}
 .sel-estado.e-empty{border-color:#e5e7eb;background:#fff;color:#9ca3af}
+.sel-estado.e-taller{border-color:#fde68a;background:#fff7ed;color:#92400e}
 
 .proy-sel{width:100%;height:24px;border-radius:5px;border:1.5px solid #fcd34d;background:#fffbeb;font-size:10.5px;padding:0 4px;cursor:pointer;color:#78350f}
 .proy-sel:focus{outline:none;border-color:#f59e0b}
@@ -122,6 +123,7 @@ td.inactive{background:#f5f5f4 !important}
   <div class="stat"><span class="dot dot-feriado"></span> Feriado <span class="num" id="cnt-feriado">0</span></div>
   <div class="stat"><span class="dot dot-medico"></span> Médico <span class="num" id="cnt-medico">0</span></div>
   <div class="stat"><span class="dot dot-descanso"></span> Descanso <span class="num" id="cnt-descanso">0</span></div>
+  <div class="stat"><span class="dot dot-taller"></span> Taller <span class="num" id="cnt-taller">0</span></div>
 </div>
 
 <div class="table-wrap">
@@ -132,10 +134,10 @@ td.inactive{background:#f5f5f4 !important}
       <th>Día</th>
       <th>Fecha</th>
       <th>Estado</th>
-      <th>Proyecto</th>
+      <th>Obra</th>
       <th>Beneficiario</th>
       <th>Descripción</th>
-      <th>Obra / Observaciones</th>
+      <th>Observaciones</th>
     </tr>
   </thead>
   <tbody id="bitacora-body"></tbody>
@@ -347,8 +349,9 @@ function buildEstadoSel(date, estado) {
     ['feriado', '🏖️ Feriado',      'e-feriado'],
     ['descanso','💤 Descanso',     'e-descanso'],
     ['medico',  '🩺 Médico',       'e-medico'],
+    ['taller',  '🔧 Taller',       'e-taller'],
   ];
-  const clsMap = {trabajo:'e-trabajo',licencia:'e-licencia',feriado:'e-feriado',descanso:'e-descanso',medico:'e-medico','':'e-empty'};
+  const clsMap = {trabajo:'e-trabajo',licencia:'e-licencia',feriado:'e-feriado',descanso:'e-descanso',medico:'e-medico',taller:'e-taller','':'e-empty'};
   const cls = clsMap[estado] || 'e-empty';
   let s = '<select class="sel-estado ' + cls + '" data-date="' + date + '" onchange="onEstado(this)">';
   for (const [v, lbl] of opts) {
@@ -359,14 +362,12 @@ function buildEstadoSel(date, estado) {
 
 function buildProySel(date, proyId) {
   if (!dataLoaded || PROYECTOS.length === 0) {
-    // fallback: free text
-    return '<input class="field-inp" style="border-color:#fcd34d;background:#fffbeb" type="text" value="' + esc(proyId) + '" placeholder="Proyecto..." data-date="' + date + '" data-field="proyecto" oninput="onField(this)">';
+    return '<input class="field-inp" style="border-color:#fcd34d;background:#fffbeb" type="text" value="' + esc(proyId) + '" placeholder="Obra..." data-date="' + date + '" data-field="proyecto" oninput="onField(this)">';
   }
   let s = '<select class="proy-sel" data-date="' + date + '" onchange="onProyChange(this)">';
-  s += '<option value="">— Sin proyecto —</option>';
+  s += '<option value="">— Sin obra —</option>';
   for (const p of PROYECTOS) {
-    const lbl = p.id + ' — ' + p.nombre;
-    s += '<option value="' + esc(p.id) + '"' + (proyId === p.id ? ' selected' : '') + '>' + esc(lbl) + '</option>';
+    s += '<option value="' + esc(p.id) + '"' + (proyId === p.id ? ' selected' : '') + '>' + esc(p.nombre) + '</option>';
   }
   s += '</select>';
   return s;
@@ -412,6 +413,7 @@ function buildRow(date) {
 
   const isTrabajo = estado === 'trabajo';
   const isMedico  = estado === 'medico';
+  const isTaller  = estado === 'taller';
   const weekend   = wd === 0 || wd === 6;
   const isToday   = date === todayStr();
   const rowCls    = (weekend ? 'weekend ' : '') + (isToday ? 'today' : '');
@@ -426,12 +428,17 @@ function buildRow(date) {
     html += '<td class="td-proy">'   + buildProySel(date, proyId)             + '</td>';
     html += '<td class="td-benef">'  + buildBenefField(date, proyId, benef)   + '</td>';
     html += '<td class="td-desc"><input class="field-inp" type="text" value="' + esc(desc) + '" placeholder="Descripción..." list="desc-list" data-date="' + date + '" data-field="descripcion" oninput="onField(this)"></td>';
-    html += '<td class="td-obs"><input class="field-inp" type="text" value="' + esc(obs) + '" placeholder="Obra / Observaciones..." list="obra-list" data-date="' + date + '" data-field="obs" oninput="onField(this)"></td>';
+    html += '<td class="td-obs"><input class="field-inp" type="text" value="' + esc(obs) + '" placeholder="Observaciones..." data-date="' + date + '" data-field="obs" oninput="onField(this)"></td>';
   } else if (isMedico) {
     html += '<td class="td-proy inactive"></td>';
     html += '<td class="td-benef"><input class="field-inp" type="text" value="' + esc(benef) + '" placeholder="Detalle / Motivo..." data-date="' + date + '" data-field="beneficiario" oninput="onField(this)"></td>';
     html += '<td class="td-desc inactive"></td>';
     html += '<td class="td-obs inactive"></td>';
+  } else if (isTaller) {
+    html += '<td class="td-proy inactive"></td>';
+    html += '<td class="td-benef"><input class="field-inp" type="text" value="' + esc(benef) + '" placeholder="Servicio técnico / Detalle..." data-date="' + date + '" data-field="beneficiario" oninput="onField(this)"></td>';
+    html += '<td class="td-desc"><input class="field-inp" type="text" value="' + esc(desc) + '" placeholder="Trabajo realizado..." data-date="' + date + '" data-field="descripcion" oninput="onField(this)"></td>';
+    html += '<td class="td-obs"><input class="field-inp" type="text" value="' + esc(obs) + '" placeholder="Observaciones taller..." data-date="' + date + '" data-field="obs" oninput="onField(this)"></td>';
   } else {
     const badge = BADGES[estado] || '';
     html += '<td class="td-proy inactive"></td>';
@@ -465,7 +472,7 @@ function renderMonth() {
 function updateSummary() {
   const mm = String(curMonth + 1).padStart(2, '0');
   const prefix = curYear + '-' + mm + '-';
-  const cnts = { trabajo:0, licencia:0, feriado:0, medico:0, descanso:0, '':0 };
+  const cnts = { trabajo:0, licencia:0, feriado:0, medico:0, descanso:0, taller:0, '':0 };
   const days  = new Date(curYear, curMonth + 1, 0).getDate();
   for (let d = 1; d <= days; d++) {
     const ds = prefix + String(d).padStart(2, '0');
@@ -477,6 +484,7 @@ function updateSummary() {
   document.getElementById('cnt-feriado').textContent  = cnts.feriado;
   document.getElementById('cnt-medico').textContent   = cnts.medico;
   document.getElementById('cnt-descanso').textContent = cnts.descanso + cnts[''];
+  document.getElementById('cnt-taller').textContent   = cnts.taller;
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -487,8 +495,12 @@ function onEstado(sel) {
   const nuevo = sel.value;
   const entry = getEntry(date);
   entry.estado = nuevo;
-  if (nuevo !== 'trabajo') { entry.proyecto = ''; entry.descripcion = ''; entry.obs = ''; }
-  if (nuevo !== 'trabajo' && nuevo !== 'medico') entry.beneficiario = '';
+  if (nuevo !== 'trabajo') entry.proyecto = '';
+  if (nuevo !== 'trabajo' && nuevo !== 'medico' && nuevo !== 'taller') {
+    entry.beneficiario = '';
+    entry.descripcion  = '';
+    entry.obs          = '';
+  }
   saveData();
   const tr = document.getElementById('row_' + date);
   if (tr) tr.outerHTML = buildRow(date);
@@ -554,7 +566,7 @@ function exportarExcel() {
   const allDates   = Object.keys(db).sort();
   if (!allDates.length) { alert('No hay datos para exportar.'); return; }
 
-  const ESTADO_LABELS = {trabajo:'Trabajo',licencia:'Licencia',feriado:'Feriado',descanso:'Descanso',medico:'Médico/Examen','':'—'};
+  const ESTADO_LABELS = {trabajo:'Trabajo',licencia:'Licencia',feriado:'Feriado',descanso:'Descanso',medico:'Médico/Examen',taller:'Taller','':'—'};
   const proyNombre = (id) => {
     if (!id) return '';
     const p = PROYECTOS.find(x => x.id === id);
@@ -584,7 +596,7 @@ function exportarExcel() {
     '<tr><td>Operador: ' + operador + '</td><td colspan="6">Exportado: ' + new Date().toLocaleString('es-CL') + '</td></tr>' +
     '<tr></tr>' +
     '<tr style="background:#78350f;color:#fff;font-weight:bold">' +
-    '<td>Día</td><td>Fecha</td><td>Estado</td><td>Proyecto</td><td>Beneficiario</td><td>Descripción</td><td>Observaciones / Obra</td>' +
+    '<td>Día</td><td>Fecha</td><td>Estado</td><td>Obra</td><td>Beneficiario</td><td>Descripción</td><td>Observaciones</td>' +
     '</tr>' + rows + '</table></body></html>';
 
   const blob = new Blob(['﻿' + xls], { type: 'application/vnd.ms-excel;charset=utf-8' });
