@@ -79,6 +79,19 @@ td.inactive{background:#f5f5f4 !important}
 .benef-inp{width:100%;height:22px;border:1.5px solid #65a30d;border-radius:4px;padding:0 5px;font-size:10.5px;background:#fff;margin-top:2px;display:none}
 .benef-inp.show{display:block}
 
+/* ── COMBOBOXES (obra / beneficiario) ── */
+.combo-wrap{position:relative;width:100%}
+.combo-inp{width:100%;height:24px;border-radius:5px;border:1.5px solid #d6d3d1;font-size:10.5px;padding:0 6px;background:#fff;color:#1c1917;box-sizing:border-box}
+.combo-inp.obra-combo{border-color:#fcd34d;background:#fffbeb;color:#78350f}
+.combo-inp.benef-combo{border-color:#a3e635;background:#f7fee7;color:#166534}
+.combo-inp.obra-combo:focus{outline:none;border-color:#f59e0b}
+.combo-inp.benef-combo:focus{outline:none;border-color:#65a30d}
+.combo-drop{position:absolute;top:calc(100% + 2px);left:0;right:0;z-index:200;background:#fff;border:1.5px solid #e5e7eb;border-radius:5px;box-shadow:0 4px 14px rgba(0,0,0,.14);max-height:200px;overflow-y:auto;display:none}
+.combo-drop.open{display:block}
+.combo-opt{padding:5px 8px;font-size:10.5px;cursor:pointer;color:#1c1917;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.combo-opt:hover{background:#fffbeb}
+.combo-opt.no-result{color:#9ca3af;cursor:default;font-style:italic}
+
 .badge{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:99px;font-size:10px;font-weight:700;white-space:nowrap}
 .badge-licencia{background:#fff7ed;color:#9a3412;border:1px solid #fdba74}
 .badge-feriado{background:#fef2f2;color:#991b1b;border:1px solid #fca5a5}
@@ -388,37 +401,34 @@ function buildEstadoSel(date, estado) {
 }
 
 function buildProySel(date, proyId) {
-  if (!dataLoaded || PROYECTOS.length === 0) {
+  if (!dataLoaded) {
     return '<input class="field-inp" style="border-color:#fcd34d;background:#fffbeb" type="text" value="' + esc(proyId) + '" placeholder="Obra..." data-date="' + date + '" data-field="proyecto" oninput="onField(this)">';
   }
-  let s = '<select class="proy-sel" data-date="' + date + '" onchange="onProyChange(this)">';
-  s += '<option value="">— Sin obra —</option>';
-  for (const p of PROYECTOS) {
-    s += '<option value="' + esc(p.id) + '"' + (proyId === p.id ? ' selected' : '') + '>' + esc(p.nombre) + '</option>';
-  }
-  s += '</select>';
-  return s;
+  const selName = (PROYECTOS.find(p => p.id === proyId) || {}).nombre || '';
+  return '<div class="combo-wrap">' +
+    '<input class="combo-inp obra-combo" type="text" value="' + esc(selName) + '" ' +
+    'placeholder="— Sin obra —" autocomplete="off" ' +
+    'data-date="' + date + '" ' +
+    'oninput="comboFilter(this,\'obra\')" ' +
+    'onfocus="comboOpen(this,\'obra\')" ' +
+    'onblur="comboBlur(this,\'obra\')">' +
+    '<div class="combo-drop" id="combodrop_obra_' + date + '"></div>' +
+    '</div>';
 }
 
 function buildBenefField(date, proyId, benefNombre) {
-  const opts = proyId ? (BENEF_POR_PROY[proyId] || []) : [];
-
   if (!dataLoaded) {
-    // Sin datos aún: campo libre
     return '<input class="field-inp" type="text" value="' + esc(benefNombre) + '" placeholder="Beneficiario..." data-date="' + date + '" data-field="beneficiario" oninput="onField(this)">';
   }
-
-  // dataLoaded: siempre select con "Otro / Libre..." aunque no haya opciones del proyecto
-  const isCustom = benefNombre && !opts.includes(benefNombre);
-  let s = '<select class="benef-sel" data-date="' + date + '" onchange="onBenefSel(this)">';
-  s += '<option value="">— seleccionar —</option>';
-  for (const o of opts) {
-    s += '<option value="' + esc(o) + '"' + (benefNombre === o && !isCustom ? ' selected' : '') + '>' + esc(o) + '</option>';
-  }
-  s += '<option value="__otro__"' + (isCustom ? ' selected' : '') + '>Otro / Libre...</option>';
-  s += '</select>';
-  s += '<input class="benef-inp' + (isCustom ? ' show' : '') + '" type="text" value="' + (isCustom ? esc(benefNombre) : '') + '" placeholder="Nombre libre..." data-date="' + date + '" data-field="beneficiario" oninput="onField(this)">';
-  return s;
+  return '<div class="combo-wrap">' +
+    '<input class="combo-inp benef-combo" type="text" value="' + esc(benefNombre) + '" ' +
+    'placeholder="— seleccionar —" autocomplete="off" ' +
+    'data-date="' + date + '" data-proyid="' + esc(proyId) + '" ' +
+    'oninput="comboFilter(this,\'benef\')" ' +
+    'onfocus="comboOpen(this,\'benef\')" ' +
+    'onblur="comboBlur(this,\'benef\')">' +
+    '<div class="combo-drop" id="combodrop_benef_' + date + '"></div>' +
+    '</div>';
 }
 
 const BADGES = {
@@ -512,6 +522,78 @@ function updateSummary() {
   document.getElementById('cnt-medico').textContent   = cnts.medico;
   document.getElementById('cnt-descanso').textContent = cnts.descanso + cnts[''];
   document.getElementById('cnt-taller').textContent   = cnts.taller;
+}
+
+/* ═══════════════════════════════════════════════════════
+   COMBOBOX — OBRA Y BENEFICIARIO
+═══════════════════════════════════════════════════════ */
+function comboOpts(type, date, proyId) {
+  if (type === 'obra') return PROYECTOS.map(p => ({ val: p.id, label: p.nombre }));
+  const pid = proyId || (db[date] || {}).proyecto || '';
+  return (BENEF_POR_PROY[pid] || []).map(n => ({ val: n, label: n }));
+}
+
+function comboPopulate(drop, opts, query, type) {
+  const q = query.toLowerCase().trim();
+  const filtered = q ? opts.filter(o => o.label.toLowerCase().includes(q)) : opts;
+  if (!filtered.length) {
+    drop.innerHTML = '<div class="combo-opt no-result">Sin resultados</div>';
+  } else {
+    drop.innerHTML = filtered.map(o =>
+      '<div class="combo-opt" data-val="' + esc(o.val) + '"' +
+      ' onmousedown="event.preventDefault();comboSelect(this,\'' + type + '\')">' +
+      esc(o.label) + '</div>'
+    ).join('');
+  }
+}
+
+function comboOpen(inp, type) {
+  if (!dataLoaded) return;
+  const date = inp.dataset.date;
+  const drop = document.getElementById('combodrop_' + type + '_' + date);
+  if (!drop) return;
+  comboPopulate(drop, comboOpts(type, date, inp.dataset.proyid), '', type);
+  drop.classList.add('open');
+}
+
+function comboFilter(inp, type) {
+  if (!dataLoaded) return;
+  const date = inp.dataset.date;
+  const drop = document.getElementById('combodrop_' + type + '_' + date);
+  if (drop) {
+    comboPopulate(drop, comboOpts(type, date, inp.dataset.proyid), inp.value, type);
+    drop.classList.add('open');
+  }
+  if (type === 'benef') { getEntry(date).beneficiario = inp.value; saveData(); }
+}
+
+function comboSelect(opt, type) {
+  const val  = opt.dataset.val;
+  const inp  = opt.closest('.combo-wrap').querySelector('.combo-inp');
+  const drop = opt.closest('.combo-drop');
+  const date = inp.dataset.date;
+  drop.classList.remove('open');
+  if (type === 'obra') {
+    const entry = getEntry(date);
+    entry.proyecto     = val;
+    entry.beneficiario = '';
+    saveData();
+    const tr = document.getElementById('row_' + date);
+    if (tr) tr.outerHTML = buildRow(date);
+  } else {
+    getEntry(date).beneficiario = val;
+    inp.value = val;
+    saveData();
+  }
+}
+
+function comboBlur(inp, type) {
+  setTimeout(function() {
+    const date = inp.dataset.date;
+    const drop = document.getElementById('combodrop_' + type + '_' + date);
+    if (drop) drop.classList.remove('open');
+    if (type === 'benef') { getEntry(date).beneficiario = inp.value; saveData(); }
+  }, 200);
 }
 
 /* ═══════════════════════════════════════════════════════
