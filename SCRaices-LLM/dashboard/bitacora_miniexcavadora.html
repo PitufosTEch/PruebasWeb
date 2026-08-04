@@ -277,26 +277,59 @@ function getEntry(date) {
 function normId(s) { const str = String(s || ''); return /^\d+$/.test(str) ? 'P' + str : str; }
 
 async function loadAppSheetData() {
-  showLoading(true, 'Cargando proyectos...');
+  showLoading(true, 'Cargando obras...');
+
+  // ── 1. Proyectos desde Firebase (rápido y confiable) ──
+  try {
+    const resp = await fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/estado_proyectos.json');
+    if (resp.ok) {
+      const fbData = await resp.json();
+      if (fbData) {
+        const arr = Array.isArray(fbData) ? fbData : Object.values(fbData);
+        const lista = arr
+          .filter(p => {
+            const est = String(p.estado_general || '').toLowerCase();
+            return est.includes('ejecuci') || est.includes('finaliz') || est.includes('activ');
+          })
+          .map(p => ({ id: normId(p.ID_proy), nombre: String(p.NOMBRE_PROYECTO || '') }))
+          .filter(p => p.id && p.nombre && !/prueba/i.test(p.nombre))
+          .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
+        if (lista.length > 0) {
+          PROYECTOS = lista;
+          dataLoaded = true;
+          showLoading(false);
+          renderMonth();
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[Bitácora] Firebase proyectos error:', e);
+  }
+
+  // ── 2. Beneficiarios desde AppSheet (puede tardar o fallar) ──
+  if (dataLoaded) showLoading(true, 'Cargando beneficiarios...');
   try {
     const url = APPS_SCRIPT_URL + '?tables=' + encodeURIComponent('Proyectos,Beneficiario');
     const resp = await fetch(url, { redirect: 'follow' });
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const data = await resp.json();
+    const appData = await resp.json();
 
-    // ── Proyectos ──
-    const proyRaw = data['Proyectos'] || [];
-    PROYECTOS = proyRaw
-      .filter(p => {
-        const est = (p.estado_general || '').toLowerCase();
-        return est.includes('ejecuci') || est.includes('finalizado');
-      })
-      .map(p => ({ id: normId(p.ID_proy), nombre: String(p.NOMBRE_PROYECTO || '') }))
-      .filter(p => p.id && p.nombre && !/prueba/i.test(p.nombre))
-      .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
+    // Si Firebase no cargó proyectos, intentar desde AppSheet
+    if (!dataLoaded) {
+      const proyRaw = appData['Proyectos'] || [];
+      const lista = proyRaw
+        .filter(p => {
+          const est = (p.estado_general || '').toLowerCase();
+          return est.includes('ejecuci') || est.includes('finalizado');
+        })
+        .map(p => ({ id: normId(p.ID_proy), nombre: String(p.NOMBRE_PROYECTO || '') }))
+        .filter(p => p.id && p.nombre && !/prueba/i.test(p.nombre))
+        .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
+      if (lista.length > 0) { PROYECTOS = lista; dataLoaded = true; }
+    }
 
-    // ── Beneficiarios por proyecto ──
-    const benRaw = data['Beneficiario'] || [];
+    // Beneficiarios por proyecto
+    const benRaw = appData['Beneficiario'] || [];
     BENEF_POR_PROY = {};
     for (const b of benRaw) {
       const pid = normId(b.ID_Proy);
@@ -306,16 +339,15 @@ async function loadAppSheetData() {
       if (!BENEF_POR_PROY[pid]) BENEF_POR_PROY[pid] = [];
       if (!BENEF_POR_PROY[pid].includes(nombre)) BENEF_POR_PROY[pid].push(nombre);
     }
-    // Ordenar nombres por apellido dentro de cada proyecto
     for (const pid in BENEF_POR_PROY) BENEF_POR_PROY[pid].sort();
 
     dataLoaded = true;
     showLoading(false);
-    renderMonth(); // volver a renderizar con dropdowns correctos
+    renderMonth();
   } catch (err) {
     console.warn('[Bitácora] AppSheet fetch falló:', err);
-    showLoading(false, 'Sin conexión — modo texto libre');
-    renderMonth();
+    showLoading(false, dataLoaded ? '' : 'Sin conexión — modo texto libre');
+    if (!dataLoaded) renderMonth();
   }
 }
 
@@ -376,12 +408,12 @@ function buildProySel(date, proyId) {
 function buildBenefField(date, proyId, benefNombre) {
   const opts = proyId ? (BENEF_POR_PROY[proyId] || []) : [];
 
-  if (!dataLoaded || opts.length === 0) {
-    // No hay datos o no hay proyecto: campo libre
+  if (!dataLoaded) {
+    // Sin datos aún: campo libre
     return '<input class="field-inp" type="text" value="' + esc(benefNombre) + '" placeholder="Beneficiario..." data-date="' + date + '" data-field="beneficiario" oninput="onField(this)">';
   }
 
-  // Hay opciones: select + opción "Otro..."
+  // dataLoaded: siempre select con "Otro / Libre..." aunque no haya opciones del proyecto
   const isCustom = benefNombre && !opts.includes(benefNombre);
   let s = '<select class="benef-sel" data-date="' + date + '" onchange="onBenefSel(this)">';
   s += '<option value="">— seleccionar —</option>';
