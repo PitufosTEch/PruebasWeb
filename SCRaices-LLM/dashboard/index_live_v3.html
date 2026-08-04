@@ -91,6 +91,7 @@ let MONTOS_PROY_DATA = {};
 // Avance fisico mensual reconstruido desde los deltas fechados de Ejecucion.
 // { [ID_proy]: { serie: [{mes:'YYYY-MM', avance, gain}], ultimoMes, avanceActual } }
 let AVANCE_MENSUAL_DATA = {};
+let AVANCE_GANTT_DATA = {};
 const ETAPAS_CONFIG_FULL = {
   "_comentario": "Configuración de tiempos para etapas de construcción. Tiempos en DÍAS.",
   "_instrucciones": {
@@ -4718,7 +4719,7 @@ const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios
     const [avanceGanttData, setAvanceGanttData] = React.useState({});
     React.useEffect(() => {
         fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/avance_gantt.json')
-            .then(r => r.json()).then(d => setAvanceGanttData(d || {})).catch(() => {});
+            .then(r => r.json()).then(d => { AVANCE_GANTT_DATA = d || {}; setAvanceGanttData(d || {}); }).catch(() => {});
     }, []);
 
     // ── Generador de Informe PDF Semanal ─────────────────────────────────────
@@ -7343,8 +7344,7 @@ ${js}</body></html>`;
             const epPendientes   = epNums.filter(n => eps.filter(e => e.Num_EP === n).some(e => !e.Estado.toLowerCase().includes('pagado'))).length;
             const agNode         = avanceGanttRaw[pid];
             const pctPrograma    = (agNode != null) ? Math.min(100, Math.round(((agNode.pct_prog ?? agNode.pct) || 0) * 10) / 10) : null;
-            const avMensual      = AVANCE_MENSUAL_DATA[pid];
-            const pctReal        = (avMensual != null && avMensual.avanceActual != null) ? Math.min(100, Math.round(avMensual.avanceActual * 10) / 10) : null;
+            const pctReal        = agNode?.pct != null ? Math.round(agNode.pct * 100) / 100 : null;
 
             // ── TAB RESUMEN ──────────────────────────────────────────────────
             // Siempre muestra datos del contrato aunque no haya EP ejecutado
@@ -7371,7 +7371,7 @@ ${js}</body></html>`;
   <div style="background:#e5e7eb;border-radius:6px;height:9px;overflow:hidden;margin-bottom:9px;">
     <div style="height:100%;width:${pctPrograma != null ? pctPrograma : 0}%;background:#7c3aed;border-radius:6px;"></div>
   </div>
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;"><span style="font-size:10px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.5px;">% Avance real</span><span style="font-size:11px;font-weight:700;color:#ea580c;">${pctReal != null ? pctReal + '%' : '—'}</span></div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;"><span style="font-size:10px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.5px;">% Avance real</span><span style="font-size:11px;font-weight:700;color:#ea580c;">${pctReal != null ? Number(pctReal).toFixed(2) + '%' : '—'}</span></div>
   <div style="background:#e5e7eb;border-radius:6px;height:9px;overflow:hidden;margin-bottom:16px;">
     <div style="height:100%;width:${pctReal != null ? pctReal : 0}%;background:#ea580c;border-radius:6px;"></div>
   </div>
@@ -7677,8 +7677,7 @@ window.addEventListener('resize',updateStickyTops);
             const pctCob  = totContrato > 0 ? Math.round(totPagado/totContrato*10000)/100 : 0;
             const pctEmit = totContrato > 0 ? Math.round(totEP/totContrato*10000)/100 : 0;
             const agPct   = (ag => ag?.pct_prog ?? ag?.pct ?? null)(avanceGanttRaw[pid]);
-            const avM     = AVANCE_MENSUAL_DATA[pid];
-            const pctReal = (avM?.avanceActual != null) ? Math.round(avM.avanceActual*100)/100 : null;
+            const pctReal = avanceGanttRaw[pid]?.pct != null ? Math.round(avanceGanttRaw[pid].pct * 100) / 100 : null;
             const pg      = ganttRaw[pid] || null;
             const progDiasR = pg?.finProg ? Math.floor((new Date(pg.finProg)-new Date())/86400000) : null;
             const cDur    = proy.duracion || 0;
@@ -9946,7 +9945,7 @@ function buildAlertasGlobales() {
         const vivs = benefByProy[pid] || [];
         const nViv = vivs.length;
         const av = AVANCE_MENSUAL_DATA[pid] || null;
-        const avance = av ? av.avanceActual : 0;
+        const avance = AVANCE_GANTT_DATA[pid]?.pct ?? 0;
         const serie = av ? av.serie : [];
         const montoProy = (MONTOS_PROY_DATA[pid] || {}).total || 0;
         const pagado = pagadoByProy[pid] || 0;
