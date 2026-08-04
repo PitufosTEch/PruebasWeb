@@ -31,6 +31,7 @@ import curvas_cloud_utils as _ccu
 # ─────────────────────────────────────────────────────────────────────────────
 FIREBASE_URL       = "https://scraices-dashboard-default-rtdb.firebaseio.com/avance_gantt.json"
 FIREBASE_GANTT_URL = "https://scraices-dashboard-default-rtdb.firebaseio.com/gantt_programa.json"
+FIREBASE_BENEF_URL = "https://scraices-dashboard-default-rtdb.firebaseio.com/avance_benef.json"
 
 # Spreadsheet ID de cada Gantt de control
 PROYECTOS = {
@@ -156,6 +157,14 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(sys.stdout)],
 )
 log = logging.getLogger(__name__)
+
+
+def _normalizar_clave(nombre: str) -> str:
+    """Normaliza un nombre para usarlo como clave Firebase: sin tildes, mayúsculas, espacios→guión bajo."""
+    import unicodedata
+    nfkd = unicodedata.normalize("NFKD", nombre)
+    sin_t = "".join(c for c in nfkd if not unicodedata.combining(c))
+    return "_".join(sin_t.upper().split())
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -375,6 +384,7 @@ def _leer_datos_control(sheets_svc, spreadsheet_id, pid) -> dict | None:
     curvas_cfg = PROYECTO_CURVAS.get(pid)
     valores_real   = []
     inicios_curvas = []
+    benef_dict     = {}  # {clave_normalizada: pct} para avance_benef Firebase
 
     for row in rows[4:]:
         if len(row) < 2:
@@ -390,6 +400,7 @@ def _leer_datos_control(sheets_svc, spreadsheet_id, pid) -> dict | None:
         except (ValueError, TypeError):
             pct = 0.0
         valores_real.append(pct)
+        benef_dict[_normalizar_clave(nombre)] = round(pct, 2)
 
         if curvas_cfg and len(row) > 2:
             ini = _parse_inicio(row[2])
@@ -410,6 +421,7 @@ def _leer_datos_control(sheets_svc, spreadsheet_id, pid) -> dict | None:
         "fuente":         "Datos Control",
         "actualizado":    hoy.isoformat(),
         "_inicios_curvas": inicios_curvas,  # solo para fallback, no se escribe a Firebase
+        "_benef":         benef_dict,       # por beneficiario, se escribe a avance_benef
     }
 
 
@@ -440,6 +452,7 @@ def main():
             return None
 
     resultado = {}
+    resultado_benef = {}  # {pid: {clave_benef: pct}}
     for pid, sid in PROYECTOS.items():
         log.info(f"Leyendo {pid}...")
 
@@ -449,6 +462,9 @@ def main():
             continue
 
         inicios_curvas = datos.pop("_inicios_curvas", [])
+        benef_dict     = datos.pop("_benef", {})
+        if benef_dict:
+            resultado_benef[pid] = benef_dict
 
         # ── Avance programado: Gantt directo → curva S → fallback Firebase ────
         hoja_gantt = GANTT_HOJAS.get(pid)
@@ -495,13 +511,21 @@ def main():
         log.error("Sin datos para ningun proyecto. Abortando escritura en Firebase.")
         sys.exit(1)
 
-    log.info(f"Escribiendo {len(resultado)} proyectos en Firebase...")
+    log.info(f"Escribiendo {len(resultado)} proyectos en Firebase (avance_gantt)...")
     resp = requests.put(FIREBASE_URL, json=resultado, timeout=30)
     if resp.status_code == 200:
-        log.info("Firebase actualizado OK.")
+        log.info("Firebase avance_gantt actualizado OK.")
     else:
-        log.error(f"Error Firebase: {resp.status_code} {resp.text[:200]}")
+        log.error(f"Error Firebase avance_gantt: {resp.status_code} {resp.text[:200]}")
         sys.exit(1)
+
+    if resultado_benef:
+        log.info(f"Escribiendo avance por beneficiario ({sum(len(v) for v in resultado_benef.values())} benef. en {len(resultado_benef)} proyectos)...")
+        resp2 = requests.put(FIREBASE_BENEF_URL, json=resultado_benef, timeout=30)
+        if resp2.status_code == 200:
+            log.info("Firebase avance_benef actualizado OK.")
+        else:
+            log.error(f"Error Firebase avance_benef: {resp2.status_code} {resp2.text[:200]}")
 
     log.info("=== Listo ===")
 
