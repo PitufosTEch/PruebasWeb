@@ -92,6 +92,7 @@ let MONTOS_PROY_DATA = {};
 // { [ID_proy]: { serie: [{mes:'YYYY-MM', avance, gain}], ultimoMes, avanceActual } }
 let AVANCE_MENSUAL_DATA = {};
 let AVANCE_GANTT_DATA = {};
+let AVANCE_BENEF_DATA = {};  // avance AppSheet por beneficiario: {pid: {NOMBRE_NORM_KEY: pct}}
 const ETAPAS_CONFIG_FULL = {
   "_comentario": "Configuración de tiempos para etapas de construcción. Tiempos en DÍAS.",
   "_instrucciones": {
@@ -1506,6 +1507,23 @@ const getSolpago = (idBenef) => SOLPAGO_DATA.filter(s => String(s.ID_Benef) === 
 const getTotalPagado = (idBenef) => getSolpago(idBenef).reduce((s, p) => s + p.monto, 0);
 const getMaestroNombre = (id) => MAESTROS_DATA[id] || id || "Desconocido";
 const getInspeccion = (idBenef) => INSPECCIONES_DATA.find(i => String(i.ID_Benef) === String(idBenef)) || null;
+
+// Avance físico real por beneficiario desde AppSheet (via Firebase avance_benef)
+const _normClave = (s) => (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().trim().replace(/\s+/g,'_');
+const getAvanceBenef = (pid, nombres, apellidos) => {
+    const node = AVANCE_BENEF_DATA[pid];
+    if (!node) return null;
+    const key = _normClave(`${nombres} ${apellidos}`);
+    if (key in node) return node[key];
+    // Fallback: intersección de tokens (robusto ante orden Nombre/Apellido invertido)
+    const tokens = new Set(key.split('_').filter(Boolean));
+    let bestVal = null, bestScore = 0;
+    for (const [k, v] of Object.entries(node)) {
+        const score = k.split('_').filter(t => tokens.has(t)).length;
+        if (score > bestScore) { bestScore = score; bestVal = v; }
+    }
+    return (bestScore >= Math.max(2, tokens.size - 1)) ? bestVal : null;
+};
 
 // Familias excluidas de presupuesto y pagados (electricidad gestionada aparte)
 const FAMILIAS_EXCLUIDAS = new Set(['07 - Eléctricidad']);
@@ -4720,6 +4738,8 @@ const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios
     React.useEffect(() => {
         fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/avance_gantt.json')
             .then(r => r.json()).then(d => { AVANCE_GANTT_DATA = d || {}; setAvanceGanttData(d || {}); }).catch(() => {});
+        fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/avance_benef.json')
+            .then(r => r.json()).then(d => { AVANCE_BENEF_DATA = d || {}; }).catch(() => {});
     }, []);
 
     // ── Generador de Informe PDF Semanal ─────────────────────────────────────
@@ -7980,13 +8000,14 @@ ${viewerCss}</style>
             const completados = Object.values(flags).filter(Boolean).length;
             const insp = getInspeccion(v.ID_Benef);
             const pctTotal = insp ? insp.pct_total : null;
+            const pctBenef = getAvanceBenef(proyectoSel, v.NOMBRES, v.APELLIDOS);
             const pagosBenef = getSolpago(v.ID_Benef);
             const totalPagadoMO = pagosBenef.reduce((s, p) => s + p.monto, 0);
             const obsAll = (observaciones && observaciones[v.ID_Benef]) || [];
             // Solo observaciones marcadas con estrella → publicas en el informe
             const obsPublicas = obsAll.filter(o => starredIds.has(String(o.id)));
             return {
-                ...v, seg, flags, completados, pctTotal, pagosBenef, totalPagadoMO,
+                ...v, seg, flags, completados, pctTotal, pctBenef, pagosBenef, totalPagadoMO,
                 obsPublicas,
                 numComentarios: obsPublicas.length
             };
@@ -8588,7 +8609,7 @@ ${viewerCss}</style>
                                     {CHECKPOINTS.map(cp => (
                                         <span key={cp.key} className="w-10 text-center" title={cp.label}>{cp.label}</span>
                                     ))}
-                                    <span className="w-14 text-right">% Av</span>
+                                    <span className="w-14 text-right" title="% Avance físico real (AppSheet)">% Av</span>
                                     <span className="w-10 text-center" title="Comentarios publicos">💬</span>
                                 </div>
                                 <div className="divide-y divide-gray-100">
@@ -8615,8 +8636,8 @@ ${viewerCss}</style>
                                                         );
                                                     })}
                                                     <span className="w-14 text-right">
-                                                        {d.pctTotal !== null ? (
-                                                            <span className={`text-xs font-bold font-mono ${d.pctTotal >= 90 ? 'text-green-600' : d.pctTotal >= 50 ? 'text-amber-600' : 'text-gray-500'}`}>{d.pctTotal}%</span>
+                                                        {d.pctBenef !== null && d.pctBenef !== undefined ? (
+                                                            <span className={`text-xs font-bold font-mono ${d.pctBenef >= 90 ? 'text-green-600' : d.pctBenef >= 50 ? 'text-amber-600' : 'text-gray-500'}`}>{Number(d.pctBenef).toFixed(2)}%</span>
                                                         ) : <span className="text-[10px] text-gray-300">—</span>}
                                                     </span>
                                                     <span className="w-10 text-center text-[11px] text-gray-500">
