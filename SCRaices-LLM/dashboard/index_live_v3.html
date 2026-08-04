@@ -5247,8 +5247,8 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
         const avC = avPct>=80 ? '#16a34a' : avPct>=50 ? '#2563eb' : '#dc2626';
 
         let sR = `<div class="blk"><div class="sg" style="grid-template-columns:repeat(auto-fit,minmax(110px,1fr));margin-bottom:14px;">
-<div class="sc" style="border-left:3px solid ${agC};"><div class="scl">Avance Real (Gantt)</div><div class="scv" style="color:${agC};">${agPct!=null?agPct+'%':'—'}</div><div class="scd">${_ag?_ag.n+'/'+_ag.total+' benef.':'Sin datos'}</div></div>
-<div class="sc" style="border-left:3px solid ${avC};"><div class="scl">Avance Insp.</div><div class="scv" style="color:${avC};">${avPct}%</div><div class="scd">${conInsp}/${tot} inspeccionadas</div></div>
+<div class="sc" style="border-left:3px solid ${agC};"><div class="scl">Avance Real (Gantt)</div><div class="scv" style="color:${agC};">${agPct!=null?Number(agPct).toFixed(2)+'%':'—'}</div><div class="scd">${_ag?_ag.n+'/'+_ag.total+' benef.':'Sin datos'}</div></div>
+<div class="sc" style="border-left:3px solid ${avC};"><div class="scl">Avance Insp.</div><div class="scv" style="color:${avC};">${Number(avPct).toFixed(2)}%</div><div class="scd">${conInsp}/${tot} inspeccionadas</div></div>
 <div class="sc"><div class="scl">Viviendas</div><div class="scv">${tot}</div><div class="scd">Beneficiarios</div></div>
 <div class="sc" style="border-left:3px solid #16a34a;"><div class="scl">Terminadas</div><div class="scv" style="color:#16a34a;">${terminadas}</div><div class="scd">RF + cierre forzado</div></div>
 <div class="sc" style="border-left:3px solid ${criticos>0?'#dc2626':'#94a3b8'};"><div class="scl">Críticas</div><div class="scv" style="color:${criticos>0?'#dc2626':'#6b7280'};">${criticos}</div><div class="scd">Estado crítico</div></div>
@@ -5533,11 +5533,11 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
 
         // Bloque detallado por obra
         proyData.forEach((d,pi)=>{
-            const agC=agColor(d.agPct),avC=avColor(d.avPct),avB=d.avPct>=80?'#16a34a':d.avPct>=50?'#3b82f6':d.avPct>=25?'#f59e0b':'#ef4444';
+            const agC=agColor(d.agPct),avC=avColor(d.avPct),agB=(d.agPct??0)>=80?'#16a34a':(d.agPct??0)>=50?'#3b82f6':(d.agPct??0)>=25?'#f59e0b':'#ef4444',avB=d.avPct>=80?'#16a34a':d.avPct>=50?'#3b82f6':d.avPct>=25?'#f59e0b':'#ef4444';
             sR+=`<div class="obra-block blk" data-obra="${pi}" style="border-left:4px solid #0f172a;">${prjHdr(d.nombre)}
 <div class="sg" style="margin-bottom:14px;">
-<div class="sc" style="border-left:3px solid ${agC};"><div class="scl">Avance Real (Gantt)</div><div class="scv" style="color:${agC};">${d.agPct!=null?d.agPct+'%':'—'}</div><div class="scd">${d._ag?d._ag.n+'/'+d._ag.total+' benef.':'Sin datos'}</div></div>
-<div class="sc" style="border-left:3px solid ${avC};"><div class="scl">Avance Insp.</div><div class="scv" style="color:${avC};">${d.avPct}%</div><div class="scd">${d.conInsp}/${d.tot} inspeccionadas</div></div>
+<div class="sc" style="border-left:3px solid ${agC};"><div class="scl">Avance Real (Gantt)</div><div class="scv" style="color:${agC};">${d.agPct!=null?Number(d.agPct).toFixed(2)+'%':'—'}</div><div class="scd">${d._ag?d._ag.n+'/'+d._ag.total+' benef.':'Sin datos'}</div></div>
+<div class="sc" style="border-left:3px solid ${avC};"><div class="scl">Avance Insp.</div><div class="scv" style="color:${avC};">${Number(d.avPct).toFixed(2)}%</div><div class="scd">${d.conInsp}/${d.tot} inspeccionadas</div></div>
 <div class="sc"><div class="scl">Viviendas</div><div class="scv">${d.tot}</div><div class="scd">Beneficiarios</div></div>
 <div class="sc" style="border-left:3px solid #16a34a;"><div class="scl">Terminadas</div><div class="scv" style="color:#16a34a;">${d.terminadas}</div><div class="scd">RF + cierre forzado</div></div>
 </div>`;
@@ -5557,12 +5557,12 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
 </div>${barRow(fF(d.pg.inicio),d.pgProgPct!==null?d.pgProgPct:d.pgPct,fF(d.pg.finProg),d.pgProgPct!==null?Number(d.pgProgPct).toFixed(2)+'% programado':null)}`;}
             sR+=`<h3 class="sh">📊 Avance real a la fecha (Inspecciones)</h3>
 <div class="sg" style="grid-template-columns:repeat(auto-fit,minmax(110px,1fr));">
-<div class="sc" style="border-left:3px solid ${avC};"><div class="scl">Avance Real</div><div class="scv" style="color:${avC};">${d.avPct}%</div></div>
+<div class="sc" style="border-left:3px solid ${agC};"><div class="scl">Avance Real</div><div class="scv" style="color:${agC};">${d.agPct!=null?Number(d.agPct).toFixed(2)+'%':'—'}</div></div>
 <div class="sc"><div class="scl">Inspeccionadas</div><div class="scv">${d.conInsp}/${d.tot}</div><div class="scd">viviendas</div></div>
 <div class="sc"><div class="scl">Terminadas</div><div class="scv" style="color:#16a34a;">${d.terminadas}</div><div class="scd">con recepción</div></div>
 </div>
-<div style="display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;margin:6px 0 3px;"><span>0%</span><span style="font-weight:600;color:${avC};">${d.avPct}% completado</span><span>100%</span></div>
-<div style="height:8px;background:#e5e7eb;border-radius:6px;overflow:hidden;"><div style="height:100%;width:${d.avPct}%;background:${avB};border-radius:6px;"></div></div>
+<div style="display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;margin:6px 0 3px;"><span>0%</span><span style="font-weight:600;color:${agC};">${d.agPct!=null?Number(d.agPct).toFixed(2)+'%':'0.00%'} completado</span><span>100%</span></div>
+<div style="height:8px;background:#e5e7eb;border-radius:6px;overflow:hidden;"><div style="height:100%;width:${d.agPct??0}%;background:${agB};border-radius:6px;"></div></div>
 </div>`;
         });
 
@@ -5922,7 +5922,7 @@ ${(()=>{const _avs=(AVANCE_MENSUAL_DATA[String(d.pr.ID_proy)]||{}).serie||[];con
                 const agCol = agPct == null ? '#94a3b8' : agPct >= 80 ? '#16a34a' : agPct >= 50 ? '#2563eb' : '#dc2626';
                 h += `Estado General</div>
 <div class="summary-grid">
-  <div class="summary-card" style="border-left:3px solid ${agCol};"><div class="summary-card-label">Avance Real</div><div class="summary-card-value" style="color:${agCol};">${agPct != null ? agPct + '%' : '—'}</div><div class="summary-card-detail">${_ag ? _ag.n + '/' + _ag.total + ' con avance' : 'Sin datos Gantt'}</div></div>
+  <div class="summary-card" style="border-left:3px solid ${agCol};"><div class="summary-card-label">Avance Real</div><div class="summary-card-value" style="color:${agCol};">${agPct != null ? Number(agPct).toFixed(2) + '%' : '—'}</div><div class="summary-card-detail">${_ag ? _ag.n + '/' + _ag.total + ' con avance' : 'Sin datos Gantt'}</div></div>
   <div class="summary-card"><div class="summary-card-label">Viviendas</div><div class="summary-card-value">${tot}</div><div class="summary-card-detail">Beneficiarios</div></div>
   <div class="summary-card"><div class="summary-card-label">Terminadas</div><div class="summary-card-value" style="color:#16a34a;">${term}</div><div class="summary-card-detail">Con recepción</div></div>
 </div>`;
@@ -5947,10 +5947,10 @@ ${(()=>{const _avs=(AVANCE_MENSUAL_DATA[String(d.pr.ID_proy)]||{}).serie||[];con
                 } else {
                     h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📋 Programa de Obra</h3><p style="color:#94a3b8;font-size:12px;">Sin datos de programa disponibles.</p>`;
                 }
-                const avBarCol = av>=80?'#16a34a':av>=50?'#3b82f6':av>=25?'#f59e0b':'#ef4444';
-                h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📊 Avance real a la fecha (Inspecciones)</h3>
-<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;"><span style="font-size:14px;font-weight:800;color:${avBarCol};font-family:monospace;">${av}%</span><span style="font-size:11px;color:#94a3b8;">${conInsp}/${tot} viviendas inspeccionadas</span></div>
-<div style="height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden;"><div style="height:100%;width:${av}%;background:${avBarCol};border-radius:6px;"></div></div>`;
+                const agBarCol = (agPct??0)>=80?'#16a34a':(agPct??0)>=50?'#3b82f6':(agPct??0)>=25?'#f59e0b':'#ef4444';
+                h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📊 Avance real a la fecha (Curvas S)</h3>
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;"><span style="font-size:14px;font-weight:800;color:${agBarCol};font-family:monospace;">${agPct != null ? Number(agPct).toFixed(2) : '—'}%</span><span style="font-size:11px;color:#94a3b8;">${_ag ? _ag.n+'/'+_ag.total+' con avance' : 'Sin datos Curvas S'}</span></div>
+<div style="height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden;"><div style="height:100%;width:${agPct??0}%;background:${agBarCol};border-radius:6px;"></div></div>`;
             } else if (tab === 'checkpoints') {
                 const tot = obra.viviendas.length;
                 h += `Checkpoints (${CPS_ADQ.length} indicadores)</div><div class="summary-grid" style="grid-template-columns:repeat(${CPS_ADQ.length},1fr);">`;
@@ -6252,7 +6252,7 @@ ${js2}
                 const agCol = agPct == null ? '#94a3b8' : agPct >= 80 ? '#16a34a' : agPct >= 50 ? '#2563eb' : '#dc2626';
                 h += `Estado General</div>
 <div class="summary-grid">
-  <div class="summary-card" style="border-left:3px solid ${agCol};"><div class="summary-card-label">Avance Real</div><div class="summary-card-value" style="color:${agCol};">${agPct != null ? agPct + '%' : '—'}</div><div class="summary-card-detail">${_ag ? _ag.n + '/' + _ag.total + ' con avance' : 'Sin datos Gantt'}</div></div>
+  <div class="summary-card" style="border-left:3px solid ${agCol};"><div class="summary-card-label">Avance Real</div><div class="summary-card-value" style="color:${agCol};">${agPct != null ? Number(agPct).toFixed(2) + '%' : '—'}</div><div class="summary-card-detail">${_ag ? _ag.n + '/' + _ag.total + ' con avance' : 'Sin datos Gantt'}</div></div>
   <div class="summary-card"><div class="summary-card-label">Viviendas</div><div class="summary-card-value">${tot}</div><div class="summary-card-detail">Beneficiarios</div></div>
   <div class="summary-card"><div class="summary-card-label">Terminadas</div><div class="summary-card-value" style="color:#16a34a;">${term}</div><div class="summary-card-detail">Con recepción</div></div>
 </div>`;
@@ -6899,7 +6899,7 @@ ${js}</body></html>`;
                 const agCol = agPct == null ? '#94a3b8' : agPct >= 80 ? '#16a34a' : agPct >= 50 ? '#2563eb' : '#dc2626';
                 h += `Estado General</div>
 <div class="summary-grid">
-  <div class="summary-card" style="border-left:3px solid ${agCol};"><div class="summary-card-label">Avance Real</div><div class="summary-card-value" style="color:${agCol};">${agPct != null ? agPct + '%' : '—'}</div><div class="summary-card-detail">${_ag ? _ag.n + '/' + _ag.total + ' con avance' : 'Sin datos Gantt'}</div></div>
+  <div class="summary-card" style="border-left:3px solid ${agCol};"><div class="summary-card-label">Avance Real</div><div class="summary-card-value" style="color:${agCol};">${agPct != null ? Number(agPct).toFixed(2) + '%' : '—'}</div><div class="summary-card-detail">${_ag ? _ag.n + '/' + _ag.total + ' con avance' : 'Sin datos Gantt'}</div></div>
   <div class="summary-card"><div class="summary-card-label">Viviendas</div><div class="summary-card-value">${tot}</div><div class="summary-card-detail">Beneficiarios</div></div>
   <div class="summary-card"><div class="summary-card-label">Terminadas</div><div class="summary-card-value" style="color:#16a34a;">${term}</div><div class="summary-card-detail">Con recepción</div></div>
 </div>`;
