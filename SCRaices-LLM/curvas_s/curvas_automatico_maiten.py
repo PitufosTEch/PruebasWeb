@@ -816,28 +816,24 @@ def _crear_o_actualizar_drive(drive_svc, name, path_local, drive_ids):
     existing_id = drive_ids.get(name, "")
 
     if existing_id:
-        drive_svc.files().update(
-            fileId=existing_id,
-            body={"name": name},
-            media_body=media,
-        ).execute()
-        log.info(f"  Actualizado: {name} -> {existing_id}")
-        return existing_id
-    else:
-        file_meta = {"name": name, "mimeType": "image/png"}
-        result = drive_svc.files().create(
-            body=file_meta,
-            media_body=media,
-            fields="id",
-        ).execute()
-        new_id = result["id"]
-        # Hacer publico para que Sheets pueda mostrarlo
-        drive_svc.permissions().create(
-            fileId=new_id,
-            body={"role": "reader", "type": "anyone"},
-        ).execute()
-        log.info(f"  Creado nuevo: {name} -> {new_id}")
-        return new_id
+        try:
+            drive_svc.files().delete(fileId=existing_id).execute()
+        except Exception:
+            pass
+    file_meta = {"name": name, "mimeType": "image/png"}
+    result = drive_svc.files().create(
+        body=file_meta,
+        media_body=media,
+        fields="id",
+    ).execute()
+    new_id = result["id"]
+    # Hacer publico para que Sheets pueda mostrarlo
+    drive_svc.permissions().create(
+        fileId=new_id,
+        body={"role": "reader", "type": "anyone"},
+    ).execute()
+    log.info(f"  Recreado (sin cache CDN): {name} -> {new_id}")
+    return new_id
 
 
 def actualizar_drive(drive_svc, outdir, drive_ids):

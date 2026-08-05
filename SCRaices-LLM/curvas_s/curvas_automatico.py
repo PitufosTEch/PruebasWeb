@@ -781,19 +781,33 @@ def insertar_imagenes_en_sheets(sheets_svc):
 # 7. ACTUALIZAR ARCHIVOS EN DRIVE (mismo ID = mismos links en Sheets)
 # ─────────────────────────────────────────────────────────────────────────────
 def actualizar_drive(drive_svc, outdir):
+    global DRIVE_IDS
     log.info("Actualizando archivos en Google Drive...")
-    for name, file_id in DRIVE_IDS.items():
+    nuevos = {}
+    for name, file_id in list(DRIVE_IDS.items()):
         path = Path(outdir) / name
         if not path.exists():
             log.warning(f"  No encontrado: {path}, saltando.")
+            nuevos[name] = file_id
             continue
         media = MediaFileUpload(str(path), mimetype="image/png", resumable=False)
-        drive_svc.files().update(
-            fileId=file_id,
-            body={"name": name},
-            media_body=media,
+        if file_id:
+            try:
+                drive_svc.files().delete(fileId=file_id).execute()
+            except Exception:
+                pass
+        res = drive_svc.files().create(
+            body={"name": name, "mimeType": "image/png"},
+            media_body=media, fields="id"
         ).execute()
-        log.info(f"  Actualizado: {name} -> {file_id}")
+        new_id = res["id"]
+        drive_svc.permissions().create(
+            fileId=new_id, body={"type": "anyone", "role": "reader"},
+        ).execute()
+        nuevos[name] = new_id
+        log.info(f"  Recreado (sin cache CDN): {name} -> {new_id}")
+    DRIVE_IDS.update(nuevos)
+    _ccu.save_drive_ids("nuke_mapu", DRIVE_IDS)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
