@@ -49,6 +49,7 @@ from googleapiclient.http import MediaFileUpload
 # CONFIGURACION
 # ─────────────────────────────────────────────────────────────────────────────
 SPREADSHEET_ID = "1IwBN7CpDvKVAvaRuYHNUfkQ0e98cJMVFDKFrntv3oNw"
+GANTT_HOJA       = "Programa de obra"
 TOKEN_FILE     = _ccu.TOKEN_FILE
 OUTPUT_DIR     = _ccu.get_output_dir()
 DRIVE_IDS_FILE = None  # gestionado por _ccu (Firebase en cloud, JSON en local)
@@ -581,7 +582,7 @@ def _fmt_date(d):
     return d.strftime("%d/%m/%Y")
 
 
-def generar_grafico_grupo(nombre_grupo, beneficiarios, control, outdir):
+def generar_grafico_grupo(nombre_grupo, beneficiarios, control, outdir, pct_prog_gantt=None):
     color = COLORES.get(nombre_grupo, "#333333")
     fechas, prog, real_hist, proj, fin_proy = build_group_curves(beneficiarios, control)
 
@@ -613,10 +614,11 @@ def generar_grafico_grupo(nombre_grupo, beneficiarios, control, outdir):
                    label=f"Termino Proyectado ({_fmt_date(fin_proy)})", zorder=4)
 
     if 0 <= idx_ctrl < len(prog):
-        _diff = pct_real_avg - prog[idx_ctrl]
+        _pct_p = pct_prog_gantt if pct_prog_gantt is not None else prog[idx_ctrl]
+        _diff = pct_real_avg - _pct_p
         _signo = "+" if _diff >= 0 else ""
         ax.annotate(
-            f"Prog: {prog[idx_ctrl]:.1f}%\nReal: {pct_real_avg:.1f}%\nDesv: {_signo}{_diff:.1f}%",
+            f"Prog: {_pct_p:.1f}%\nReal: {pct_real_avg:.1f}%\nDesv: {_signo}{_diff:.1f}%",
             xy=(control, prog[idx_ctrl]),
             xytext=(control + timedelta(days=14), prog[idx_ctrl] + 8),
             fontsize=12, color="#111111", fontweight="bold",
@@ -656,7 +658,7 @@ def generar_grafico_grupo(nombre_grupo, beneficiarios, control, outdir):
     return pct_real_avg, pct_prog_ctrl, min(b[1] for b in beneficiarios), fin_proy
 
 
-def generar_grafico_total(grupos, control, fines_proy_global, outdir):
+def generar_grafico_total(grupos, control, fines_proy_global, outdir, pct_prog_gantt=None):
     todos = [b for bens in grupos.values() for b in bens]
     inicio_total   = min(b[1] for b in todos)
     fin_prog_total = max(b[1] for b in todos) + timedelta(days=DURACION_DIAS)
@@ -712,10 +714,11 @@ def generar_grafico_total(grupos, control, fines_proy_global, outdir):
 
     if 0 <= idx_ctrl_total < len(prog_total):
         prog_en_ctrl = prog_total[idx_ctrl_total]
-        diff = pct_real_total - prog_en_ctrl
+        _pct_p_t = pct_prog_gantt if pct_prog_gantt is not None else prog_en_ctrl
+        diff = pct_real_total - _pct_p_t
         signo = "+" if diff >= 0 else ""
         ax2.annotate(
-            f"Prog:  {prog_en_ctrl:.1f}%\nReal:  {pct_real_total:.1f}%\n"
+            f"Prog:  {_pct_p_t:.1f}%\nReal:  {pct_real_total:.1f}%\n"
             f"Desv: {signo}{diff:.1f}%",
             xy=(control, prog_en_ctrl),
             xytext=(control + timedelta(days=20), prog_en_ctrl + 10),
@@ -978,16 +981,18 @@ def main():
 
         # Generar graficos por grupo
         log.info("Generando graficos por grupo...")
+        pct_prog_gantt = _ccu.leer_pct_programa_gantt(sheets_svc, SPREADSHEET_ID, GANTT_HOJA)
+        log.info(f"% Prog Gantt leido: {pct_prog_gantt}%")
         fines_proy_global = []
         for nombre_grupo, beneficiarios in grupos.items():
             _, _, _, fin_proy = generar_grafico_grupo(
-                nombre_grupo, beneficiarios, control_date, OUTPUT_DIR
+                nombre_grupo, beneficiarios, control_date, OUTPUT_DIR, pct_prog_gantt=pct_prog_gantt
             )
             fines_proy_global.append(fin_proy)
 
         # Graficos consolidados
         log.info("Generando graficos consolidados...")
-        generar_grafico_total(grupos, control_date, fines_proy_global, OUTPUT_DIR)
+        generar_grafico_total(grupos, control_date, fines_proy_global, OUTPUT_DIR, pct_prog_gantt=pct_prog_gantt)
         generar_grafico_todos(grupos, control_date, fines_proy_global, OUTPUT_DIR)
 
         # Subir a Drive

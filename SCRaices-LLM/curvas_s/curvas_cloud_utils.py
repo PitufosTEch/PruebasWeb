@@ -245,6 +245,75 @@ def get_github_token() -> str | None:
     return None
 
 
+# ─── LECTURA % PROG DESDE GANTT ───────────────────────────────────────────────
+def leer_pct_programa_gantt(sheets_svc, spreadsheet_id, hoja="Programa de obra"):
+    """
+    Lee el % programado del inicio de la semana actual desde la fila 'Programa'
+    del Gantt (pestaña indicada por `hoja`). Devuelve float o None si no se pudo leer.
+    Se conserva el % del día de inicio de semana (columna <= hoy más reciente),
+    sin interpolar hasta que empiece la siguiente semana.
+    """
+    from datetime import date, timedelta
+
+    _base = date(1899, 12, 30)
+    _labels = {"programa", "progra", "prog.", "prog"}
+    hoy = date.today()
+    hoy_ser = (hoy - _base).days
+
+    _log = logging.getLogger("curvas_cloud_utils")
+    try:
+        r = sheets_svc.spreadsheets().values().get(
+            spreadsheetId=spreadsheet_id,
+            range=f"'{hoja}'!A1:EZ120",
+            valueRenderOption="UNFORMATTED_VALUE",
+        ).execute()
+    except Exception as e:
+        _log.warning(f"leer_pct_programa_gantt('{hoja}'): error leyendo hoja → {e}")
+        return None
+
+    rows = r.get("values", [])
+    if not rows:
+        return None
+
+    row1 = rows[0]
+    date_cols = []
+    for ci, v in enumerate(row1):
+        if isinstance(v, (int, float)) and 44000 < v < 52000:
+            try:
+                date_cols.append((ci, int(v)))
+            except Exception:
+                pass
+
+    if not date_cols:
+        return None
+
+    past = [(ci, s) for ci, s in date_cols if s <= hoy_ser]
+    if not past:
+        return None
+    cur_ci = max(past, key=lambda x: x[1])[0]
+
+    prog_row = None
+    for row in rows:
+        for ci in range(min(25, len(row))):
+            label = str(row[ci]).strip().lower()
+            if label in _labels or "rograma" in label:
+                prog_row = row
+                break
+        if prog_row is not None:
+            break
+
+    if prog_row is None or cur_ci >= len(prog_row):
+        _log.warning(f"leer_pct_programa_gantt('{hoja}'): fila 'Programa' no encontrada o columna fuera de rango")
+        return None
+
+    v = prog_row[cur_ci]
+    if not isinstance(v, (int, float)) or v < 0:
+        return None
+    pct = round(float(v) * (100.0 if v <= 1.5 else 1.0), 2)
+    _log.info(f"leer_pct_programa_gantt('{hoja}'): pct_prog_gantt={pct}%")
+    return pct
+
+
 # ─── RETRY SHEETS API ─────────────────────────────────────────────────────────
 def retry_sheets(fn, *args, max_retries=4, base_wait=30, **kwargs):
     """
