@@ -1,4 +1,4 @@
-"""
+﻿"""
 curvas_automatico_quilaleo.py  —  Curvas S automáticas · Individual Sonia Quilaleo (P116)
 ==========================================================================================
 - Fecha de control: date.today()
@@ -35,6 +35,7 @@ from googleapiclient.http import MediaFileUpload
 # CONFIGURACION
 # ─────────────────────────────────────────────────────────────────────────────
 SPREADSHEET_ID   = "1z9kNq9uo363NrWqCojGfGpP326FDj3V60irWxtMMbU8"
+GANTT_HOJA       = "Programa de obra"
 APPSHEET_PROJECT = "P116"
 TOKEN_FILE     = _ccu.TOKEN_FILE
 OUTPUT_DIR     = _ccu.get_output_dir()
@@ -476,7 +477,7 @@ def build_group_curves(beneficiarios, control):
 # ─────────────────────────────────────────────────────────────────────────────
 # 5. GENERAR GRAFICOS
 # ─────────────────────────────────────────────────────────────────────────────
-def generar_grafico_grupo(nombre_grupo, beneficiarios, control, outdir):
+def generar_grafico_grupo(nombre_grupo, beneficiarios, control, outdir, pct_prog_gantt=None):
     color = COLORES.get(nombre_grupo, "#333333")
     fechas, prog, real_hist, proj, fin_proy = build_group_curves(beneficiarios, control)
 
@@ -499,10 +500,11 @@ def generar_grafico_grupo(nombre_grupo, beneficiarios, control, outdir):
         ax.axvline(fin_proy, color="#9467bd", linewidth=1.5, linestyle=":", label=f"Termino Proyectado ({_fmt_date(fin_proy)})", zorder=4)
 
     if 0 <= idx_ctrl < len(prog):
-        _diff = pct_real_avg - prog[idx_ctrl]
+        _pct_p = pct_prog_gantt if pct_prog_gantt is not None else prog[idx_ctrl]
+        _diff = pct_real_avg - _pct_p
         _signo = "+" if _diff >= 0 else ""
         ax.annotate(
-            f"Prog: {prog[idx_ctrl]:.1f}%\nReal: {pct_real_avg:.1f}%\nDesv: {_signo}{_diff:.1f}%",
+            f"Prog: {_pct_p:.1f}%\nReal: {pct_real_avg:.1f}%\nDesv: {_signo}{_diff:.1f}%",
             xy=(control, prog[idx_ctrl]),
             xytext=(control + timedelta(days=21), prog[idx_ctrl] + 8),
             fontsize=12, color="#111111", fontweight="bold",
@@ -537,7 +539,7 @@ def generar_grafico_grupo(nombre_grupo, beneficiarios, control, outdir):
     return pct_real_avg, pct_prog_ctrl, min(b[1] for b in beneficiarios), fin_proy
 
 
-def generar_grafico_total(grupos, control, fines_proy_global, outdir):
+def generar_grafico_total(grupos, control, fines_proy_global, outdir, pct_prog_gantt=None):
     todos = [b for bens in grupos.values() for b in bens]
     inicio_total    = min(b[1] for b in todos)
     fin_prog_total  = max(b[1] for b in todos) + timedelta(days=DURACION_DIAS)
@@ -583,10 +585,11 @@ def generar_grafico_total(grupos, control, fines_proy_global, outdir):
 
     if 0 <= idx_ctrl_total < len(prog_total):
         prog_en_ctrl = prog_total[idx_ctrl_total]
-        _diff2 = pct_real_total - prog_en_ctrl
+        _pct_p_t = pct_prog_gantt if pct_prog_gantt is not None else prog_en_ctrl
+        _diff2 = pct_real_total - _pct_p_t
         _signo2 = "+" if _diff2 >= 0 else ""
         ax2.annotate(
-            f"Prog:  {prog_en_ctrl:.1f}%\nReal:  {pct_real_total:.1f}%\nDesv: {_signo2}{_diff2:.1f}%",
+            f"Prog:  {_pct_p_t:.1f}%\nReal:  {pct_real_total:.1f}%\nDesv: {_signo2}{_diff2:.1f}%",
             xy=(control, prog_en_ctrl),
             xytext=(control + timedelta(days=28), prog_en_ctrl + 10),
             fontsize=12, color="#111111", fontweight="bold",
@@ -802,13 +805,15 @@ def main():
         Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
 
         log.info("Generando graficos por grupo...")
+        pct_prog_gantt = _ccu.leer_pct_programa_gantt(sheets_svc, SPREADSHEET_ID, GANTT_HOJA)
+        log.info(f"% Prog Gantt leido: {pct_prog_gantt}%")
         fines_proy_global = []
         for nombre_grupo, beneficiarios in grupos.items():
-            _, _, _, fin_proy = generar_grafico_grupo(nombre_grupo, beneficiarios, control_date, OUTPUT_DIR)
+            _, _, _, fin_proy = generar_grafico_grupo(nombre_grupo, beneficiarios, control_date, OUTPUT_DIR, pct_prog_gantt=pct_prog_gantt)
             fines_proy_global.append(fin_proy)
 
         log.info("Generando graficos consolidados...")
-        generar_grafico_total(grupos, control_date, fines_proy_global, OUTPUT_DIR)
+        generar_grafico_total(grupos, control_date, fines_proy_global, OUTPUT_DIR, pct_prog_gantt=pct_prog_gantt)
         generar_grafico_todos(grupos, control_date, fines_proy_global, OUTPUT_DIR)
 
         drive_ids = actualizar_drive(drive_svc, OUTPUT_DIR)

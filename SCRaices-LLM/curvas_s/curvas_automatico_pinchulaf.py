@@ -1,4 +1,4 @@
-"""
+﻿"""
 curvas_automatico_pinchulaf.py  —  Curvas S automáticas · Elsa Pinchulaf (P28)
 ===============================================================================
 - Fecha de control: date.today()
@@ -46,6 +46,7 @@ from googleapiclient.http import MediaFileUpload
 # CONFIGURACION
 # ─────────────────────────────────────────────────────────────────────────────
 SPREADSHEET_ID   = "18XkRb7RAF52Aqj4immGebME-d9sODY0HgxIKWcBGrlg"
+GANTT_HOJA       = "Programa de obra"
 APPSHEET_PROJECT = "P28"
 TOKEN_FILE     = _ccu.TOKEN_FILE
 OUTPUT_DIR     = _ccu.get_output_dir()
@@ -508,7 +509,7 @@ def build_group_curves(beneficiarios, control):
 # ─────────────────────────────────────────────────────────────────────────────
 # 5. GENERAR GRAFICOS
 # ─────────────────────────────────────────────────────────────────────────────
-def generar_grafico_grupo(nombre_grupo, beneficiarios, control, outdir):
+def generar_grafico_grupo(nombre_grupo, beneficiarios, control, outdir, pct_prog_gantt=None):
     color = COLORES.get(nombre_grupo, "#333333")
     fechas, prog, real_hist, proj, fin_proy = build_group_curves(beneficiarios, control)
 
@@ -574,7 +575,7 @@ def generar_grafico_grupo(nombre_grupo, beneficiarios, control, outdir):
     return pct_real_avg, pct_prog_ctrl, min(b[1] for b in beneficiarios), fin_proy
 
 
-def generar_grafico_total(grupos, control, fines_proy_global, outdir):
+def generar_grafico_total(grupos, control, fines_proy_global, outdir, pct_prog_gantt=None):
     todos = [b for bens in grupos.values() for b in bens]
     inicio_total    = min(b[1] for b in todos)
     fin_prog_total  = max(b[1] for b in todos) + timedelta(days=DURACION_DIAS)
@@ -843,13 +844,15 @@ def main():
         Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
 
         log.info("Generando graficos por grupo...")
+        pct_prog_gantt = _ccu.leer_pct_programa_gantt(sheets_svc, SPREADSHEET_ID, GANTT_HOJA)
+        log.info(f"% Prog Gantt leido: {pct_prog_gantt}%")
         fines_proy_global = []
         for nombre_grupo, beneficiarios in grupos.items():
-            _, _, _, fin_proy = generar_grafico_grupo(nombre_grupo, beneficiarios, control_date, OUTPUT_DIR)
+            _, _, _, fin_proy = generar_grafico_grupo(nombre_grupo, beneficiarios, control_date, OUTPUT_DIR, pct_prog_gantt=pct_prog_gantt)
             fines_proy_global.append(fin_proy)
 
         log.info("Generando graficos consolidados...")
-        generar_grafico_total(grupos, control_date, fines_proy_global, OUTPUT_DIR)
+        generar_grafico_total(grupos, control_date, fines_proy_global, OUTPUT_DIR, pct_prog_gantt=pct_prog_gantt)
         generar_grafico_todos(grupos, control_date, fines_proy_global, OUTPUT_DIR)
 
         drive_ids = actualizar_drive(drive_svc, OUTPUT_DIR)
