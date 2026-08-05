@@ -525,8 +525,11 @@ def generar_grafico_grupo(nombre_grupo, beneficiarios, control, outdir, pct_prog
         ax.annotate(
             f"Prog: {_pct_p:.1f}%\nReal: {pct_real_avg:.1f}%\nDesv: {_signo}{_diff:.1f}%",
             xy=(control, prog[idx_ctrl]),
-            xytext=(control + timedelta(days=21), prog[idx_ctrl] + 8),
+            xycoords='data',
+            xytext=(0.97, 0.06),
+            textcoords='axes fraction',
             fontsize=12, color="#111111", fontweight="bold",
+            ha='right', va='bottom',
             arrowprops=dict(arrowstyle="->", color="#ff7f0e", lw=1.0),
             bbox=dict(boxstyle="round,pad=0.4", facecolor="#fffbe6", edgecolor="#ff7f0e", linewidth=1.0, alpha=0.95),
         )
@@ -611,8 +614,11 @@ def generar_grafico_total(grupos, control, fines_proy_global, outdir, pct_prog_g
         ax2.annotate(
             f"Prog:  {_pct_p_t:.1f}%\nReal:  {pct_real_total:.1f}%\nDesv: {_signo2}{_diff2:.1f}%",
             xy=(control, prog_en_ctrl),
-            xytext=(control + timedelta(days=28), prog_en_ctrl + 10),
+            xycoords='data',
+            xytext=(0.97, 0.06),
+            textcoords='axes fraction',
             fontsize=12, color="#111111", fontweight="bold",
+            ha='right', va='bottom',
             arrowprops=dict(arrowstyle="->", color="#ff7f0e", lw=1.0),
             bbox=dict(boxstyle="round,pad=0.4", facecolor="#fffbe6", edgecolor="#ff7f0e", linewidth=1.0, alpha=0.95),
         )

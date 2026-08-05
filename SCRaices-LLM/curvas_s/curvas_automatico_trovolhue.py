@@ -536,19 +536,17 @@ def generar_grafico_grupo(nombre_grupo, beneficiarios, control, outdir, pct_prog
         ax.axvline(fin_proy, color="#9467bd", linewidth=1.5, linestyle=":", label=f"Termino Proyectado ({_fmt_date(fin_proy)})", zorder=4)
 
     if 0 <= idx_ctrl < len(prog):
-        _diff = pct_real_avg - prog[idx_ctrl]
+        _pct_p = pct_prog_gantt if pct_prog_gantt is not None else prog[idx_ctrl]
+        _diff = pct_real_avg - _pct_p
         _signo = "+" if _diff >= 0 else ""
-        prog_ctrl = prog[idx_ctrl]
-        # Si el % programado es alto, bajar la anotación para no tapar el título
-        if prog_ctrl > 65:
-            _xytext = (fechas[0] + timedelta(days=14), 28)
-        else:
-            _xytext = (control + timedelta(days=21), prog_ctrl + 8)
         ax.annotate(
-            f"Prog: {prog_ctrl:.1f}%\nReal: {pct_real_avg:.1f}%\nDesv: {_signo}{_diff:.1f}%",
-            xy=(control, prog_ctrl),
-            xytext=_xytext,
+            f"Prog: {_pct_p:.1f}%\nReal: {pct_real_avg:.1f}%\nDesv: {_signo}{_diff:.1f}%",
+            xy=(control, prog[idx_ctrl]),
+            xycoords='data',
+            xytext=(0.97, 0.06),
+            textcoords='axes fraction',
             fontsize=11, color="#111111", fontweight="bold",
+            ha='right', va='bottom',
             arrowprops=dict(arrowstyle="->", color="#ff7f0e", lw=1.2),
             bbox=dict(boxstyle="round,pad=0.45", facecolor="#fffbe6", edgecolor="#ff7f0e", linewidth=1.2, alpha=0.97),
         )
@@ -626,17 +624,17 @@ def generar_grafico_total(grupos, control, fines_proy_global, outdir, pct_prog_g
 
     if 0 <= idx_ctrl_total < len(prog_total):
         prog_en_ctrl = prog_total[idx_ctrl_total]
-        _diff2 = pct_real_total - prog_en_ctrl
+        _pct_p_t = pct_prog_gantt if pct_prog_gantt is not None else prog_en_ctrl
+        _diff2 = pct_real_total - _pct_p_t
         _signo2 = "+" if _diff2 >= 0 else ""
-        if prog_en_ctrl > 65:
-            _xytext2 = (fechas_total[0] + timedelta(days=14), 28)
-        else:
-            _xytext2 = (control + timedelta(days=28), prog_en_ctrl + 10)
         ax2.annotate(
-            f"Prog:  {prog_en_ctrl:.1f}%\nReal:  {pct_real_total:.1f}%\nDesv: {_signo2}{_diff2:.1f}%",
+            f"Prog:  {_pct_p_t:.1f}%\nReal:  {pct_real_total:.1f}%\nDesv: {_signo2}{_diff2:.1f}%",
             xy=(control, prog_en_ctrl),
-            xytext=_xytext2,
+            xycoords='data',
+            xytext=(0.97, 0.06),
+            textcoords='axes fraction',
             fontsize=11, color="#111111", fontweight="bold",
+            ha='right', va='bottom',
             arrowprops=dict(arrowstyle="->", color="#ff7f0e", lw=1.2),
             bbox=dict(boxstyle="round,pad=0.45", facecolor="#fffbe6", edgecolor="#ff7f0e", linewidth=1.2, alpha=0.97),
         )
