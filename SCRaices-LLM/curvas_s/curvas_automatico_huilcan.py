@@ -700,24 +700,20 @@ def actualizar_drive(drive_svc, outdir):
         media = MediaFileUpload(str(path), mimetype="image/png", resumable=False)
         existing_id = drive_ids.get(chart_name, "")
         if existing_id:
-            drive_svc.files().update(
-                fileId=existing_id, body={"name": chart_name}, media_body=media
-            ).execute()
-            nuevos[chart_name] = existing_id
-            log.info(f"  Actualizado: {chart_name} -> {existing_id}")
-        else:
-            res = drive_svc.files().create(
-                body={"name": chart_name, "mimeType": "image/png"},
-                media_body=media,
-                fields="id"
-            ).execute()
-            new_id = res["id"]
-            drive_svc.permissions().create(
-                fileId=new_id,
-                body={"type": "anyone", "role": "reader"},
-            ).execute()
-            nuevos[chart_name] = new_id
-            log.info(f"  Creado nuevo: {chart_name} -> {new_id}")
+            try:
+                drive_svc.files().delete(fileId=existing_id).execute()
+            except Exception:
+                pass
+        res = drive_svc.files().create(
+            body={"name": chart_name, "mimeType": "image/png"},
+            media_body=media, fields="id"
+        ).execute()
+        new_id = res["id"]
+        drive_svc.permissions().create(
+            fileId=new_id, body={"type": "anyone", "role": "reader"},
+        ).execute()
+        nuevos[chart_name] = new_id
+        log.info(f"  Recreado (sin cache CDN): {chart_name} -> {new_id}")
 
     drive_ids.update(nuevos)
     _save_drive_ids(drive_ids)
