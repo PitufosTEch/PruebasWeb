@@ -282,6 +282,15 @@ def sincronizar_grupos_desde_gantt(sheets_svc):
     dc_rows = dc.get("values", [])
 
     # Detectar cambios
+    def _parse_fecha(s):
+        for fmt in ("%d/%m/%Y", "%m/%d/%Y"):
+            try:
+                from datetime import datetime as _dt
+                return _dt.strptime(str(s).strip(), fmt).date()
+            except (ValueError, TypeError):
+                pass
+        return None
+
     cambios = []
     for i, row in enumerate(dc_rows[4:], start=5):  # fila real en sheet = i+1 (1-indexed)
         if len(row) < 2 or not row[0].strip() or not row[1].strip():
@@ -289,10 +298,16 @@ def sincronizar_grupos_desde_gantt(sheets_svc):
         grupo_dc = str(row[0]).strip().upper()
         nombre_dc = str(row[1]).strip()
         nombre_norm = _normalizar_nombre(nombre_dc)
+        inicio_dc_s = str(row[2]).strip() if len(row) > 2 else ""
         if nombre_norm in gantt_map:
             grupo_gantt = gantt_map[nombre_norm]["grupo"]
             inicio_gantt = gantt_map[nombre_norm]["inicio"]
-            if grupo_dc != grupo_gantt:
+            grupo_cambio = grupo_dc != grupo_gantt
+            fecha_cambio = (bool(inicio_dc_s) and bool(inicio_gantt)
+                            and _parse_fecha(inicio_dc_s) is not None
+                            and _parse_fecha(inicio_gantt) is not None
+                            and _parse_fecha(inicio_dc_s) != _parse_fecha(inicio_gantt))
+            if grupo_cambio or fecha_cambio:
                 cambios.append({
                     "fila_sheet": i,       # 1-indexed row in sheet
                     "nombre": nombre_dc,
@@ -303,11 +318,11 @@ def sincronizar_grupos_desde_gantt(sheets_svc):
                 })
 
     if not cambios:
-        log.info("  Sin movimientos de grupo detectados.")
+        log.info("  Sin cambios de grupo ni de fecha detectados.")
         return
 
     # 3. Aplicar cambios: reescribir grupos/inicio en las filas afectadas
-    log.info(f"  MOVIMIENTOS DETECTADOS ({len(cambios)}):")
+    log.info(f"  CAMBIOS DETECTADOS ({len(cambios)}):")
     requests = []
     for c in cambios:
         log.info(f"    >> {c['nombre']}: {c['grupo_anterior']} → {c['grupo_nuevo']} "
