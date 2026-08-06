@@ -225,6 +225,15 @@ def sincronizar_grupos_desde_gantt(sheets_svc):
     ).execute()
     dc_rows = dc.get("values", [])
 
+    def _parse_fecha(s):
+        for fmt in ("%d/%m/%Y", "%m/%d/%Y"):
+            try:
+                from datetime import datetime as _dt
+                return _dt.strptime(str(s).strip(), fmt).date()
+            except (ValueError, TypeError):
+                pass
+        return None
+
     cambios = []
     for i, row in enumerate(dc_rows[4:], start=5):
         if len(row) < 2 or not row[0].strip() or not row[1].strip():
@@ -232,10 +241,16 @@ def sincronizar_grupos_desde_gantt(sheets_svc):
         grupo_dc = str(row[0]).strip().upper()
         nombre_dc = str(row[1]).strip()
         nombre_norm = _normalizar_nombre(nombre_dc)
+        inicio_dc_s = str(row[2]).strip() if len(row) > 2 else ""
         if nombre_norm in gantt_map:
             grupo_gantt = gantt_map[nombre_norm]["grupo"]
             inicio_gantt = gantt_map[nombre_norm]["inicio"]
-            if grupo_dc != grupo_gantt:
+            grupo_cambio = grupo_dc != grupo_gantt
+            fecha_cambio = (bool(inicio_dc_s) and bool(inicio_gantt)
+                            and _parse_fecha(inicio_dc_s) is not None
+                            and _parse_fecha(inicio_gantt) is not None
+                            and _parse_fecha(inicio_dc_s) != _parse_fecha(inicio_gantt))
+            if grupo_cambio or fecha_cambio:
                 cambios.append({
                     "fila_sheet": i,
                     "nombre": nombre_dc,
@@ -246,23 +261,24 @@ def sincronizar_grupos_desde_gantt(sheets_svc):
                 })
 
     if not cambios:
-        log.info("  Sin movimientos de grupo detectados.")
+        log.info("  Sin cambios de grupo ni de fecha detectados.")
         return
 
-    log.info(f"  MOVIMIENTOS DETECTADOS ({len(cambios)}):")
+    log.info(f"  CAMBIOS DETECTADOS ({len(cambios)}):")
     requests = []
     dc_gid = _get_dc_gid(sheets_svc)
     for c in cambios:
         log.info(f"    >> {c['nombre']}: {c['grupo_anterior']} → {c['grupo_nuevo']} "
                  f"(inicio: {c['inicio_nuevo']})")
         fila_idx = c["fila_sheet"] - 1
-        requests.append({"updateCells": {
-            "range": {"sheetId": dc_gid,
-                      "startRowIndex": fila_idx, "endRowIndex": fila_idx + 1,
-                      "startColumnIndex": 0, "endColumnIndex": 1},
-            "rows": [{"values": [{"userEnteredValue": {"stringValue": c["grupo_nuevo"]}}]}],
-            "fields": "userEnteredValue"
-        }})
+        if c.get("grupo_cambio", True):
+            requests.append({"updateCells": {
+                "range": {"sheetId": dc_gid,
+                          "startRowIndex": fila_idx, "endRowIndex": fila_idx + 1,
+                          "startColumnIndex": 0, "endColumnIndex": 1},
+                "rows": [{"values": [{"userEnteredValue": {"stringValue": c["grupo_nuevo"]}}]}],
+                "fields": "userEnteredValue"
+            }})
         if c["inicio_nuevo"]:
             requests.append({"updateCells": {
                 "range": {"sheetId": dc_gid,
