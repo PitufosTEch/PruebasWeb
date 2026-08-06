@@ -48,10 +48,10 @@ SCOPES = [
 
 DPI_EXPORT = 200  # 10"×5.1" → 2000×1020 px
 
-# Curva S programada (154 días = 22 semanas, promedio de 2 beneficiarios)
+# Curva S programada (161 días = 23 semanas, promedio de 2 beneficiarios)
 PCT_SEMANA = [0, 2, 7, 11, 16, 20, 25, 30, 34, 39, 43, 48, 52, 57, 61,
               66, 70, 75, 80, 84, 89, 93, 98, 100, 100, 100]
-DURACION_DIAS = 154
+DURACION_DIAS = 161
 
 COLORES = {
     "GRUPO 1": "#1a6eb5",
