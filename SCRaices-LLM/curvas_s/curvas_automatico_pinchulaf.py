@@ -59,10 +59,10 @@ SCOPES = [
 
 DPI_EXPORT = 200  # 10"x5.1" -> 2000x1020 px
 
-# Curva S programada — lineal 4.35% por semana durante 23 semanas (147 días)
+# Curva S programada — lineal 4.35% por semana durante 22 semanas (154 días)
 PCT_SEMANA = [0, 4, 9, 13, 17, 22, 26, 30, 35, 39, 43, 48, 52, 57, 61, 65,
               70, 74, 78, 83, 87, 91, 96, 100, 100]
-DURACION_DIAS = 147
+DURACION_DIAS = 154
 
 COLORES = {
     "GRUPO 1": "#1a6eb5",
