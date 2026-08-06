@@ -287,6 +287,12 @@ def leer_pct_programa_gantt(sheets_svc, spreadsheet_id, hoja="Programa de obra")
     if not date_cols:
         return None
 
+    max_ser = max(s for _, s in date_cols)
+    # Hoy supera el último periodo del Gantt → progreso programado = 100%
+    if hoy_ser > max_ser + 7:
+        _log.info(f"leer_pct_programa_gantt('{hoja}'): hoy > término Gantt → pct_prog_gantt=100%")
+        return 100.0
+
     past = [(ci, s) for ci, s in date_cols if s <= hoy_ser]
     if not past:
         return None
@@ -302,9 +308,17 @@ def leer_pct_programa_gantt(sheets_svc, spreadsheet_id, hoja="Programa de obra")
         if prog_row is not None:
             break
 
-    if prog_row is None or cur_ci >= len(prog_row):
-        _log.warning(f"leer_pct_programa_gantt('{hoja}'): fila 'Programa' no encontrada o columna fuera de rango")
+    if prog_row is None:
+        _log.warning(f"leer_pct_programa_gantt('{hoja}'): fila 'Programa' no encontrada")
         return None
+
+    # Si la columna actual está fuera del rango de prog_row, usar el último valor disponible
+    if cur_ci >= len(prog_row):
+        last_ci = max((ci for ci, _ in date_cols if ci < len(prog_row)), default=None)
+        if last_ci is None:
+            _log.warning(f"leer_pct_programa_gantt('{hoja}'): columna fuera de rango en fila Programa")
+            return None
+        cur_ci = last_ci
 
     v = prog_row[cur_ci]
     if not isinstance(v, (int, float)) or v < 0:
