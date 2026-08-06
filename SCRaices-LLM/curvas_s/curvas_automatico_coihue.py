@@ -48,14 +48,14 @@ SCOPES = [
 
 DPI_EXPORT = 200  # 10"×5.1" → 2000×1020 px
 
-# Curva S programada individual (57 semanas = 399 días)
+# Curva S programada individual (46 semanas = 322 días por vivienda)
 PCT_SEMANA = [
     0,  2,  3,  5,  7,  9, 12, 14, 17, 20, 23, 27, 30, 34, 37,
    41, 44, 48, 51, 55, 58, 62, 65, 68, 71, 75, 78, 81, 84, 87,
    89, 91, 93, 95, 96, 97, 98, 99, 100, 100, 100, 100, 100, 100,
   100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100,
 ]
-DURACION_DIAS = 399
+DURACION_DIAS = 322
 
 COLORES = {
     "GRUPO 1": "#1a6eb5",
@@ -73,30 +73,30 @@ CHART_NAMES = [
 
 # Beneficiarios iniciales para setup (nombre, grupo, inicio dd/mm/yyyy)
 BENEFICIARIOS_SETUP = [
-    # GRUPO 1 — inicio 05/05/2026
-    ("ZAVALA MORALES CAROLINA JEANNETTE",      "GRUPO 1", "05/05/2026"),
-    ("MORALES COLIN FRANCISCO ROMÁN",          "GRUPO 1", "05/05/2026"),
-    ("ARAYA CEBALLOS LUCINDA INÉS",            "GRUPO 1", "05/05/2026"),
-    ("HUENUPI YAÑEZ LUIS ALBERTO",             "GRUPO 1", "05/05/2026"),
-    ("MUÑOZ RIFFO LUZ MARIA",                  "GRUPO 1", "05/05/2026"),
-    ("FIGUEROA RIVAS MARÍA CRISTINA",          "GRUPO 1", "05/05/2026"),
-    ("RUBILAR NAHUELHUAL MIRTA ELIANA",        "GRUPO 1", "05/05/2026"),
-    ("TRAIPE TRAIPE NANCY MAGDALENA",          "GRUPO 1", "05/05/2026"),
-    ("QUEZADA ARAYA VERÓNICA ANGÉLICA",        "GRUPO 1", "05/05/2026"),
-    # GRUPO 2 — inicio 08/06/2026
+    # GRUPO 1 — inicios escalonados desde 04/05/2026
+    ("ZAVALA MORALES CAROLINA JEANNETTE",      "GRUPO 1", "04/05/2026"),
+    ("MORALES COLIN FRANCISCO ROMÁN",          "GRUPO 1", "04/05/2026"),
+    ("ARAYA CEBALLOS LUCINDA INÉS",            "GRUPO 1", "11/05/2026"),
+    ("HUENUPI YAÑEZ LUIS ALBERTO",             "GRUPO 1", "11/05/2026"),
+    ("MUÑOZ RIFFO LUZ MARIA",                  "GRUPO 1", "18/05/2026"),
+    ("FIGUEROA RIVAS MARÍA CRISTINA",          "GRUPO 1", "18/05/2026"),
+    ("RUBILAR NAHUELHUAL MIRTA ELIANA",        "GRUPO 1", "25/05/2026"),
+    ("TRAIPE TRAIPE NANCY MAGDALENA",          "GRUPO 1", "25/05/2026"),
+    ("QUEZADA ARAYA VERÓNICA ANGÉLICA",        "GRUPO 1", "01/06/2026"),
+    # GRUPO 2 — inicios escalonados desde 08/06/2026
     ("ELICEIRY SOLA CARMEN GLORIA",            "GRUPO 2", "08/06/2026"),
     ("LEFIHUALA CALFUAL GERMAN ANTONIO",       "GRUPO 2", "08/06/2026"),
-    ("PÉREZ ALARCÓN IVONNE DEL CARMEN",        "GRUPO 2", "08/06/2026"),
-    ("ANTILEF COLPI MARIA ELENA",              "GRUPO 2", "08/06/2026"),
-    ("DIAZ PAINEMAN MARIA SILVIA",             "GRUPO 2", "08/06/2026"),
-    ("LAGOS VERA NANCY DEL PILAR",             "GRUPO 2", "08/06/2026"),
-    ("ANTIMILLA NECULPAN ROSA ELVIRA",         "GRUPO 2", "08/06/2026"),
-    # GRUPO 3 — inicio estimado 06/07/2026
+    ("PÉREZ ALARCÓN IVONNE DEL CARMEN",        "GRUPO 2", "15/06/2026"),
+    ("ANTILEF COLPI MARIA ELENA",              "GRUPO 2", "15/06/2026"),
+    ("DIAZ PAINEMAN MARIA SILVIA",             "GRUPO 2", "22/06/2026"),
+    ("LAGOS VERA NANCY DEL PILAR",             "GRUPO 2", "22/06/2026"),
+    ("ANTIMILLA NECULPAN ROSA ELVIRA",         "GRUPO 2", "29/06/2026"),
+    # GRUPO 3 — inicios escalonados desde 06/07/2026
     ("CABRAPÁN TRAIMAQUEO ANGELINA",           "GRUPO 3", "06/07/2026"),
     ("HUENÚN LLANQUIMÁN BRUNILDE EULOGIA",     "GRUPO 3", "06/07/2026"),
-    ("HUENUN LLANQUIMAN FIDELIA ROSA",         "GRUPO 3", "06/07/2026"),
-    ("ÁLVAREZ CASTILLO MARIA MERCEDES",        "GRUPO 3", "06/07/2026"),
-    ("HUILIPAN COILÑANCO ROSA DEL TRANSITO",   "GRUPO 3", "06/07/2026"),
+    ("HUENUN LLANQUIMAN FIDELIA ROSA",         "GRUPO 3", "13/07/2026"),
+    ("ÁLVAREZ CASTILLO MARIA MERCEDES",        "GRUPO 3", "13/07/2026"),
+    ("HUILIPAN COILÑANCO ROSA DEL TRANSITO",   "GRUPO 3", "20/07/2026"),
 ]
 
 # ─────────────────────────────────────────────────────────────────────────────

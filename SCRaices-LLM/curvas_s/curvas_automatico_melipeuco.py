@@ -50,11 +50,11 @@ SCOPES = [
 
 DPI_EXPORT = 200
 
-# Curva S programada — individual por beneficiario (2.78%/semana, 36 semanas)
+# Curva S programada — individual por beneficiario (35 semanas = 245 días)
 PCT_SEMANA = [0, 3, 6, 8, 11, 14, 17, 19, 22, 25, 28, 31, 33, 36, 39, 42,
               44, 47, 50, 53, 56, 58, 61, 64, 67, 69, 72, 75, 78, 81, 83,
               86, 89, 92, 94, 97, 100, 100]
-DURACION_DIAS = 294
+DURACION_DIAS = 245
 
 COLORES = {
     "GRUPO 1": "#1a6eb5",
@@ -72,21 +72,21 @@ orden_grupos = ["GRUPO 1", "GRUPO 2"]
 
 BENEFICIARIOS_SETUP = [
     # GRUPO 1
-    ("INES DEL CARMEN HERNANDEZ CASTRO",    "GRUPO 1", "15/06/2026"),
-    ("ISABEL MARIA DIAZ BLANCO",            "GRUPO 1", "15/06/2026"),
-    ("JORGE MANUEL CALFIN CANIO",           "GRUPO 1", "22/06/2026"),
-    ("JUAN NEMESIO REUMAY NAHUELMAN",       "GRUPO 1", "22/06/2026"),
-    ("MARCELINA CARMEN CALFUL LEMONAO",     "GRUPO 1", "29/06/2026"),
-    ("YENIFER VICTORIA NUNEZ ORTIZ",        "GRUPO 1", "29/06/2026"),
-    ("GRACIELA EFROCINA CAMPOS FERNANDEZ",  "GRUPO 1", "06/07/2026"),
+    ("INES DEL CARMEN HERNANDEZ CASTRO",    "GRUPO 1", "29/06/2026"),
+    ("ISABEL MARIA DIAZ BLANCO",            "GRUPO 1", "29/06/2026"),
+    ("JORGE MANUEL CALFIN CANIO",           "GRUPO 1", "06/07/2026"),
+    ("JUAN NEMESIO REUMAY NAHUELMAN",       "GRUPO 1", "06/07/2026"),
+    ("MARCELINA CARMEN CALFUL LEMONAO",     "GRUPO 1", "13/07/2026"),
+    ("YENIFER VICTORIA NUNEZ ORTIZ",        "GRUPO 1", "13/07/2026"),
+    ("GRACIELA EFROCINA CAMPOS FERNANDEZ",  "GRUPO 1", "20/07/2026"),
     # GRUPO 2
-    ("MARCELINA ENRIQUETA ROMERO DIAZ",     "GRUPO 2", "13/07/2026"),
-    ("CALEB MAGNIL ESPARZA MONROY",         "GRUPO 2", "13/07/2026"),
-    ("ANA LIDIA SAN MARTIN ZUBER",          "GRUPO 2", "20/07/2026"),
-    ("JACINTO LUIS HUENCHUMAN MIRANDA",     "GRUPO 2", "20/07/2026"),
-    ("KARINA PAOLA ROMERO JARA",            "GRUPO 2", "27/07/2026"),
-    ("NEMESIO EUSEBIO TRECAMAN MARQUEZ",    "GRUPO 2", "27/07/2026"),
-    ("MARIA ANTONIA ALONSO LEIVA",          "GRUPO 2", "03/08/2026"),
+    ("MARCELINA ENRIQUETA ROMERO DIAZ",     "GRUPO 2", "27/07/2026"),
+    ("CALEB MAGNIL ESPARZA MONROY",         "GRUPO 2", "27/07/2026"),
+    ("ANA LIDIA SAN MARTIN ZUBER",          "GRUPO 2", "03/08/2026"),
+    ("JACINTO LUIS HUENCHUMAN MIRANDA",     "GRUPO 2", "03/08/2026"),
+    ("KARINA PAOLA ROMERO JARA",            "GRUPO 2", "10/08/2026"),
+    ("NEMESIO EUSEBIO TRECAMAN MARQUEZ",    "GRUPO 2", "10/08/2026"),
+    ("MARIA ANTONIA ALONSO LEIVA",          "GRUPO 2", "17/08/2026"),
 ]
 
 # ─────────────────────────────────────────────────────────────────────────────
