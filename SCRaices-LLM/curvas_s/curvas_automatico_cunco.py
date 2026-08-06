@@ -48,13 +48,13 @@ SCOPES = [
 
 DPI_EXPORT = 200  # 10"×5.1" → 2000×1020 px
 
-# Curva S programada individual (44 semanas = 308 días por vivienda)
+# Curva S programada individual (43 semanas = 301 días por vivienda)
 PCT_SEMANA = [
     0,  2,  4,  7, 10, 13, 17, 21, 25, 30, 35, 40, 45, 50, 55,
    60, 65, 70, 74, 78, 82, 85, 88, 90, 92, 94, 96, 97, 98, 99,
   100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100,
 ]
-DURACION_DIAS = 385
+DURACION_DIAS = 301
 
 COLORES = {
     "GRUPO 1": "#1a6eb5",
