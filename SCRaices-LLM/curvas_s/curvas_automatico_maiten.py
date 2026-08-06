@@ -61,11 +61,12 @@ SCOPES = [
 
 DPI_EXPORT = 200   # 10"x5.1" -> 2000x1020 px, optimo para celda 755x385
 
-# Curva S programada semanal El Maiten (35 semanas = 245 dias)
+# Curva S programada semanal El Maiten (50 semanas = 350 dias)
 PCT_SEMANA = [0, 4, 7, 11, 14, 18, 21, 25, 29, 32, 36, 39, 43, 46, 50,
               54, 57, 61, 64, 68, 71, 75, 79, 82, 86, 89, 93, 96, 100, 100,
-              100, 100, 100, 100, 100, 100]
-DURACION_DIAS = 245
+              100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100,
+              100, 100, 100, 100, 100, 100, 100, 100, 100]
+DURACION_DIAS = 350
 
 COLORES = {
     "GRUPO 1":         "#1a6eb5",
