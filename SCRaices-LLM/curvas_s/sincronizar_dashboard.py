@@ -129,6 +129,7 @@ def _get_github_token():
 # ─────────────────────────────────────────────────────────────────────────────
 # Mapeo proyecto_id → nombre_firebase (clave en /curvas_drive_ids/)
 _FIREBASE_NOMBRE = {
+    "P119": "nuke_mapu",
     "P38":  "aliwen",
     "P126": "maiten",
     "P39":  "coihue",
@@ -227,32 +228,12 @@ def extract_current_config(html):
 # 4. GENERAR NUEVO BLOQUE JS
 # ─────────────────────────────────────────────────────────────────────────────
 def build_new_js_block(expected_config, current_config):
-    """
-    Para P119 (hardcoded) usa los IDs del config actual.
-    Para el resto usa los IDs de los JSON locales.
-    """
+    """Construye el bloque JS CURVAS_S_CONFIG con los IDs frescos de todos los proyectos."""
     lines = ["const CURVAS_S_CONFIG = {"]
     for proy_id, entries in expected_config.items():
         lines.append(f"    '{proy_id}': [")
-        # Para P119, rellenar IDs desde el config actual
-        if proy_id == "P119":
-            current_entries = {e["label"]: e["id"] for e in (current_config.get("P119") or [])}
-            # Usar los IDs del hardcoded de Ñuke Mapu que ya están en los scripts Python
-            hardcoded_ids = {
-                "CurvaS_TOTAL_Nuke_Mapu.png": "11L-TIagyTGZOh3yhbGvjdIruG0dJQGPQ",
-                "CurvaS_Todos_Grupos.png":    "1_xxaqAay-UeB4POTcXMaBRD_Xo5ceb-1",
-                "CurvaS_GRUPO_1.png":         "1k2gpSr9Sk5zUZ3MAOxw3zGcHRa9ljFSA",
-                "CurvaS_GRUPO_2.png":         "1Ciu52kLYT9NjgaqUBPif4mtWk6l0RtPm",
-                "CurvaS_GRUPO_3.png":         "1mDdpyG5zGmSgOXZVMN4qzGbp_0BMrzT2",
-                "CurvaS_GRUPO_4.png":         "1GHthHYK1bpoA7_2Q5qSm3VFJq4KPYQa_",
-                "CurvaS_GRUPO_5.png":         "12yQw_tt3W4H91Q4KpiMafm_eLUNkwqpP",
-            }
-            for e in entries:
-                drive_id = hardcoded_ids.get(e["fname"], current_entries.get(e["label"], "MISSING"))
-                lines.append(f"        {{ id: '{drive_id}', label: '{e['label']}' }},")
-        else:
-            for e in entries:
-                lines.append(f"        {{ id: '{e['id']}', label: '{e['label']}' }},")
+        for e in entries:
+            lines.append(f"        {{ id: '{e['id']}', label: '{e['label']}' }},")
         lines.append("    ],")
     lines.append("};")
     return "\n".join(lines)
@@ -314,8 +295,8 @@ def main():
     # Comparar
     diferencias = []
     for proy_id, entries in expected.items():
-        if proy_id == "P119":
-            continue  # IDs hardcodeados, no cambian
+        if False:
+            pass  # placeholder — todos los proyectos se comparan igual
         curr_ids = {e["id"] for e in (current.get(proy_id) or [])}
         exp_ids  = {e["id"] for e in entries}
         if curr_ids != exp_ids or proy_id not in current:
