@@ -328,6 +328,73 @@ def leer_pct_programa_gantt(sheets_svc, spreadsheet_id, hoja="Programa de obra")
     return pct
 
 
+def leer_pct_prog_por_grupo(sheets_svc, spreadsheet_id, hoja, control_date):
+    """
+    Lee el % programado de avance por grupo desde las filas 'Programa Grupo X'
+    del Gantt (pestaña `hoja`).
+
+    Busca en las primeras 20 columnas de cada fila el texto "Programa Grupo".
+    Las fechas en fila 1 son seriales Excel (UNFORMATTED_VALUE).
+    Usa la columna con la fecha <= control_date más reciente (sin interpolación).
+
+    Retorna dict {"GRUPO 1": pct, "GRUPO 2": pct, ...} o {} si no encuentra datos.
+    """
+    from datetime import date as _date
+
+    _base = _date(1899, 12, 30)
+    _log  = logging.getLogger("curvas_cloud_utils")
+    ctrl_ser = (control_date - _base).days
+
+    try:
+        r = sheets_svc.spreadsheets().values().get(
+            spreadsheetId=spreadsheet_id,
+            range=f"'{hoja}'!A1:EZ120",
+            valueRenderOption="UNFORMATTED_VALUE",
+        ).execute()
+    except Exception as e:
+        _log.warning(f"leer_pct_prog_por_grupo('{hoja}'): error leyendo hoja → {e}")
+        return {}
+
+    rows = r.get("values", [])
+    if not rows:
+        return {}
+
+    # Fila 1: encabezados de fecha como seriales Excel
+    row1 = rows[0]
+    date_cols = []
+    for ci, v in enumerate(row1):
+        if isinstance(v, (int, float)) and 44000 < v < 52000:
+            date_cols.append((ci, int(v)))
+
+    if not date_cols:
+        _log.warning(f"leer_pct_prog_por_grupo('{hoja}'): sin fechas en fila 1")
+        return {}
+
+    # Columna con fecha <= control_date más reciente
+    past = [(ci, s) for ci, s in date_cols if s <= ctrl_ser]
+    if not past:
+        return {}
+    cur_ci = max(past, key=lambda x: x[1])[0]
+
+    # Buscar filas "Programa Grupo X" en las primeras 20 columnas
+    result = {}
+    for row in rows[1:]:
+        for ci in range(min(20, len(row))):
+            label = str(row[ci]).strip().upper()
+            if "PROGRAMA GRUPO" in label:
+                grupo_part = label.replace("PROGRAMA GRUPO", "").strip()
+                grupo_key  = f"GRUPO {grupo_part}"
+                if cur_ci < len(row):
+                    v = row[cur_ci]
+                    if isinstance(v, (int, float)) and v >= 0:
+                        pct = round(float(v) * (100.0 if v <= 1.5 else 1.0), 2)
+                        result[grupo_key] = pct
+                break  # no seguir buscando columnas en esta fila
+
+    _log.info(f"leer_pct_prog_por_grupo('{hoja}'): {result}")
+    return result
+
+
 # ─── RETRY SHEETS API ─────────────────────────────────────────────────────────
 def retry_sheets(fn, *args, max_retries=4, base_wait=30, **kwargs):
     """
