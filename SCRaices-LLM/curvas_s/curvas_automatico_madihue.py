@@ -831,9 +831,11 @@ def main():
         log.info("Generando graficos por grupo...")
         pct_prog_gantt = _ccu.leer_pct_programa_gantt(sheets_svc, SPREADSHEET_ID, GANTT_HOJA)
         log.info(f"% Prog Gantt leido: {pct_prog_gantt}%")
+        pct_prog_por_grupo = _ccu.leer_pct_prog_por_grupo(sheets_svc, SPREADSHEET_ID, GANTT_HOJA, control_date)
+        log.info(f"% Prog Gantt por grupo: {pct_prog_por_grupo}")
         fines_proy_global = []
         for nombre_grupo, beneficiarios in grupos.items():
-            _, _, _, fin_proy = generar_grafico_grupo(nombre_grupo, beneficiarios, control_date, OUTPUT_DIR, pct_prog_gantt=pct_prog_gantt)
+            _, _, _, fin_proy = generar_grafico_grupo(nombre_grupo, beneficiarios, control_date, OUTPUT_DIR, pct_prog_gantt=pct_prog_por_grupo.get(nombre_grupo.upper()))
             fines_proy_global.append(fin_proy)
 
         log.info("Generando graficos consolidados...")
