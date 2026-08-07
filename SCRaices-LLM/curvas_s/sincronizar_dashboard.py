@@ -40,17 +40,8 @@ log = _ccu.setup_logging("sincronizar_dashboard")
 PROYECTOS_META = {
     "P119": {
         "nombre": "Ñuke Mapu",
-        "json": None,
-        "hardcoded": {
-            "CurvaS_TOTAL_Nuke_Mapu.png":    ("Total Proyecto · Ñuke Mapu",        1),
-            "CurvaS_Todos_Grupos.png":        ("Todos los Grupos · Ñuke Mapu",      2),
-            "CurvaS_GRUPO_1.png":             ("Grupo 1 · Ñuke Mapu",              3),
-            "CurvaS_GRUPO_2.png":             ("Grupo 2 · Ñuke Mapu",              4),
-            "CurvaS_GRUPO_3.png":             ("Grupo 3 · Ñuke Mapu",              5),
-            "CurvaS_GRUPO_4.png":             ("Grupo 4 · Ñuke Mapu",              6),
-            "CurvaS_GRUPO_5.png":             ("Grupo 5 · Ñuke Mapu",              7),
-        },
-        "id": "P119",
+        "json":   "drive_ids_nuke_mapu.json",
+        "id":     "P119",
     },
     "P38":  {"nombre": "Aliwen",              "json": "drive_ids_aliwen.json",    "id": "P38"},
     "P126": {"nombre": "El Maitén",           "json": "drive_ids_maiten.json",    "id": "P126"},
@@ -295,8 +286,6 @@ def main():
     # Comparar
     diferencias = []
     for proy_id, entries in expected.items():
-        if False:
-            pass  # placeholder — todos los proyectos se comparan igual
         curr_ids = {e["id"] for e in (current.get(proy_id) or [])}
         exp_ids  = {e["id"] for e in entries}
         if curr_ids != exp_ids or proy_id not in current:
