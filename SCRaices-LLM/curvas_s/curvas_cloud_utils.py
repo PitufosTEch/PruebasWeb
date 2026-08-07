@@ -302,7 +302,7 @@ def leer_pct_programa_gantt(sheets_svc, spreadsheet_id, hoja="Programa de obra")
     for row in rows:
         for ci in range(min(25, len(row))):
             label = str(row[ci]).strip().lower()
-            if label in _labels or "rograma" in label:
+            if (label in _labels or "rograma" in label) and "grupo" not in label:
                 prog_row = row
                 break
         if prog_row is not None:
