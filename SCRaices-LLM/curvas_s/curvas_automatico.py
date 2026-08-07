@@ -153,6 +153,9 @@ def leer_datos_control(sheets_svc):
     ).execute()
     rows = result.get("values", [])
 
+    # ── Leer TERMINO individual por beneficiario desde Gantt ─────────────────
+    termino_map = _leer_terminos_desde_gantt(sheets_svc)
+
     # ── Leer % real desde AppSheet (preferido) ────────────────────────────────
     avance_appsheet = leer_avance_appsheet()
 
@@ -208,7 +211,9 @@ def leer_datos_control(sheets_svc):
             except (ValueError, TypeError):
                 pct = 0.0
 
-        grupos.setdefault(grupo_raw, []).append((nombre, inicio, float(pct)))
+        termino = termino_map.get(_normalizar_nombre(nombre),
+                                  inicio + timedelta(days=DURACION_DIAS))
+        grupos.setdefault(grupo_raw, []).append((nombre, inicio, float(pct), termino))
 
     if sin_match_appsheet:
         log.warning(f"Sin match en AppSheet ({len(sin_match_appsheet)}): "
@@ -221,7 +226,50 @@ def leer_datos_control(sheets_svc):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 2b. SINCRONIZAR GRUPOS DESDE GANTT
+# 2b. LEER TERMINOS INDIVIDUALES DESDE GANTT
+# ─────────────────────────────────────────────────────────────────────────────
+def _leer_terminos_desde_gantt(sheets_svc):
+    """Lee fechas TERMINO individuales de cada beneficiario desde el Gantt 'Nuke Mapu'.
+    Columna J (idx 9) = TERMINO, columna D (idx 3) = BENEFICIARIO.
+    Retorna dict {nombre_normalizado: termino_date}.
+    """
+    r = sheets_svc.spreadsheets().values().get(
+        spreadsheetId=SPREADSHEET_ID,
+        range="'Ñuke Mapu'!A1:J80",
+        valueRenderOption="FORMATTED_VALUE",
+    ).execute()
+    prog_rows = r.get("values", [])
+
+    termino_map = {}
+    for row in prog_rows:
+        nombre_raw  = str(row[3]).strip() if len(row) > 3 else ""
+        termino_raw = str(row[9]).strip() if len(row) > 9 else ""
+        if not nombre_raw or not termino_raw:
+            continue
+        if (nombre_raw.upper().startswith("GRUPO")
+                or nombre_raw.upper() in ("BENEFICIARIO", "CARTA GANTT", "TERMINO", "")):
+            continue
+        try:
+            float(nombre_raw.replace("%", "").replace(",", "."))
+            continue
+        except ValueError:
+            pass
+        termino_date = None
+        for fmt in ("%m/%d/%Y", "%d/%m/%Y"):
+            try:
+                termino_date = datetime.strptime(termino_raw, fmt).date()
+                break
+            except ValueError:
+                pass
+        if termino_date:
+            termino_map[_normalizar_nombre(nombre_raw)] = termino_date
+
+    log.info(f"  Terminos leidos desde Gantt: {len(termino_map)} beneficiarios")
+    return termino_map
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 2c. SINCRONIZAR GRUPOS DESDE GANTT
 # ─────────────────────────────────────────────────────────────────────────────
 def _get_dc_gid(sheets_svc):
     meta = sheets_svc.spreadsheets().get(spreadsheetId=SPREADSHEET_ID).execute()
@@ -457,18 +505,18 @@ def proyectar_fin(inicio, pct_real, control):
 def build_group_curves(beneficiarios, control):
     # Opción B: si inicio >= control pero pct_real > 0, estimar inicio efectivo
     beneficiarios_adj = []
-    for nombre, inicio, pct in beneficiarios:
+    for nombre, inicio, pct, termino in beneficiarios:
         if inicio >= control and pct > 0:
             inicio_eff = _estimar_inicio_efectivo(control, pct)
             log.info(f"    [inicio_eff] {nombre}: planif={_fmt_date(inicio)} "
                      f"→ eff={_fmt_date(inicio_eff)} ({pct:.0f}% real)")
-            beneficiarios_adj.append((nombre, inicio_eff, pct))
+            beneficiarios_adj.append((nombre, inicio_eff, pct, termino))
         else:
-            beneficiarios_adj.append((nombre, inicio, pct))
+            beneficiarios_adj.append((nombre, inicio, pct, termino))
     beneficiarios = beneficiarios_adj
 
     inicio_grupo = min(b[1] for b in beneficiarios)
-    fines_prog   = [b[1] + timedelta(days=DURACION_DIAS) for b in beneficiarios]
+    fines_prog   = [b[3] for b in beneficiarios]   # termino individual desde Gantt
     fin_proyecto = max(fines_prog)
     fines_real   = [proyectar_fin(b[1], b[2], control) for b in beneficiarios]
     fin_proyectado = max(fines_real)
@@ -480,15 +528,18 @@ def build_group_curves(beneficiarios, control):
     prog_list, real_list, proj_list = [], [], []
     for fecha in fechas:
         vp, vr, vproj = [], [], []
-        for _, inicio, pct in beneficiarios:
+        for _, inicio, pct, termino in beneficiarios:
             dias = (fecha - inicio).days
-            vp.append(pct_programada(dias))
+            # Escalar dias a la calibración de PCT_SEMANA (245 días)
+            duracion = max(1, (termino - inicio).days)
+            dias_esc = dias * DURACION_DIAS / duracion
+            vp.append(pct_programada(dias_esc))
             if fecha <= control:
                 t_ctrl = max(1, (control - inicio).days)
                 vr.append(s_curve_real(max(0, dias), pct, t_ctrl))
             if fecha >= control:
                 if pct <= 0:
-                    vproj.append(pct_programada(dias))
+                    vproj.append(pct_programada(dias_esc))
                 else:
                     dias_ctrl = max(1, (control - inicio).days)
                     vproj.append(min(100, (pct / dias_ctrl) * max(0, dias)))
@@ -554,7 +605,7 @@ def generar_grafico_grupo(nombre_grupo, beneficiarios, control, outdir, pct_prog
                       edgecolor="#ff7f0e", linewidth=1.0, alpha=0.95),
         )
 
-    fin_prog_grupo = max(b[1] for b in beneficiarios) + timedelta(days=DURACION_DIAS)
+    fin_prog_grupo = max(b[3] for b in beneficiarios)   # termino real del Gantt
     ax.set_xlim(fechas[0] - timedelta(days=7), fechas[-1] + timedelta(days=7))
     ax.set_ylim(-2, 108)
     ax.set_ylabel("Avance (%)", fontsize=12)
@@ -587,7 +638,7 @@ def generar_grafico_grupo(nombre_grupo, beneficiarios, control, outdir, pct_prog
 def generar_grafico_total(grupos, control, fines_proy_global, outdir, pct_prog_gantt=None):
     todos = [b for bens in grupos.values() for b in bens]
     inicio_total   = min(b[1] for b in todos)
-    fin_prog_total = max(b[1] for b in todos) + timedelta(days=DURACION_DIAS)
+    fin_prog_total = max(b[3] for b in todos)   # termino real del Gantt por beneficiario
     fin_proy_total = max(fines_proy_global)
 
     fecha_fin_total = max(fin_prog_total, fin_proy_total) + timedelta(days=14)
@@ -597,15 +648,17 @@ def generar_grafico_total(grupos, control, fines_proy_global, outdir, pct_prog_g
     prog_total, real_total_hist, proj_total = [], [], []
     for fecha in fechas_total:
         vp, vr, vproj = [], [], []
-        for _, inicio, pct in todos:
+        for _, inicio, pct, termino in todos:
             dias = (fecha - inicio).days
-            vp.append(pct_programada(dias))
+            duracion = max(1, (termino - inicio).days)
+            dias_esc = dias * DURACION_DIAS / duracion
+            vp.append(pct_programada(dias_esc))
             if fecha <= control:
                 t_ctrl = max(1, (control - inicio).days)
                 vr.append(s_curve_real(max(0, dias), pct, t_ctrl))
             if fecha >= control:
                 if pct <= 0:
-                    vproj.append(pct_programada(dias))
+                    vproj.append(pct_programada(dias_esc))
                 else:
                     dias_ctrl = max(1, (control - inicio).days)
                     vproj.append(min(100, (pct / dias_ctrl) * max(0, dias)))
@@ -856,8 +909,8 @@ def actualizar_pct_en_hoja(sheets_svc, grupos):
     """Escribe % real de vuelta a 'Datos Control' col D para mantener fallback fresco."""
     valores = []
     for bens in grupos.values():
-        for _, _, pct in bens:
-            valores.append([round(pct, 2)])
+        for b in bens:
+            valores.append([round(b[2], 2)])
     if not valores:
         return
     n = len(valores)
