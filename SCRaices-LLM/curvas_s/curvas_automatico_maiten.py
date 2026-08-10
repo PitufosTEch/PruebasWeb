@@ -546,6 +546,11 @@ def proyectar_fin(inicio, pct_real, control):
     return control + timedelta(days=int(dias_rest))
 
 
+def _promedio_fechas(fechas):
+    ref = fechas[0]
+    return ref + timedelta(days=round(sum((d - ref).days for d in fechas) / len(fechas)))
+
+
 def build_group_curves(beneficiarios, control):
     # Opcion B: si inicio >= control pero pct_real > 0, estimar inicio efectivo
     beneficiarios_adj = []
@@ -563,7 +568,7 @@ def build_group_curves(beneficiarios, control):
     fines_prog     = [b[1] + timedelta(days=DURACION_DIAS) for b in beneficiarios]
     fin_proyecto   = max(fines_prog)
     fines_real     = [proyectar_fin(b[1], b[2], control) for b in beneficiarios]
-    fin_proyectado = max(fines_real)
+    fin_proyectado = _promedio_fechas(fines_real)
 
     fecha_fin = max(fin_proyecto, fin_proyectado) + timedelta(days=14)
     fechas = [inicio_grupo + timedelta(days=d)
