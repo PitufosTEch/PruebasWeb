@@ -20,6 +20,7 @@ Integrado en ejecutar_curvas_cloud.py (POST_SCRIPTS).
 """
 
 import sys
+import time
 import logging
 import requests
 from datetime import date, datetime, timedelta
@@ -460,6 +461,7 @@ def main():
     resultado_benef = {}  # {pid: {clave_benef: pct}}
     for pid, sid in PROYECTOS.items():
         log.info(f"Leyendo {pid}...")
+        time.sleep(2)  # evita saturar cuota 60 reads/min de Sheets API
 
         # ── Avance real desde 'Datos Control' ─────────────────────────────────
         datos = _leer_datos_control(sheets_svc, sid, pid)
