@@ -255,7 +255,7 @@ def _leer_terminos_desde_gantt(sheets_svc):
         except ValueError:
             pass
         termino_date = None
-        for fmt in ("%m/%d/%Y", "%d/%m/%Y"):
+        for fmt in ("%d/%m/%Y", "%m/%d/%Y"):
             try:
                 termino_date = datetime.strptime(termino_raw, fmt).date()
                 break
