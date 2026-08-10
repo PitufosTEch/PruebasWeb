@@ -233,8 +233,8 @@ def _leer_gantt_datos(sheets_svc, spreadsheet_id, hoja) -> tuple:
     min_ser, max_ser = min(serials), max(serials)
 
     # ── Casos fuera de rango ───────────────────────────────────────────────────
-    if hoy_ser >= max_ser + 7:
-        log.info(f"    Gantt '{hoja}': hoy > término → pct_prog=100%")
+    if hoy_ser >= max_ser:
+        log.info(f"    Gantt '{hoja}': hoy >= última columna Gantt → pct_prog=100%")
         return 100.0, None
     if hoy_ser < min_ser - 7:
         log.info(f"    Gantt '{hoja}': hoy < inicio → pct_prog=0%")
