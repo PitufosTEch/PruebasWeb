@@ -26,17 +26,17 @@ jobs:
       fail-fast: false      # Si un proyecto falla, los demás siguen
       matrix:
         include:
-          - { label: "P119 Ñuke Mapu",        script: curvas_automatico }
-          - { label: "P38  Aliwen",            script: curvas_automatico_aliwen }
-          - { label: "P39  El Coihue",         script: curvas_automatico_coihue }
-          - { label: "P127 Nuevo Cunco",       script: curvas_automatico_cunco }
-          - { label: "P12  Juan Huilcan",      script: curvas_automatico_huilcan }
-          - { label: "P14  Com. Madihue",      script: curvas_automatico_madihue }
-          - { label: "P126 El Maitén",         script: curvas_automatico_maiten }
-          - { label: "P131 Raíces Melipeuco",  script: curvas_automatico_melipeuco }
-          - { label: "P116 Sonia Quilaleo",    script: curvas_automatico_quilaleo }
-          - { label: "P31  Trovolhue",         script: curvas_automatico_trovolhue }
-          - { label: "P28  Elsa Pinchulaf",    script: curvas_automatico_pinchulaf }
+          - { label: "P119 Ñuke Mapu",        script: curvas_automatico,           delay: 0   }
+          - { label: "P38  Aliwen",            script: curvas_automatico_aliwen,    delay: 15  }
+          - { label: "P39  El Coihue",         script: curvas_automatico_coihue,    delay: 30  }
+          - { label: "P127 Nuevo Cunco",       script: curvas_automatico_cunco,     delay: 45  }
+          - { label: "P12  Juan Huilcan",      script: curvas_automatico_huilcan,   delay: 60  }
+          - { label: "P14  Com. Madihue",      script: curvas_automatico_madihue,   delay: 75  }
+          - { label: "P126 El Maitén",         script: curvas_automatico_maiten,    delay: 90  }
+          - { label: "P131 Raíces Melipeuco",  script: curvas_automatico_melipeuco, delay: 105 }
+          - { label: "P116 Sonia Quilaleo",    script: curvas_automatico_quilaleo,  delay: 120 }
+          - { label: "P31  Trovolhue",         script: curvas_automatico_trovolhue, delay: 135 }
+          - { label: "P28  Elsa Pinchulaf",    script: curvas_automatico_pinchulaf, delay: 150 }
           # ── Proyectos futuros — descomentar cuando tengan script y carta Gantt ──────
           # Rural Araucanía 2024
           # - { label: "P118 El Canelo",               script: curvas_automatico_el_canelo }
@@ -93,6 +93,9 @@ jobs:
 
       - name: Instalar Playwright + Chromium
         run: pip install playwright && playwright install chromium --with-deps
+
+      - name: "Esperar ${{ matrix.delay }}s (escalonamiento API)"
+        run: sleep ${{ matrix.delay }}
 
       - name: "Ejecutar Curvas S — ${{ matrix.label }}"
         working-directory: SCRaices-LLM/curvas_s
