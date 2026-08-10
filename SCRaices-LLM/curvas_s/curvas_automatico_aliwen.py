@@ -57,11 +57,12 @@ SCOPES = [
 DPI_EXPORT = 200           # resolucion de exportacion (10"x5.1" -> 2000x1020 px, optimo para celda 755x385)
 DRIVE_IDS_FILE = None  # gestionado por _ccu (Firebase en cloud, JSON en local)
 
-# Curva S programada semanal Aliwen (32 semanas = 224 dias)
+# Curva S programada semanal Aliwen (26 semanas = 182 dias)
 PCT_SEMANA = [0, 2, 5, 9, 14, 18, 23, 27, 32, 36, 41, 45, 50, 55, 59, 64,
               68, 73, 77, 82, 86, 91, 95, 100, 100, 100, 100, 100, 100, 100,
               100, 100, 100]
-DURACION_DIAS = 224
+DURACION_DIAS = 182
+TERMINO_PROYECTO = date(2026, 8, 31)  # Fecha de término contractual del proyecto
 
 COLORES = {
     "GRUPO 1": "#1a6eb5",
@@ -354,7 +355,6 @@ def leer_datos_control(sheets_svc):
     ).execute()
     rows = result.get("values", [])
 
-    termino_map = _leer_terminos_desde_gantt(sheets_svc)
     avance_appsheet = leer_avance_appsheet()
 
     grupos = {}
@@ -405,9 +405,8 @@ def leer_datos_control(sheets_svc):
             except (ValueError, TypeError):
                 pct = 0.0
 
-        nombre_norm = _normalizar_nombre(nombre)
-        termino = termino_map.get(nombre_norm, inicio + timedelta(days=DURACION_DIAS))
-        grupos.setdefault(grupo_raw, []).append((nombre, inicio, float(pct), termino))
+        # Termino contractual fijo para todos los beneficiarios
+        grupos.setdefault(grupo_raw, []).append((nombre, inicio, float(pct), TERMINO_PROYECTO))
 
     if sin_match:
         log.warning(f"Sin match AppSheet: {', '.join(sin_match)}")
