@@ -285,6 +285,18 @@ def _leer_gantt_datos(sheets_svc, spreadsheet_id, hoja) -> tuple:
                 f"(dist={best_dist}d label='{prog_label}')"
             )
 
+    # Si pct_actual >= 90% y la última columna del Gantt llega a 100%,
+    # el proyecto está en su etapa final → reportar como 100%
+    if pct_actual is not None and 90.0 <= pct_actual < 100.0:
+        max_ci = next((ci for ci, _, s in date_cols if s == max_ser), None)
+        if max_ci is not None and max_ci < len(prog_row):
+            pct_fin = _parse_val(prog_row[max_ci])
+            if pct_fin is not None and pct_fin >= 100.0:
+                log.info(
+                    f"    Gantt '{hoja}': pct_actual={pct_actual}% ≥90% y Gantt termina en 100% → 100%"
+                )
+                pct_actual = 100.0
+
     # ── Serie mensual completa ────────────────────────────────────────────────
     # Para cada mes toma el valor de la columna más tardía dentro del mes.
     mensual: dict[str, float] = {}
