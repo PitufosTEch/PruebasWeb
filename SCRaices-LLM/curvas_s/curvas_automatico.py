@@ -82,6 +82,9 @@ COLORES = {
     "GRUPO 5": "#9467bd",
 }
 
+# Vencimiento del Programa de Obra del proyecto (contrato: 09/01/2026 + 402 días)
+FIN_PROGRAMADO_PROYECTO = date(2027, 2, 15)
+
 # ─────────────────────────────────────────────────────────────────────────────
 # LOG
 # ─────────────────────────────────────────────────────────────────────────────
@@ -638,7 +641,7 @@ def generar_grafico_grupo(nombre_grupo, beneficiarios, control, outdir, pct_prog
 def generar_grafico_total(grupos, control, fines_proy_global, outdir, pct_prog_gantt=None):
     todos = [b for bens in grupos.values() for b in bens]
     inicio_total   = min(b[1] for b in todos)
-    fin_prog_total = max(b[3] for b in todos)   # termino real del Gantt por beneficiario
+    fin_prog_total = FIN_PROGRAMADO_PROYECTO     # vencimiento programa de obra del proyecto
     fin_proy_total = max(fines_proy_global)
 
     fecha_fin_total = max(fin_prog_total, fin_proy_total) + timedelta(days=14)
