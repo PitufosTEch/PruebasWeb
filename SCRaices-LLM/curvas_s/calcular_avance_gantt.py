@@ -258,7 +258,7 @@ def _leer_gantt_datos(sheets_svc, spreadsheet_id, hoja) -> tuple:
     for row in rows:
         for ci in range(min(25, len(row))):
             label = str(row[ci]).strip().lower()
-            if label in _PROGRAMA_LABELS or "rograma" in label:
+            if (label in _PROGRAMA_LABELS or "rograma" in label) and "grupo" not in label:
                 prog_row = row
                 prog_label = row[ci]
                 break
