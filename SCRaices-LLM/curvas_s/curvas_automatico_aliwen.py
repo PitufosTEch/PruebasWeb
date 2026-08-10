@@ -295,6 +295,47 @@ def leer_avance_appsheet():
         return None
 
 
+def _leer_terminos_desde_gantt(sheets_svc):
+    """Lee fechas TERMINO individuales de cada beneficiario desde '% Avance'.
+    Columna I (idx 8) = TERMINO, columna C (idx 2) = BENEFICIARIO.
+    Retorna dict {nombre_normalizado: termino_date}.
+    """
+    r = sheets_svc.spreadsheets().values().get(
+        spreadsheetId=SPREADSHEET_ID,
+        range="'% Avance'!A1:J80",
+        valueRenderOption="FORMATTED_VALUE",
+    ).execute()
+    prog_rows = r.get("values", [])
+
+    termino_map = {}
+    for row in prog_rows:
+        nombre_raw  = str(row[2]).strip() if len(row) > 2 else ""
+        termino_raw = str(row[8]).strip() if len(row) > 8 else ""
+        if not nombre_raw or not termino_raw:
+            continue
+        if nombre_raw.upper().startswith("GRUPO") or nombre_raw.upper() in (
+            "BENEFICIARIO", "CARTA GANTT", "CORRE.", "PROGRAMA", ""
+        ):
+            continue
+        try:
+            float(nombre_raw.replace("%", "").replace(",", "."))
+            continue
+        except ValueError:
+            pass
+        termino_date = None
+        for fmt in ("%d/%m/%Y", "%m/%d/%Y"):
+            try:
+                termino_date = datetime.strptime(termino_raw, fmt).date()
+                break
+            except ValueError:
+                pass
+        if termino_date:
+            termino_map[_normalizar_nombre(nombre_raw)] = termino_date
+
+    log.info(f"  Terminos leidos desde Gantt: {len(termino_map)} beneficiarios")
+    return termino_map
+
+
 def leer_datos_control(sheets_svc):
     """
     Lee la hoja 'Datos Control' de Aliwen.
@@ -313,6 +354,7 @@ def leer_datos_control(sheets_svc):
     ).execute()
     rows = result.get("values", [])
 
+    termino_map = _leer_terminos_desde_gantt(sheets_svc)
     avance_appsheet = leer_avance_appsheet()
 
     grupos = {}
@@ -363,7 +405,9 @@ def leer_datos_control(sheets_svc):
             except (ValueError, TypeError):
                 pct = 0.0
 
-        grupos.setdefault(grupo_raw, []).append((nombre, inicio, float(pct)))
+        nombre_norm = _normalizar_nombre(nombre)
+        termino = termino_map.get(nombre_norm, inicio + timedelta(days=DURACION_DIAS))
+        grupos.setdefault(grupo_raw, []).append((nombre, inicio, float(pct), termino))
 
     if sin_match:
         log.warning(f"Sin match AppSheet: {', '.join(sin_match)}")
@@ -411,7 +455,7 @@ def proyectar_fin(inicio, pct_real, control):
 
 def build_group_curves(beneficiarios, control):
     inicio_grupo   = min(b[1] for b in beneficiarios)
-    fin_proyecto   = max(b[1] for b in beneficiarios) + timedelta(days=DURACION_DIAS)
+    fin_proyecto   = max(b[3] for b in beneficiarios)
     fines_real     = [proyectar_fin(b[1], b[2], control) for b in beneficiarios]
     fin_proyectado = max(fines_real)
 
@@ -422,15 +466,17 @@ def build_group_curves(beneficiarios, control):
     prog_list, real_list, proj_list = [], [], []
     for fecha in fechas:
         vp, vr, vproj = [], [], []
-        for _, inicio, pct in beneficiarios:
+        for _, inicio, pct, termino in beneficiarios:
             dias = (fecha - inicio).days
-            vp.append(pct_programada(dias))
+            duracion = max(1, (termino - inicio).days)
+            dias_esc = dias * DURACION_DIAS / duracion
+            vp.append(pct_programada(dias_esc))
             if fecha <= control:
                 t_ctrl = max(1, (control - inicio).days)
                 vr.append(s_curve_real(max(0, dias), pct, t_ctrl))
             if fecha >= control:
                 if pct <= 0:
-                    vproj.append(pct_programada(dias))
+                    vproj.append(pct_programada(dias_esc))
                 else:
                     dias_ctrl = max(1, (control - inicio).days)
                     vproj.append(min(100, (pct / dias_ctrl) * max(0, dias)))
@@ -496,7 +542,7 @@ def generar_grafico_grupo(nombre_grupo, beneficiarios, control, outdir, pct_prog
                       edgecolor="#ff7f0e", linewidth=1.0, alpha=0.95),
         )
 
-    fin_prog_grupo = max(b[1] for b in beneficiarios) + timedelta(days=DURACION_DIAS)
+    fin_prog_grupo = max(b[3] for b in beneficiarios)
     ax.set_xlim(fechas[0] - timedelta(days=7), fechas[-1] + timedelta(days=7))
     ax.set_ylim(-2, 108)
     ax.set_ylabel("Avance (%)", fontsize=12)
@@ -530,7 +576,7 @@ def generar_grafico_grupo(nombre_grupo, beneficiarios, control, outdir, pct_prog
 def generar_grafico_total(grupos, control, fines_proy_global, outdir, pct_prog_gantt=None):
     todos = [b for bens in grupos.values() for b in bens]
     inicio_total   = min(b[1] for b in todos)
-    fin_prog_total = max(b[1] for b in todos) + timedelta(days=DURACION_DIAS)
+    fin_prog_total = max(b[3] for b in todos)
     fin_proy_total = max(fines_proy_global)
 
     fecha_fin_total = max(fin_prog_total, fin_proy_total) + timedelta(days=14)
@@ -540,15 +586,17 @@ def generar_grafico_total(grupos, control, fines_proy_global, outdir, pct_prog_g
     prog_total, real_total_hist, proj_total = [], [], []
     for fecha in fechas_total:
         vp, vr, vproj = [], [], []
-        for _, inicio, pct in todos:
+        for _, inicio, pct, termino in todos:
             dias = (fecha - inicio).days
-            vp.append(pct_programada(dias))
+            duracion = max(1, (termino - inicio).days)
+            dias_esc = dias * DURACION_DIAS / duracion
+            vp.append(pct_programada(dias_esc))
             if fecha <= control:
                 t_ctrl = max(1, (control - inicio).days)
                 vr.append(s_curve_real(max(0, dias), pct, t_ctrl))
             if fecha >= control:
                 if pct <= 0:
-                    vproj.append(pct_programada(dias))
+                    vproj.append(pct_programada(dias_esc))
                 else:
                     dias_ctrl = max(1, (control - inicio).days)
                     vproj.append(min(100, (pct / dias_ctrl) * max(0, dias)))
@@ -811,8 +859,8 @@ def actualizar_pct_en_hoja(sheets_svc, grupos):
     """Escribe % real actualizados de vuelta a 'Datos Control' col D (rango dinamico)."""
     valores = []
     for bens in grupos.values():
-        for _, _, pct in bens:
-            valores.append([round(pct, 2)])
+        for b in bens:
+            valores.append([round(b[2], 2)])
     if valores:
         n = len(valores)
         sheets_svc.spreadsheets().values().update(
