@@ -11209,23 +11209,9 @@ const App = () => {
                             <span className="hidden md:inline">Sugerencias</span>
                             {pendientesSug > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">{pendientesSug}</span>}
                         </button>
-                        {kpis.esFinalizado ? (
-                            <span className="flex items-center gap-1.5 px-2.5 py-1.5 bg-green-50 border border-green-300 rounded-lg text-[11px] font-semibold text-green-700 whitespace-nowrap shrink-0">
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
-                                Terminado
-                                {kpis.finalizadoManual && <button onClick={() => desmarcarTerminado(proyectoSel)} className="text-green-400 hover:text-red-500 ml-1" title="Desmarcar">&times;</button>}
-                            </span>
-                        ) : (
-                            <button onClick={() => {
-                                const motivo = prompt('Motivo (ej: 1 casa no se construira):');
-                                if (motivo !== null) marcarTerminado(proyectoSel, motivo);
-                            }} title="Marcar proyecto como terminado" className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-violet-700 bg-violet-50 border border-violet-300 hover:bg-violet-100 transition-colors whitespace-nowrap shrink-0">
-                                Marcar Terminado
-                            </button>
-                        )}
                     </div>
-                    {/* ── Segunda fila: Informes — alineado a la derecha bajo los botones de acción ── */}
-                    <div className="flex items-center gap-2 mt-1.5 pt-1.5 border-t border-gray-100 justify-end">
+                    {/* ── Segunda fila: Informes + Marcar Terminado — bajo Estado de Proyectos y Bitácora ── */}
+                    <div className="flex items-center gap-2 mt-1.5 pt-1.5 border-t border-gray-100">
                         <div ref={informesRef} className="relative">
                             <button
                                 type="button"
@@ -11267,6 +11253,20 @@ const App = () => {
                                 </div>
                             )}
                         </div>
+                        {kpis.esFinalizado ? (
+                            <span className="flex items-center gap-1.5 px-2.5 py-1.5 bg-green-50 border border-green-300 rounded-lg text-[11px] font-semibold text-green-700 whitespace-nowrap shrink-0">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                Terminado
+                                {kpis.finalizadoManual && <button onClick={() => desmarcarTerminado(proyectoSel)} className="text-green-400 hover:text-red-500 ml-1" title="Desmarcar">&times;</button>}
+                            </span>
+                        ) : (
+                            <button onClick={() => {
+                                const motivo = prompt('Motivo (ej: 1 casa no se construira):');
+                                if (motivo !== null) marcarTerminado(proyectoSel, motivo);
+                            }} title="Marcar proyecto como terminado" className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-violet-700 bg-violet-50 border border-violet-300 hover:bg-violet-100 transition-colors whitespace-nowrap shrink-0">
+                                Marcar Terminado
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
