@@ -5274,8 +5274,25 @@ h3.sh{font-size:13px;color:#333;margin:18px 0 9px;display:flex;align-items:cente
 h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
 @media (max-width:768px){.tabs{padding:0 8px;flex-wrap:wrap;}.tab-btn{font-size:11px;padding:9px 10px;flex:1 1 auto;text-align:center;min-width:0;}.obra-jumper-wrap{margin-left:0;width:calc(100% - 16px);max-width:100%;margin:4px 8px 6px;}.blk{margin:8px;padding:14px 12px;}.sg{grid-template-columns:1fr 1fr;}}
 @media print{.ftr{display:none;}.tabs{display:none;}.sec{display:block!important;}.blk{page-break-after:always;border:none;border-radius:0;margin:0;}}
+.seg-dot{cursor:help;display:inline-block;}
 </style>`;
-    const _JS_INF = '<scr'+'ipt>function mst(t,b){document.querySelectorAll(\'.sec\').forEach(s=>s.classList.remove(\'active\'));document.querySelectorAll(\'.tab-btn\').forEach(x=>x.classList.remove(\'active\'));document.getElementById(\'s-\'+t).classList.add(\'active\');b.classList.add(\'active\');}function jumpToObra(idx){if(idx===\'\')return;var sec=document.querySelector(\'.sec.active\');var block=sec&&sec.querySelector(\'.obra-block[data-obra="\'+idx+\'"]\');if(block)block.scrollIntoView({behavior:\'smooth\',block:\'start\'});}(function(){var w=document.getElementById(\'ojWrap\'),inp=document.getElementById(\'ojInput\'),lst=document.getElementById(\'ojList\');if(!w)return;function openL(){lst.classList.add(\'open\');}function closeL(){lst.classList.remove(\'open\');inp.value=\'\';}inp.addEventListener(\'focus\',openL);inp.addEventListener(\'click\',openL);inp.addEventListener(\'input\',function(){var q=this.value.toLowerCase();lst.querySelectorAll(\'.obra-jumper-item\').forEach(function(li){li.classList.toggle(\'oj-hidden\',q&&!li.textContent.toLowerCase().includes(q));});openL();});lst.addEventListener(\'click\',function(e){var li=e.target.closest(\'.obra-jumper-item\');if(!li)return;jumpToObra(li.dataset.idx);closeL();});document.addEventListener(\'click\',function(e){if(!w.contains(e.target))closeL();});})();</scr'+'ipt>';
+    const _JS_INF = '<scr'+'ipt>function mst(t,b){document.querySelectorAll(\'.sec\').forEach(s=>s.classList.remove(\'active\'));document.querySelectorAll(\'.tab-btn\').forEach(x=>x.classList.remove(\'active\'));document.getElementById(\'s-\'+t).classList.add(\'active\');b.classList.add(\'active\');}function jumpToObra(idx){if(idx===\'\')return;var sec=document.querySelector(\'.sec.active\');var block=sec&&sec.querySelector(\'.obra-block[data-obra="\'+idx+\'"]\');if(block)block.scrollIntoView({behavior:\'smooth\',block:\'start\'});}(function(){var w=document.getElementById(\'ojWrap\'),inp=document.getElementById(\'ojInput\'),lst=document.getElementById(\'ojList\');if(!w)return;function openL(){lst.classList.add(\'open\');}function closeL(){lst.classList.remove(\'open\');inp.value=\'\';}inp.addEventListener(\'focus\',openL);inp.addEventListener(\'click\',openL);inp.addEventListener(\'input\',function(){var q=this.value.toLowerCase();lst.querySelectorAll(\'.obra-jumper-item\').forEach(function(li){li.classList.toggle(\'oj-hidden\',q&&!li.textContent.toLowerCase().includes(q));});openL();});lst.addEventListener(\'click\',function(e){var li=e.target.closest(\'.obra-jumper-item\');if(!li)return;jumpToObra(li.dataset.idx);closeL();});document.addEventListener(\'click\',function(e){if(!w.contains(e.target))closeL();});})();
+;(function(){
+  var tip=null;
+  function getEl(e){return e.target?e.target.closest(\'.seg-dot\'):null;}
+  document.addEventListener(\'mouseover\',function(e){
+    var el=getEl(e);if(!el)return;
+    if(!tip){tip=document.createElement(\'div\');tip.style.cssText=\'position:fixed;background:#0f172a;color:#f1f5f9;font-size:11px;font-weight:500;padding:5px 9px;border-radius:6px;pointer-events:none;z-index:9999;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.3);display:none;\';document.body.appendChild(tip);}
+    tip.textContent=el.dataset.tip||el.title||\'\';
+    tip.style.display=\'block\';
+  });
+  document.addEventListener(\'mousemove\',function(e){
+    if(tip&&tip.style.display===\'block\'){tip.style.left=(e.clientX+14)+\'px\';tip.style.top=(e.clientY-36)+\'px\';}
+  });
+  document.addEventListener(\'mouseout\',function(e){
+    if(tip&&!(e.relatedTarget&&e.relatedTarget.closest&&e.relatedTarget.closest(\'.seg-dot\')))tip.style.display=\'none\';
+  });
+})();</scr'+'ipt>';
 
     // ── Construye las 6 secciones de tabs para residente o capataz ────────────────────────────
     const _buildSecciones = (vivs, grps, curvasFiltro, capatazDesp, ganttRaw, despachosData) => {
@@ -5522,7 +5539,7 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
             let pgDiasRFrozen=pgDR,pgDiasRColor=null,pgDiasRText=null;
             if(todasRecep&&pg&&pg.finProg&&ultimaFR){const df=Math.floor((new Date(pg.finProg)-ultimaFR)/86400000);pgDiasRFrozen=df;pgDiasRColor=df>=0?'#16a34a':'#dc2626';pgDiasRText=(df>=0?'+':'')+df+'d';}
             const _pctPend=tot>0?(tot-recepDom)/tot*100:0;
-            const circleHtml=(todasRecep&&pgDiasRFrozen>=0)?'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#16a34a;vertical-align:middle;" title="Todas con Recep. DOM"></span>':(pgDR!==null&&pgDR<=90)?'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#dc2626;vertical-align:middle;" title="≤90d al término del programa"></span>':(recepDom>0&&pg&&pg.plazo>0?(()=>{const pctEl=Math.max(0,pg.plazo-Math.max(0,pgDR??0))/pg.plazo*100;return pctEl>=80?'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#eab308;vertical-align:middle;" title=">80% plazo transcurrido, >90d al término"></span>':'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#9ca3af;vertical-align:middle;" title="Con Recep. DOM, <80% plazo transcurrido"></span>';})():'')
+            const circleHtml=(todasRecep&&pgDiasRFrozen>=0)?'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#16a34a;vertical-align:middle;" class="seg-dot" data-tip="Todas con Recep. DOM completadas dentro del plazo"></span>':(pgDR!==null&&pgDR<=90)?'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#dc2626;vertical-align:middle;" class="seg-dot" data-tip="90 días o menos al término del programa"></span>':(recepDom>0&&pg&&pg.plazo>0?(()=>{const pctEl=Math.max(0,pg.plazo-Math.max(0,pgDR??0))/pg.plazo*100;return pctEl>=80?'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#eab308;vertical-align:middle;" class="seg-dot" data-tip="Más del 80% del plazo transcurrido, más de 90d al término"></span>':'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#9ca3af;vertical-align:middle;" class="seg-dot" data-tip="Con Recep. DOM, menos del 80% del plazo transcurrido"></span>';})():'')
             return {pr,vivs,grps,curvas,tot,avPct,conInsp,terminadas,_ag,agPct,pg,pgDR,pgPct,pgProgPct,cIni,cDur,cFin,cDR,cPct,despachos:despMap[pr.ID_proy],nombre,obs,esCurrent,habilitadas,enEjecucion,diff,recepDom,todasRecep,pgDiasRFrozen,pgDiasRColor,pgDiasRText,circleHtml};
         });
 
@@ -6139,6 +6156,7 @@ table tr:hover td:first-child{background:#f8fafc;}
 .no-data{color:#94a3b8;font-size:13px;text-align:center;padding:48px;font-style:italic;line-height:1.8;}
 @media (max-width:768px){.tabs{flex-wrap:wrap;padding:0 8px 0;gap:0;}.tab-btn{font-size:11px;padding:9px 10px;flex:1 1 auto;text-align:center;min-width:0;}.obra-jumper-wrap{margin-left:0;width:calc(100% - 16px);max-width:100%;margin:4px 8px 6px;}.obra-block{margin:8px;padding:14px 12px;}.summary-grid{grid-template-columns:1fr 1fr;}}
 @media print{.footer{display:none;}.tabs{display:none;}.section{display:block!important;}.obra-block{page-break-after:always;border:none;border-bottom:2px solid #e2e8f0;border-radius:0;margin:0;}}
+.seg-dot{cursor:help;display:inline-block;}
 </style>`;
 
         const jsOpen2 = '<scr' + 'ipt>';
@@ -6609,7 +6627,7 @@ ${mProy>0?`<tr style="font-weight:700;color:#7c3aed;background:#f5f3ff;"><td col
             let pgDiasRFrozen=progDiasR,pgDiasRColor=null,pgDiasRText=null;
             if(todasRecep&&pg&&pg.finProg&&ultimaFR){const df=Math.floor((new Date(pg.finProg)-ultimaFR)/86400000);pgDiasRFrozen=df;pgDiasRColor=df>=0?'#16a34a':'#dc2626';pgDiasRText=(df>=0?'+':'')+df+'d';}
             const _pctPend=tot>0?(tot-recepDom)/tot*100:0;
-            const circleHtml=(todasRecep&&pgDiasRFrozen>=0)?'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#16a34a;vertical-align:middle;" title="Todas con Recep. DOM"></span>':(progDiasR!==null&&progDiasR<=90)?'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#dc2626;vertical-align:middle;" title="≤90d al término del programa"></span>':(recepDom>0&&pg&&pg.plazo>0?(()=>{const pctEl=Math.max(0,pg.plazo-Math.max(0,progDiasR??0))/pg.plazo*100;return pctEl>=80?'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#eab308;vertical-align:middle;" title=">80% plazo transcurrido, >90d al término"></span>':'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#9ca3af;vertical-align:middle;" title="Con Recep. DOM, <80% plazo transcurrido"></span>';})():'')
+            const circleHtml=(todasRecep&&pgDiasRFrozen>=0)?'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#16a34a;vertical-align:middle;" class="seg-dot" data-tip="Todas con Recep. DOM completadas dentro del plazo"></span>':(progDiasR!==null&&progDiasR<=90)?'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#dc2626;vertical-align:middle;" class="seg-dot" data-tip="90 días o menos al término del programa"></span>':(recepDom>0&&pg&&pg.plazo>0?(()=>{const pctEl=Math.max(0,pg.plazo-Math.max(0,progDiasR??0))/pg.plazo*100;return pctEl>=80?'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#eab308;vertical-align:middle;" class="seg-dot" data-tip="Más del 80% del plazo transcurrido, más de 90d al término"></span>':'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#9ca3af;vertical-align:middle;" class="seg-dot" data-tip="Con Recep. DOM, menos del 80% del plazo transcurrido"></span>';})():'')
             return { obra, tot, av, avReal, agPct, cPctTr, cDiasR, cDur, pg, progDiasR, habilitadas, enEjecucion, diff, recepDom, todasRecep, pgDiasRFrozen, pgDiasRColor, pgDiasRText, circleHtml };
         });
 
@@ -6743,6 +6761,7 @@ table tr:hover td:first-child{background:#f8fafc;}
   .summary-card-value{font-size:11px;}
 }
 @media print{.footer{display:none;}.tabs{display:none;}.section{display:block!important;}.obra-block{page-break-after:always;border:none;border-bottom:2px solid #e2e8f0;border-radius:0;margin:0;}}
+.seg-dot{cursor:help;display:inline-block;}
 </style>`;
 
         const jsOpen = '<scr' + 'ipt>';
@@ -6776,6 +6795,22 @@ function jumpToObra(idx){
     jumpToObra(li.dataset.idx);closeL();
   });
   document.addEventListener('click',function(e){if(!w.contains(e.target))closeL();});
+})();
+;(function(){
+  var tip=null;
+  function getEl(e){return e.target?e.target.closest('.seg-dot'):null;}
+  document.addEventListener('mouseover',function(e){
+    var el=getEl(e);if(!el)return;
+    if(!tip){tip=document.createElement('div');tip.style.cssText='position:fixed;background:#0f172a;color:#f1f5f9;font-size:11px;font-weight:500;padding:5px 9px;border-radius:6px;pointer-events:none;z-index:9999;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.3);display:none;';document.body.appendChild(tip);}
+    tip.textContent=el.dataset.tip||el.title||'';
+    tip.style.display='block';
+  });
+  document.addEventListener('mousemove',function(e){
+    if(tip&&tip.style.display==='block'){tip.style.left=(e.clientX+14)+'px';tip.style.top=(e.clientY-36)+'px';}
+  });
+  document.addEventListener('mouseout',function(e){
+    if(tip&&!(e.relatedTarget&&e.relatedTarget.closest&&e.relatedTarget.closest('.seg-dot')))tip.style.display='none';
+  });
 })();
 ` + jsClose;
 
@@ -7181,6 +7216,7 @@ table tr:hover td:first-child{background:#f8fafc;}
   .summary-card-value{font-size:11px;}
 }
 @media print{.footer{display:none;}.tabs{display:none;}.section{display:block!important;}.obra-block{page-break-after:always;border:none;border-bottom:2px solid #e2e8f0;border-radius:0;margin:0;}}
+.seg-dot{cursor:help;display:inline-block;}
 </style>`;
 
         const jsOpen = '<scr' + 'ipt>';
@@ -7215,6 +7251,22 @@ function jumpToObra(idx){
   });
   document.addEventListener('click',function(e){if(!w.contains(e.target))closeL();});
 })();
+;(function(){
+  var tip=null;
+  function getEl(e){return e.target?e.target.closest('.seg-dot'):null;}
+  document.addEventListener('mouseover',function(e){
+    var el=getEl(e);if(!el)return;
+    if(!tip){tip=document.createElement('div');tip.style.cssText='position:fixed;background:#0f172a;color:#f1f5f9;font-size:11px;font-weight:500;padding:5px 9px;border-radius:6px;pointer-events:none;z-index:9999;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.3);display:none;';document.body.appendChild(tip);}
+    tip.textContent=el.dataset.tip||el.title||'';
+    tip.style.display='block';
+  });
+  document.addEventListener('mousemove',function(e){
+    if(tip&&tip.style.display==='block'){tip.style.left=(e.clientX+14)+'px';tip.style.top=(e.clientY-36)+'px';}
+  });
+  document.addEventListener('mouseout',function(e){
+    if(tip&&!(e.relatedTarget&&e.relatedTarget.closest&&e.relatedTarget.closest('.seg-dot')))tip.style.display='none';
+  });
+})();
 ` + jsClose;
 
         const vivConDespacho = new Set(DESPACHOS_DATA.map(d => String(d.ID_Benef)));
@@ -7243,7 +7295,7 @@ function jumpToObra(idx){
             let pgDiasRFrozen=progDiasR,pgDiasRColor=null,pgDiasRText=null;
             if(todasRecep&&pg&&pg.finProg&&ultimaFR){const df=Math.floor((new Date(pg.finProg)-ultimaFR)/86400000);pgDiasRFrozen=df;pgDiasRColor=df>=0?'#16a34a':'#dc2626';pgDiasRText=(df>=0?'+':'')+df+'d';}
             const _pctPend=tot>0?(tot-recepDom)/tot*100:0;
-            const circleHtml=(todasRecep&&pgDiasRFrozen>=0)?'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#16a34a;vertical-align:middle;" title="Todas con Recep. DOM"></span>':(progDiasR!==null&&progDiasR<=90)?'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#dc2626;vertical-align:middle;" title="≤90d al término del programa"></span>':(recepDom>0&&pg&&pg.plazo>0?(()=>{const pctEl=Math.max(0,pg.plazo-Math.max(0,progDiasR??0))/pg.plazo*100;return pctEl>=80?'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#eab308;vertical-align:middle;" title=">80% plazo transcurrido, >90d al término"></span>':'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#9ca3af;vertical-align:middle;" title="Con Recep. DOM, <80% plazo transcurrido"></span>';})():'')
+            const circleHtml=(todasRecep&&pgDiasRFrozen>=0)?'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#16a34a;vertical-align:middle;" class="seg-dot" data-tip="Todas con Recep. DOM completadas dentro del plazo"></span>':(progDiasR!==null&&progDiasR<=90)?'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#dc2626;vertical-align:middle;" class="seg-dot" data-tip="90 días o menos al término del programa"></span>':(recepDom>0&&pg&&pg.plazo>0?(()=>{const pctEl=Math.max(0,pg.plazo-Math.max(0,progDiasR??0))/pg.plazo*100;return pctEl>=80?'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#eab308;vertical-align:middle;" class="seg-dot" data-tip="Más del 80% del plazo transcurrido, más de 90d al término"></span>':'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#9ca3af;vertical-align:middle;" class="seg-dot" data-tip="Con Recep. DOM, menos del 80% del plazo transcurrido"></span>';})():'')
             return { obra, tot, av, avReal, agPct, cPctTr, cDiasR, cDur, pg, progDiasR, habilitadas, enEjecucion, diff, recepDom, todasRecep, pgDiasRFrozen, pgDiasRColor, pgDiasRText, circleHtml };
         });
         const resumenTablaHtml = (() => {
@@ -7768,6 +7820,22 @@ window.addEventListener('resize',updateStickyTops);
     jumpToObra(li.dataset.idx);closeL();
   });
   document.addEventListener('click',function(e){if(!w.contains(e.target))closeL();});
+})();
+;(function(){
+  var tip=null;
+  function getEl(e){return e.target?e.target.closest('.seg-dot'):null;}
+  document.addEventListener('mouseover',function(e){
+    var el=getEl(e);if(!el)return;
+    if(!tip){tip=document.createElement('div');tip.style.cssText='position:fixed;background:#0f172a;color:#f1f5f9;font-size:11px;font-weight:500;padding:5px 9px;border-radius:6px;pointer-events:none;z-index:9999;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.3);display:none;';document.body.appendChild(tip);}
+    tip.textContent=el.dataset.tip||el.title||'';
+    tip.style.display='block';
+  });
+  document.addEventListener('mousemove',function(e){
+    if(tip&&tip.style.display==='block'){tip.style.left=(e.clientX+14)+'px';tip.style.top=(e.clientY-36)+'px';}
+  });
+  document.addEventListener('mouseout',function(e){
+    if(tip&&!(e.relatedTarget&&e.relatedTarget.closest&&e.relatedTarget.closest('.seg-dot')))tip.style.display='none';
+  });
 })();
 ` + jsClose;
 
