@@ -5515,7 +5515,15 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
             const habilitadas=vivs.filter(v=>v.habil).length;
             const enEjecucion=vivs.filter(v=>DESPACHOS_DATA.some(d=>String(d.ID_Benef)===String(v.ID_Benef))).length;
             const diff=agPct!==null&&pg?Math.round((agPct-pgPct)*100)/100:null;
-            return {pr,vivs,grps,curvas,tot,avPct,conInsp,terminadas,_ag,agPct,pg,pgDR,pgPct,pgProgPct,cIni,cDur,cFin,cDR,cPct,despachos:despMap[pr.ID_proy],nombre,obs,esCurrent,habilitadas,enEjecucion,diff};
+            const recepDom=vivs.filter(v=>{const seg=SEGUIMIENTO_DATA[String(v.ID_Benef)];return seg&&seg._has&&seg._has.recepcion_dom;}).length;
+            const todasRecep=tot>0&&recepDom===tot;
+            const _ufr=todasRecep?vivs.map(v=>{const seg=SEGUIMIENTO_DATA[String(v.ID_Benef)];const fd=v.fecha_recepcion||(seg&&seg.fecha_recep)||null;return fd?new Date(fd):null;}).filter(f=>f&&!isNaN(f.getTime())):[]; 
+            const ultimaFR=_ufr.length?new Date(Math.max(..._ufr.map(f=>f.getTime()))):null;
+            let pgDiasRFrozen=pgDR,pgDiasRColor=null,pgDiasRText=null;
+            if(todasRecep&&pg&&pg.finProg&&ultimaFR){const df=Math.floor((new Date(pg.finProg)-ultimaFR)/86400000);pgDiasRFrozen=df;pgDiasRColor=df>=0?'#16a34a':'#dc2626';pgDiasRText=(df>=0?'+':'')+df+'d';}
+            const _pctPend=tot>0?(tot-recepDom)/tot*100:0;
+            const circleHtml=todasRecep?'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#16a34a;vertical-align:middle;" title="Todas con Recep. DOM"></span>':(pg&&pg.finProg?(()=>{if(_pctPend<20&&pgDR>90)return'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#9ca3af;vertical-align:middle;" title="<20% pend. RECEP, >90d prog."></span>';if(_pctPend<20&&pgDR<=90)return'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#eab308;vertical-align:middle;" title="<20% pend. RECEP, ≤90d prog."></span>';if(_pctPend>=21&&_pctPend<=30&&pgDR<=90)return'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#dc2626;vertical-align:middle;" title="21-30% pend. RECEP, ≤90d prog."></span>';return'';})():'')
+            return {pr,vivs,grps,curvas,tot,avPct,conInsp,terminadas,_ag,agPct,pg,pgDR,pgPct,pgProgPct,cIni,cDur,cFin,cDR,cPct,despachos:despMap[pr.ID_proy],nombre,obs,esCurrent,habilitadas,enEjecucion,diff,recepDom,todasRecep,pgDiasRFrozen,pgDiasRColor,pgDiasRText,circleHtml};
         });
 
         // Helpers de render
@@ -5548,6 +5556,8 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
   <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Tot.<br>Viv.</th>
   <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Hab.</th>
   <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;text-transform:uppercase;color:#475569;" title="Con al menos 1 despacho realizado">Viv. en<br>Ejec.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;background:#f0fdf4;cursor:help;" title="Cantidad de beneficiarios con Recepción Definitiva DOM">Recep.<br>DOM</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;cursor:help;" title="Indicador de estado RECEP DOM vs plazo de programa">Est.<br>RECEP</th>
 </tr>
 <tr style="background:#f8fafc;">
   <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;width:72px;min-width:72px;" title="% Avance de contrato">% Cont.</th>
@@ -5563,7 +5573,7 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
         let _fc90r=true;
         sortedProyData.forEach(d=>{
             const isCrit90=d.pgDR!==null&&d.pgDR<=90;
-            if(isCrit90&&_fc90r){_fc90r=false;sR+=`<tr style="height:0;"><td colspan="14" style="padding:0;border:none;border-top:3px solid #dc2626;"></td></tr>`;}
+            if(isCrit90&&_fc90r){_fc90r=false;sR+=`<tr style="height:0;"><td colspan="16" style="padding:0;border:none;border-top:3px solid #dc2626;"></td></tr>`;}
             const rowBg=isCrit90?'background:#fff1f2;':'';
             const dCol=d.diff===null?'#94a3b8':d.diff>=0?'#16a34a':'#dc2626';
             const dBg=d.diff===null?'':d.diff>=0?'#f0fdf4':'#fef2f2';
@@ -5581,10 +5591,12 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${d.cDur?d.cDur+'d':'—'}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${d.pg?.plazo?d.pg.plazo+'d':'—'}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:${cRCol};">${d.cDR!==null?d.cDR+'d':'—'}</td>
-  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:${pRCol};font-weight:${isCrit90?'700':'400'};">${d.pgDR!==null?d.pgDR+'d':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:${d.pgDiasRColor||pRCol};font-weight:${(d.todasRecep||isCrit90)?'700':'400'};">${d.pgDiasRText||(d.pgDiasRFrozen!==null?d.pgDiasRFrozen+'d':'—')}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${d.tot}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${d.habilitadas}</td>
-  <td style="padding:4px 4px;text-align:center;font-size:10px;font-weight:700;color:#2563eb;">${d.enEjecucion}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;font-weight:700;color:#2563eb;">${d.enEjecucion}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;font-weight:700;color:${d.todasRecep?'#16a34a':'#374151'};">${d.recepDom}/${d.tot}</td>
+  <td style="padding:4px 4px;text-align:center;">${d.circleHtml}</td>
 </tr>`;
         });
         sR+=`</tbody></table></div></div>`;
@@ -6590,7 +6602,15 @@ ${mProy>0?`<tr style="font-weight:700;color:#7c3aed;background:#f5f3ff;"><td col
             const habilitadas = obra.viviendas.filter(v=>v.habil).length;
             const enEjecucion = obra.viviendas.filter(v=>vivConDespacho.has(String(v.ID_Benef))).length;
             const diff = (avReal!==null&&agPct!==null) ? Math.round((avReal-agPct)*100)/100 : null;
-            return { obra, tot, av, avReal, agPct, cPctTr, cDiasR, cDur, pg, progDiasR, habilitadas, enEjecucion, diff };
+            const recepDom=obra.viviendas.filter(v=>{const seg=SEGUIMIENTO_DATA[String(v.ID_Benef)];return seg&&seg._has&&seg._has.recepcion_dom;}).length;
+            const todasRecep=tot>0&&recepDom===tot;
+            const _ufr=todasRecep?obra.viviendas.map(v=>{const seg=SEGUIMIENTO_DATA[String(v.ID_Benef)];const fd=(seg&&seg.fecha_recep)||v.fecha_recepcion||null;return fd?new Date(fd):null;}).filter(f=>f&&!isNaN(f.getTime())):[]; 
+            const ultimaFR=_ufr.length?new Date(Math.max(..._ufr.map(f=>f.getTime()))):null;
+            let pgDiasRFrozen=progDiasR,pgDiasRColor=null,pgDiasRText=null;
+            if(todasRecep&&pg&&pg.finProg&&ultimaFR){const df=Math.floor((new Date(pg.finProg)-ultimaFR)/86400000);pgDiasRFrozen=df;pgDiasRColor=df>=0?'#16a34a':'#dc2626';pgDiasRText=(df>=0?'+':'')+df+'d';}
+            const _pctPend=tot>0?(tot-recepDom)/tot*100:0;
+            const circleHtml=todasRecep?'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#16a34a;vertical-align:middle;" title="Todas con Recep. DOM"></span>':(progDiasR!==null?(()=>{if(_pctPend<20&&progDiasR>90)return'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#9ca3af;vertical-align:middle;" title="<20% pend. RECEP, >90d prog."></span>';if(_pctPend<20&&progDiasR<=90)return'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#eab308;vertical-align:middle;" title="<20% pend. RECEP, ≤90d prog."></span>';if(_pctPend>=21&&_pctPend<=30&&progDiasR<=90)return'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#dc2626;vertical-align:middle;" title="21-30% pend. RECEP, ≤90d prog."></span>';return'';})():'')
+            return { obra, tot, av, avReal, agPct, cPctTr, cDiasR, cDur, pg, progDiasR, habilitadas, enEjecucion, diff, recepDom, todasRecep, pgDiasRFrozen, pgDiasRColor, pgDiasRText, circleHtml };
         });
 
         const resumenTablaHtml = (() => {
@@ -6611,6 +6631,8 @@ ${mProy>0?`<tr style="font-weight:700;color:#7c3aed;background:#f5f3ff;"><td col
   <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Tot.<br>Viv.</th>
   <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Hab.</th>
   <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;text-transform:uppercase;color:#475569;cursor:help;" title="Considera en ejecución aquellas con al menos 1 despacho realizado.">Viv. en<br>Ejec.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;background:#f0fdf4;cursor:help;" title="Cantidad de beneficiarios con Recepción Definitiva DOM">Recep.<br>DOM</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;cursor:help;" title="Indicador de estado RECEP DOM vs plazo de programa">Est.<br>RECEP</th>
 </tr>
 <tr style="background:#f8fafc;">
   <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;width:72px;min-width:72px;" title="% Avance de contrato">% Cont.</th>
@@ -6626,7 +6648,7 @@ ${mProy>0?`<tr style="font-weight:700;color:#7c3aed;background:#f5f3ff;"><td col
             let _fc90e=true;
             sortedResumenFilas.forEach(r => {
                 const isCrit90=r.progDiasR!==null&&r.progDiasR<=90;
-                if(isCrit90&&_fc90e){_fc90e=false;t+=`<tr style="height:0;"><td colspan="14" style="padding:0;border:none;border-top:3px solid #dc2626;"></td></tr>`;}
+                if(isCrit90&&_fc90e){_fc90e=false;t+=`<tr style="height:0;"><td colspan="16" style="padding:0;border:none;border-top:3px solid #dc2626;"></td></tr>`;}
                 const rowBg=isCrit90?'background:#fff1f2;':'';
                 const dCol = r.diff===null?'#94a3b8':r.diff>=0?'#16a34a':'#dc2626';
                 const dBg  = r.diff===null?'':r.diff>=0?'#f0fdf4':'#fef2f2';
@@ -6644,10 +6666,12 @@ ${mProy>0?`<tr style="font-weight:700;color:#7c3aed;background:#f5f3ff;"><td col
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${r.cDur?r.cDur+'d':'—'}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${r.pg&&r.pg.plazo?r.pg.plazo+'d':'—'}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:${cRCol};">${r.cDiasR!==null?r.cDiasR+'d':'—'}</td>
-  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:${pRCol};font-weight:${isCrit90?'700':'400'};">${r.progDiasR!==null?r.progDiasR+'d':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:${r.pgDiasRColor||pRCol};font-weight:${(r.todasRecep||isCrit90)?'700':'400'};">${r.pgDiasRText||(r.pgDiasRFrozen!==null?r.pgDiasRFrozen+'d':'—')}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${r.tot}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${r.habilitadas}</td>
-  <td style="padding:4px 4px;text-align:center;font-size:10px;font-weight:700;color:#2563eb;">${r.enEjecucion}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;font-weight:700;color:#2563eb;">${r.enEjecucion}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;font-weight:700;color:${r.todasRecep?'#16a34a':'#374151'};">${r.recepDom}/${r.tot}</td>
+  <td style="padding:4px 4px;text-align:center;">${r.circleHtml}</td>
 </tr>`;
             });
             t += `</tbody></table></div>`;
@@ -7212,7 +7236,15 @@ function jumpToObra(idx){
             const habilitadas = obra.viviendas.filter(v=>v.habil).length;
             const enEjecucion = obra.viviendas.filter(v=>vivConDespacho.has(String(v.ID_Benef))).length;
             const diff = (avReal!==null&&agPct!==null) ? Math.round((avReal-agPct)*100)/100 : null;
-            return { obra, tot, av, avReal, agPct, cPctTr, cDiasR, cDur, pg, progDiasR, habilitadas, enEjecucion, diff };
+            const recepDom=obra.viviendas.filter(v=>{const seg=SEGUIMIENTO_DATA[String(v.ID_Benef)];return seg&&seg._has&&seg._has.recepcion_dom;}).length;
+            const todasRecep=tot>0&&recepDom===tot;
+            const _ufr=todasRecep?obra.viviendas.map(v=>{const seg=SEGUIMIENTO_DATA[String(v.ID_Benef)];const fd=(seg&&seg.fecha_recep)||v.fecha_recepcion||null;return fd?new Date(fd):null;}).filter(f=>f&&!isNaN(f.getTime())):[]; 
+            const ultimaFR=_ufr.length?new Date(Math.max(..._ufr.map(f=>f.getTime()))):null;
+            let pgDiasRFrozen=progDiasR,pgDiasRColor=null,pgDiasRText=null;
+            if(todasRecep&&pg&&pg.finProg&&ultimaFR){const df=Math.floor((new Date(pg.finProg)-ultimaFR)/86400000);pgDiasRFrozen=df;pgDiasRColor=df>=0?'#16a34a':'#dc2626';pgDiasRText=(df>=0?'+':'')+df+'d';}
+            const _pctPend=tot>0?(tot-recepDom)/tot*100:0;
+            const circleHtml=todasRecep?'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#16a34a;vertical-align:middle;" title="Todas con Recep. DOM"></span>':(progDiasR!==null?(()=>{if(_pctPend<20&&progDiasR>90)return'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#9ca3af;vertical-align:middle;" title="<20% pend. RECEP, >90d prog."></span>';if(_pctPend<20&&progDiasR<=90)return'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#eab308;vertical-align:middle;" title="<20% pend. RECEP, ≤90d prog."></span>';if(_pctPend>=21&&_pctPend<=30&&progDiasR<=90)return'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#dc2626;vertical-align:middle;" title="21-30% pend. RECEP, ≤90d prog."></span>';return'';})():'')
+            return { obra, tot, av, avReal, agPct, cPctTr, cDiasR, cDur, pg, progDiasR, habilitadas, enEjecucion, diff, recepDom, todasRecep, pgDiasRFrozen, pgDiasRColor, pgDiasRText, circleHtml };
         });
         const resumenTablaHtml = (() => {
             let t = `<div style="background:#fff;margin:12px 12px 0;border-radius:10px;padding:14px 16px;border:1px solid #e2e8f0;overflow-x:auto;overflow-y:auto;max-height:420px;-webkit-overflow-scrolling:touch;">
@@ -7232,6 +7264,8 @@ function jumpToObra(idx){
   <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Tot.<br>Viv.</th>
   <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Hab.</th>
   <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;text-transform:uppercase;color:#475569;cursor:help;" title="Considera en ejecución aquellas con al menos 1 despacho realizado.">Viv. en<br>Ejec.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;background:#f0fdf4;cursor:help;" title="Cantidad de beneficiarios con Recepción Definitiva DOM">Recep.<br>DOM</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;cursor:help;" title="Indicador de estado RECEP DOM vs plazo de programa">Est.<br>RECEP</th>
 </tr>
 <tr style="background:#f8fafc;">
   <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;width:72px;min-width:72px;" title="% Avance de contrato">% Cont.</th>
@@ -7247,7 +7281,7 @@ function jumpToObra(idx){
             let _fc90r2=true;
             sortedResumenFilas2.forEach(r => {
                 const isCrit90=r.progDiasR!==null&&r.progDiasR<=90;
-                if(isCrit90&&_fc90r2){_fc90r2=false;t+=`<tr style="height:0;"><td colspan="14" style="padding:0;border:none;border-top:3px solid #dc2626;"></td></tr>`;}
+                if(isCrit90&&_fc90r2){_fc90r2=false;t+=`<tr style="height:0;"><td colspan="16" style="padding:0;border:none;border-top:3px solid #dc2626;"></td></tr>`;}
                 const rowBg=isCrit90?'background:#fff1f2;':'';
                 const dCol = r.diff===null?'#94a3b8':r.diff>=0?'#16a34a':'#dc2626';
                 const dBg  = r.diff===null?'':r.diff>=0?'#f0fdf4':'#fef2f2';
@@ -7265,10 +7299,12 @@ function jumpToObra(idx){
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${r.cDur?r.cDur+'d':'—'}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${r.pg&&r.pg.plazo?r.pg.plazo+'d':'—'}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:${cRCol};">${r.cDiasR!==null?r.cDiasR+'d':'—'}</td>
-  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:${pRCol};font-weight:${isCrit90?'700':'400'};">${r.progDiasR!==null?r.progDiasR+'d':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:${r.pgDiasRColor||pRCol};font-weight:${(r.todasRecep||isCrit90)?'700':'400'};">${r.pgDiasRText||(r.pgDiasRFrozen!==null?r.pgDiasRFrozen+'d':'—')}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${r.tot}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${r.habilitadas}</td>
-  <td style="padding:4px 4px;text-align:center;font-size:10px;font-weight:700;color:#2563eb;">${r.enEjecucion}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;font-weight:700;color:#2563eb;">${r.enEjecucion}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;font-weight:700;color:${r.todasRecep?'#16a34a':'#374151'};">${r.recepDom}/${r.tot}</td>
+  <td style="padding:4px 4px;text-align:center;">${r.circleHtml}</td>
 </tr>`;
             });
             t += `</tbody></table></div>`;
