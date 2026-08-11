@@ -11657,6 +11657,11 @@ const App = () => {
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14M12 2v2m0 16v2m-7.07-4.93 1.41-1.41M17.66 6.34l1.41-1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
                             Configuración General
                         </button>
+                        <button type="button" onClick={() => setShowAlertas(true)} title="Alertas globales de gerencia: obras con situaciones críticas" className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border transition-colors whitespace-nowrap shrink-0 ${obrasConAlertas > 0 ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100' : 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'}`}>
+                            <span style={{fontSize:'12px',lineHeight:1}}>🚨</span>
+                            {obrasConAlertas > 0 ? `${obrasConAlertas} con alertas` : 'Sin alertas'}
+                            {obrasConAlertas > 0 && <span className="text-[9px] font-normal opacity-70">(gerencia)</span>}
+                        </button>
                         {kpis.esFinalizado ? (
                             <span className="flex items-center gap-1.5 px-2.5 py-1.5 bg-green-50 border border-green-300 rounded-lg text-[11px] font-semibold text-green-700 whitespace-nowrap shrink-0">
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
@@ -11725,14 +11730,8 @@ const App = () => {
                     <div className="bg-white rounded-lg p-2 border border-amber-200 shadow-sm"><p className="text-[9px] text-amber-600">TE1</p><p className="text-base font-bold font-mono text-amber-700">{kpis.conTE1}<span className="text-xs text-gray-400 font-normal">/{kpis.total}</span></p></div>
                 </div>
 
-                {/* ALERTAS + VALIDACION + MUESTRAS — fila única */}
+                {/* VALIDACION + MUESTRAS — fila única */}
                 <div className="flex flex-wrap gap-2 mb-3 items-center">
-                {/* ALERTAS GLOBALES (gerencia) - Botón + Modal */}
-                <button onClick={() => setShowAlertas(true)} className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${obrasConAlertas > 0 ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100' : 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'}`}>
-                    <span>🚨</span>
-                    {obrasConAlertas > 0 ? `${obrasConAlertas} obra${obrasConAlertas !== 1 ? 's' : ''} con alertas` : 'Sin alertas globales'}
-                    <span className="text-[10px] font-normal opacity-70">(gerencia)</span>
-                </button>
                 {/* VALIDACION CRUZADA - Botón + Modal */}
                 <button onClick={() => setShowValidacion(true)} className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${totalHallazgos > 0 ? 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100' : 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'}`}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
