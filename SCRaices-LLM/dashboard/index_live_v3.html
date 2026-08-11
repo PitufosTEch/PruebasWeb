@@ -5276,23 +5276,7 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
 @media print{.ftr{display:none;}.tabs{display:none;}.sec{display:block!important;}.blk{page-break-after:always;border:none;border-radius:0;margin:0;}}
 .seg-dot{cursor:help;display:inline-block;}
 </style>`;
-    const _JS_INF = '<scr'+'ipt>function mst(t,b){document.querySelectorAll(\'.sec\').forEach(s=>s.classList.remove(\'active\'));document.querySelectorAll(\'.tab-btn\').forEach(x=>x.classList.remove(\'active\'));document.getElementById(\'s-\'+t).classList.add(\'active\');b.classList.add(\'active\');}function jumpToObra(idx){if(idx===\'\')return;var sec=document.querySelector(\'.sec.active\');var block=sec&&sec.querySelector(\'.obra-block[data-obra="\'+idx+\'"]\');if(block)block.scrollIntoView({behavior:\'smooth\',block:\'start\'});}(function(){var w=document.getElementById(\'ojWrap\'),inp=document.getElementById(\'ojInput\'),lst=document.getElementById(\'ojList\');if(!w)return;function openL(){lst.classList.add(\'open\');}function closeL(){lst.classList.remove(\'open\');inp.value=\'\';}inp.addEventListener(\'focus\',openL);inp.addEventListener(\'click\',openL);inp.addEventListener(\'input\',function(){var q=this.value.toLowerCase();lst.querySelectorAll(\'.obra-jumper-item\').forEach(function(li){li.classList.toggle(\'oj-hidden\',q&&!li.textContent.toLowerCase().includes(q));});openL();});lst.addEventListener(\'click\',function(e){var li=e.target.closest(\'.obra-jumper-item\');if(!li)return;jumpToObra(li.dataset.idx);closeL();});document.addEventListener(\'click\',function(e){if(!w.contains(e.target))closeL();});})();
-;(function(){
-  var tip=null;
-  function getEl(e){return e.target?e.target.closest(\'.seg-dot\'):null;}
-  document.addEventListener(\'mouseover\',function(e){
-    var el=getEl(e);if(!el)return;
-    if(!tip){tip=document.createElement(\'div\');tip.style.cssText=\'position:fixed;background:#0f172a;color:#f1f5f9;font-size:11px;font-weight:500;padding:5px 9px;border-radius:6px;pointer-events:none;z-index:9999;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.3);display:none;\';document.body.appendChild(tip);}
-    tip.textContent=el.dataset.tip||el.title||\'\';
-    tip.style.display=\'block\';
-  });
-  document.addEventListener(\'mousemove\',function(e){
-    if(tip&&tip.style.display===\'block\'){tip.style.left=(e.clientX+14)+\'px\';tip.style.top=(e.clientY-36)+\'px\';}
-  });
-  document.addEventListener(\'mouseout\',function(e){
-    if(tip&&!(e.relatedTarget&&e.relatedTarget.closest&&e.relatedTarget.closest(\'.seg-dot\')))tip.style.display=\'none\';
-  });
-})();</scr'+'ipt>';
+    const _JS_INF = '<scr'+'ipt>function mst(t,b){document.querySelectorAll(\'.sec\').forEach(s=>s.classList.remove(\'active\'));document.querySelectorAll(\'.tab-btn\').forEach(x=>x.classList.remove(\'active\'));document.getElementById(\'s-\'+t).classList.add(\'active\');b.classList.add(\'active\');}function jumpToObra(idx){if(idx===\'\')return;var sec=document.querySelector(\'.sec.active\');var block=sec&&sec.querySelector(\'.obra-block[data-obra="\'+idx+\'"]\');if(block)block.scrollIntoView({behavior:\'smooth\',block:\'start\'});}(function(){var w=document.getElementById(\'ojWrap\'),inp=document.getElementById(\'ojInput\'),lst=document.getElementById(\'ojList\');if(!w)return;function openL(){lst.classList.add(\'open\');}function closeL(){lst.classList.remove(\'open\');inp.value=\'\';}inp.addEventListener(\'focus\',openL);inp.addEventListener(\'click\',openL);inp.addEventListener(\'input\',function(){var q=this.value.toLowerCase();lst.querySelectorAll(\'.obra-jumper-item\').forEach(function(li){li.classList.toggle(\'oj-hidden\',q&&!li.textContent.toLowerCase().includes(q));});openL();});lst.addEventListener(\'click\',function(e){var li=e.target.closest(\'.obra-jumper-item\');if(!li)return;jumpToObra(li.dataset.idx);closeL();});document.addEventListener(\'click\',function(e){if(!w.contains(e.target))closeL();});})();;(function(){  var tip=null;  function getEl(e){return e.target?e.target.closest(\'.seg-dot\'):null;}  document.addEventListener(\'mouseover\',function(e){    var el=getEl(e);if(!el)return;    if(!tip){tip=document.createElement(\'div\');tip.style.cssText=\'position:fixed;background:#0f172a;color:#f1f5f9;font-size:11px;font-weight:500;padding:5px 9px;border-radius:6px;pointer-events:none;z-index:9999;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.3);display:none;\';document.body.appendChild(tip);}    tip.textContent=el.dataset.tip||el.title||\'\';    tip.style.display=\'block\';  });  document.addEventListener(\'mousemove\',function(e){    if(tip&&tip.style.display===\'block\'){tip.style.left=(e.clientX+14)+\'px\';tip.style.top=(e.clientY-36)+\'px\';}  });  document.addEventListener(\'mouseout\',function(e){    if(tip&&!(e.relatedTarget&&e.relatedTarget.closest&&e.relatedTarget.closest(\'.seg-dot\')))tip.style.display=\'none\';  });})();</scr'+'ipt>';
 
     // ── Construye las 6 secciones de tabs para residente o capataz ────────────────────────────
     const _buildSecciones = (vivs, grps, curvasFiltro, capatazDesp, ganttRaw, despachosData) => {
@@ -11728,27 +11712,29 @@ const App = () => {
                 )}
 
                 {/* KPIs */}
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3 mb-4">
-                    <div className="bg-white rounded-xl p-3 border border-gray-200 shadow-sm"><p className="text-[10px] text-gray-500 uppercase">Viviendas</p><p className="text-xl font-bold font-mono">{kpis.total}</p></div>
-                    <div className="bg-white rounded-xl p-3 border border-green-200 shadow-sm"><p className="text-[10px] text-green-600">Terminadas</p><p className="text-xl font-bold font-mono text-green-700">{kpis.terminadas}</p><p className="text-[9px] text-gray-400">{kpis.total > 0 ? Math.round(kpis.terminadas/kpis.total*100) : 0}%</p></div>
-                    <div className="bg-white rounded-xl p-3 border border-green-200 shadow-sm"><p className="text-[10px] text-green-600">En Tiempo</p><p className="text-xl font-bold font-mono text-green-600">{kpis.enTiempo}</p></div>
-                    <div className="bg-white rounded-xl p-3 border border-yellow-200 shadow-sm"><p className="text-[10px] text-yellow-600">Atención</p><p className="text-xl font-bold font-mono text-yellow-600">{kpis.atencion}</p></div>
-                    <div className="bg-white rounded-xl p-3 border border-red-200 shadow-sm"><p className="text-[10px] text-red-600">Críticas</p><p className="text-xl font-bold font-mono text-red-600">{kpis.criticos}</p>{kpis.alertasCoherencia > 0 && <p className="text-[9px] text-red-400">{kpis.alertasCoherencia} alertas</p>}</div>
-                    <div className="bg-white rounded-xl p-3 border border-purple-200 shadow-sm"><p className="text-[10px] text-purple-600">Solicitadas</p><p className="text-xl font-bold font-mono text-purple-600">{kpis.totalSolicitadas}</p><p className="text-[9px] text-gray-400">esperando desp.</p></div>
-                    <div className="bg-white rounded-xl p-3 border border-gray-200 shadow-sm"><p className="text-[10px] text-gray-500">Días Prom.</p><p className="text-xl font-bold font-mono">{kpis.diasPromedio}d</p><p className="text-[9px] text-gray-400">Fund → última</p></div>
-                    <div className="bg-white rounded-xl p-3 border border-violet-200 shadow-sm overflow-hidden"><p className="text-[10px] text-violet-600">Total Pagado</p><p className={`font-bold font-mono text-violet-700 mt-1 ${kpis.totalPagado >= 100000000 ? "text-xs" : kpis.totalPagado >= 10000000 ? "text-sm" : "text-lg"}`}>{formatPeso(kpis.totalPagado)}</p></div>
-                    <div className="bg-white rounded-xl p-3 border border-blue-200 shadow-sm"><p className="text-[10px] text-blue-600">Recepcion Def.</p><p className="text-xl font-bold font-mono text-blue-700">{kpis.conRecepcion}<span className="text-sm text-gray-400 font-normal"> de {kpis.total}</span></p></div>
-                    <div className="bg-white rounded-xl p-3 border border-amber-200 shadow-sm"><p className="text-[10px] text-amber-600">TE1</p><p className="text-xl font-bold font-mono text-amber-700">{kpis.conTE1}<span className="text-sm text-gray-400 font-normal"> de {kpis.total}</span></p></div>
+                <div className="grid grid-cols-5 lg:grid-cols-10 gap-1.5 mb-3">
+                    <div className="bg-white rounded-lg p-2 border border-gray-200 shadow-sm"><p className="text-[9px] text-gray-500 uppercase">Viviendas</p><p className="text-base font-bold font-mono">{kpis.total}</p></div>
+                    <div className="bg-white rounded-lg p-2 border border-green-200 shadow-sm"><p className="text-[9px] text-green-600">Terminadas</p><p className="text-base font-bold font-mono text-green-700">{kpis.terminadas}</p><p className="text-[8px] text-gray-400">{kpis.total > 0 ? Math.round(kpis.terminadas/kpis.total*100) : 0}%</p></div>
+                    <div className="bg-white rounded-lg p-2 border border-green-200 shadow-sm"><p className="text-[9px] text-green-600">En Tiempo</p><p className="text-base font-bold font-mono text-green-600">{kpis.enTiempo}</p></div>
+                    <div className="bg-white rounded-lg p-2 border border-yellow-200 shadow-sm"><p className="text-[9px] text-yellow-600">Atención</p><p className="text-base font-bold font-mono text-yellow-600">{kpis.atencion}</p></div>
+                    <div className="bg-white rounded-lg p-2 border border-red-200 shadow-sm"><p className="text-[9px] text-red-600">Críticas</p><p className="text-base font-bold font-mono text-red-600">{kpis.criticos}</p>{kpis.alertasCoherencia > 0 && <p className="text-[8px] text-red-400">{kpis.alertasCoherencia} alertas</p>}</div>
+                    <div className="bg-white rounded-lg p-2 border border-purple-200 shadow-sm"><p className="text-[9px] text-purple-600">Solicitadas</p><p className="text-base font-bold font-mono text-purple-600">{kpis.totalSolicitadas}</p><p className="text-[8px] text-gray-400">esp. desp.</p></div>
+                    <div className="bg-white rounded-lg p-2 border border-gray-200 shadow-sm"><p className="text-[9px] text-gray-500">Días Prom.</p><p className="text-base font-bold font-mono">{kpis.diasPromedio}d</p><p className="text-[8px] text-gray-400">Fund→últ.</p></div>
+                    <div className="bg-white rounded-lg p-2 border border-violet-200 shadow-sm overflow-hidden"><p className="text-[9px] text-violet-600">Total Pagado</p><p className={`font-bold font-mono text-violet-700 mt-0.5 ${kpis.totalPagado >= 100000000 ? "text-[10px]" : kpis.totalPagado >= 10000000 ? "text-xs" : "text-sm"}`}>{formatPeso(kpis.totalPagado)}</p></div>
+                    <div className="bg-white rounded-lg p-2 border border-blue-200 shadow-sm"><p className="text-[9px] text-blue-600">Recep. Def.</p><p className="text-base font-bold font-mono text-blue-700">{kpis.conRecepcion}<span className="text-xs text-gray-400 font-normal">/{kpis.total}</span></p></div>
+                    <div className="bg-white rounded-lg p-2 border border-amber-200 shadow-sm"><p className="text-[9px] text-amber-600">TE1</p><p className="text-base font-bold font-mono text-amber-700">{kpis.conTE1}<span className="text-xs text-gray-400 font-normal">/{kpis.total}</span></p></div>
                 </div>
 
+                {/* ALERTAS + VALIDACION + MUESTRAS — fila única */}
+                <div className="flex flex-wrap gap-2 mb-3 items-center">
                 {/* ALERTAS GLOBALES (gerencia) - Botón + Modal */}
-                <button onClick={() => setShowAlertas(true)} className={`mb-3 mr-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${obrasConAlertas > 0 ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100' : 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'}`}>
+                <button onClick={() => setShowAlertas(true)} className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${obrasConAlertas > 0 ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100' : 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'}`}>
                     <span>🚨</span>
                     {obrasConAlertas > 0 ? `${obrasConAlertas} obra${obrasConAlertas !== 1 ? 's' : ''} con alertas` : 'Sin alertas globales'}
                     <span className="text-[10px] font-normal opacity-70">(gerencia)</span>
                 </button>
                 {/* VALIDACION CRUZADA - Botón + Modal */}
-                <button onClick={() => setShowValidacion(true)} className={`mb-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${totalHallazgos > 0 ? 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100' : 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'}`}>
+                <button onClick={() => setShowValidacion(true)} className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${totalHallazgos > 0 ? 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100' : 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'}`}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         {totalHallazgos > 0
                             ? <><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></>
@@ -11765,7 +11751,7 @@ const App = () => {
                         : rm.completo ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'
                         : rm.total > 0 ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
                         : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100';
-                    return <button onClick={() => setShowMuestras(true)} className={`mb-3 ml-2 flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${cls}`}>
+                    return <button onClick={() => setShowMuestras(true)} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${cls}`}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M9 3h6v2a3 3 0 0 1-6 0V3z"/><path d="M12 5v6"/><path d="M8 11h8l1 10H7L8 11z"/>
                         </svg>
@@ -11774,6 +11760,7 @@ const App = () => {
                         {rm.completo && <span className="bg-green-600 text-white text-[10px] px-1.5 py-0.5 rounded-full">Completo</span>}
                     </button>;
                 })()}
+                </div>{/* fin flex alertas */}
                 {showMuestras && (() => {
                     const muestrasArr = getMuestrasProy();
                     const cfg = getMuestrasCfg();
