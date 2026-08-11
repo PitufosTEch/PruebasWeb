@@ -5527,13 +5527,22 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
   <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;width:72px;min-width:72px;" title="% Avance real (Curvas S)">% Real</th>
 </tr>
 </thead><tbody>`;
-        proyData.forEach(d=>{
+        const sortedProyData=[...proyData].sort((a,b)=>{
+            if(a.pgDR===null&&b.pgDR===null)return 0;
+            if(a.pgDR===null)return 1; if(b.pgDR===null)return -1;
+            return b.pgDR-a.pgDR;
+        });
+        let _fc90r=true;
+        sortedProyData.forEach(d=>{
+            const isCrit90=d.pgDR!==null&&d.pgDR<=90;
+            if(isCrit90&&_fc90r){_fc90r=false;sR+=`<tr style="height:0;"><td colspan="14" style="padding:0;border:none;border-top:3px solid #dc2626;"></td></tr>`;}
+            const rowBg=isCrit90?'background:#fff1f2;':'';
             const dCol=d.diff===null?'#94a3b8':d.diff>=0?'#16a34a':'#dc2626';
             const dBg=d.diff===null?'':d.diff>=0?'#f0fdf4':'#fef2f2';
             const dTxt=d.diff===null?'—':(d.diff>=0?'+':'')+Number(d.diff).toFixed(2)+'%';
             const cRCol=d.cDR===null?'#94a3b8':d.cDR<0?'#dc2626':d.cDR<30?'#b45309':'#374151';
-            const pRCol=d.pgDR===null?'#94a3b8':d.pgDR<90?'#dc2626':'#374151';
-            sR+=`<tr style="border-bottom:1px solid #f1f5f9;">
+            const pRCol=d.pgDR===null?'#94a3b8':d.pgDR<=90?'#dc2626':'#374151';
+            sR+=`<tr style="border-bottom:1px solid #f1f5f9;${rowBg}">
   <td style="padding:5px 6px;border-right:1px solid #f1f5f9;font-size:10px;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(d.nombre)}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${d.cPct!==null?Number(d.cPct).toFixed(2)+'%':'—'}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${d.pg?Number(d.pgPct).toFixed(2)+'%':'—'}</td>
@@ -5544,7 +5553,7 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${d.cDur?d.cDur+'d':'—'}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${d.pg?.plazo?d.pg.plazo+'d':'—'}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:${cRCol};">${d.cDR!==null?d.cDR+'d':'—'}</td>
-  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:${pRCol};">${d.pgDR!==null?d.pgDR+'d':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:${pRCol};font-weight:${isCrit90?'700':'400'};">${d.pgDR!==null?d.pgDR+'d':'—'}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${d.tot}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${d.habilitadas}</td>
   <td style="padding:4px 4px;text-align:center;font-size:10px;font-weight:700;color:#2563eb;">${d.enEjecucion}</td>
@@ -6581,13 +6590,22 @@ ${mProy>0?`<tr style="font-weight:700;color:#7c3aed;background:#f5f3ff;"><td col
   <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;width:72px;min-width:72px;" title="% Avance real (Curvas S)">% Real</th>
 </tr>
 </thead><tbody>`;
-            resumenFilas.forEach(r => {
+            const sortedResumenFilas=[...resumenFilas].sort((a,b)=>{
+                if(a.progDiasR===null&&b.progDiasR===null)return 0;
+                if(a.progDiasR===null)return 1; if(b.progDiasR===null)return -1;
+                return b.progDiasR-a.progDiasR;
+            });
+            let _fc90e=true;
+            sortedResumenFilas.forEach(r => {
+                const isCrit90=r.progDiasR!==null&&r.progDiasR<=90;
+                if(isCrit90&&_fc90e){_fc90e=false;t+=`<tr style="height:0;"><td colspan="14" style="padding:0;border:none;border-top:3px solid #dc2626;"></td></tr>`;}
+                const rowBg=isCrit90?'background:#fff1f2;':'';
                 const dCol = r.diff===null?'#94a3b8':r.diff>=0?'#16a34a':'#dc2626';
                 const dBg  = r.diff===null?'':r.diff>=0?'#f0fdf4':'#fef2f2';
                 const dTxt = r.diff===null?'—':(r.diff>=0?'+':'')+Number(r.diff).toFixed(2)+'%';
                 const cRCol = r.cDiasR===null?'#94a3b8':r.cDiasR<0?'#dc2626':r.cDiasR<30?'#b45309':'#374151';
-                const pRCol = r.progDiasR===null?'#94a3b8':r.progDiasR<90?'#dc2626':'#374151';
-                t += `<tr style="border-bottom:1px solid #f1f5f9;">
+                const pRCol = r.progDiasR===null?'#94a3b8':r.progDiasR<=90?'#dc2626':'#374151';
+                t += `<tr style="border-bottom:1px solid #f1f5f9;${rowBg}">
   <td style="padding:5px 6px;border-right:1px solid #f1f5f9;font-size:10px;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.obra.nombre}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${r.cPctTr!==null?Number(r.cPctTr).toFixed(2)+'%':'—'}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${r.agPct!==null?Number(r.agPct).toFixed(2)+'%':'—'}</td>
@@ -6598,7 +6616,7 @@ ${mProy>0?`<tr style="font-weight:700;color:#7c3aed;background:#f5f3ff;"><td col
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${r.cDur?r.cDur+'d':'—'}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${r.pg&&r.pg.plazo?r.pg.plazo+'d':'—'}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:${cRCol};">${r.cDiasR!==null?r.cDiasR+'d':'—'}</td>
-  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:${pRCol};">${r.progDiasR!==null?r.progDiasR+'d':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:${pRCol};font-weight:${isCrit90?'700':'400'};">${r.progDiasR!==null?r.progDiasR+'d':'—'}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${r.tot}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${r.habilitadas}</td>
   <td style="padding:4px 4px;text-align:center;font-size:10px;font-weight:700;color:#2563eb;">${r.enEjecucion}</td>
@@ -7193,13 +7211,22 @@ function jumpToObra(idx){
   <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;width:72px;min-width:72px;" title="% Avance real (Curvas S)">% Real</th>
 </tr>
 </thead><tbody>`;
-            resumenFilas.forEach(r => {
+            const sortedResumenFilas2=[...resumenFilas].sort((a,b)=>{
+                if(a.progDiasR===null&&b.progDiasR===null)return 0;
+                if(a.progDiasR===null)return 1; if(b.progDiasR===null)return -1;
+                return b.progDiasR-a.progDiasR;
+            });
+            let _fc90r2=true;
+            sortedResumenFilas2.forEach(r => {
+                const isCrit90=r.progDiasR!==null&&r.progDiasR<=90;
+                if(isCrit90&&_fc90r2){_fc90r2=false;t+=`<tr style="height:0;"><td colspan="14" style="padding:0;border:none;border-top:3px solid #dc2626;"></td></tr>`;}
+                const rowBg=isCrit90?'background:#fff1f2;':'';
                 const dCol = r.diff===null?'#94a3b8':r.diff>=0?'#16a34a':'#dc2626';
                 const dBg  = r.diff===null?'':r.diff>=0?'#f0fdf4':'#fef2f2';
                 const dTxt = r.diff===null?'—':(r.diff>=0?'+':'')+Number(r.diff).toFixed(2)+'%';
                 const cRCol = r.cDiasR===null?'#94a3b8':r.cDiasR<0?'#dc2626':r.cDiasR<30?'#b45309':'#374151';
-                const pRCol = r.progDiasR===null?'#94a3b8':r.progDiasR<90?'#dc2626':'#374151';
-                t += `<tr style="border-bottom:1px solid #f1f5f9;">
+                const pRCol = r.progDiasR===null?'#94a3b8':r.progDiasR<=90?'#dc2626':'#374151';
+                t += `<tr style="border-bottom:1px solid #f1f5f9;${rowBg}">
   <td style="padding:5px 6px;border-right:1px solid #f1f5f9;font-size:10px;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.obra.nombre}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${r.cPctTr!==null?Number(r.cPctTr).toFixed(2)+'%':'—'}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${r.agPct!==null?Number(r.agPct).toFixed(2)+'%':'—'}</td>
@@ -7210,7 +7237,7 @@ function jumpToObra(idx){
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${r.cDur?r.cDur+'d':'—'}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${r.pg&&r.pg.plazo?r.pg.plazo+'d':'—'}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:${cRCol};">${r.cDiasR!==null?r.cDiasR+'d':'—'}</td>
-  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:${pRCol};">${r.progDiasR!==null?r.progDiasR+'d':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:${pRCol};font-weight:${isCrit90?'700':'400'};">${r.progDiasR!==null?r.progDiasR+'d':'—'}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${r.tot}</td>
   <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${r.habilitadas}</td>
   <td style="padding:4px 4px;text-align:center;font-size:10px;font-weight:700;color:#2563eb;">${r.enEjecucion}</td>
