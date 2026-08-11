@@ -284,56 +284,58 @@ const SEED = {
 ═══════════════════════════════════════════════════════ */
 let _fbSynced = false;
 let _fbPending = false;
-let _fbSaveTimer = null;
+let _fbOnline  = true;
 
 function loadData() {
-  // 1) Cargar desde localStorage de inmediato (render rápido)
+  // 1) localStorage inmediato para render rápido
   try { db = JSON.parse(localStorage.getItem(LS_KEY) || 'null') || {}; } catch { db = {}; }
-  // 2) Aplicar SEED como base para fechas sin registro
+  // 2) SEED como base para fechas sin registro
   for (const [d, v] of Object.entries(SEED)) {
     if (!db[d]) db[d] = { ...v };
   }
-  // 3) Cargar desde Firebase (sobreescribe localStorage si hay datos más recientes)
+  // 3) Monitorear conexión a Firebase
+  _fbDB.ref('.info/connected').on('value', snap => {
+    _fbOnline = !!snap.val();
+    if (_fbOnline && _fbPending) _pushToFirebase();
+    updateFooter();
+  });
+  // 4) Cargar desde Firebase (prioridad sobre localStorage)
   _fbDB.ref(FB_PATH).once('value').then(snap => {
     const fbData = snap.val();
     if (fbData && typeof fbData === 'object') {
-      // Merge: Firebase tiene prioridad sobre localStorage
-      for (const [d, v] of Object.entries(fbData)) {
-        db[d] = v;
-      }
+      for (const [d, v] of Object.entries(fbData)) { db[d] = v; }
       localStorage.setItem(LS_KEY, JSON.stringify(db));
       _fbSynced = true;
       renderMonth();
-      updateFooter();
     } else {
-      // No hay datos en Firebase — subir el estado local actual
-      _fbSynced = true;
+      // Firebase vacío → subir estado local
       _pushToFirebase();
-      updateFooter();
     }
+    updateFooter();
   }).catch(err => {
-    console.warn('[Bitácora] Firebase no disponible, usando localStorage:', err.message);
-    _fbSynced = false;
+    console.warn('[Bitácora] Firebase load error:', err.message);
     updateFooter();
   });
 }
 
 function saveData() {
+  // Guardar en localStorage inmediatamente
   localStorage.setItem(LS_KEY, JSON.stringify(db));
-  // Debounce: esperar 1.5s de inactividad antes de escribir en Firebase
-  clearTimeout(_fbSaveTimer);
   _fbPending = true;
   updateFooter();
-  _fbSaveTimer = setTimeout(_pushToFirebase, 1500);
+  // Guardar en Firebase inmediatamente (sin debounce)
+  _pushToFirebase();
 }
 
 function _pushToFirebase() {
   _fbDB.ref(FB_PATH).set(db).then(() => {
     _fbPending = false;
-    _fbSynced = true;
+    _fbSynced  = true;
     updateFooter();
   }).catch(err => {
-    console.warn('[Bitácora] Error al guardar en Firebase:', err.message);
+    // Quedará pendiente; se reintenta cuando .info/connected vuelva a true
+    console.warn('[Bitácora] Firebase write error (reintento al reconectar):', err.message);
+    _fbPending = true;
     updateFooter();
   });
 }
@@ -341,18 +343,26 @@ function _pushToFirebase() {
 function updateFooter() {
   const n = Object.keys(db).length;
   const hora = new Date().toLocaleTimeString('es-CL');
-  let sync = '';
-  if (_fbPending)      sync = ' · ☁️ Guardando en nube...';
-  else if (_fbSynced)  sync = ' · ☁️ Backup en nube OK';
-  else                 sync = ' · ⚠️ Solo local (sin nube)';
+  let sync;
+  if (!_fbOnline)       sync = ' · 🔴 Sin red — guardado local, sincronizará al reconectar';
+  else if (_fbPending)  sync = ' · ☁️ Sincronizando...';
+  else if (_fbSynced)   sync = ' · ☁️ Backup en nube OK';
+  else                  sync = ' · ⚠️ Sin confirmar';
   document.getElementById('footer-info').textContent =
-    'Guardado automáticamente · ' + n + ' registros · ' + hora + sync;
+    'Guardado · ' + n + ' registros · ' + hora + sync;
 }
 
 function getEntry(date) {
   if (!db[date]) db[date] = {};
   return db[date];
 }
+
+// Forzar push al cerrar la pestaña (seguro contra cierre accidental)
+window.addEventListener('beforeunload', () => {
+  if (_fbPending) {
+    navigator.sendBeacon && _fbDB.ref(FB_PATH).set(db);
+  }
+});
 
 /* ═══════════════════════════════════════════════════════
    APPSHEET — CARGA DE PROYECTOS Y BENEFICIARIOS
