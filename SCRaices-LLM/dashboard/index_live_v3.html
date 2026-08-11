@@ -8937,10 +8937,10 @@ const ModalPersonalGlobal = ({ personalGlobal, fbDB, onClose }) => {
 
 
 // ===== LINAJE DE DATOS — SVG EMBEBIDO =====
-const SVG_LINAJE_CONTENT = `<svg viewBox="0 0 1140 720"
+const SVG_LINAJE_CONTENT = `<svg viewBox="0 0 1140 430"
      xmlns="http://www.w3.org/2000/svg"
      role="img"
-     aria-label="Diagrama de linaje de datos SG Raíces: 4 capas — Fuentes (Google Sheets, 8 vistas AppSheet, DMC API), Procesamiento (scripts Python vía GitHub Actions), Almacenamiento (Firebase RTDB + Google Drive), Salidas (Dashboard React SPA y 6 tipos de reportes vía Playwright)">
+     aria-label="Diagrama de linaje de datos SG Raíces: 4 capas — Fuentes (Google Sheets, 8 vistas AppSheet, DMC API), Procesamiento (scripts Python vía GitHub Actions + fetch directo browser), Almacenamiento (Firebase RTDB + Google Drive), Salidas (Dashboard React SPA)">
 
 <defs>
   <marker id="a" markerWidth="7" markerHeight="5" refX="6.5" refY="2.5" orient="auto">
@@ -8965,7 +8965,7 @@ const SVG_LINAJE_CONTENT = `<svg viewBox="0 0 1140 720"
 <text x="622" y="18" text-anchor="middle" font-size="10" font-weight="700" letter-spacing=".8" fill="var(--sto-s)">ALMACENAMIENTO</text>
 
 <rect x="782" y="4" width="345" height="20" rx="4" fill="var(--dsh-s)" opacity=".12"/>
-<text x="954" y="18" text-anchor="middle" font-size="10" font-weight="700" letter-spacing=".8" fill="var(--dsh-s)">SALIDAS — Dashboard · Reportes</text>
+<text x="954" y="18" text-anchor="middle" font-size="10" font-weight="700" letter-spacing=".8" fill="var(--dsh-s)">SALIDAS — Dashboard</text>
 
 <!-- ═══ S1: GOOGLE SHEETS ═══ -->
 <rect x="8" y="32" width="192" height="108" rx="6" fill="var(--src-fill)" stroke="var(--src-s)" stroke-width="1.5"/>
@@ -9023,7 +9023,7 @@ const SVG_LINAJE_CONTENT = `<svg viewBox="0 0 1140 720"
 <rect x="16" y="478" width="176" height="45" rx="5" fill="var(--src-fill)" stroke="var(--src-s)" stroke-width="1.2"/>
 <text x="104" y="495" text-anchor="middle" font-size="9.5" font-weight="700" fill="var(--src-t)">Pendientes</text>
 <text x="104" y="508" text-anchor="middle" font-size="8.5" fill="var(--src-t)" opacity=".8">Operaciones > Pendientes</text>
-<text x="104" y="519" text-anchor="middle" font-size="8"   fill="var(--src-t)" opacity=".55">→ vía Firebase · alimenta Reportes</text>
+<text x="104" y="519" text-anchor="middle" font-size="8"   fill="var(--src-t)" opacity=".55">→ vía Firebase</text>
 <!-- AppSheet group: y=148-528, S9 ends y=523 -->
 
 <!-- ═══ S10: DMC / Clima API ═══ -->
@@ -9037,7 +9037,7 @@ const SVG_LINAJE_CONTENT = `<svg viewBox="0 0 1140 720"
 
 <!-- GitHub Actions badge -->
 <rect x="262" y="32" width="162" height="14" rx="3" fill="var(--etl-s)" opacity=".15"/>
-<text x="343" y="43" text-anchor="middle" font-size="8.5" fill="var(--etl-t)">⚡ GitHub Actions · lunes 09:00</text>
+<text x="343" y="43" text-anchor="middle" font-size="8.5" fill="var(--etl-t)">⚡ GitHub Actions · lun–vie 09:00</text>
 
 <!-- E1: calcular_avance_gantt.py -->
 <rect x="258" y="50" width="205" height="60" rx="6" fill="var(--etl-fill)" stroke="var(--etl-s)" stroke-width="1.5"/>
@@ -9057,14 +9057,14 @@ const SVG_LINAJE_CONTENT = `<svg viewBox="0 0 1140 720"
 <text x="360" y="191" text-anchor="middle" font-size="8.5" fill="var(--etl-t)" opacity=".6">leer_pct_programa_gantt()</text>
 <!-- E2: y=118-196, center y=157 -->
 
-<!-- E3: AppSheet → Firebase sync -->
+<!-- E3: Apps Script fetch directo browser -->
 <rect x="258" y="268" width="205" height="78" rx="6" fill="var(--etl-fill)" stroke="var(--etl-s)" stroke-width="1.5"/>
-<text x="360" y="286" text-anchor="middle" font-size="11"  font-weight="700" fill="var(--etl-t)">AppSheet → Firebase sync</text>
+<text x="360" y="286" text-anchor="middle" font-size="11"  font-weight="700" fill="var(--etl-t)">Apps Script → Browser</text>
 <line x1="268" y1="292" x2="453" y2="292" stroke="var(--etl-s)" stroke-width=".5" opacity=".35"/>
-<text x="360" y="304" text-anchor="middle" font-size="9"   fill="var(--etl-t)" opacity=".85">Total Avances · Sgt. Cierre · Eléctrico</text>
-<text x="360" y="316" text-anchor="middle" font-size="9"   fill="var(--etl-t)" opacity=".85">Pagos MO · Despachos · Pendientes</text>
-<text x="360" y="328" text-anchor="middle" font-size="8.5" fill="var(--etl-t)" opacity=".65">sincronizar_tipologias.py</text>
-<text x="360" y="339" text-anchor="middle" font-size="8.5" fill="var(--etl-t)" opacity=".65">Data Snapshot cada 15 min</text>
+<text x="360" y="304" text-anchor="middle" font-size="9"   fill="var(--etl-t)" opacity=".85">fetch directo al cargar el dashboard</text>
+<text x="360" y="316" text-anchor="middle" font-size="9"   fill="var(--etl-t)" opacity=".85">Seguimiento · Despacho · Pagos · Benef.</text>
+<text x="360" y="328" text-anchor="middle" font-size="8.5" fill="var(--etl-t)" opacity=".65">generar_snapshot.py (cache 15 min)</text>
+<text x="360" y="339" text-anchor="middle" font-size="8.5" fill="var(--etl-t)" opacity=".65">→ rama data-snapshot · GitHub</text>
 <!-- E3: y=268-346, center y=307 -->
 
 <!-- E4: alerta_climatica.py -->
@@ -9172,52 +9172,6 @@ const SVG_LINAJE_CONTENT = `<svg viewBox="0 0 1140 720"
 
 <!-- Dashboard ends y=387 -->
 
-<!-- ── Connector: Dashboard → Playwright ── -->
-<line x1="954" y1="387" x2="954" y2="398" stroke="var(--etl-s)" stroke-width="1.5" marker-end="url(#ae)"/>
-
-<!-- Playwright band -->
-<rect x="782" y="398" width="345" height="30" rx="5" fill="var(--etl-fill)" stroke="var(--etl-s)" stroke-width="1.2"/>
-<text x="954" y="411" text-anchor="middle" font-size="9"   font-weight="700" fill="var(--etl-t)">⚡ Playwright (headless Chromium) — capturar_informes_dashboard.py</text>
-<text x="954" y="423" text-anchor="middle" font-size="8.5" fill="var(--etl-t)" opacity=".75">abre el dashboard y captura HTML/PDF por proyecto · lunes 09:30</text>
-<!-- Playwright: y=398-428 -->
-
-<!-- ── Connector: Playwright → Reports ── -->
-<line x1="954" y1="428" x2="954" y2="440" stroke="var(--rpt-s)" stroke-width="1.3" marker-end="url(#ar)"/>
-
-<!-- Reports sub-header -->
-<rect x="782" y="440" width="345" height="14" rx="3" fill="var(--rpt-s)" opacity=".1"/>
-<text x="954" y="451" text-anchor="middle" font-size="8.5" font-weight="700" fill="var(--rpt-t)" letter-spacing=".4">REPORTES — generación semanal (lunes)</text>
-
-<!-- R1: PDF Residente -->
-<rect x="782" y="458" width="345" height="36" rx="5" fill="var(--rpt-fill)" stroke="var(--rpt-s)" stroke-width="1.2"/>
-<text x="954" y="473" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--rpt-t)">PDF Residente</text>
-<text x="954" y="486" text-anchor="middle" font-size="8.5"  fill="var(--rpt-t)" opacity=".85">Informe_Residente_{pid}_{nombre}_{fecha}.pdf  ×11 proyectos</text>
-
-<!-- R2: PDF Capataz -->
-<rect x="782" y="500" width="345" height="36" rx="5" fill="var(--rpt-fill)" stroke="var(--rpt-s)" stroke-width="1.2"/>
-<text x="954" y="515" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--rpt-t)">PDF Capataz</text>
-<text x="954" y="528" text-anchor="middle" font-size="8.5"  fill="var(--rpt-t)" opacity=".85">Informe_Capataz_{pid}_{capataz}_{fecha}.pdf</text>
-
-<!-- R3: HTML Ejecutivo -->
-<rect x="782" y="542" width="345" height="36" rx="5" fill="var(--rpt-fill)" stroke="var(--rpt-s)" stroke-width="1.2"/>
-<text x="954" y="557" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--rpt-t)">HTML Ejecutivo (multi-obras)</text>
-<text x="954" y="570" text-anchor="middle" font-size="8.5"  fill="var(--rpt-t)" opacity=".85">Informe_EjecutivoHTML_{fecha}.html</text>
-
-<!-- R4: HTML Adquisiciones -->
-<rect x="782" y="584" width="345" height="36" rx="5" fill="var(--rpt-fill)" stroke="var(--rpt-s)" stroke-width="1.2"/>
-<text x="954" y="599" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--rpt-t)">HTML Adquisiciones</text>
-<text x="954" y="612" text-anchor="middle" font-size="8.5"  fill="var(--rpt-t)" opacity=".85">Informe_Adquisiciones_{fecha}.html</text>
-
-<!-- R5: HTML Recepciones -->
-<rect x="782" y="626" width="345" height="36" rx="5" fill="var(--rpt-fill)" stroke="var(--rpt-s)" stroke-width="1.2"/>
-<text x="954" y="641" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--rpt-t)">HTML Recepciones</text>
-<text x="954" y="654" text-anchor="middle" font-size="8.5"  fill="var(--rpt-t)" opacity=".85">Informe_RecepcionesHTML_{fecha}.html</text>
-
-<!-- R6: HTML Estados de Pago -->
-<rect x="782" y="668" width="345" height="36" rx="5" fill="var(--rpt-fill)" stroke="var(--rpt-s)" stroke-width="1.2"/>
-<text x="954" y="683" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--rpt-t)">HTML Estados de Pago</text>
-<text x="954" y="696" text-anchor="middle" font-size="8.5"  fill="var(--rpt-t)" opacity=".85">Informe_EstadosPago_{fecha}.html</text>
-
 <!-- ═══ ARROWS: FUENTES → PROCESAMIENTO ═══ -->
 
 <!-- S1 → E1 (Sheets API → calcular_avance) -->
@@ -9236,7 +9190,7 @@ const SVG_LINAJE_CONTENT = `<svg viewBox="0 0 1140 720"
 <!-- AppSheet group → E3 (midpoint of bar ≈ y=355) -->
 <path d="M 200,355 C 230,355 230,307 258,307"
       fill="none" stroke="var(--arr)" stroke-width="1.2" marker-end="url(#a)"/>
-<text x="228" y="328" text-anchor="middle" font-size="8.5" fill="var(--arr-lbl)">export</text>
+<text x="228" y="328" text-anchor="middle" font-size="8.5" fill="var(--arr-lbl)">Sheets API</text>
 
 <!-- S10 → E4 (DMC → alerta) -->
 <path d="M 200,566 C 230,566 230,549 258,549"
@@ -9323,25 +9277,23 @@ const SVG_LINAJE_CONTENT = `<svg viewBox="0 0 1140 720"
 <text x="752" y="454" text-anchor="middle" font-size="8.5" fill="var(--arr-lbl)">flag 🌦️</text>
 
 <!-- ═══ LEGEND ═══ -->
-<line x1="10"  y1="712" x2="35"  y2="712" stroke="var(--arr)" stroke-width="1.2" marker-end="url(#a)"/>
-<text x="42"   y="716" font-size="8.5" fill="var(--muted)">flujo de datos</text>
-<line x1="118" y1="712" x2="143" y2="712" stroke="var(--arr)" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#a)"/>
-<text x="150"  y="716" font-size="8.5" fill="var(--muted)">fetch directo browser (thumbnail)</text>
-<line x1="340" y1="712" x2="365" y2="712" stroke="var(--etl-s)" stroke-width="1.5" marker-end="url(#ae)"/>
-<text x="372"  y="716" font-size="8.5" fill="var(--muted)">Pipeline Playwright (reportes)</text>
-<text x="554"  y="716" font-size="8.5" fill="var(--muted)">★ = fuente principal Ritmo Despachos</text>
+<line x1="10"  y1="412" x2="35"  y2="412" stroke="var(--arr)" stroke-width="1.2" marker-end="url(#a)"/>
+<text x="42"   y="416" font-size="8.5" fill="var(--muted)">flujo de datos</text>
+<line x1="150" y1="412" x2="175" y2="412" stroke="var(--arr)" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#a)"/>
+<text x="182"  y="416" font-size="8.5" fill="var(--muted)">fetch directo browser (thumbnail)</text>
+<text x="380"  y="416" font-size="8.5" fill="var(--muted)">★ = fuente principal Ritmo Despachos</text>
 
 </svg>`;
 const FIG_LINAJE_CONTENT = `<figcaption>
-  <strong>Fuentes primarias:</strong> Google Sheets (Gantt de Control, 11 proyectos) y 8 vistas de AppSheet «Seguimiento» — cada vista alimenta un módulo distinto del dashboard.
+  <strong>Fuentes primarias:</strong> Google Sheets (Gantt de Control, 11 proyectos) y 8 vistas de AppSheet «Seguimiento» — cada vista alimenta un módulo distinto del dashboard. Los datos de AppSheet se escriben en Google Sheets; el dashboard los lee vía Apps Script.
   <br>
-  <strong>Checkpoints:</strong> HPC · VAS · RAS · VF1 · F1 · Artef. · Recep. vienen de <em>Seguimiento cierre de obras</em>; TE1 y Empalme (solicitud de conexión) vienen del módulo <em>Eléctrico</em>.
+  <strong>Carga en vivo (E3):</strong> al abrir el dashboard el browser hace un fetch directo a Apps Script, que devuelve las tablas (Seguimiento, Despacho, Pagos, Beneficiarios, etc.) sin sync intermedio AppSheet→Firebase. <code>generar_snapshot.py</code> captura el estado procesado cada 15 min y lo publica en la rama <code>data-snapshot</code> para carga instantánea.
   <br>
-  <strong>Curvas S → Dashboard:</strong> los scripts generan PNG, los suben a Google Drive y guardan los Drive IDs en <code>/curvas_drive_ids</code>. <code>sincronizar_dashboard.py</code> actualiza el array <code>CURVAS_S_CONFIG</code> hardcodeado en el HTML cuando los IDs cambian. El browser carga la imagen directamente desde Drive vía URL de thumbnail (línea punteada).
+  <strong>Checkpoints:</strong> HPC · VAS · RAS · VF1 · F1 · Artef. · Recep. vienen de <em>Seguimiento cierre de obras</em>; TE1 y Empalme (solicitud de conexión) vienen del módulo <em>Eléctrico</em>. Se computan en el browser a partir de los datos descargados vía Apps Script.
   <br>
-  <strong>Reportes semanales (lunes 09:30):</strong> <code>capturar_informes_dashboard.py</code> abre el dashboard con Playwright headless, captura cada informe — PDF Residente y Capataz por proyecto, HTML Ejecutivo, Adquisiciones, Recepciones y Estados de Pago (globales) — y los sube a Drive y envía por correo. Todos los datos de los reportes vienen de Firebase a través del dashboard.
+  <strong>Curvas S → Dashboard:</strong> los scripts (<code>curvas_automatico_*.py</code>, lun–vie 09:00) generan PNG, los suben a Drive y guardan Drive IDs en <code>/curvas_drive_ids</code>. <code>sincronizar_dashboard.py</code> actualiza <code>CURVAS_S_CONFIG</code> en el HTML. El browser carga las imágenes desde Drive vía URL de thumbnail (línea punteada).
   <br>
-  <strong>AppSheet «Pendientes»</strong> se sincroniza a Firebase junto al resto de vistas AppSheet; los reportes consumen ese dato a través del dashboard (no leen AppSheet directamente).
+  <strong>Nota:</strong> la generación de reportes PDF/HTML vía Playwright fue eliminada el 2026-08-06.
 </figcaption>`;
 
 // ===== CONFIGURACION GENERAL MODAL (transversal a todas las obras) =====
