@@ -969,13 +969,39 @@ const ETAPAS_CONFIG_FULL = {
         const idCol = idColCandidates[0] || null;
         console.log('[LIVE] Seguimiento: columna ID detectada =', idCol, '(candidatos:', idColCandidates, ')');
 
+        // Fallback nombre→ID para "Seguimiento cierre de obras" (AppSheet no incluye ID_Benef).
+        // Esa vista muestra nombres como "Apellido[s] Nombre[s]"; BENEFICIARIOS_DATA tiene
+        // APELLIDOS y NOMBRES separados → construimos el índice en ambos órdenes.
+        const _segNameIdx = new Map();
+        BENEFICIARIOS_DATA.forEach(b => {
+            const apNom = normCol((String(b.APELLIDOS || '') + ' ' + String(b.NOMBRES || '')).trim());
+            const nomAp = normCol((String(b.NOMBRES || '') + ' ' + String(b.APELLIDOS || '')).trim());
+            const idStr = String(b.ID_Benef);
+            if (apNom) _segNameIdx.set(apNom, idStr);
+            if (nomAp && nomAp !== apNom) _segNameIdx.set(nomAp, idStr);
+        });
+        // Detectar columna "Nombre completo" en Seguimiento (primero nombre+completo, luego solo nombre)
+        const _segNombreCol = findColOne(segKeysSample, ['nombre', 'completo'], ['id', 'tipo', 'proyecto'])
+            || findColOne(segKeysSample, ['nombre'], ['id', 'tipo', 'proyecto', 'resol', 'visita', 'fecha', 'aprob']);
+        console.log('[LIVE] Seguimiento: col nombre para fallback =', _segNombreCol, '| nameIdx size =', _segNameIdx.size);
+
         const unmatchedBenefs = [];
         const matchedIds = [];
         let skippedNoId = 0;
+        let _segNameMatchCount = 0;
         segRaw.forEach(s => {
             // Usar la columna detectada o fallback a las clasicas
             let rawId = idCol ? s[idCol] : (s.ID_Benef ?? s.ID_benef ?? s.IDU_Benef);
-            const id = String(rawId == null ? '' : rawId).trim();
+            let id = String(rawId == null ? '' : rawId).trim();
+            // Fallback por nombre cuando no hay ID o el ID no pertenece a BENEFICIARIOS_DATA
+            if ((!id || id === 'nan' || !idsBenef.has(id)) && _segNombreCol) {
+                const rawNombre = valOf(s, _segNombreCol);
+                const normNombre = normCol(rawNombre);
+                if (normNombre && _segNameIdx.has(normNombre)) {
+                    id = _segNameIdx.get(normNombre);
+                    _segNameMatchCount++;
+                }
+            }
             if (!id || id === 'nan') { skippedNoId++; return; }
             if (!idsBenef.has(id)) { unmatchedBenefs.push(id); return; }
             matchedIds.push(id);
@@ -1009,13 +1035,15 @@ const ETAPAS_CONFIG_FULL = {
             segMatchedCount: matchedIds.length,
             segUnmatchedCount: unmatchedBenefs.length,
             segSkippedNoId: skippedNoId,
+            segNameMatchCount: _segNameMatchCount,
+            segNombreCol: _segNombreCol,
             idCol: idCol,
             idColCandidates: idColCandidates,
             sampleUnmatched: unmatchedBenefs.slice(0, 10),
             sampleBenefIds: BENEFICIARIOS_DATA.slice(0, 10).map(b => String(b.ID_Benef)),
             benefDataLen: BENEFICIARIOS_DATA.length
         };
-        console.log('[LIVE] Seguimiento: tabla usada =', segTableUsed || '(NINGUNA)', '| segRaw =', segRaw.length, '| matched =', matchedIds.length, '| sin match =', unmatchedBenefs.length, '| sin ID =', skippedNoId);
+        console.log('[LIVE] Seguimiento: tabla usada =', segTableUsed || '(NINGUNA)', '| segRaw =', segRaw.length, '| matched =', matchedIds.length, '(por nombre:', _segNameMatchCount, ')| sin match =', unmatchedBenefs.length, '| sin ID =', skippedNoId);
         console.log('[LIVE] Seguimiento idCol:', idCol, '| BENEFICIARIOS_DATA =', BENEFICIARIOS_DATA.length);
         if (segRaw.length > 0) {
             console.log('[LIVE] Columnas detectadas en Seguimiento[0]:', segKeysSample.join(' | '));
