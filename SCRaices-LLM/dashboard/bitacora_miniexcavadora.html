@@ -4,6 +4,22 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Bitácora Miniexcavadora — Constructora Las Raíces</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+const _fbCfg = {
+  apiKey: "AIzaSyDuM11JE-7klfBBrWsSSi1DF71HiXXYpW0",
+  authDomain: "scraices-dashboard.firebaseapp.com",
+  databaseURL: "https://scraices-dashboard-default-rtdb.firebaseio.com",
+  projectId: "scraices-dashboard",
+  storageBucket: "scraices-dashboard.firebasestorage.app",
+  messagingSenderId: "158927821043",
+  appId: "1:158927821043:web:2ca9bfdaff066dcc527f86"
+};
+const _fbApp = firebase.initializeApp(_fbCfg, 'bitacora');
+const _fbDB  = firebase.database(_fbApp);
+const FB_PATH = 'bitacora_miniexcavadora';
+</script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'IBM Plex Sans',system-ui,sans-serif;background:#fafaf9;color:#1c1917;font-size:13px}
@@ -264,23 +280,75 @@ const SEED = {
 };
 
 /* ═══════════════════════════════════════════════════════
-   PERSISTENCIA
+   PERSISTENCIA — localStorage + Firebase Realtime DB
 ═══════════════════════════════════════════════════════ */
+let _fbSynced = false;
+let _fbPending = false;
+let _fbSaveTimer = null;
+
 function loadData() {
+  // 1) Cargar desde localStorage de inmediato (render rápido)
   try { db = JSON.parse(localStorage.getItem(LS_KEY) || 'null') || {}; } catch { db = {}; }
+  // 2) Aplicar SEED como base para fechas sin registro
   for (const [d, v] of Object.entries(SEED)) {
     if (!db[d]) db[d] = { ...v };
   }
+  // 3) Cargar desde Firebase (sobreescribe localStorage si hay datos más recientes)
+  _fbDB.ref(FB_PATH).once('value').then(snap => {
+    const fbData = snap.val();
+    if (fbData && typeof fbData === 'object') {
+      // Merge: Firebase tiene prioridad sobre localStorage
+      for (const [d, v] of Object.entries(fbData)) {
+        db[d] = v;
+      }
+      localStorage.setItem(LS_KEY, JSON.stringify(db));
+      _fbSynced = true;
+      renderMonth();
+      updateFooter();
+    } else {
+      // No hay datos en Firebase — subir el estado local actual
+      _fbSynced = true;
+      _pushToFirebase();
+      updateFooter();
+    }
+  }).catch(err => {
+    console.warn('[Bitácora] Firebase no disponible, usando localStorage:', err.message);
+    _fbSynced = false;
+    updateFooter();
+  });
 }
+
 function saveData() {
   localStorage.setItem(LS_KEY, JSON.stringify(db));
+  // Debounce: esperar 1.5s de inactividad antes de escribir en Firebase
+  clearTimeout(_fbSaveTimer);
+  _fbPending = true;
   updateFooter();
+  _fbSaveTimer = setTimeout(_pushToFirebase, 1500);
 }
+
+function _pushToFirebase() {
+  _fbDB.ref(FB_PATH).set(db).then(() => {
+    _fbPending = false;
+    _fbSynced = true;
+    updateFooter();
+  }).catch(err => {
+    console.warn('[Bitácora] Error al guardar en Firebase:', err.message);
+    updateFooter();
+  });
+}
+
 function updateFooter() {
   const n = Object.keys(db).length;
+  const hora = new Date().toLocaleTimeString('es-CL');
+  let sync = '';
+  if (_fbPending)      sync = ' · ☁️ Guardando en nube...';
+  else if (_fbSynced)  sync = ' · ☁️ Backup en nube OK';
+  else                 sync = ' · ⚠️ Solo local (sin nube)';
   document.getElementById('footer-info').textContent =
-    'Guardado automáticamente · ' + n + ' registros · ' + new Date().toLocaleTimeString('es-CL');
+    'Guardado automáticamente · ' + n + ' registros · ' + hora + sync;
 }
+
 function getEntry(date) {
   if (!db[date]) db[date] = {};
   return db[date];
