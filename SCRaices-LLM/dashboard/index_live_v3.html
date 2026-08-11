@@ -3917,7 +3917,7 @@ const ManoDeObraTab = ({ viviendas }) => {
                             <span>Presup.: <strong className="text-gray-700">{formatPeso(avanceData.proyTotalPres)}</strong></span>
                             <span>Real: <strong className="text-violet-700">{formatPeso(avanceData.proyTimeline[avanceData.proyTimeline.length-1]?.cumul || 0)}</strong></span>
                             {avanceData.proyPatronTimeline.length > 0 && (
-                                <span>Patrón hoy: <strong className="text-amber-600">{formatPeso(avanceData.proyPatronTimeline.find(p => p.mk <= new Date().toISOString().slice(0,7))?.cumul || avanceData.proyPatronTimeline[avanceData.proyPatronTimeline.length-1]?.cumul || 0)}</strong></span>
+                                <span>Patrón hoy: <strong className="text-amber-600">{formatPeso((() => { const hoyMk = new Date().toISOString().slice(0,7); const matches = avanceData.proyPatronTimeline.filter(p => p.mk <= hoyMk); return (matches.length ? matches[matches.length-1] : avanceData.proyPatronTimeline[avanceData.proyPatronTimeline.length-1])?.cumul || 0; })())}</strong></span>
                             )}
                         </div>
                     </div>
