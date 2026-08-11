@@ -8216,56 +8216,7 @@ ${viewerCss}</style>
                     <h2 className="text-sm font-bold text-gray-800">Estado General del Proyecto</h2>
                     {proy && <span className="text-xs text-gray-400 font-normal">— {proy.ID_proy} · {proy.NOMBRE_PROYECTO}</span>}
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                    <button
-                        onClick={generarInformeResidenteHTML}
-                        className="flex items-center gap-2 px-4 py-2 bg-amber-700 hover:bg-amber-800 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors"
-                        title="Descarga HTML de avance de obra para el residente: grupos, checkpoints, programa y despachos"
-                    >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-                        Reporte residente HTML
-                    </button>
-                    <button
-                        onClick={generarTodosReportesCapataz}
-                        className="flex items-center gap-2 px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors"
-                        title="Descarga un HTML por cada capataz del proyecto (un archivo por capataz)"
-                    >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
-                        Reporte Capataz HTML
-                    </button>
-                    <button
-                        onClick={generarInformeAdquisicionesHTML}
-                        className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors"
-                        title="Descarga HTML navegable multi-obras con datos de adquisiciones: checkpoints, curvas S y ritmos (sin inspecciones in-situ)"
-                    >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-                        Reporte adquisiciones HTML
-                    </button>
-                    <button
-                        onClick={generarInformeMultiObras}
-                        className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-900 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors"
-                        title="Descarga HTML con selector de obra y tabs para navegar entre secciones (Resumen, Checkpoints, Curvas S, Ritmos, Viviendas)"
-                    >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-                        Reporte Ejecutivo HTML
-                    </button>
-                    <button
-                        onClick={generarInformeRecepciones}
-                        className="flex items-center gap-2 px-4 py-2 bg-indigo-700 hover:bg-indigo-800 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors"
-                        title="Descarga HTML multi-obras para coordinador de recepciones: Resumen, Checkpoints, Curvas S, Comentarios y Viviendas (sin Estado de Pago ni gráficos de ritmos)"
-                    >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-                        Reporte recepciones HTML
-                    </button>
-                    <button
-                        onClick={generarEstadosPagoHTML}
-                        className="flex items-center gap-2 px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors"
-                        title="Descarga HTML con todos los estados de pago, garantías y pagos M.O. por obra (selector de obra + tabs)"
-                    >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
-                        Estados de Pago HTML
-                    </button>
-                </div>
+                <p className="text-xs text-gray-400">Los informes HTML están disponibles en el botón <strong className="text-indigo-600">Informes</strong> de la barra superior.</p>
             </div>
             {/* PANEL DE DEBUG / DIAGNOSTICO Seguimiento */}
             <div className={`border rounded-xl shadow-sm overflow-hidden ${checkpointsSinMatch.length > 0 || segRawCount === 0 ? 'bg-red-50 border-red-300' : 'bg-blue-50 border-blue-200'}`}>
@@ -10539,6 +10490,13 @@ const App = () => {
     const [personalGlobal, setPersonalGlobal] = React.useState({});
     const personalGlobalRef = React.useRef(null);
     const [showModalPersonal, setShowModalPersonal] = React.useState(false);
+    const [showInformes, setShowInformes] = React.useState(false);
+    const informesRef = React.useRef(null);
+    React.useEffect(() => {
+        const handler = e => { if (informesRef.current && !informesRef.current.contains(e.target)) setShowInformes(false); };
+        document.addEventListener("mousedown", handler);
+        return () => document.removeEventListener("mousedown", handler);
+    }, []);
 
     // Proyectos marcados como terminados manualmente (Firebase)
     const [proyTerminados, setProyTerminados] = React.useState({});
@@ -11226,6 +11184,50 @@ const App = () => {
                                 Marcar Terminado
                             </button>
                         )}
+                    </div>
+                    {/* ── Segunda fila: Informes ── */}
+                    <div className="flex items-center gap-2 mt-1.5 pt-1.5 border-t border-gray-100">
+                        <div ref={informesRef} className="relative">
+                            <button
+                                type="button"
+                                onClick={() => setShowInformes(v => !v)}
+                                title="Generar informes HTML descargables"
+                                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-colors whitespace-nowrap shrink-0 ${showInformes ? 'bg-indigo-600 text-white border border-indigo-600' : 'text-indigo-700 bg-indigo-50 border border-indigo-300 hover:bg-indigo-100'}`}
+                            >
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                                Informes
+                                <svg width="11" height="11" viewBox="0 0 20 20" fill="none" style={{transition:"transform 0.15s",transform:showInformes?"rotate(180deg)":"rotate(0deg)"}}><path d="M5 7.5l5 5 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                            </button>
+                            {showInformes && (
+                                <div className="absolute left-0 top-full mt-1.5 bg-white border border-gray-200 rounded-xl shadow-xl z-[200] p-3 flex flex-wrap gap-2" style={{minWidth:"520px"}}>
+                                    <div className="w-full text-[10px] text-gray-400 font-semibold uppercase tracking-wider mb-1 px-0.5">Selecciona el informe a descargar</div>
+                                    <button onClick={() => { generarInformeResidenteHTML(); setShowInformes(false); }} className="flex items-center gap-2 px-3 py-1.5 bg-amber-700 hover:bg-amber-800 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors whitespace-nowrap" title="HTML de avance de obra para el residente">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                                        Residente
+                                    </button>
+                                    <button onClick={() => { generarTodosReportesCapataz(); setShowInformes(false); }} className="flex items-center gap-2 px-3 py-1.5 bg-teal-700 hover:bg-teal-800 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors whitespace-nowrap" title="Un HTML por cada capataz del proyecto">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+                                        Capataz
+                                    </button>
+                                    <button onClick={() => { generarInformeAdquisicionesHTML(); setShowInformes(false); }} className="flex items-center gap-2 px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors whitespace-nowrap" title="Multi-obras: checkpoints, curvas S y ritmos">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                                        Adquisiciones
+                                    </button>
+                                    <button onClick={() => { generarInformeMultiObras(); setShowInformes(false); }} className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-900 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors whitespace-nowrap" title="Multi-obras con selector y tabs (Resumen, Checkpoints, Curvas S, Ritmos, Viviendas)">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                                        Ejecutivo
+                                    </button>
+                                    <button onClick={() => { generarInformeRecepciones(); setShowInformes(false); }} className="flex items-center gap-2 px-3 py-1.5 bg-indigo-700 hover:bg-indigo-800 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors whitespace-nowrap" title="Multi-obras para coordinador de recepciones">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                                        Recepciones
+                                    </button>
+                                    <button onClick={() => { generarEstadosPagoHTML(); setShowInformes(false); }} className="flex items-center gap-2 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors whitespace-nowrap" title="Estados de pago, garantías y pagos M.O. por obra">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                                        Estados de Pago
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
