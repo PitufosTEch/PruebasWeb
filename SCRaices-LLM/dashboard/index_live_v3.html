@@ -8935,10 +8935,421 @@ const ModalPersonalGlobal = ({ personalGlobal, fbDB, onClose }) => {
     );
 };
 
-const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel, personalObra, personalObraRef, personalGlobal }) => {
+
+// ===== LINAJE DE DATOS — SVG EMBEBIDO =====
+const SVG_LINAJE_CONTENT = `<svg viewBox="0 0 1140 720"
+     xmlns="http://www.w3.org/2000/svg"
+     role="img"
+     aria-label="Diagrama de linaje de datos SG Raíces: 4 capas — Fuentes (Google Sheets, 8 vistas AppSheet, DMC API), Procesamiento (scripts Python vía GitHub Actions), Almacenamiento (Firebase RTDB + Google Drive), Salidas (Dashboard React SPA y 6 tipos de reportes vía Playwright)">
+
+<defs>
+  <marker id="a" markerWidth="7" markerHeight="5" refX="6.5" refY="2.5" orient="auto">
+    <polygon points="0 0,7 2.5,0 5" fill="var(--arr)"/>
+  </marker>
+  <marker id="ae" markerWidth="7" markerHeight="5" refX="6.5" refY="2.5" orient="auto">
+    <polygon points="0 0,7 2.5,0 5" fill="var(--etl-s)"/>
+  </marker>
+  <marker id="ar" markerWidth="7" markerHeight="5" refX="6.5" refY="2.5" orient="auto">
+    <polygon points="0 0,7 2.5,0 5" fill="var(--rpt-s)"/>
+  </marker>
+</defs>
+
+<!-- ═══ COLUMN HEADERS ═══ -->
+<rect x="8"   y="4" width="192" height="20" rx="4" fill="var(--src-s)" opacity=".12"/>
+<text x="104" y="18" text-anchor="middle" font-size="10" font-weight="700" letter-spacing=".8" fill="var(--src-s)">FUENTES</text>
+
+<rect x="258" y="4" width="205" height="20" rx="4" fill="var(--etl-s)" opacity=".12"/>
+<text x="360" y="18" text-anchor="middle" font-size="10" font-weight="700" letter-spacing=".8" fill="var(--etl-s)">PROCESAMIENTO</text>
+
+<rect x="520" y="4" width="205" height="20" rx="4" fill="var(--sto-s)" opacity=".12"/>
+<text x="622" y="18" text-anchor="middle" font-size="10" font-weight="700" letter-spacing=".8" fill="var(--sto-s)">ALMACENAMIENTO</text>
+
+<rect x="782" y="4" width="345" height="20" rx="4" fill="var(--dsh-s)" opacity=".12"/>
+<text x="954" y="18" text-anchor="middle" font-size="10" font-weight="700" letter-spacing=".8" fill="var(--dsh-s)">SALIDAS — Dashboard · Reportes</text>
+
+<!-- ═══ S1: GOOGLE SHEETS ═══ -->
+<rect x="8" y="32" width="192" height="108" rx="6" fill="var(--src-fill)" stroke="var(--src-s)" stroke-width="1.5"/>
+<text x="104" y="51"  text-anchor="middle" font-size="12"  font-weight="700" fill="var(--src-t)">Google Sheets</text>
+<text x="104" y="64"  text-anchor="middle" font-size="10.5" fill="var(--src-t)">Gantt de Control</text>
+<line x1="18" y1="70" x2="190" y2="70" stroke="var(--src-s)" stroke-width=".5" opacity=".35"/>
+<text x="104" y="82"  text-anchor="middle" font-size="9.5" fill="var(--src-t)" opacity=".85">11 hojas — una por proyecto</text>
+<text x="104" y="95"  text-anchor="middle" font-size="9.5" fill="var(--src-t)" opacity=".85">tab «Programa de obra»</text>
+<text x="104" y="108" text-anchor="middle" font-size="9.5" fill="var(--src-t)" opacity=".85">tab «% Avance» (Aliwen)</text>
+<text x="104" y="120" text-anchor="middle" font-size="9"   fill="var(--src-t)" opacity=".6">tab «Ñuke Mapu» · «Datos Control»</text>
+<!-- S1: y=32-140, center y=86 -->
+
+<!-- ═══ APPSHEET GROUP ═══ -->
+<rect x="6" y="148" width="196" height="380" rx="6"
+      fill="var(--src-s)" opacity=".05"
+      stroke="var(--src-s)" stroke-width="1" stroke-dasharray="4,3"/>
+<text x="104" y="163" text-anchor="middle" font-size="9.5" font-weight="700" fill="var(--src-s)" letter-spacing=".4">AppSheet «Seguimiento»</text>
+
+<!-- S2: Total Avances -->
+<rect x="16" y="170" width="176" height="38" rx="5" fill="var(--src-fill)" stroke="var(--src-s)" stroke-width="1.2"/>
+<text x="104" y="185" text-anchor="middle" font-size="9.5" font-weight="700" fill="var(--src-t)">Total Avances [En Ejecución]</text>
+<text x="104" y="199" text-anchor="middle" font-size="8.5" fill="var(--src-t)" opacity=".8">Obras > Total Avances</text>
+
+<!-- S3: Seguimiento cierre -->
+<rect x="16" y="214" width="176" height="38" rx="5" fill="var(--src-fill)" stroke="var(--src-s)" stroke-width="1.2"/>
+<text x="104" y="229" text-anchor="middle" font-size="9.5" font-weight="700" fill="var(--src-t)">Seguimiento cierre de obras</text>
+<text x="104" y="243" text-anchor="middle" font-size="8.5" fill="var(--src-t)" opacity=".8">HPC · VAS · RAS · VF1 · F1 · Artef. · Recep.</text>
+
+<!-- S4: Eléctrico -->
+<rect x="16" y="258" width="176" height="38" rx="5" fill="var(--src-fill)" stroke="var(--src-s)" stroke-width="1.2"/>
+<text x="104" y="273" text-anchor="middle" font-size="9.5" font-weight="700" fill="var(--src-t)">Eléctrico</text>
+<text x="104" y="287" text-anchor="middle" font-size="8.5" fill="var(--src-t)" opacity=".8">TE1 · Solicitud de empalme</text>
+
+<!-- S5: Pagos MO Histórico -->
+<rect x="16" y="302" width="176" height="38" rx="5" fill="var(--src-fill)" stroke="var(--src-s)" stroke-width="1.2"/>
+<text x="104" y="317" text-anchor="middle" font-size="9.5" font-weight="700" fill="var(--src-t)">Pagos M.O. Histórico</text>
+<text x="104" y="331" text-anchor="middle" font-size="8.5" fill="var(--src-t)" opacity=".8">Obras > Pagos M.O. Histórico</text>
+
+<!-- S6: Pagos MO en curso -->
+<rect x="16" y="346" width="176" height="38" rx="5" fill="var(--src-fill)" stroke="var(--src-s)" stroke-width="1.2"/>
+<text x="104" y="361" text-anchor="middle" font-size="9.5" font-weight="700" fill="var(--src-t)">Pagos M.O. en curso</text>
+<text x="104" y="375" text-anchor="middle" font-size="8.5" fill="var(--src-t)" opacity=".8">Obras > Pagos M.O. en curso</text>
+
+<!-- S7: Solicitudes de Despacho -->
+<rect x="16" y="390" width="176" height="38" rx="5" fill="var(--src-fill)" stroke="var(--src-s)" stroke-width="1.2"/>
+<text x="104" y="405" text-anchor="middle" font-size="9.5" font-weight="700" fill="var(--src-t)">Solicitudes de Despacho ★</text>
+<text x="104" y="419" text-anchor="middle" font-size="8.5" fill="var(--src-t)" opacity=".8">Operaciones > Solicitudes (principal)</text>
+
+<!-- S8: Ver Despachos -->
+<rect x="16" y="434" width="176" height="38" rx="5" fill="var(--src-fill)" stroke="var(--src-s)" stroke-width="1.2"/>
+<text x="104" y="449" text-anchor="middle" font-size="9.5" font-weight="700" fill="var(--src-t)">Ver Despachos</text>
+<text x="104" y="463" text-anchor="middle" font-size="8.5" fill="var(--src-t)" opacity=".8">Operaciones > Ver Despachos</text>
+
+<!-- S9: Pendientes -->
+<rect x="16" y="478" width="176" height="45" rx="5" fill="var(--src-fill)" stroke="var(--src-s)" stroke-width="1.2"/>
+<text x="104" y="495" text-anchor="middle" font-size="9.5" font-weight="700" fill="var(--src-t)">Pendientes</text>
+<text x="104" y="508" text-anchor="middle" font-size="8.5" fill="var(--src-t)" opacity=".8">Operaciones > Pendientes</text>
+<text x="104" y="519" text-anchor="middle" font-size="8"   fill="var(--src-t)" opacity=".55">→ vía Firebase · alimenta Reportes</text>
+<!-- AppSheet group: y=148-528, S9 ends y=523 -->
+
+<!-- ═══ S10: DMC / Clima API ═══ -->
+<rect x="8" y="540" width="192" height="52" rx="6" fill="var(--src-fill)" stroke="var(--src-s)" stroke-width="1.5"/>
+<text x="104" y="559" text-anchor="middle" font-size="12"  font-weight="700" fill="var(--src-t)">DMC / Clima API</text>
+<line x1="18" y1="565" x2="190" y2="565" stroke="var(--src-s)" stroke-width=".5" opacity=".35"/>
+<text x="104" y="578" text-anchor="middle" font-size="9.5" fill="var(--src-t)" opacity=".85">12 sectores · IX Región</text>
+<!-- S10: y=540-592, center y=566 -->
+
+<!-- ═══ PROCESAMIENTO ═══ -->
+
+<!-- GitHub Actions badge -->
+<rect x="262" y="32" width="162" height="14" rx="3" fill="var(--etl-s)" opacity=".15"/>
+<text x="343" y="43" text-anchor="middle" font-size="8.5" fill="var(--etl-t)">⚡ GitHub Actions · lunes 09:00</text>
+
+<!-- E1: calcular_avance_gantt.py -->
+<rect x="258" y="50" width="205" height="60" rx="6" fill="var(--etl-fill)" stroke="var(--etl-s)" stroke-width="1.5"/>
+<text x="360" y="68"  text-anchor="middle" font-size="11"  font-weight="700" fill="var(--etl-t)">calcular_avance_gantt.py</text>
+<line x1="268" y1="74" x2="453" y2="74" stroke="var(--etl-s)" stroke-width=".5" opacity=".35"/>
+<text x="360" y="86"  text-anchor="middle" font-size="9"   fill="var(--etl-t)" opacity=".85">lee fila «Programa» del Gantt</text>
+<text x="360" y="99"  text-anchor="middle" font-size="9"   fill="var(--etl-t)" opacity=".85">calcula pct_real por beneficiario</text>
+<!-- E1: y=50-110, center y=80 -->
+
+<!-- E2: curvas_automatico_*.py -->
+<rect x="258" y="118" width="205" height="78" rx="6" fill="var(--etl-fill)" stroke="var(--etl-s)" stroke-width="1.5"/>
+<text x="360" y="136" text-anchor="middle" font-size="11"  font-weight="700" fill="var(--etl-t)">curvas_automatico_*.py</text>
+<text x="360" y="149" text-anchor="middle" font-size="9"   fill="var(--etl-t)">× 11 scripts — uno por proyecto</text>
+<line x1="268" y1="155" x2="453" y2="155" stroke="var(--etl-s)" stroke-width=".5" opacity=".35"/>
+<text x="360" y="167" text-anchor="middle" font-size="9"   fill="var(--etl-t)" opacity=".85">genera PNG Curva S por grupo</text>
+<text x="360" y="180" text-anchor="middle" font-size="9"   fill="var(--etl-t)" opacity=".85">tooltip: Prog desde «Programa de obra»</text>
+<text x="360" y="191" text-anchor="middle" font-size="8.5" fill="var(--etl-t)" opacity=".6">leer_pct_programa_gantt()</text>
+<!-- E2: y=118-196, center y=157 -->
+
+<!-- E3: AppSheet → Firebase sync -->
+<rect x="258" y="268" width="205" height="78" rx="6" fill="var(--etl-fill)" stroke="var(--etl-s)" stroke-width="1.5"/>
+<text x="360" y="286" text-anchor="middle" font-size="11"  font-weight="700" fill="var(--etl-t)">AppSheet → Firebase sync</text>
+<line x1="268" y1="292" x2="453" y2="292" stroke="var(--etl-s)" stroke-width=".5" opacity=".35"/>
+<text x="360" y="304" text-anchor="middle" font-size="9"   fill="var(--etl-t)" opacity=".85">Total Avances · Sgt. Cierre · Eléctrico</text>
+<text x="360" y="316" text-anchor="middle" font-size="9"   fill="var(--etl-t)" opacity=".85">Pagos MO · Despachos · Pendientes</text>
+<text x="360" y="328" text-anchor="middle" font-size="8.5" fill="var(--etl-t)" opacity=".65">sincronizar_tipologias.py</text>
+<text x="360" y="339" text-anchor="middle" font-size="8.5" fill="var(--etl-t)" opacity=".65">Data Snapshot cada 15 min</text>
+<!-- E3: y=268-346, center y=307 -->
+
+<!-- E4: alerta_climatica.py -->
+<rect x="258" y="522" width="205" height="55" rx="6" fill="var(--etl-fill)" stroke="var(--etl-s)" stroke-width="1.5"/>
+<text x="360" y="542" text-anchor="middle" font-size="11"  font-weight="700" fill="var(--etl-t)">alerta_climatica.py</text>
+<line x1="268" y1="548" x2="453" y2="548" stroke="var(--etl-s)" stroke-width=".5" opacity=".35"/>
+<text x="360" y="560" text-anchor="middle" font-size="9"   fill="var(--etl-t)" opacity=".85">evalúa umbrales por sector</text>
+<text x="360" y="571" text-anchor="middle" font-size="9"   fill="var(--etl-t)" opacity=".85">escribe flag booleano</text>
+<!-- E4: y=522-577, center y=549 -->
+
+<!-- ═══ ALMACENAMIENTO ═══ -->
+
+<!-- ST1 -->
+<rect x="520" y="50" width="205" height="52" rx="6" fill="var(--sto-fill)" stroke="var(--sto-s)" stroke-width="1.5"/>
+<text x="622" y="69"  text-anchor="middle" font-size="11"  font-weight="700" fill="var(--sto-t)">Firebase RTDB</text>
+<text x="622" y="83"  text-anchor="middle" font-size="10"  fill="var(--sto-t)">/avance_gantt/{pid}</text>
+<text x="622" y="95"  text-anchor="middle" font-size="8.5" fill="var(--sto-t)" opacity=".75">pct_real · pct_prog · desglose mensual</text>
+<!-- ST1: y=50-102, center y=76 -->
+
+<!-- ST2 -->
+<rect x="520" y="115" width="205" height="52" rx="6" fill="var(--sto-fill)" stroke="var(--sto-s)" stroke-width="1.5"/>
+<text x="622" y="134" text-anchor="middle" font-size="11"  font-weight="700" fill="var(--sto-t)">Firebase RTDB</text>
+<text x="622" y="148" text-anchor="middle" font-size="10"  fill="var(--sto-t)">/curvas_drive_ids</text>
+<text x="622" y="160" text-anchor="middle" font-size="8.5" fill="var(--sto-t)" opacity=".75">Drive file IDs por proyecto/grupo</text>
+<!-- ST2: y=115-167, center y=141 -->
+
+<!-- ST3 -->
+<rect x="520" y="180" width="205" height="52" rx="6" fill="var(--sto-fill)" stroke="var(--sto-s)" stroke-width="1.5"/>
+<text x="622" y="199" text-anchor="middle" font-size="11"  font-weight="700" fill="var(--sto-t)">Google Drive</text>
+<text x="622" y="213" text-anchor="middle" font-size="10"  fill="var(--sto-t)">PNG Curva S</text>
+<text x="622" y="225" text-anchor="middle" font-size="8.5" fill="var(--sto-t)" opacity=".75">~70 imágenes (grupos + total)</text>
+<!-- ST3: y=180-232, center y=206 -->
+
+<!-- separator: Sheets vs AppSheet origin -->
+<line x1="520" y1="244" x2="725" y2="244" stroke="var(--sto-s)" stroke-width=".5" stroke-dasharray="3,4" opacity=".3"/>
+
+<!-- ST4 -->
+<rect x="520" y="254" width="205" height="52" rx="6" fill="var(--sto-fill)" stroke="var(--sto-s)" stroke-width="1.5"/>
+<text x="622" y="273" text-anchor="middle" font-size="11"  font-weight="700" fill="var(--sto-t)">Firebase RTDB</text>
+<text x="622" y="287" text-anchor="middle" font-size="10"  fill="var(--sto-t)">/avance_benef</text>
+<text x="622" y="299" text-anchor="middle" font-size="8.5" fill="var(--sto-t)" opacity=".75">% avance por beneficiario</text>
+<!-- ST4: y=254-306, center y=280 -->
+
+<!-- ST5 -->
+<rect x="520" y="318" width="205" height="52" rx="6" fill="var(--sto-fill)" stroke="var(--sto-s)" stroke-width="1.5"/>
+<text x="622" y="337" text-anchor="middle" font-size="11"  font-weight="700" fill="var(--sto-t)">Firebase RTDB</text>
+<text x="622" y="351" text-anchor="middle" font-size="10"  fill="var(--sto-t)">/checkpoints</text>
+<text x="622" y="363" text-anchor="middle" font-size="8.5" fill="var(--sto-t)" opacity=".75">HPC · VAS · RAS · TE1 · Empalme · …</text>
+<!-- ST5: y=318-370, center y=344 -->
+
+<!-- ST6 -->
+<rect x="520" y="382" width="205" height="52" rx="6" fill="var(--sto-fill)" stroke="var(--sto-s)" stroke-width="1.5"/>
+<text x="622" y="401" text-anchor="middle" font-size="11"  font-weight="700" fill="var(--sto-t)">Firebase RTDB</text>
+<text x="622" y="415" text-anchor="middle" font-size="10"  fill="var(--sto-t)">/pagos_despachos</text>
+<text x="622" y="427" text-anchor="middle" font-size="8.5" fill="var(--sto-t)" opacity=".75">montos pagos MO · registros despacho</text>
+<!-- ST6: y=382-434, center y=408 -->
+
+<!-- separator: AppSheet vs Clima -->
+<line x1="520" y1="448" x2="725" y2="448" stroke="var(--sto-s)" stroke-width=".5" stroke-dasharray="3,4" opacity=".3"/>
+
+<!-- ST7 -->
+<rect x="520" y="520" width="205" height="52" rx="6" fill="var(--sto-fill)" stroke="var(--sto-s)" stroke-width="1.5"/>
+<text x="622" y="539" text-anchor="middle" font-size="11"  font-weight="700" fill="var(--sto-t)">Firebase RTDB</text>
+<text x="622" y="553" text-anchor="middle" font-size="10"  fill="var(--sto-t)">/alerta_climatica</text>
+<text x="622" y="565" text-anchor="middle" font-size="8.5" fill="var(--sto-t)" opacity=".75">flag 🌦️ booleano por sector</text>
+<!-- ST7: y=520-572, center y=546 -->
+
+<!-- ═══ SALIDAS: DASHBOARD ═══ -->
+
+<!-- D1: Programa de Obra -->
+<rect x="782" y="32" width="345" height="42" rx="6" fill="var(--dsh-fill)" stroke="var(--dsh-s)" stroke-width="1.5"/>
+<text x="954" y="51"  text-anchor="middle" font-size="11.5" font-weight="700" fill="var(--dsh-t)">Programa de Obra</text>
+<text x="954" y="65"  text-anchor="middle" font-size="9.5"  fill="var(--dsh-t)">% Real · % Prog · Desviación · card por proyecto</text>
+
+<!-- D2: Curvas S -->
+<rect x="782" y="82" width="345" height="42" rx="6" fill="var(--dsh-fill)" stroke="var(--dsh-s)" stroke-width="1.5"/>
+<text x="954" y="101" text-anchor="middle" font-size="11.5" font-weight="700" fill="var(--dsh-t)">Curvas S de Control</text>
+<text x="954" y="115" text-anchor="middle" font-size="9.5"  fill="var(--dsh-t)">PNG por grupo · tooltip Prog / Real / Desv.</text>
+
+<!-- D3: % AV Beneficiarios -->
+<rect x="782" y="132" width="345" height="42" rx="6" fill="var(--dsh-fill)" stroke="var(--dsh-s)" stroke-width="1.5"/>
+<text x="954" y="151" text-anchor="middle" font-size="11.5" font-weight="700" fill="var(--dsh-t)">% AV Beneficiarios</text>
+<text x="954" y="165" text-anchor="middle" font-size="9.5"  fill="var(--dsh-t)">Total Avances [En Ejecución] · % por vivienda</text>
+
+<!-- D4: Checkpoints -->
+<rect x="782" y="182" width="345" height="55" rx="6" fill="var(--dsh-fill)" stroke="var(--dsh-s)" stroke-width="1.5"/>
+<text x="954" y="201" text-anchor="middle" font-size="11.5" font-weight="700" fill="var(--dsh-t)">Checkpoints del Proyecto</text>
+<text x="954" y="216" text-anchor="middle" font-size="9"    fill="var(--dsh-t)">Sgt. Cierre → HPC · VAS · RAS · VF1 · F1 · Artef. · Recep.</text>
+<text x="954" y="229" text-anchor="middle" font-size="9"    fill="var(--dsh-t)">Eléctrico → TE1 · Empalme (solicitud conexión)</text>
+
+<!-- D5: Ritmo Pagos MO -->
+<rect x="782" y="245" width="345" height="42" rx="6" fill="var(--dsh-fill)" stroke="var(--dsh-s)" stroke-width="1.5"/>
+<text x="954" y="264" text-anchor="middle" font-size="11.5" font-weight="700" fill="var(--dsh-t)">Ritmo Pagos M.O.</text>
+<text x="954" y="278" text-anchor="middle" font-size="9.5"  fill="var(--dsh-t)">Pagos MO Histórico · Pagos MO en curso</text>
+
+<!-- D6: Ritmo Despachos -->
+<rect x="782" y="295" width="345" height="42" rx="6" fill="var(--dsh-fill)" stroke="var(--dsh-s)" stroke-width="1.5"/>
+<text x="954" y="314" text-anchor="middle" font-size="11.5" font-weight="700" fill="var(--dsh-t)">Ritmo Despachos</text>
+<text x="954" y="328" text-anchor="middle" font-size="9.5"  fill="var(--dsh-t)">Solicitudes Despacho ★ · Ver Despachos</text>
+
+<!-- D7: Alerta Climática -->
+<rect x="782" y="345" width="345" height="42" rx="6" fill="var(--dsh-fill)" stroke="var(--dsh-s)" stroke-width="1.5"/>
+<text x="954" y="364" text-anchor="middle" font-size="11.5" font-weight="700" fill="var(--dsh-t)">Alerta Climática 🌦️</text>
+<text x="954" y="378" text-anchor="middle" font-size="9.5"  fill="var(--dsh-t)">flag por sector · IX Región · actualiz. diaria</text>
+
+<!-- Dashboard ends y=387 -->
+
+<!-- ── Connector: Dashboard → Playwright ── -->
+<line x1="954" y1="387" x2="954" y2="398" stroke="var(--etl-s)" stroke-width="1.5" marker-end="url(#ae)"/>
+
+<!-- Playwright band -->
+<rect x="782" y="398" width="345" height="30" rx="5" fill="var(--etl-fill)" stroke="var(--etl-s)" stroke-width="1.2"/>
+<text x="954" y="411" text-anchor="middle" font-size="9"   font-weight="700" fill="var(--etl-t)">⚡ Playwright (headless Chromium) — capturar_informes_dashboard.py</text>
+<text x="954" y="423" text-anchor="middle" font-size="8.5" fill="var(--etl-t)" opacity=".75">abre el dashboard y captura HTML/PDF por proyecto · lunes 09:30</text>
+<!-- Playwright: y=398-428 -->
+
+<!-- ── Connector: Playwright → Reports ── -->
+<line x1="954" y1="428" x2="954" y2="440" stroke="var(--rpt-s)" stroke-width="1.3" marker-end="url(#ar)"/>
+
+<!-- Reports sub-header -->
+<rect x="782" y="440" width="345" height="14" rx="3" fill="var(--rpt-s)" opacity=".1"/>
+<text x="954" y="451" text-anchor="middle" font-size="8.5" font-weight="700" fill="var(--rpt-t)" letter-spacing=".4">REPORTES — generación semanal (lunes)</text>
+
+<!-- R1: PDF Residente -->
+<rect x="782" y="458" width="345" height="36" rx="5" fill="var(--rpt-fill)" stroke="var(--rpt-s)" stroke-width="1.2"/>
+<text x="954" y="473" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--rpt-t)">PDF Residente</text>
+<text x="954" y="486" text-anchor="middle" font-size="8.5"  fill="var(--rpt-t)" opacity=".85">Informe_Residente_{pid}_{nombre}_{fecha}.pdf  ×11 proyectos</text>
+
+<!-- R2: PDF Capataz -->
+<rect x="782" y="500" width="345" height="36" rx="5" fill="var(--rpt-fill)" stroke="var(--rpt-s)" stroke-width="1.2"/>
+<text x="954" y="515" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--rpt-t)">PDF Capataz</text>
+<text x="954" y="528" text-anchor="middle" font-size="8.5"  fill="var(--rpt-t)" opacity=".85">Informe_Capataz_{pid}_{capataz}_{fecha}.pdf</text>
+
+<!-- R3: HTML Ejecutivo -->
+<rect x="782" y="542" width="345" height="36" rx="5" fill="var(--rpt-fill)" stroke="var(--rpt-s)" stroke-width="1.2"/>
+<text x="954" y="557" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--rpt-t)">HTML Ejecutivo (multi-obras)</text>
+<text x="954" y="570" text-anchor="middle" font-size="8.5"  fill="var(--rpt-t)" opacity=".85">Informe_EjecutivoHTML_{fecha}.html</text>
+
+<!-- R4: HTML Adquisiciones -->
+<rect x="782" y="584" width="345" height="36" rx="5" fill="var(--rpt-fill)" stroke="var(--rpt-s)" stroke-width="1.2"/>
+<text x="954" y="599" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--rpt-t)">HTML Adquisiciones</text>
+<text x="954" y="612" text-anchor="middle" font-size="8.5"  fill="var(--rpt-t)" opacity=".85">Informe_Adquisiciones_{fecha}.html</text>
+
+<!-- R5: HTML Recepciones -->
+<rect x="782" y="626" width="345" height="36" rx="5" fill="var(--rpt-fill)" stroke="var(--rpt-s)" stroke-width="1.2"/>
+<text x="954" y="641" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--rpt-t)">HTML Recepciones</text>
+<text x="954" y="654" text-anchor="middle" font-size="8.5"  fill="var(--rpt-t)" opacity=".85">Informe_RecepcionesHTML_{fecha}.html</text>
+
+<!-- R6: HTML Estados de Pago -->
+<rect x="782" y="668" width="345" height="36" rx="5" fill="var(--rpt-fill)" stroke="var(--rpt-s)" stroke-width="1.2"/>
+<text x="954" y="683" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--rpt-t)">HTML Estados de Pago</text>
+<text x="954" y="696" text-anchor="middle" font-size="8.5"  fill="var(--rpt-t)" opacity=".85">Informe_EstadosPago_{fecha}.html</text>
+
+<!-- ═══ ARROWS: FUENTES → PROCESAMIENTO ═══ -->
+
+<!-- S1 → E1 (Sheets API → calcular_avance) -->
+<path d="M 200,75 C 230,75 230,80 258,80"
+      fill="none" stroke="var(--arr)" stroke-width="1.2" marker-end="url(#a)"/>
+<text x="228" y="72" text-anchor="middle" font-size="8.5" fill="var(--arr-lbl)">Sheets API</text>
+
+<!-- S1 → E2 (Sheets API → curvas) -->
+<path d="M 200,122 C 230,122 230,157 258,157"
+      fill="none" stroke="var(--arr)" stroke-width="1.2" marker-end="url(#a)"/>
+<text x="228" y="142" text-anchor="middle" font-size="8.5" fill="var(--arr-lbl)">Sheets API</text>
+
+<!-- AppSheet vertical collecting bar -->
+<line x1="200" y1="189" x2="200" y2="522"
+      stroke="var(--src-s)" stroke-width=".9" opacity=".3"/>
+<!-- AppSheet group → E3 (midpoint of bar ≈ y=355) -->
+<path d="M 200,355 C 230,355 230,307 258,307"
+      fill="none" stroke="var(--arr)" stroke-width="1.2" marker-end="url(#a)"/>
+<text x="228" y="328" text-anchor="middle" font-size="8.5" fill="var(--arr-lbl)">export</text>
+
+<!-- S10 → E4 (DMC → alerta) -->
+<path d="M 200,566 C 230,566 230,549 258,549"
+      fill="none" stroke="var(--arr)" stroke-width="1.2" marker-end="url(#a)"/>
+<text x="228" y="551" text-anchor="middle" font-size="8.5" fill="var(--arr-lbl)">API</text>
+
+<!-- ═══ ARROWS: PROCESAMIENTO → ALMACENAMIENTO ═══ -->
+
+<!-- E1 → ST1 -->
+<line x1="463" y1="80" x2="520" y2="76"
+      stroke="var(--arr)" stroke-width="1.2" marker-end="url(#a)"/>
+<text x="491" y="70" text-anchor="middle" font-size="8.5" fill="var(--arr-lbl)">pct_prog · pct_real</text>
+
+<!-- E2 → ST2 -->
+<path d="M 463,141 C 492,141 492,141 520,141"
+      fill="none" stroke="var(--arr)" stroke-width="1.2" marker-end="url(#a)"/>
+<text x="491" y="134" text-anchor="middle" font-size="8.5" fill="var(--arr-lbl)">Drive IDs</text>
+
+<!-- E2 → ST3 -->
+<path d="M 463,173 C 492,173 492,206 520,206"
+      fill="none" stroke="var(--arr)" stroke-width="1.2" marker-end="url(#a)"/>
+<text x="491" y="196" text-anchor="middle" font-size="8.5" fill="var(--arr-lbl)">sube PNG</text>
+
+<!-- E3 → ST4 -->
+<path d="M 463,296 C 492,296 492,280 520,280"
+      fill="none" stroke="var(--arr)" stroke-width="1.2" marker-end="url(#a)"/>
+<text x="491" y="281" text-anchor="middle" font-size="8.5" fill="var(--arr-lbl)">escribe</text>
+
+<!-- E3 → ST5 -->
+<path d="M 463,307 C 492,307 492,344 520,344"
+      fill="none" stroke="var(--arr)" stroke-width="1.2" marker-end="url(#a)"/>
+<text x="491" y="332" text-anchor="middle" font-size="8.5" fill="var(--arr-lbl)">escribe</text>
+
+<!-- E3 → ST6 -->
+<path d="M 463,322 C 492,322 492,408 520,408"
+      fill="none" stroke="var(--arr)" stroke-width="1.2" marker-end="url(#a)"/>
+<text x="491" y="368" text-anchor="middle" font-size="8.5" fill="var(--arr-lbl)">escribe</text>
+
+<!-- E4 → ST7 -->
+<path d="M 463,549 C 492,549 492,546 520,546"
+      fill="none" stroke="var(--arr)" stroke-width="1.2" marker-end="url(#a)"/>
+<text x="491" y="540" text-anchor="middle" font-size="8.5" fill="var(--arr-lbl)">flag</text>
+
+<!-- ═══ ARROWS: ALMACENAMIENTO → DASHBOARD ═══ -->
+
+<!-- ST1 → D1 -->
+<path d="M 725,76 C 754,76 754,53 782,53"
+      fill="none" stroke="var(--arr)" stroke-width="1.2" marker-end="url(#a)"/>
+<text x="752" y="59" text-anchor="middle" font-size="8.5" fill="var(--arr-lbl)">pct_real · prog</text>
+
+<!-- ST2 → D2 (Drive IDs en HTML) -->
+<path d="M 725,141 C 754,141 754,103 782,103"
+      fill="none" stroke="var(--arr)" stroke-width="1.2" marker-end="url(#a)"/>
+<text x="752" y="113" text-anchor="middle" font-size="8.5" fill="var(--arr-lbl)">IDs en HTML</text>
+
+<!-- ST3 → D2 (thumbnail, dashed = browser fetch) -->
+<path d="M 725,206 C 754,206 754,115 782,115"
+      fill="none" stroke="var(--arr)" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#a)"/>
+<text x="751" y="165" text-anchor="middle" font-size="8.5" fill="var(--arr-lbl)" font-style="italic">thumbnail</text>
+
+<!-- ST4 → D3 -->
+<path d="M 725,280 C 754,280 754,153 782,153"
+      fill="none" stroke="var(--arr)" stroke-width="1.2" marker-end="url(#a)"/>
+<text x="752" y="208" text-anchor="middle" font-size="8.5" fill="var(--arr-lbl)">% avance</text>
+
+<!-- ST5 → D4 -->
+<path d="M 725,344 C 754,344 754,209 782,209"
+      fill="none" stroke="var(--arr)" stroke-width="1.2" marker-end="url(#a)"/>
+<text x="752" y="272" text-anchor="middle" font-size="8.5" fill="var(--arr-lbl)">checkpoints</text>
+
+<!-- ST6 → D5 (pagos MO) -->
+<path d="M 725,400 C 754,400 754,266 782,266"
+      fill="none" stroke="var(--arr)" stroke-width="1.2" marker-end="url(#a)"/>
+<text x="752" y="329" text-anchor="middle" font-size="8.5" fill="var(--arr-lbl)">pagos MO</text>
+
+<!-- ST6 → D6 (despachos) -->
+<path d="M 725,418 C 754,418 754,316 782,316"
+      fill="none" stroke="var(--arr)" stroke-width="1.2" marker-end="url(#a)"/>
+<text x="752" y="363" text-anchor="middle" font-size="8.5" fill="var(--arr-lbl)">despachos</text>
+
+<!-- ST7 → D7 -->
+<path d="M 725,546 C 754,546 754,366 782,366"
+      fill="none" stroke="var(--arr)" stroke-width="1.2" marker-end="url(#a)"/>
+<text x="752" y="454" text-anchor="middle" font-size="8.5" fill="var(--arr-lbl)">flag 🌦️</text>
+
+<!-- ═══ LEGEND ═══ -->
+<line x1="10"  y1="712" x2="35"  y2="712" stroke="var(--arr)" stroke-width="1.2" marker-end="url(#a)"/>
+<text x="42"   y="716" font-size="8.5" fill="var(--muted)">flujo de datos</text>
+<line x1="118" y1="712" x2="143" y2="712" stroke="var(--arr)" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#a)"/>
+<text x="150"  y="716" font-size="8.5" fill="var(--muted)">fetch directo browser (thumbnail)</text>
+<line x1="340" y1="712" x2="365" y2="712" stroke="var(--etl-s)" stroke-width="1.5" marker-end="url(#ae)"/>
+<text x="372"  y="716" font-size="8.5" fill="var(--muted)">Pipeline Playwright (reportes)</text>
+<text x="554"  y="716" font-size="8.5" fill="var(--muted)">★ = fuente principal Ritmo Despachos</text>
+
+</svg>`;
+const FIG_LINAJE_CONTENT = `<figcaption>
+  <strong>Fuentes primarias:</strong> Google Sheets (Gantt de Control, 11 proyectos) y 8 vistas de AppSheet «Seguimiento» — cada vista alimenta un módulo distinto del dashboard.
+  <br>
+  <strong>Checkpoints:</strong> HPC · VAS · RAS · VF1 · F1 · Artef. · Recep. vienen de <em>Seguimiento cierre de obras</em>; TE1 y Empalme (solicitud de conexión) vienen del módulo <em>Eléctrico</em>.
+  <br>
+  <strong>Curvas S → Dashboard:</strong> los scripts generan PNG, los suben a Google Drive y guardan los Drive IDs en <code>/curvas_drive_ids</code>. <code>sincronizar_dashboard.py</code> actualiza el array <code>CURVAS_S_CONFIG</code> hardcodeado en el HTML cuando los IDs cambian. El browser carga la imagen directamente desde Drive vía URL de thumbnail (línea punteada).
+  <br>
+  <strong>Reportes semanales (lunes 09:30):</strong> <code>capturar_informes_dashboard.py</code> abre el dashboard con Playwright headless, captura cada informe — PDF Residente y Capataz por proyecto, HTML Ejecutivo, Adquisiciones, Recepciones y Estados de Pago (globales) — y los sube a Drive y envía por correo. Todos los datos de los reportes vienen de Firebase a través del dashboard.
+  <br>
+  <strong>AppSheet «Pendientes»</strong> se sincroniza a Firebase junto al resto de vistas AppSheet; los reportes consumen ese dato a través del dashboard (no leen AppSheet directamente).
+</figcaption>`;
+
+// ===== CONFIGURACION GENERAL MODAL (transversal a todas las obras) =====
+const ConfigGeneralModal = ({ show, onClose, viviendas, proyectoSel }) => {
+    if (!show) return null;
     const originalConfig = ETAPAS_CONFIG_FULL;
     const [config, setConfig] = React.useState(() => JSON.parse(JSON.stringify(originalConfig)));
-    const [subTab, setSubTab] = React.useState('grupos');
+    const [subTab, setSubTab] = React.useState('diagrama');
     const [dirty, setDirty] = React.useState(false);
 
     const etapas = config.etapas || {};
@@ -8946,74 +9357,295 @@ const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel, personal
     const allKeys = Object.keys(etapas);
 
     const updateEtapa = (key, field, value) => {
-        setConfig(prev => {
-            const next = JSON.parse(JSON.stringify(prev));
-            next.etapas[key][field] = value;
-            return next;
-        });
+        setConfig(prev => { const next = JSON.parse(JSON.stringify(prev)); next.etapas[key][field] = value; return next; });
         setDirty(true);
     };
-
     const toggleSecuencia = (key) => {
-        setConfig(prev => {
-            const next = JSON.parse(JSON.stringify(prev));
-            const idx = next.secuencia_principal.indexOf(key);
-            if (idx >= 0) next.secuencia_principal.splice(idx, 1);
-            else next.secuencia_principal.push(key);
-            return next;
-        });
+        setConfig(prev => { const next = JSON.parse(JSON.stringify(prev)); const idx = next.secuencia_principal.indexOf(key); if (idx >= 0) next.secuencia_principal.splice(idx, 1); else next.secuencia_principal.push(key); return next; });
         setDirty(true);
     };
-
-    const toggleCritico = (key) => {
-        updateEtapa(key, 'critico', !etapas[key].critico);
-    };
-
-    const restaurar = () => {
-        setConfig(JSON.parse(JSON.stringify(originalConfig)));
-        setDirty(false);
-    };
-
+    const toggleCritico = (key) => { updateEtapa(key, 'critico', !etapas[key].critico); };
+    const restaurar = () => { setConfig(JSON.parse(JSON.stringify(originalConfig))); setDirty(false); };
     const exportarJSON = () => {
         const exportData = JSON.parse(JSON.stringify(config));
         exportData._ultima_modificacion = new Date().toISOString().split('T')[0];
         const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = 'etapas_config.json';
-        document.body.appendChild(a); a.click();
-        document.body.removeChild(a); URL.revokeObjectURL(url);
+        const a = document.createElement('a'); a.href = url; a.download = 'etapas_config.json';
+        document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
     };
-
-    // BFS para niveles de dependencia
     const calcNiveles = () => {
-        const niveles = {};
-        const visited = new Set();
-        const queue = [];
-        allKeys.forEach(k => {
-            if (!etapas[k].dependencia) {
-                niveles[k] = 0; visited.add(k); queue.push(k);
-            }
-        });
-        while (queue.length > 0) {
-            const current = queue.shift();
-            allKeys.forEach(k => {
-                if (!visited.has(k) && etapas[k].dependencia === current) {
-                    niveles[k] = (niveles[current] || 0) + 1;
-                    visited.add(k); queue.push(k);
-                }
-            });
-        }
-        const porNivel = {};
-        Object.entries(niveles).forEach(([k, n]) => {
-            if (!porNivel[n]) porNivel[n] = [];
-            porNivel[n].push(k);
-        });
-        return porNivel;
+        const niveles = {}; const visited = new Set(); const queue = [];
+        allKeys.forEach(k => { if (!etapas[k].dependencia) { niveles[k] = 0; visited.add(k); queue.push(k); } });
+        while (queue.length > 0) { const current = queue.shift(); allKeys.forEach(k => { if (!visited.has(k) && etapas[k].dependencia === current) { niveles[k] = (niveles[current] || 0) + 1; visited.add(k); queue.push(k); } }); }
+        const porNivel = {}; Object.entries(niveles).forEach(([k, n]) => { if (!porNivel[n]) porNivel[n] = []; porNivel[n].push(k); }); return porNivel;
     };
-
     const niveles = calcNiveles();
     const maxNivel = Math.max(...Object.keys(niveles).map(Number), 0);
+
+    // ===== DIAGRAMA SUB-TAB =====
+    const DiagramaTab = () => {
+        const NODE_W = 150, NODE_H = 80, LEVEL_GAP = 60, NODE_GAP = 16;
+        const maxNodesInLevel = Math.max(...Object.values(niveles).map(arr => arr.length), 1);
+        const svgHeight = Math.max(maxNodesInLevel * (NODE_H + NODE_GAP) + 40, 300);
+        const svgWidth = (maxNivel + 1) * (NODE_W + LEVEL_GAP) + 60;
+        const positions = {};
+        Object.entries(niveles).forEach(([nivel, keys]) => {
+            const n = Number(nivel);
+            const totalH = keys.length * NODE_H + (keys.length - 1) * NODE_GAP;
+            const startY = (svgHeight - totalH) / 2;
+            keys.forEach((k, i) => { positions[k] = { x: 30 + n * (NODE_W + LEVEL_GAP), y: startY + i * (NODE_H + NODE_GAP) }; });
+        });
+        const esCritica = (k) => secuencia.includes(k);
+        const esFlexible = (k) => etapas[k].flexible || etapas[k].ventana_flexible;
+        return (
+            <div className="overflow-auto bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <svg width={svgWidth} height={svgHeight} className="block">
+                    {allKeys.map(k => {
+                        const dep = etapas[k].dependencia;
+                        if (!dep || !positions[dep] || !positions[k]) return null;
+                        const from = positions[dep]; const to = positions[k];
+                        const x1 = from.x + NODE_W, y1 = from.y + NODE_H / 2;
+                        const x2 = to.x, y2 = to.y + NODE_H / 2;
+                        const midX = (x1 + x2) / 2;
+                        const isCrit = esCritica(k) && esCritica(dep);
+                        return (
+                            <g key={`conn-${k}`}>
+                                <path d={`M${x1},${y1} C${midX},${y1} ${midX},${y2} ${x2},${y2}`} fill="none" stroke={isCrit ? "#8b5cf6" : "#d1d5db"} strokeWidth={isCrit ? 2.5 : 1.5} strokeDasharray={esFlexible(k) ? "6,3" : "none"} />
+                                <polygon points={`${x2},${y2} ${x2-8},${y2-4} ${x2-8},${y2+4}`} fill={isCrit ? "#8b5cf6" : "#d1d5db"} />
+                            </g>
+                        );
+                    })}
+                    {allKeys.map(k => {
+                        const pos = positions[k]; if (!pos) return null;
+                        const e = etapas[k]; const crit = esCritica(k); const flex = esFlexible(k);
+                        return (
+                            <g key={k} transform={`translate(${pos.x},${pos.y})`}>
+                                <rect width={NODE_W} height={NODE_H} rx={8} ry={8} fill={crit ? "#faf5ff" : flex ? "#f9fafb" : "white"} stroke={crit ? "#8b5cf6" : flex ? "#9ca3af" : "#e5e7eb"} strokeWidth={crit ? 2.5 : 1.5} strokeDasharray={flex ? "6,3" : "none"} />
+                                <text x={NODE_W/2} y={20} textAnchor="middle" fontSize="11" fontWeight="600" fill={crit ? "#6d28d9" : "#374151"}>{e.nombre}</text>
+                                <text x={NODE_W/2} y={35} textAnchor="middle" fontSize="10" fill="#9ca3af" fontFamily="IBM Plex Mono">{e.codigo} {crit ? "| CRITICO" : flex ? "| flexible" : ""}</text>
+                                <text x={NODE_W/2} y={52} textAnchor="middle" fontSize="10" fill="#6b7280">Duración: {e.duracion}d</text>
+                                {e.tiempo_optimo !== null && (
+                                    <g>
+                                        <rect x={10} y={60} width={(NODE_W-20)*0.5} height={6} rx={3} fill="#22c55e" opacity={0.6} />
+                                        <rect x={10 + (NODE_W-20)*0.5} y={60} width={(NODE_W-20)*0.5} height={6} rx={3} fill="#eab308" opacity={0.6} />
+                                        <text x={18} y={69} fontSize="8" fill="#166534">{e.tiempo_optimo}d</text>
+                                        <text x={NODE_W-30} y={69} fontSize="8" fill="#854d0e">{e.tiempo_alerta}d</text>
+                                    </g>
+                                )}
+                            </g>
+                        );
+                    })}
+                </svg>
+                <div className="mt-4 flex flex-wrap gap-4 text-xs text-gray-500 border-t border-gray-200 pt-3">
+                    <div className="flex items-center gap-2"><div className="w-8 h-4 rounded border-2 border-violet-500 bg-violet-50" /><span>Ruta crítica</span></div>
+                    <div className="flex items-center gap-2"><div className="w-8 h-4 rounded border-2 border-gray-300 border-dashed bg-gray-50" /><span>Etapa flexible</span></div>
+                    <div className="flex items-center gap-2"><div className="w-8 h-4 rounded border-2 border-gray-200 bg-white" /><span>Etapa estándar</span></div>
+                    <div className="flex items-center gap-2"><div className="w-8 h-0.5 bg-violet-500" /><span>Dependencia crítica</span></div>
+                    <div className="flex items-center gap-2"><div className="flex gap-0.5"><div className="w-4 h-2 rounded bg-green-500 opacity-60" /><div className="w-4 h-2 rounded bg-yellow-500 opacity-60" /></div><span>Tiempos: óptimo | alerta</span></div>
+                </div>
+            </div>
+        );
+    };
+
+    // ===== EDITOR SUB-TAB =====
+    const EditorTab = () => (
+        <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+                <thead>
+                    <tr className="text-left text-gray-500 border-b border-gray-200 bg-gray-50">
+                        <th className="py-2 px-3">Cód</th><th className="py-2 px-3">Etapa</th>
+                        <th className="py-2 px-3 text-center">Duración</th><th className="py-2 px-3 text-center">T. Óptimo</th>
+                        <th className="py-2 px-3 text-center">T. Alerta</th><th className="py-2 px-3">Depende de</th>
+                        <th className="py-2 px-3 text-center">Crítica</th><th className="py-2 px-3 text-center">En Secuencia</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {allKeys.map((key) => {
+                        const e = etapas[key]; const enSeq = secuencia.includes(key);
+                        return (
+                            <tr key={key} className={`border-b border-gray-100 ${enSeq ? "bg-violet-50/50" : ""}`}>
+                                <td className="py-2 px-3 font-mono text-gray-600">{e.codigo}</td>
+                                <td className="py-2 px-3 text-gray-800 font-medium">{e.nombre}</td>
+                                <td className="py-2 px-3 text-center"><input type="number" min="1" max="60" value={e.duracion || 0} onChange={(ev) => updateEtapa(key, 'duracion', parseInt(ev.target.value) || 0)} className="w-14 text-center border border-gray-300 rounded px-1 py-0.5 text-sm focus:ring-1 focus:ring-violet-400 focus:border-violet-400" /></td>
+                                <td className="py-2 px-3 text-center"><input type="number" min="0" max="60" value={e.tiempo_optimo ?? ''} placeholder="-" onChange={(ev) => { const v = ev.target.value === '' ? null : parseInt(ev.target.value); updateEtapa(key, 'tiempo_optimo', v); }} className="w-14 text-center border border-gray-300 rounded px-1 py-0.5 text-sm focus:ring-1 focus:ring-green-400 focus:border-green-400" /></td>
+                                <td className="py-2 px-3 text-center"><input type="number" min="0" max="60" value={e.tiempo_alerta ?? ''} placeholder="-" onChange={(ev) => { const v = ev.target.value === '' ? null : parseInt(ev.target.value); updateEtapa(key, 'tiempo_alerta', v); }} className="w-14 text-center border border-gray-300 rounded px-1 py-0.5 text-sm focus:ring-1 focus:ring-red-400 focus:border-red-400" /></td>
+                                <td className="py-2 px-3"><select value={e.dependencia || ''} onChange={(ev) => updateEtapa(key, 'dependencia', ev.target.value || null)} className="w-full border border-gray-300 rounded px-1 py-0.5 text-sm text-gray-700 focus:ring-1 focus:ring-violet-400 bg-white"><option value="">— Ninguna —</option>{allKeys.filter(k => k !== key).map(k => (<option key={k} value={k}>{etapas[k].nombre} ({etapas[k].codigo})</option>))}</select></td>
+                                <td className="py-2 px-3 text-center"><input type="checkbox" checked={!!e.critico} onChange={() => toggleCritico(key)} className="w-4 h-4 rounded border-gray-300 text-violet-600 focus:ring-violet-400" /></td>
+                                <td className="py-2 px-3 text-center"><input type="checkbox" checked={enSeq} onChange={() => toggleSecuencia(key)} className="w-4 h-4 rounded border-gray-300 text-violet-600 focus:ring-violet-400" /></td>
+                            </tr>
+                        );
+                    })}
+                </tbody>
+            </table>
+        </div>
+    );
+
+    // ===== FUNCIONAMIENTO SUB-TAB =====
+    const FuncionamientoTab = () => {
+        const seg = (typeof window !== 'undefined' && window._SEG_DIAG) || {};
+        const nProy = (typeof PROYECTOS_DATA !== 'undefined' ? PROYECTOS_DATA.length : 0);
+        const nViv = viviendas.length;
+        const nInsp = (typeof INSPECCIONES_DATA !== 'undefined' ? INSPECCIONES_DATA.length : 0);
+        const te1Count = (typeof BENEF_CON_TE1 !== 'undefined' && BENEF_CON_TE1 && BENEF_CON_TE1.size) ? BENEF_CON_TE1.size : 0;
+        const curvasCfg = (typeof CURVAS_S_CONFIG !== 'undefined' ? CURVAS_S_CONFIG : {});
+        const curvasKeys = Object.keys(curvasCfg);
+        const curvasProyActual = (curvasCfg[proyectoSel] || []).length;
+        const tablas = (typeof TABLES_TO_FETCH !== 'undefined' ? TABLES_TO_FETCH.split(',') : []);
+        const familias = (typeof FAMILIAS_CRITICAS !== 'undefined' ? FAMILIAS_CRITICAS : []);
+        const segCheckpoints = (typeof window !== 'undefined' && window._SEG_COL_MAP) ? Object.keys(window._SEG_COL_MAP) : ['te1','visita_as','resol_as','visita_f1','fecha_f1','artefactado','empalme','visita_dom','fecha_v_dom','recepcion_dom','fecha_recep','obs'];
+        const endpoint = (typeof APPS_SCRIPT_URL !== 'undefined' ? APPS_SCRIPT_URL : '');
+        const [solReg, setSolReg] = React.useState(null);
+        const [solTxt, setSolTxt] = React.useState('');
+        const enviarSolicitud = (regla) => {
+            const t = solTxt.trim(); if (!t) return;
+            const id = Date.now();
+            const fecha = (typeof fechaChile === 'function') ? fechaChile() : new Date().toISOString();
+            fbDB.ref('sugerencias/' + id).set({ id, texto: '[Funcionamiento · ' + regla + '] ' + t, imagen: null, fecha, resuelta: false });
+            setSolReg(null); setSolTxt(''); alert('Solicitud registrada en Sugerencias. El equipo la revisara desde ese panel.');
+        };
+        const REGLAS = [
+            { id: 'avance',    nombre: 'Formula % Avance (70/25/5)',        estado: 'ok',   detalle: '% Total = 0.70 x %Viv + 0.25 x %RC + 0.05 x %Hab. Coincide con la definicion de negocio. Cada fila de Ejecucion es un delta que se suma por beneficiario.' },
+            { id: 'solpago',   nombre: 'Pagos M.O. — solo "Aprobado"',      estado: 'ok',   detalle: 'Suma montos de Solpago cuyo ESTADO incluye "aprobad". Los no aprobados no cuentan.' },
+            { id: 'ciclo',     nombre: 'Ciclo de pago 25 a 25',             estado: 'ok',   detalle: 'Un pago con fecha dia >= 25 se contabiliza en el mes siguiente (no calendario natural).' },
+            { id: 'te1',       nombre: 'TE1 — triple fuente (OR logico)',   estado: 'ok',   detalle: 'Prendido si CUALQUIERA: set embebido (' + te1Count + ' IDs) OR columna en perfil Beneficiario OR columna en tabla de cierre.' },
+            { id: 'estrella',  nombre: 'Comentarios publicos (estrella)',   estado: 'ok',   detalle: 'Solo las observaciones marcadas con estrella se muestran en el informe Estado General. El resto son internas.' },
+            { id: 'seg',       nombre: 'Matching de columnas de Cierre',    estado: 'warn', detalle: 'SEG_RULES normaliza nombres (must/not) y tolera variantes de AppSheet, pero un renombre de columna lo puede romper en silencio. Tabla en uso: ' + (seg.tableUsed || '—') + '.' },
+            { id: 'semaforo',  nombre: 'Semaforo de plazos por etapa',      estado: 'warn', detalle: 'El codigo usa tiempo_optimo/alerta por etapa (desde despacho de la dependencia). CLAUDE.md describe otro modelo (dias desde ultima solicitud 7/14). Conviene definir UNO solo.' },
+            { id: 'config',    nombre: 'Tiempos de etapa — fuente unica',   estado: 'warn', detalle: 'Hoy existen 3 copias: ETAPAS_CONFIG embebido en este HTML, config/etapas_config.json y Etapas.md. Pueden divergir; el dashboard usa el embebido.' },
+            { id: 'despachos', nombre: 'Ritmo Despachos (proxy temporal)',  estado: 'warn', detalle: 'Es un proxy de actividad (conteo de despachos por mes). Pendiente reemplazar por % avance real desde los deltas de Ejecucion.' },
+            { id: 'curvas',    nombre: 'Curvas S — imagenes estaticas',     estado: 'bad',  detalle: 'Son imagenes PNG de Drive hardcodeadas por proyecto (CURVAS_S_CONFIG), generadas afuera. Estan desconectadas del % real vivo que el dashboard YA calcula. El "% Real" mostrado puede estar desactualizado.' },
+            { id: 'firebase',  nombre: 'Reglas de Firebase abiertas',       estado: 'bad',  detalle: 'El RTDB no tiene autenticacion: cualquiera con la URL puede leer y escribir observaciones, grupos, etc. Riesgo de integridad de lo supervisado.' },
+        ];
+        const estiloEstado = { ok: { c: '#16a34a', bg: '#f0fdf4', b: '#bbf7d0', t: 'OK' }, warn: { c: '#d97706', bg: '#fffbeb', b: '#fde68a', t: 'REVISAR' }, bad: { c: '#dc2626', bg: '#fef2f2', b: '#fecaca', t: 'CORREGIR' } };
+        const Stat = ({ label, value, sub }) => (<div className="bg-white rounded-lg border border-gray-200 px-3 py-2"><div className="text-[18px] font-bold text-gray-800 leading-none">{value}</div><div className="text-[10px] text-gray-500 mt-1">{label}</div>{sub && <div className="text-[9px] text-gray-400">{sub}</div>}</div>);
+        const Pill = ({ children, tone }) => (<span className="inline-block text-[10px] font-medium px-2 py-0.5 rounded-full mr-1 mb-1" style={{ background: tone === 'warn' ? '#fffbeb' : tone === 'bad' ? '#fef2f2' : '#eff6ff', color: tone === 'warn' ? '#b45309' : tone === 'bad' ? '#b91c1c' : '#1d4ed8', border: '1px solid ' + (tone === 'warn' ? '#fde68a' : tone === 'bad' ? '#fecaca' : '#bfdbfe') }}>{children}</span>);
+        return (
+            <div className="space-y-5">
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                    <h3 className="text-sm font-semibold text-blue-800 mb-1">Funcionamiento del Dashboard (ficha tecnica viva)</h3>
+                    <p className="text-xs text-blue-600 leading-relaxed">Esta seccion documenta — con los valores reales cargados en este momento — de donde sale la informacion, que reglas de negocio aplica el panel y como se calcula cada cosa. Sirve para <strong>supervisar las reglas, juzgarlas y solicitar cambios</strong> sin salir del dashboard. En cada regla puedes pulsar <em>"Solicitar cambio"</em> y queda registrado en el panel de Sugerencias.</p>
+                </div>
+                <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+                    <h4 className="text-sm font-semibold text-gray-700 mb-3">1. Fuentes de informacion <span className="text-[10px] font-normal text-green-600">● en vivo</span></h4>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
+                        <Stat label="Proyectos cargados" value={nProy} />
+                        <Stat label="Viviendas (proy. actual)" value={nViv} sub={proyectoSel} />
+                        <Stat label="Con inspeccion/avance" value={nInsp} />
+                        <Stat label="Beneficiarios con TE1" value={te1Count} sub="set embebido" />
+                    </div>
+                    <div className="text-xs text-gray-600 space-y-1.5">
+                        <div><span className="font-semibold text-gray-700">Google Sheets</span> via Apps Script <code className="bg-gray-100 px-1 rounded text-[10px]">{endpoint ? (endpoint.slice(0, 52) + '…') : '—'}</code></div>
+                        <div className="flex flex-wrap items-center"><span className="font-semibold text-gray-700 mr-1">Tablas descargadas:</span>{tablas.map(t => <Pill key={t}>{t.trim()}</Pill>)}</div>
+                        <div><span className="font-semibold text-gray-700">Firebase RTDB</span> (lectura+escritura): <span className="text-gray-500">grupos · observaciones · actividades · consultas · muestras_hormigon · sugerencias · proyectos_terminados · ocultados · resumen_comentarios</span></div>
+                        <div><span className="font-semibold text-gray-700">Tabla de cierre en uso:</span> <code className="bg-gray-100 px-1 rounded text-[10px]">{seg.tableUsed || '—'}</code> <span className="text-gray-400">({seg.segMatchedCount != null ? seg.segMatchedCount : '?'} matches de {seg.benefDataLen != null ? seg.benefDataLen : '?'} benef.)</span></div>
+                        <div><span className="font-semibold text-gray-700">Google Drive:</span> imagenes de Curvas S (estaticas, cargadas como thumbnail)</div>
+                    </div>
+                </div>
+                <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+                    <h4 className="text-sm font-semibold text-gray-700 mb-1">2. Reglas de plazos por etapa <span className="text-[10px] font-normal text-green-600">● refleja el Editor de Tiempos</span></h4>
+                    <p className="text-[11px] text-gray-500 mb-2">Verde si dias &lt; optimo · Amarillo entre optimo y alerta · Rojo si &gt;= alerta. Si editas en "Editor de Tiempos", esta tabla cambia.</p>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                            <thead><tr className="text-gray-400 border-b border-gray-200"><th className="text-left py-1.5 px-2">Etapa</th><th className="text-center px-2">Optimo</th><th className="text-center px-2">Alerta</th><th className="text-left px-2">Depende de</th><th className="text-center px-2">Critica</th></tr></thead>
+                            <tbody>{Object.keys(etapas).map(k => { const e = etapas[k]; return (<tr key={k} className="border-b border-gray-50"><td className="py-1.5 px-2 text-gray-700 font-medium">{e.nombre} <span className="text-gray-400">({e.codigo})</span></td><td className="text-center px-2 text-gray-600">{e.tiempo_optimo ?? '—'}</td><td className="text-center px-2 text-gray-600">{e.tiempo_alerta ?? '—'}</td><td className="px-2 text-gray-500">{e.dependencia ? (etapas[e.dependencia]?.nombre || e.dependencia) : '—'}</td><td className="text-center px-2">{e.critico ? <span className="text-red-500 font-bold">si</span> : <span className="text-gray-300">no</span>}</td></tr>); })}</tbody>
+                        </table>
+                    </div>
+                    <div className="mt-2 text-[11px] text-gray-600"><span className="font-semibold">Pagos M.O.:</span> ciclo 25 a 25 · solo "Aprobado" · familias criticas: {familias.map(f => <Pill key={f} tone="warn">{f}</Pill>)}</div>
+                </div>
+                <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+                    <h4 className="text-sm font-semibold text-gray-700 mb-1">3. Curvas S — cobertura actual</h4>
+                    <div className="flex items-center gap-3 text-xs mb-2">
+                        <Stat label="Proyectos con curvas" value={curvasKeys.length + ' / ' + nProy} />
+                        <div className={"px-3 py-2 rounded-lg border " + (curvasProyActual > 0 ? "bg-green-50 border-green-200 text-green-700" : "bg-red-50 border-red-200 text-red-600")}>Proyecto actual ({proyectoSel}): {curvasProyActual > 0 ? (curvasProyActual + ' curva(s) configurada(s)') : 'SIN curvas configuradas'}</div>
+                    </div>
+                    <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2"><strong>Limitacion conocida:</strong> las Curvas S son imagenes estaticas de Drive agregadas a mano por proyecto (en codigo). El "% Real" que muestran es una foto, no el % vivo que este mismo panel ya calcula. Optimizacion sugerida: graficarlas desde la data viva.</div>
+                </div>
+                <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+                    <h4 className="text-sm font-semibold text-gray-700 mb-1">4. Supervision de reglas — juzgar y solicitar cambios</h4>
+                    <p className="text-[11px] text-gray-500 mb-3">Estado de cada regla frente al modelo de negocio. Pulsa "Solicitar cambio" para registrar una observacion en Sugerencias.</p>
+                    <div className="space-y-2">
+                        {REGLAS.map(r => { const s = estiloEstado[r.estado]; return (
+                            <div key={r.id} className="rounded-lg border p-3" style={{ background: s.bg, borderColor: s.b }}>
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: s.c, color: '#fff' }}>{s.t}</span>
+                                            <span className="text-sm font-semibold text-gray-800">{r.nombre}</span>
+                                        </div>
+                                        <p className="text-[11px] text-gray-600 mt-1 leading-relaxed">{r.detalle}</p>
+                                    </div>
+                                    <button onClick={() => { setSolReg(solReg === r.id ? null : r.id); setSolTxt(''); }} className="text-[11px] whitespace-nowrap px-2.5 py-1 rounded-md border border-gray-300 bg-white text-gray-600 hover:bg-gray-50">Solicitar cambio</button>
+                                </div>
+                                {solReg === r.id && (
+                                    <div className="mt-2 flex items-end gap-2">
+                                        <textarea value={solTxt} onChange={e => setSolTxt(e.target.value)} rows={2} placeholder={'Que cambio propones para "' + r.nombre + '"? (por que, y como deberia comportarse)'} className="flex-1 text-xs border border-gray-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-400" />
+                                        <button onClick={() => enviarSolicitud(r.nombre)} className="px-3 py-1.5 text-xs bg-violet-600 text-white rounded-lg hover:bg-violet-700 font-medium whitespace-nowrap">Enviar</button>
+                                    </div>
+                                )}
+                            </div>
+                        ); })}
+                    </div>
+                </div>
+                <p className="text-[10px] text-gray-400">Checkpoints de cierre rastreados ({segCheckpoints.length}): {segCheckpoints.join(' · ')}</p>
+            </div>
+        );
+    };
+
+    // ===== LINAJE DE DATOS TAB =====
+    const LinajeDatosTab = () => (
+        <div id="cfg-linaje-wrapper" style={{fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif'}}>
+            <style dangerouslySetInnerHTML={{__html:`#cfg-linaje-wrapper{--bg:#f1f5f9;--fg:#0f172a;--muted:#64748b;--src-fill:#eff6ff;--src-s:#2563eb;--src-t:#1e40af;--etl-fill:#fffbeb;--etl-s:#d97706;--etl-t:#78350f;--sto-fill:#f5f3ff;--sto-s:#7c3aed;--sto-t:#4c1d95;--dsh-fill:#f0fdf4;--dsh-s:#16a34a;--dsh-t:#14532d;--rpt-fill:#f0fdfa;--rpt-s:#0d9488;--rpt-t:#134e4a;--arr:#94a3b8;--arr-lbl:#64748b;}#cfg-linaje-wrapper figcaption{margin-top:14px;font-size:12px;color:var(--muted);line-height:1.7;border-top:1px solid var(--arr);padding-top:12px;}#cfg-linaje-wrapper figcaption strong{color:var(--fg);}#cfg-linaje-wrapper figcaption code{font-size:11px;background:var(--sto-fill);color:var(--sto-t);padding:1px 4px;border-radius:3px;}`}} />
+            <header style={{marginBottom:'16px'}}>
+                <h2 style={{fontSize:'15px',fontWeight:'700',color:'#0f172a',margin:0}}>Linaje de Datos — SG Raíces Dashboard</h2>
+                <p style={{fontSize:'12px',color:'#64748b',marginTop:'3px',margin:'3px 0 0'}}>Trazabilidad del origen de cada dato por módulo, desde la fuente primaria hasta el panel de control y los reportes semanales</p>
+            </header>
+            <figure style={{margin:0,overflowX:'auto'}}>
+                <div dangerouslySetInnerHTML={{__html: SVG_LINAJE_CONTENT}} />
+                <figcaption dangerouslySetInnerHTML={{__html: FIG_LINAJE_CONTENT}} />
+            </figure>
+        </div>
+    );
+
+    return (
+        <div className="fixed inset-0 z-[500] bg-white flex flex-col">
+            <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-gray-50 shrink-0">
+                <div className="flex items-center gap-4 flex-wrap">
+                    <span className="text-sm font-bold text-gray-700">⚙ Configuración General</span>
+                    <div className="flex gap-1 bg-white border border-gray-200 rounded-lg p-1 shadow-sm">
+                        {[["diagrama","Diagrama de Dependencias"],["editor","Editor de Tiempos"],["funcionamiento","Funcionamiento"],["linaje","Linaje de Datos"]].map(([k,l]) => (
+                            <button key={k} onClick={() => setSubTab(k)} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${subTab===k ? "bg-raices-red text-white" : "text-gray-600 hover:bg-gray-100"}`}>{l}</button>
+                        ))}
+                    </div>
+                    {(subTab === 'diagrama' || subTab === 'editor') && (
+                        <div className="flex items-center gap-2">
+                            {dirty && <span className="text-xs text-orange-500 font-medium mr-2">Cambios sin guardar</span>}
+                            <button onClick={restaurar} className="px-3 py-1.5 text-sm border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors">Restaurar Original</button>
+                            <button onClick={exportarJSON} className="px-3 py-1.5 text-sm bg-raices-red text-white rounded-lg hover:bg-opacity-90 transition-colors flex items-center gap-1"><IconDownload /> Exportar JSON</button>
+                        </div>
+                    )}
+                </div>
+                <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors ml-4 shrink-0" title="Cerrar Configuración General">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div className="flex-1 overflow-auto px-6 py-4">
+                {subTab === 'diagrama' && <DiagramaTab />}
+                {subTab === 'editor' && <EditorTab />}
+                {subTab === 'funcionamiento' && <FuncionamientoTab />}
+                {subTab === 'linaje' && <LinajeDatosTab />}
+                {(subTab === 'diagrama' || subTab === 'editor') && (
+                    <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-xs text-yellow-700">
+                        <strong>Nota:</strong> Para aplicar cambios al dashboard, exporta el JSON y reemplaza <code className="bg-yellow-100 px-1 rounded">config/etapas_config.json</code>, luego regenera el dashboard.
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel, personalObra, personalObraRef, personalGlobal }) => {
+    const [subTab, setSubTab] = React.useState('grupos');
 
     // ===== Grupos editor state =====
     const [editingGrupos, setEditingGrupos] = React.useState(JSON.parse(JSON.stringify(grupos)));
@@ -9132,306 +9764,17 @@ const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel, personal
         setGrupos(editingGrupos);
     };
 
-    // ===== DIAGRAMA SUB-TAB =====
-    const DiagramaTab = () => {
-        const NODE_W = 150, NODE_H = 80, LEVEL_GAP = 60, NODE_GAP = 16;
-        const maxNodesInLevel = Math.max(...Object.values(niveles).map(arr => arr.length), 1);
-        const svgHeight = Math.max(maxNodesInLevel * (NODE_H + NODE_GAP) + 40, 300);
-        const svgWidth = (maxNivel + 1) * (NODE_W + LEVEL_GAP) + 60;
-
-        const positions = {};
-        Object.entries(niveles).forEach(([nivel, keys]) => {
-            const n = Number(nivel);
-            const totalH = keys.length * NODE_H + (keys.length - 1) * NODE_GAP;
-            const startY = (svgHeight - totalH) / 2;
-            keys.forEach((k, i) => {
-                positions[k] = { x: 30 + n * (NODE_W + LEVEL_GAP), y: startY + i * (NODE_H + NODE_GAP) };
-            });
-        });
-
-        const esCritica = (k) => secuencia.includes(k);
-        const esFlexible = (k) => etapas[k].flexible || etapas[k].ventana_flexible;
-
-        return (
-            <div className="overflow-auto bg-gray-50 border border-gray-200 rounded-lg p-4">
-                <svg width={svgWidth} height={svgHeight} className="block">
-                    {allKeys.map(k => {
-                        const dep = etapas[k].dependencia;
-                        if (!dep || !positions[dep] || !positions[k]) return null;
-                        const from = positions[dep]; const to = positions[k];
-                        const x1 = from.x + NODE_W, y1 = from.y + NODE_H / 2;
-                        const x2 = to.x, y2 = to.y + NODE_H / 2;
-                        const midX = (x1 + x2) / 2;
-                        const isCrit = esCritica(k) && esCritica(dep);
-                        return (
-                            <g key={`conn-${k}`}>
-                                <path d={`M${x1},${y1} C${midX},${y1} ${midX},${y2} ${x2},${y2}`} fill="none" stroke={isCrit ? "#8b5cf6" : "#d1d5db"} strokeWidth={isCrit ? 2.5 : 1.5} strokeDasharray={esFlexible(k) ? "6,3" : "none"} />
-                                <polygon points={`${x2},${y2} ${x2-8},${y2-4} ${x2-8},${y2+4}`} fill={isCrit ? "#8b5cf6" : "#d1d5db"} />
-                            </g>
-                        );
-                    })}
-                    {allKeys.map(k => {
-                        const pos = positions[k]; if (!pos) return null;
-                        const e = etapas[k];
-                        const crit = esCritica(k);
-                        const flex = esFlexible(k);
-                        return (
-                            <g key={k} transform={`translate(${pos.x},${pos.y})`}>
-                                <rect width={NODE_W} height={NODE_H} rx={8} ry={8} fill={crit ? "#faf5ff" : flex ? "#f9fafb" : "white"} stroke={crit ? "#8b5cf6" : flex ? "#9ca3af" : "#e5e7eb"} strokeWidth={crit ? 2.5 : 1.5} strokeDasharray={flex ? "6,3" : "none"} />
-                                <text x={NODE_W/2} y={20} textAnchor="middle" fontSize="11" fontWeight="600" fill={crit ? "#6d28d9" : "#374151"}>{e.nombre}</text>
-                                <text x={NODE_W/2} y={35} textAnchor="middle" fontSize="10" fill="#9ca3af" fontFamily="IBM Plex Mono">{e.codigo} {crit ? "| CRITICO" : flex ? "| flexible" : ""}</text>
-                                <text x={NODE_W/2} y={52} textAnchor="middle" fontSize="10" fill="#6b7280">Duración: {e.duracion}d</text>
-                                {e.tiempo_optimo !== null && (
-                                    <g>
-                                        <rect x={10} y={60} width={(NODE_W-20)*0.5} height={6} rx={3} fill="#22c55e" opacity={0.6} />
-                                        <rect x={10 + (NODE_W-20)*0.5} y={60} width={(NODE_W-20)*0.5} height={6} rx={3} fill="#eab308" opacity={0.6} />
-                                        <text x={18} y={69} fontSize="8" fill="#166534">{e.tiempo_optimo}d</text>
-                                        <text x={NODE_W-30} y={69} fontSize="8" fill="#854d0e">{e.tiempo_alerta}d</text>
-                                    </g>
-                                )}
-                            </g>
-                        );
-                    })}
-                </svg>
-                <div className="mt-4 flex flex-wrap gap-4 text-xs text-gray-500 border-t border-gray-200 pt-3">
-                    <div className="flex items-center gap-2"><div className="w-8 h-4 rounded border-2 border-violet-500 bg-violet-50" /><span>Ruta crítica</span></div>
-                    <div className="flex items-center gap-2"><div className="w-8 h-4 rounded border-2 border-gray-300 border-dashed bg-gray-50" /><span>Etapa flexible</span></div>
-                    <div className="flex items-center gap-2"><div className="w-8 h-4 rounded border-2 border-gray-200 bg-white" /><span>Etapa estándar</span></div>
-                    <div className="flex items-center gap-2"><div className="w-8 h-0.5 bg-violet-500" /><span>Dependencia crítica</span></div>
-                    <div className="flex items-center gap-2"><div className="flex gap-0.5"><div className="w-4 h-2 rounded bg-green-500 opacity-60" /><div className="w-4 h-2 rounded bg-yellow-500 opacity-60" /></div><span>Tiempos: óptimo | alerta</span></div>
-                </div>
-            </div>
-        );
-    };
-
-    // ===== EDITOR SUB-TAB =====
-    const EditorTab = () => {
-        return (
-            <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                    <thead>
-                        <tr className="text-left text-gray-500 border-b border-gray-200 bg-gray-50">
-                            <th className="py-2 px-3">Cód</th>
-                            <th className="py-2 px-3">Etapa</th>
-                            <th className="py-2 px-3 text-center">Duración</th>
-                            <th className="py-2 px-3 text-center">T. Óptimo</th>
-                            <th className="py-2 px-3 text-center">T. Alerta</th>
-                            <th className="py-2 px-3">Depende de</th>
-                            <th className="py-2 px-3 text-center">Crítica</th>
-                            <th className="py-2 px-3 text-center">En Secuencia</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {allKeys.map((key) => {
-                            const e = etapas[key];
-                            const enSeq = secuencia.includes(key);
-                            return (
-                                <tr key={key} className={`border-b border-gray-100 ${enSeq ? "bg-violet-50/50" : ""}`}>
-                                    <td className="py-2 px-3 font-mono text-gray-600">{e.codigo}</td>
-                                    <td className="py-2 px-3 text-gray-800 font-medium">{e.nombre}</td>
-                                    <td className="py-2 px-3 text-center">
-                                        <input type="number" min="1" max="60" value={e.duracion || 0} onChange={(ev) => updateEtapa(key, 'duracion', parseInt(ev.target.value) || 0)} className="w-14 text-center border border-gray-300 rounded px-1 py-0.5 text-sm focus:ring-1 focus:ring-violet-400 focus:border-violet-400" />
-                                    </td>
-                                    <td className="py-2 px-3 text-center">
-                                        <input type="number" min="0" max="60" value={e.tiempo_optimo ?? ''} placeholder="-" onChange={(ev) => { const v = ev.target.value === '' ? null : parseInt(ev.target.value); updateEtapa(key, 'tiempo_optimo', v); }} className="w-14 text-center border border-gray-300 rounded px-1 py-0.5 text-sm focus:ring-1 focus:ring-green-400 focus:border-green-400" />
-                                    </td>
-                                    <td className="py-2 px-3 text-center">
-                                        <input type="number" min="0" max="60" value={e.tiempo_alerta ?? ''} placeholder="-" onChange={(ev) => { const v = ev.target.value === '' ? null : parseInt(ev.target.value); updateEtapa(key, 'tiempo_alerta', v); }} className="w-14 text-center border border-gray-300 rounded px-1 py-0.5 text-sm focus:ring-1 focus:ring-red-400 focus:border-red-400" />
-                                    </td>
-                                    <td className="py-2 px-3">
-                                        <select value={e.dependencia || ''} onChange={(ev) => updateEtapa(key, 'dependencia', ev.target.value || null)} className="w-full border border-gray-300 rounded px-1 py-0.5 text-sm text-gray-700 focus:ring-1 focus:ring-violet-400 bg-white">
-                                            <option value="">— Ninguna —</option>
-                                            {allKeys.filter(k => k !== key).map(k => (
-                                                <option key={k} value={k}>{etapas[k].nombre} ({etapas[k].codigo})</option>
-                                            ))}
-                                        </select>
-                                    </td>
-                                    <td className="py-2 px-3 text-center">
-                                        <input type="checkbox" checked={!!e.critico} onChange={() => toggleCritico(key)} className="w-4 h-4 rounded border-gray-300 text-violet-600 focus:ring-violet-400" />
-                                    </td>
-                                    <td className="py-2 px-3 text-center">
-                                        <input type="checkbox" checked={enSeq} onChange={() => toggleSecuencia(key)} className="w-4 h-4 rounded border-gray-300 text-violet-600 focus:ring-violet-400" />
-                                    </td>
-                                </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
-            </div>
-        );
-    };
-
-    // ========== FUNCIONAMIENTO (autodocumentacion viva del dashboard) ==========
-    const FuncionamientoTab = () => {
-        const seg = (typeof window !== 'undefined' && window._SEG_DIAG) || {};
-        const nProy = (typeof PROYECTOS_DATA !== 'undefined' ? PROYECTOS_DATA.length : 0);
-        const nViv = viviendas.length;
-        const nInsp = (typeof INSPECCIONES_DATA !== 'undefined' ? INSPECCIONES_DATA.length : 0);
-        const te1Count = (typeof BENEF_CON_TE1 !== 'undefined' && BENEF_CON_TE1 && BENEF_CON_TE1.size) ? BENEF_CON_TE1.size : 0;
-        const curvasCfg = (typeof CURVAS_S_CONFIG !== 'undefined' ? CURVAS_S_CONFIG : {});
-        const curvasKeys = Object.keys(curvasCfg);
-        const curvasProyActual = (curvasCfg[proyectoSel] || []).length;
-        const tablas = (typeof TABLES_TO_FETCH !== 'undefined' ? TABLES_TO_FETCH.split(',') : []);
-        const familias = (typeof FAMILIAS_CRITICAS !== 'undefined' ? FAMILIAS_CRITICAS : []);
-        const segCheckpoints = (typeof window !== 'undefined' && window._SEG_COL_MAP) ? Object.keys(window._SEG_COL_MAP)
-            : ['te1', 'visita_as', 'resol_as', 'visita_f1', 'fecha_f1', 'artefactado', 'empalme', 'visita_dom', 'fecha_v_dom', 'recepcion_dom', 'fecha_recep', 'obs'];
-        const endpoint = (typeof APPS_SCRIPT_URL !== 'undefined' ? APPS_SCRIPT_URL : '');
-
-        const [solReg, setSolReg] = React.useState(null);
-        const [solTxt, setSolTxt] = React.useState('');
-        const enviarSolicitud = (regla) => {
-            const t = solTxt.trim();
-            if (!t) return;
-            const id = Date.now();
-            const fecha = (typeof fechaChile === 'function') ? fechaChile() : new Date().toISOString();
-            fbDB.ref('sugerencias/' + id).set({ id, texto: '[Funcionamiento · ' + regla + '] ' + t, imagen: null, fecha, resuelta: false });
-            setSolReg(null); setSolTxt('');
-            alert('Solicitud registrada en Sugerencias. El equipo la revisara desde ese panel.');
-        };
-
-        const REGLAS = [
-            { id: 'avance',    nombre: 'Formula % Avance (70/25/5)',        estado: 'ok',   detalle: '% Total = 0.70 x %Viv + 0.25 x %RC + 0.05 x %Hab. Coincide con la definicion de negocio. Cada fila de Ejecucion es un delta que se suma por beneficiario.' },
-            { id: 'solpago',   nombre: 'Pagos M.O. — solo "Aprobado"',      estado: 'ok',   detalle: 'Suma montos de Solpago cuyo ESTADO incluye "aprobad". Los no aprobados no cuentan.' },
-            { id: 'ciclo',     nombre: 'Ciclo de pago 25 a 25',             estado: 'ok',   detalle: 'Un pago con fecha dia >= 25 se contabiliza en el mes siguiente (no calendario natural).' },
-            { id: 'te1',       nombre: 'TE1 — triple fuente (OR logico)',   estado: 'ok',   detalle: 'Prendido si CUALQUIERA: set embebido (' + te1Count + ' IDs) OR columna en perfil Beneficiario OR columna en tabla de cierre.' },
-            { id: 'estrella',  nombre: 'Comentarios publicos (estrella)',   estado: 'ok',   detalle: 'Solo las observaciones marcadas con estrella se muestran en el informe Estado General. El resto son internas.' },
-            { id: 'seg',       nombre: 'Matching de columnas de Cierre',    estado: 'warn', detalle: 'SEG_RULES normaliza nombres (must/not) y tolera variantes de AppSheet, pero un renombre de columna lo puede romper en silencio. Tabla en uso: ' + (seg.tableUsed || '—') + '.' },
-            { id: 'semaforo',  nombre: 'Semaforo de plazos por etapa',      estado: 'warn', detalle: 'El codigo usa tiempo_optimo/alerta por etapa (desde despacho de la dependencia). CLAUDE.md describe otro modelo (dias desde ultima solicitud 7/14). Conviene definir UNO solo.' },
-            { id: 'config',    nombre: 'Tiempos de etapa — fuente unica',   estado: 'warn', detalle: 'Hoy existen 3 copias: ETAPAS_CONFIG embebido en este HTML, config/etapas_config.json y Etapas.md. Pueden divergir; el dashboard usa el embebido.' },
-            { id: 'despachos', nombre: 'Ritmo Despachos (proxy temporal)',  estado: 'warn', detalle: 'Es un proxy de actividad (conteo de despachos por mes). Pendiente reemplazar por % avance real desde los deltas de Ejecucion.' },
-            { id: 'curvas',    nombre: 'Curvas S — imagenes estaticas',     estado: 'bad',  detalle: 'Son imagenes PNG de Drive hardcodeadas por proyecto (CURVAS_S_CONFIG), generadas afuera. Estan desconectadas del % real vivo que el dashboard YA calcula. El "% Real" mostrado puede estar desactualizado.' },
-            { id: 'firebase',  nombre: 'Reglas de Firebase abiertas',       estado: 'bad',  detalle: 'El RTDB no tiene autenticacion: cualquiera con la URL puede leer y escribir observaciones, grupos, etc. Riesgo de integridad de lo supervisado.' },
-        ];
-        const estiloEstado = { ok: { c: '#16a34a', bg: '#f0fdf4', b: '#bbf7d0', t: 'OK' }, warn: { c: '#d97706', bg: '#fffbeb', b: '#fde68a', t: 'REVISAR' }, bad: { c: '#dc2626', bg: '#fef2f2', b: '#fecaca', t: 'CORREGIR' } };
-
-        const Stat = ({ label, value, sub }) => (
-            <div className="bg-white rounded-lg border border-gray-200 px-3 py-2">
-                <div className="text-[18px] font-bold text-gray-800 leading-none">{value}</div>
-                <div className="text-[10px] text-gray-500 mt-1">{label}</div>
-                {sub && <div className="text-[9px] text-gray-400">{sub}</div>}
-            </div>
-        );
-        const Pill = ({ children, tone }) => (
-            <span className="inline-block text-[10px] font-medium px-2 py-0.5 rounded-full mr-1 mb-1" style={{ background: tone === 'warn' ? '#fffbeb' : tone === 'bad' ? '#fef2f2' : '#eff6ff', color: tone === 'warn' ? '#b45309' : tone === 'bad' ? '#b91c1c' : '#1d4ed8', border: '1px solid ' + (tone === 'warn' ? '#fde68a' : tone === 'bad' ? '#fecaca' : '#bfdbfe') }}>{children}</span>
-        );
-
-        return (
-            <div className="space-y-5">
-                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-                    <h3 className="text-sm font-semibold text-blue-800 mb-1">Funcionamiento del Dashboard (ficha tecnica viva)</h3>
-                    <p className="text-xs text-blue-600 leading-relaxed">
-                        Esta seccion documenta — con los valores reales cargados en este momento — de donde sale la informacion,
-                        que reglas de negocio aplica el panel y como se calcula cada cosa. Sirve para <strong>supervisar las reglas, juzgarlas y solicitar cambios</strong> sin
-                        salir del dashboard. En cada regla puedes pulsar <em>"Solicitar cambio"</em> y queda registrado en el panel de Sugerencias.
-                    </p>
-                </div>
-
-                {/* ---- FUENTES DE DATOS (EN VIVO) ---- */}
-                <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-                    <h4 className="text-sm font-semibold text-gray-700 mb-3">1. Fuentes de informacion <span className="text-[10px] font-normal text-green-600">● en vivo</span></h4>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
-                        <Stat label="Proyectos cargados" value={nProy} />
-                        <Stat label="Viviendas (proy. actual)" value={nViv} sub={proyectoSel} />
-                        <Stat label="Con inspeccion/avance" value={nInsp} />
-                        <Stat label="Beneficiarios con TE1" value={te1Count} sub="set embebido" />
-                    </div>
-                    <div className="text-xs text-gray-600 space-y-1.5">
-                        <div><span className="font-semibold text-gray-700">Google Sheets</span> via Apps Script <code className="bg-gray-100 px-1 rounded text-[10px]">{endpoint ? (endpoint.slice(0, 52) + '…') : '—'}</code></div>
-                        <div className="flex flex-wrap items-center"><span className="font-semibold text-gray-700 mr-1">Tablas descargadas:</span>{tablas.map(t => <Pill key={t}>{t.trim()}</Pill>)}</div>
-                        <div><span className="font-semibold text-gray-700">Firebase RTDB</span> (lectura+escritura): <span className="text-gray-500">grupos · observaciones · actividades · consultas · muestras_hormigon · sugerencias · proyectos_terminados · ocultados · resumen_comentarios</span></div>
-                        <div><span className="font-semibold text-gray-700">Tabla de cierre en uso:</span> <code className="bg-gray-100 px-1 rounded text-[10px]">{seg.tableUsed || '—'}</code> <span className="text-gray-400">({seg.segMatchedCount != null ? seg.segMatchedCount : '?'} matches de {seg.benefDataLen != null ? seg.benefDataLen : '?'} benef.)</span></div>
-                        <div><span className="font-semibold text-gray-700">Google Drive:</span> imagenes de Curvas S (estaticas, cargadas como thumbnail)</div>
-                    </div>
-                </div>
-
-                {/* ---- SEMAFORO DE PLAZOS (leido de la config viva) ---- */}
-                <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-                    <h4 className="text-sm font-semibold text-gray-700 mb-1">2. Reglas de plazos por etapa <span className="text-[10px] font-normal text-green-600">● refleja el Editor de Tiempos</span></h4>
-                    <p className="text-[11px] text-gray-500 mb-2">Verde si dias &lt; optimo · Amarillo entre optimo y alerta · Rojo si &gt;= alerta. Si editas en "Editor de Tiempos", esta tabla cambia.</p>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-xs">
-                            <thead><tr className="text-gray-400 border-b border-gray-200"><th className="text-left py-1.5 px-2">Etapa</th><th className="text-center px-2">Optimo</th><th className="text-center px-2">Alerta</th><th className="text-left px-2">Depende de</th><th className="text-center px-2">Critica</th></tr></thead>
-                            <tbody>
-                                {Object.keys(etapas).map(k => { const e = etapas[k]; return (
-                                    <tr key={k} className="border-b border-gray-50">
-                                        <td className="py-1.5 px-2 text-gray-700 font-medium">{e.nombre} <span className="text-gray-400">({e.codigo})</span></td>
-                                        <td className="text-center px-2 text-gray-600">{e.tiempo_optimo ?? '—'}</td>
-                                        <td className="text-center px-2 text-gray-600">{e.tiempo_alerta ?? '—'}</td>
-                                        <td className="px-2 text-gray-500">{e.dependencia ? (etapas[e.dependencia]?.nombre || e.dependencia) : '—'}</td>
-                                        <td className="text-center px-2">{e.critico ? <span className="text-red-500 font-bold">si</span> : <span className="text-gray-300">no</span>}</td>
-                                    </tr>
-                                ); })}
-                            </tbody>
-                        </table>
-                    </div>
-                    <div className="mt-2 text-[11px] text-gray-600"><span className="font-semibold">Pagos M.O.:</span> ciclo 25 a 25 · solo "Aprobado" · familias criticas: {familias.map(f => <Pill key={f} tone="warn">{f}</Pill>)}</div>
-                </div>
-
-                {/* ---- CURVAS S (cobertura viva) ---- */}
-                <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-                    <h4 className="text-sm font-semibold text-gray-700 mb-1">3. Curvas S — cobertura actual</h4>
-                    <div className="flex items-center gap-3 text-xs mb-2">
-                        <Stat label="Proyectos con curvas" value={curvasKeys.length + ' / ' + nProy} />
-                        <div className={"px-3 py-2 rounded-lg border " + (curvasProyActual > 0 ? "bg-green-50 border-green-200 text-green-700" : "bg-red-50 border-red-200 text-red-600")}>
-                            Proyecto actual ({proyectoSel}): {curvasProyActual > 0 ? (curvasProyActual + ' curva(s) configurada(s)') : 'SIN curvas configuradas'}
-                        </div>
-                    </div>
-                    <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2">
-                        <strong>Limitacion conocida:</strong> las Curvas S son imagenes estaticas de Drive agregadas a mano por proyecto (en codigo). El "% Real" que muestran es una foto, no el % vivo que este mismo panel ya calcula. Optimizacion sugerida: graficarlas desde la data viva.
-                    </div>
-                </div>
-
-                {/* ---- SUPERVISION DE REGLAS + SOLICITAR CAMBIO ---- */}
-                <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-                    <h4 className="text-sm font-semibold text-gray-700 mb-1">4. Supervision de reglas — juzgar y solicitar cambios</h4>
-                    <p className="text-[11px] text-gray-500 mb-3">Estado de cada regla frente al modelo de negocio. Pulsa "Solicitar cambio" para registrar una observacion en Sugerencias.</p>
-                    <div className="space-y-2">
-                        {REGLAS.map(r => { const s = estiloEstado[r.estado]; return (
-                            <div key={r.id} className="rounded-lg border p-3" style={{ background: s.bg, borderColor: s.b }}>
-                                <div className="flex items-start justify-between gap-3">
-                                    <div className="flex-1">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: s.c, color: '#fff' }}>{s.t}</span>
-                                            <span className="text-sm font-semibold text-gray-800">{r.nombre}</span>
-                                        </div>
-                                        <p className="text-[11px] text-gray-600 mt-1 leading-relaxed">{r.detalle}</p>
-                                    </div>
-                                    <button onClick={() => { setSolReg(solReg === r.id ? null : r.id); setSolTxt(''); }} className="text-[11px] whitespace-nowrap px-2.5 py-1 rounded-md border border-gray-300 bg-white text-gray-600 hover:bg-gray-50">Solicitar cambio</button>
-                                </div>
-                                {solReg === r.id && (
-                                    <div className="mt-2 flex items-end gap-2">
-                                        <textarea value={solTxt} onChange={e => setSolTxt(e.target.value)} rows={2} placeholder={'Que cambio propones para "' + r.nombre + '"? (por que, y como deberia comportarse)'} className="flex-1 text-xs border border-gray-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-400" />
-                                        <button onClick={() => enviarSolicitud(r.nombre)} className="px-3 py-1.5 text-xs bg-violet-600 text-white rounded-lg hover:bg-violet-700 font-medium whitespace-nowrap">Enviar</button>
-                                    </div>
-                                )}
-                            </div>
-                        ); })}
-                    </div>
-                </div>
-
-                <p className="text-[10px] text-gray-400">Checkpoints de cierre rastreados ({segCheckpoints.length}): {segCheckpoints.join(' · ')}</p>
-            </div>
-        );
-    };
-
     return (
         <div>
             {/* Sub-tabs */}
             <div className="flex items-center justify-between mb-4">
                 <div className="flex gap-1 bg-white border border-gray-200 rounded-lg p-1 shadow-sm">
-                    {[["grupos", "Grupos de Trabajo"], ["diagrama", "Diagrama de Dependencias"], ["editor", "Editor de Tiempos"], ["funcionamiento", "Funcionamiento"]].map(([k, l]) => (
+                    {[["grupos", "Grupos de Trabajo"]].map(([k, l]) => (
                         <button key={k} onClick={() => setSubTab(k)} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${subTab === k ? "bg-raices-red text-white" : "text-gray-600 hover:bg-gray-100"}`}>
                             {l}
                         </button>
                     ))}
                 </div>
-                {(subTab === 'diagrama' || subTab === 'editor') && (
-                    <div className="flex items-center gap-2">
-                        {dirty && <span className="text-xs text-orange-500 font-medium mr-2">Cambios sin guardar</span>}
-                        <button onClick={restaurar} className="px-3 py-1.5 text-sm border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors">Restaurar Original</button>
-                        <button onClick={exportarJSON} className="px-3 py-1.5 text-sm bg-raices-red text-white rounded-lg hover:bg-opacity-90 transition-colors flex items-center gap-1"><IconDownload /> Exportar JSON</button>
-                    </div>
-                )}
             </div>
 
             {/* ========== GRUPOS ========== */}
@@ -9761,20 +10104,6 @@ const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel, personal
                 </div>
             )}
 
-            {/* ========== DIAGRAMA ========== */}
-            {subTab === 'diagrama' && <DiagramaTab />}
-
-            {/* ========== EDITOR ========== */}
-            {subTab === 'editor' && <EditorTab />}
-
-            {/* ========== FUNCIONAMIENTO ========== */}
-            {subTab === 'funcionamiento' && <FuncionamientoTab />}
-
-            {(subTab === 'diagrama' || subTab === 'editor') && (
-                <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-xs text-yellow-700">
-                    <strong>Nota:</strong> Para aplicar cambios al dashboard, exporta el JSON y reemplaza <code className="bg-yellow-100 px-1 rounded">config/etapas_config.json</code>, luego regenera el dashboard.
-                </div>
-            )}
         </div>
     );
 };
@@ -10530,6 +10859,7 @@ const App = () => {
     const personalGlobalRef = React.useRef(null);
     const [showModalPersonal, setShowModalPersonal] = React.useState(false);
     const [showInformes, setShowInformes] = React.useState(false);
+    const [showConfigGeneral, setShowConfigGeneral] = React.useState(false);
     const informesRef = React.useRef(null);
     React.useEffect(() => {
         const handler = e => { if (informesRef.current && !informesRef.current.contains(e.target)) setShowInformes(false); };
@@ -11057,10 +11387,12 @@ const App = () => {
 
     const totalHallazgos = validaciones.reduce((s, c) => s + c.items.length, 0);
 
-    const tabs = [["viviendas","Viviendas"],["matriz","Matriz"],["distribucion","Distribución"],["financiero","Financiero"],["mano_obra","M.O."],["estados_pago","Estados de Pago"],["estado_general","Estado General"],["configuracion","Configuración"]];
+    const tabs = [["viviendas","Viviendas"],["matriz","Matriz"],["distribucion","Distribución"],["financiero","Financiero"],["mano_obra","M.O."],["estados_pago","Estados de Pago"],["estado_general","Estado General"],["configuracion","Configuración Obra"]];
 
     return (
         <div className="min-h-screen bg-gray-50">
+            {/* CONFIGURACION GENERAL MODAL */}
+            <ConfigGeneralModal show={showConfigGeneral} onClose={() => setShowConfigGeneral(false)} viviendas={viviendas} proyectoSel={proyectoSel} />
             {/* TOP BAR */}
             <div className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
                 <div className="max-w-[1400px] mx-auto px-4 py-3">
@@ -11253,6 +11585,10 @@ const App = () => {
                                 </div>
                             )}
                         </div>
+                        <button type="button" onClick={() => setShowConfigGeneral(true)} title="Configuración general transversal a todas las obras" className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-slate-700 bg-slate-50 border border-slate-300 hover:bg-slate-100 transition-colors whitespace-nowrap shrink-0">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14M12 2v2m0 16v2m-7.07-4.93 1.41-1.41M17.66 6.34l1.41-1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+                            Configuración General
+                        </button>
                         {kpis.esFinalizado ? (
                             <span className="flex items-center gap-1.5 px-2.5 py-1.5 bg-green-50 border border-green-300 rounded-lg text-[11px] font-semibold text-green-700 whitespace-nowrap shrink-0">
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
