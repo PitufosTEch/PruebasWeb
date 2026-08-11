@@ -10352,13 +10352,16 @@ function buildAlertasGlobales() {
         const finalizado = p.estado === 'finalizado';
         const vivs = benefByProy[pid] || [];
         const nViv = vivs.length;
+        const recep = vivs.filter(v => v.fecha_recepcion).length;
+        // obra efectivamente terminada: marcada finalizado O con 100% de recepciones
+        const terminada = finalizado || (nViv > 0 && recep === nViv);
         const av = AVANCE_MENSUAL_DATA[pid] || null;
-        const avance = AVANCE_GANTT_DATA[pid]?.pct ?? 0;
+        const _rawPct = AVANCE_GANTT_DATA[pid] != null ? AVANCE_GANTT_DATA[pid].pct : null;
+        const avance = (terminada && _rawPct == null) ? 100 : (_rawPct != null ? _rawPct : 0);
         const serie = av ? av.serie : [];
         const montoProy = (MONTOS_PROY_DATA[pid] || {}).total || 0;
         const pagado = pagadoByProy[pid] || 0;
         const pctCobrado = montoProy > 0 ? (pagado / montoProy * 100) : null;
-        const recep = vivs.filter(v => v.fecha_recepcion).length;
         // ritmo (promedio puntos/mes en los ultimos N meses calendario hasta hoy)
         let ritmo = null;
         if (av && serie.length) {
@@ -10388,28 +10391,28 @@ function buildAlertasGlobales() {
             if (garDiasMin < 0) alertas.push({ tipo: 'garantia', sev: 3, label: 'Garantía vencida', detalle: `hace ${Math.abs(garDiasMin)}d` });
             else if (garDiasMin < cfg.garantiaDias) alertas.push({ tipo: 'garantia', sev: garDiasMin < 15 ? 2 : 1, label: 'Garantía por vencer', detalle: `en ${garDiasMin}d` });
         }
-        // 2) Contrato (solo obras no finalizadas)
-        if (!finalizado && contratoDias !== null) {
+        // 2) Contrato (solo obras no terminadas)
+        if (!terminada && contratoDias !== null) {
             if (contratoDias < 0) alertas.push({ tipo: 'contrato', sev: 3, label: 'Contrato vencido', detalle: `hace ${Math.abs(contratoDias)}d` });
             else if (contratoDias < cfg.contratoDias) alertas.push({ tipo: 'contrato', sev: 2, label: 'Contrato por vencer', detalle: `en ${contratoDias}d` });
         }
-        // 3) Cobro atrasado vs avance (no finalizado, con Montos)
-        if (!finalizado && pctCobrado !== null) {
+        // 3) Cobro atrasado vs avance (solo obras no terminadas, con Montos)
+        if (!terminada && pctCobrado !== null) {
             const gap = avance - pctCobrado;
             if (gap > cfg.cobroGapPts) alertas.push({ tipo: 'cobro', sev: gap > 30 ? 2 : 1, label: 'Cobro atrasado', detalle: `avance ${Math.round(avance)}% vs cobrado ${Math.round(pctCobrado)}%` });
         }
         // 4) Obra >=90% sin recepcion total
-        if (avance >= cfg.recepcionAvance && recep < nViv) {
+        if (!terminada && avance >= cfg.recepcionAvance && recep < nViv) {
             alertas.push({ tipo: 'recepcion', sev: 2, label: 'Obra avanzada sin recepción', detalle: `${recep}/${nViv} recepcionadas` });
         }
         // 5) Avance atrasado vs PLAN (avance real por debajo del esperado segun el
         //    plazo del contrato). Reemplaza el umbral absoluto pts/mes, que daba
         //    falsos positivos en obras nuevas o adelantadas (ej. Ñuke Mapu).
-        if (!finalizado && atraso !== null && avance < 98 && atraso > cfg.atrasoPts) {
+        if (!terminada && atraso !== null && avance < 98 && atraso > cfg.atrasoPts) {
             alertas.push({ tipo: 'ritmo', sev: atraso > 35 ? 2 : 1, label: 'Avance atrasado', detalle: `${Math.round(avance)}% real vs ${Math.round(esperado)}% esperado (${Math.round(atraso)} pts)` });
         }
         const sev = alertas.reduce((m, a) => Math.max(m, a.sev), 0);
-        return { pid, nombre: `${p.ID_proy} · ${p.NOMBRE_PROYECTO}`, comuna: p.COMUNA, finalizado, avance, serie, ritmo, esperado, atraso, pctCobrado, recep, nViv, contratoDias, garDiasMin, alertas, sev };
+        return { pid, nombre: `${p.ID_proy} · ${p.NOMBRE_PROYECTO}`, comuna: p.COMUNA, finalizado, terminada, avance, serie, ritmo, esperado, atraso, pctCobrado, recep, nViv, contratoDias, garDiasMin, alertas, sev };
     });
 }
 
@@ -10419,7 +10422,7 @@ const AlertasGlobales = ({ onClose, onSelectProyecto }) => {
     const [ocultarTerminados, setOcultarTerminados] = React.useState(true);
     const [orden, setOrden] = React.useState('urgencia');
     // base segun "ocultar terminados"; los KPI y la tabla respetan este filtro
-    const base = ocultarTerminados ? data.filter(d => !d.finalizado) : data;
+    const base = ocultarTerminados ? data.filter(d => !d.terminada) : data;
     const conAlertas = base.filter(d => d.alertas.length > 0);
     const resumen = React.useMemo(() => {
         const r = { obras: conAlertas.length, criticas: conAlertas.filter(d => d.sev >= 3).length, porTipo: {} };
