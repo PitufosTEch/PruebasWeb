@@ -1,6 +1,17 @@
 <!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Tiempos de Ejecucion — SCRaices</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+const _fbApp = firebase.initializeApp({
+  apiKey:"AIzaSyDuM11JE-7klfBBrWsSSi1DF71HiXXYpW0",
+  databaseURL:"https://scraices-dashboard-default-rtdb.firebaseio.com",
+  projectId:"scraices-dashboard",appId:"1:158927821043:web:2ca9bfdaff066dcc527f86"
+},'tiempos');
+const _fbDB = firebase.database(_fbApp);
+const FB_TIEMPOS = 'tiempos_ejecucion_ocultos';
+</script>
 <script src="https://cdn.tailwindcss.com"></script>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -94,7 +105,20 @@ let sortField = 'fi';
 let sortAsc = true;
 
 function getOcultos() { try { return JSON.parse(localStorage.getItem(LS_KEY)) || []; } catch { return []; } }
-function setOcultos(arr) { localStorage.setItem(LS_KEY, JSON.stringify(arr)); render(); renderModal(); }
+function setOcultos(arr) {
+  localStorage.setItem(LS_KEY, JSON.stringify(arr));
+  _fbDB.ref(FB_TIEMPOS).set(arr.length ? arr : null);
+  render(); renderModal();
+}
+
+// Load ocultos from Firebase on startup (Firebase wins over localStorage)
+_fbDB.ref(FB_TIEMPOS).once('value').then(snap => {
+  const fbVal = snap.val();
+  if (Array.isArray(fbVal) && fbVal.length) {
+    localStorage.setItem(LS_KEY, JSON.stringify(fbVal));
+    render(); renderModal();
+  }
+});
 
 function ocultarProy(nombre) {
     const oc = getOcultos();

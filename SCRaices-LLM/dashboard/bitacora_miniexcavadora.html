@@ -743,8 +743,16 @@ document.getElementById('next-month').addEventListener('click', () => {
    OPERADOR
 ═══════════════════════════════════════════════════════ */
 const opInp = document.getElementById('op-input');
-opInp.value = localStorage.getItem(LS_OP) || '';
-opInp.addEventListener('input', () => localStorage.setItem(LS_OP, opInp.value));
+// Cargar nombre operador desde Firebase, fallback a localStorage
+_fbDB.ref('bitacora_miniexcavadora_operador').once('value').then(snap => {
+  const val = snap.val();
+  if (val) { opInp.value = val; localStorage.setItem(LS_OP, val); }
+  else { opInp.value = localStorage.getItem(LS_OP) || ''; }
+});
+opInp.addEventListener('input', () => {
+  localStorage.setItem(LS_OP, opInp.value);
+  _fbDB.ref('bitacora_miniexcavadora_operador').set(opInp.value);
+});
 
 /* ═══════════════════════════════════════════════════════
    EXPORTAR EXCEL
