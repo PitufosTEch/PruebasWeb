@@ -2803,7 +2803,7 @@ const HeaderProyecto = ({ proy, garantiasProy, eeppResumen, kpis, avanceInsp = 0
                                 </div>
                                 {avanceInsp > 0 && (
                                     <div className="absolute top-0 bottom-0 flex flex-col items-center pointer-events-none" style={{ left: `${Math.min(avanceInsp, 100)}%`, transform: 'translateX(-50%)' }} title={`Avance físico real (Gantt de control): ${avanceInsp}%`}>
-                                        <span className="text-[9px] font-bold text-red-600 leading-none">{avanceInsp}%</span>
+                                        <span className="text-[9px] font-bold text-red-600 leading-none">{avanceInsp.toFixed(2)}%</span>
                                         <div className="w-0.5 bg-red-600 flex-1"></div>
                                     </div>
                                 )}
@@ -2813,7 +2813,7 @@ const HeaderProyecto = ({ proy, garantiasProy, eeppResumen, kpis, avanceInsp = 0
                                 <div><span className="text-yellow-600 font-semibold">Ingresado</span><br/><span className="font-mono font-bold text-gray-700">{formatUF(ingresado)}</span> <span className="text-gray-400">· {wtxt(ingresado)}</span></div>
                                 <div><span className="text-violet-600 font-semibold">Pendiente</span><br/><span className="font-mono font-bold text-gray-700">{base > 0 ? formatUF(pendiente) : '—'}</span> <span className="text-gray-400">· {wtxt(pendiente)}</span></div>
                             </div>
-                            <p className="text-[9px] text-red-500 mt-1 flex items-center gap-1"><span className="inline-block w-0.5 h-3 bg-red-600" />Avance físico (inspecciones): {avanceInsp}%</p>
+                            <p className="text-[9px] text-red-500 mt-1 flex items-center gap-1"><span className="inline-block w-0.5 h-3 bg-red-600" />Avance físico real: {avanceInsp.toFixed(2)}%</p>
                         </div>
                     );
                 })()}
@@ -11242,10 +11242,11 @@ const App = () => {
         return { pagado: montoPag, ingresado: montoIng, preparacion: montoPrep, total: montoPag + montoIng + montoPrep };
     }, [eeppProy]);
 
-    // Avance fisico segun inspecciones (promedio pct_total de las viviendas).
-    const avanceInsp = React.useMemo(() => viviendas.length
-        ? Math.round(viviendas.reduce((s, v) => { const i = getInspeccion(v.ID_Benef); return s + (i ? i.pct_total : 0); }, 0) / viviendas.length)
-        : 0, [viviendas]);
+    // Avance físico real desde Gantt de control (no checkpoints de inspección).
+    const avanceInsp = React.useMemo(() => {
+        const ag = AVANCE_GANTT_DATA[proyectoSel];
+        return ag != null ? Number(ag.pct) : 0;
+    }, [proyectoSel]);
 
     const formatUF = (val) => {
         if (!val && val !== 0) return '—';
