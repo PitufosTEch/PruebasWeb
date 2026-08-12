@@ -3885,6 +3885,12 @@ const ManoDeObraTab = ({ viviendas }) => {
         return { proyTimeline, proyTotalPres, proyPatronTimeline, porBenef, avanceSerie };
     }, [viviendas, ganttProg]);
 
+    const _hoyMk = new Date().toISOString().slice(0,7);
+    const _pMatches = avanceData.proyPatronTimeline.filter(p => p.mk <= _hoyMk);
+    const patronHoy = _pMatches.length > 0
+        ? _pMatches[_pMatches.length - 1].cumul
+        : (avanceData.proyPatronTimeline.length > 0 ? avanceData.proyPatronTimeline[avanceData.proyPatronTimeline.length - 1].cumul : 0);
+
     return (
         <div className="space-y-6">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -3917,7 +3923,7 @@ const ManoDeObraTab = ({ viviendas }) => {
                             <span>Presup.: <strong className="text-gray-700">{formatPeso(avanceData.proyTotalPres)}</strong></span>
                             <span>Real: <strong className="text-violet-700">{formatPeso(avanceData.proyTimeline[avanceData.proyTimeline.length-1]?.cumul || 0)}</strong></span>
                             {avanceData.proyPatronTimeline.length > 0 && (
-                                <span>Patrón hoy: <strong className="text-amber-600">{formatPeso((() => { const hoyMk = new Date().toISOString().slice(0,7); const matches = avanceData.proyPatronTimeline.filter(p => p.mk <= hoyMk); return (matches.length ? matches[matches.length-1] : avanceData.proyPatronTimeline[avanceData.proyPatronTimeline.length-1])?.cumul || 0; })())}</strong></span>
+                                <span>Patrón hoy: <strong className="text-amber-600">{formatPeso(patronHoy)}</strong></span>
                             )}
                         </div>
                     </div>
