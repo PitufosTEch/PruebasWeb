@@ -444,7 +444,7 @@ def _construir_bloque_script(despachos_por_idx: dict) -> str:
         f"\n{SENTINEL_START}\n"
         "<script>\n"
         f"(function(){{var _d={despachos_json};"
-        "Object.keys(_d).forEach(function(k){if(secciones[k])secciones[k].despachos=_d[k];});"
+        "try{Object.keys(_d).forEach(function(k){if(secciones[k])secciones[k].despachos=_d[k];});}catch(e){}"
         "})()\n"
         f"</script>\n"
         f"{SENTINEL_END}\n"
