@@ -1,9 +1,10 @@
 // Service Worker - SCRaices Dashboard PWA
-const CACHE_NAME = 'scraices-v1';
+const CACHE_NAME = 'scraices-v2';
 
 // Solo cachear assets estáticos, los datos siempre se cargan frescos
 const STATIC_ASSETS = [
   './index_live_v3.html',
+  './app_compiled.js',
   './manifest.json',
   './icon-192.png',
   './icon-512.png'
@@ -11,7 +12,11 @@ const STATIC_ASSETS = [
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
+    caches.open(CACHE_NAME).then((cache) =>
+      Promise.all(STATIC_ASSETS.map(url =>
+        fetch(new Request(url, {cache: 'reload'})).then(r => r.ok ? cache.put(url, r) : null).catch(() => null)
+      ))
+    )
   );
   self.skipWaiting();
 });

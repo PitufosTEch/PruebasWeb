@@ -1,0 +1,12205 @@
+
+// ========== DATA ==========
+let PROYECTOS_DATA = [];
+let BENEFICIARIOS_DATA = [];
+let DESPACHOS_DATA = [];
+let SOLICITUDES_DATA = [];
+let INSPECCIONES_DATA = [];
+let SOLPAGO_DATA = [];
+let MAESTROS_DATA = {};
+let PRESUPUESTO_DATA = {};
+let PRESUPUESTO_PARTIDA_DATA = {}; // tipol → familia → partida → monto
+let GARANTIAS_DATA = [];
+let EEPP_DATA = [];
+let COMENTARIOS_BENEF_DATA = [];
+let SEGUIMIENTO_DATA = {};
+// Monto total por cobrar por proyecto (suma de la tabla Montos, en UF).
+// { [ID_proy]: { total, viviendas } }
+let MONTOS_PROY_DATA = {};
+// Avance fisico mensual reconstruido desde los deltas fechados de Ejecucion.
+// { [ID_proy]: { serie: [{mes:'YYYY-MM', avance, gain}], ultimoMes, avanceActual } }
+let AVANCE_MENSUAL_DATA = {};
+let AVANCE_GANTT_DATA = {};
+let AVANCE_BENEF_DATA = {};  // avance AppSheet por beneficiario: {pid: {NOMBRE_NORM_KEY: pct}}
+const ETAPAS_CONFIG_FULL = {
+  "_comentario": "Configuración de tiempos para etapas de construcción. Tiempos en DÍAS.",
+  "_instrucciones": {
+    "tiempo_optimo": "Días esperados para iniciar la siguiente etapa (verde -> amarillo)",
+    "tiempo_alerta": "Días máximos antes de alerta crítica (amarillo -> rojo)",
+    "duracion": "Tiempo que demora ejecutar la etapa en obra",
+    "dependencia": "Código de etapa(s) que debe(n) completarse antes"
+  },
+  "etapas": {
+    "01_FUNDACIONES": {
+      "codigo": "01",
+      "nombre": "Fundaciones Viv.",
+      "duracion": 3,
+      "tiempo_optimo": null,
+      "tiempo_alerta": null,
+      "dependencia": null,
+      "es_inicio": true,
+      "critico": false
+    },
+    "12_ALCANTARILLADO": {
+      "codigo": "12",
+      "nombre": "Alcantarillado Ext.",
+      "duracion": 3,
+      "tiempo_optimo": null,
+      "tiempo_alerta": null,
+      "dependencia": "01_FUNDACIONES",
+      "flexible": true,
+      "critico": false
+    },
+    "02_1ERA_ETAPA": {
+      "codigo": "02",
+      "nombre": "1era Etapa Viv.",
+      "duracion": 21,
+      "tiempo_optimo": 7,
+      "tiempo_alerta": 14,
+      "dependencia": "01_FUNDACIONES",
+      "critico": true
+    },
+    "28_VENTANAS": {
+      "codigo": "28",
+      "nombre": "Ventanas",
+      "duracion": 1,
+      "tiempo_optimo": 3,
+      "tiempo_alerta": 7,
+      "dependencia": "02_1ERA_ETAPA",
+      "desde_inicio_dependencia": true,
+      "_nota": "Se necesitan DURANTE la ejecución de 1era Etapa, no después",
+      "critico": true
+    },
+    "29_EIFS": {
+      "codigo": "29",
+      "nombre": "EIFS (Aislación)",
+      "duracion": 3,
+      "tiempo_optimo": 7,
+      "tiempo_alerta": 14,
+      "dependencia": "02_1ERA_ETAPA",
+      "critico": false
+    },
+    "03_2DA_ETAPA": {
+      "codigo": "03",
+      "nombre": "2da Etapa Viv.",
+      "duracion": 10,
+      "tiempo_optimo": 7,
+      "tiempo_alerta": 14,
+      "dependencia": "02_1ERA_ETAPA",
+      "critico": true
+    },
+    "07_CERAMICO_PISO": {
+      "codigo": "07",
+      "nombre": "Cerámicos Piso",
+      "duracion": 7,
+      "tiempo_optimo": 7,
+      "tiempo_alerta": 14,
+      "dependencia": "02_1ERA_ETAPA",
+      "ventana_flexible": {
+        "desde_etapa": "02_1ERA_ETAPA",
+        "desde_dias": 15,
+        "hasta_etapa": "03_2DA_ETAPA",
+        "hasta_dias_post": 20
+      },
+      "critico": false
+    },
+    "09_PINTURA_EXT": {
+      "codigo": "09",
+      "nombre": "Pintura Exterior",
+      "duracion": 7,
+      "tiempo_optimo": 7,
+      "tiempo_alerta": 14,
+      "dependencia": "02_1ERA_ETAPA",
+      "ventana_flexible": {
+        "desde_etapa": "02_1ERA_ETAPA",
+        "desde_dias": 15,
+        "hasta_etapa": "03_2DA_ETAPA",
+        "hasta_dias_post": 20
+      },
+      "critico": false
+    },
+    "08_CERAMICO_MURO": {
+      "codigo": "08",
+      "nombre": "Cerámicos Muro",
+      "duracion": 3,
+      "tiempo_optimo": 7,
+      "tiempo_alerta": 14,
+      "dependencia": "03_2DA_ETAPA",
+      "critico": true
+    },
+    "10_PINTURA_INT": {
+      "codigo": "10",
+      "nombre": "Pintura Interior",
+      "duracion": 7,
+      "tiempo_optimo": 7,
+      "tiempo_alerta": 14,
+      "dependencia": "03_2DA_ETAPA",
+      "critico": false
+    },
+    "13_GASFITERIA": {
+      "codigo": "13",
+      "nombre": "Gasfitería + Artefactos",
+      "duracion": 5,
+      "tiempo_optimo": 7,
+      "tiempo_alerta": 14,
+      "dependencia": "08_CERAMICO_MURO",
+      "critico": true,
+      "_nota": "Incluye instalación de artefactos (cocina, calefont). Es la etapa final de la ruta crítica."
+    }
+  },
+  "colores": {
+    "en_tiempo": "#22c55e",
+    "atencion": "#eab308",
+    "critico": "#ef4444",
+    "bloqueado": "#9ca3af",
+    "completado": "#3b82f6"
+  },
+  "secuencia_principal": [
+    "01_FUNDACIONES",
+    "02_1ERA_ETAPA",
+    "03_2DA_ETAPA",
+    "08_CERAMICO_MURO",
+    "13_GASFITERIA"
+  ],
+  "_version": "1.0",
+  "_ultima_modificacion": "2026-01-26"
+};
+
+
+    // ============================================================
+    // DATA LOADER - Carga datos en tiempo real desde Google Sheets
+    // via Google Apps Script (v3)
+    // ============================================================
+    // Deployment PUBLICO ("Cualquier persona") verificado funcionando. Los
+    // deployments recientes (AKfycbzFnaEA..., AKfycbzBcqr...) quedaron
+    // restringidos a "Cualquier usuario" (requiere login Google) y devolvian
+    // "No cuentas con el permiso necesario", rompiendo la carga en vivo y
+    // congelando el snapshot.
+    // IMPORTANTE: cualquier deployment nuevo DEBE publicarse como "Cualquier
+    // persona", no "Cualquier usuario".
+    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxcJowX3a3XBmSNiKOCesj1jRkQWS1VIsMbvdt-x7ckK8ZXMauI6gRgCGsoT77xYxpP/exec";
+    const TABLES_TO_FETCH = "Proyectos,Beneficiario,Despacho,soldepacho,Ejecucion,Solpago,Maestros,Tabla_pago,Tipologias,controlBGB,controlEEPP,Seguimiento";
+    // Snapshot crudo pre-generado cada 15 min por el workflow data_snapshot.yml.
+    // Se sirve desde el CDN de GitHub (rama dedicada data-snapshot) para el
+    // primer pintado instantaneo en cualquier dispositivo, antes del fetch en vivo.
+    const SNAPSHOT_URL = "https://raw.githubusercontent.com/PitufosTEch/PruebasWeb/data-snapshot/data_snapshot.json";
+
+    // Mapeo columna real → short code + peso (28 partidas vivienda)
+    const VIV_COLUMNS = {
+    "A_Fund":          { "short": "Fundaciones", "weight": 0.02 },
+    "A_Radier":        { "short": "Radier",  "weight": 0.04 },
+    "A_Planta_Alc":    { "short": "Alcantarillado", "weight": 0.01 },
+    "A_E_Tabiques":    { "short": "Tabiques", "weight": 0.06 },
+    "A_E_Techumbre":   { "short": "Techumbre", "weight": 0.04 },
+    "A_rev Ext":       { "short": "Rev. Exterior", "weight": 0.06 },
+    "A_vent":          { "short": "Ventanas", "weight": 0.03 },
+    "A_Cubierta":      { "short": "Cubierta",  "weight": 0.03 },
+    "A_Ent_Cielo":     { "short": "Cielo", "weight": 0.02 },
+    "A_ent_alero":     { "short": "Alero", "weight": 0.02 },
+    "A_Red_AP":        { "short": "Red Agua Pot.", "weight": 0.03 },
+    "A_Red_Elect":     { "short": "Red Eléctrica", "weight": 0.04 },
+    "A_rev_ZS":        { "short": "Rev. Zona Seca", "weight": 0.04 },
+    "A_rev_ZH":        { "short": "Rev. Zona Húmeda", "weight": 0.02 },
+    "A_Aisl_Muro":     { "short": "Aisl. Muro", "weight": 0.04 },
+    "A_Aisl_Cielo":    { "short": "Aisl. Cielo", "weight": 0.03 },
+    "A_Cer_Piso":      { "short": "Cerámico Piso", "weight": 0.05 },
+    "A_Cer_muro":      { "short": "Cerámico Muro", "weight": 0.03 },
+    "A_pint_Ext":      { "short": "Pintura Ext.", "weight": 0.04 },
+    "A_pint_int":      { "short": "Pintura Int.", "weight": 0.02 },
+    "A_puertas":       { "short": "Puertas", "weight": 0.05 },
+    "A_molduras":      { "short": "Molduras", "weight": 0.02 },
+    "A_Art_Ba\u00f1o":{ "short": "Art. Baño", "weight": 0.05 },
+    "A_Art_cocina":    { "short": "Art. Cocina", "weight": 0.02 },
+    "A_Art_Elec":      { "short": "Art. Eléctricos", "weight": 0.04 },
+    "A_AP_Ext":        { "short": "Agua Pot. Ext.", "weight": 0.05 },
+    "A_ALC_Ext":       { "short": "Alcant. Ext.", "weight": 0.05 },
+    "A_Ins_Elec_Ext":  { "short": "Inst. Eléc. Ext.", "weight": 0.05 }
+};
+
+    // Cierre columns
+    const CIERRE_COLS = {
+    "empalme": "E", "preF1": "P", "desarme": "D", "ret_escombro": "R", "aseo": "A"
+};
+
+    // Estado de carga
+    let _loadingState = { total: 0, loaded: 0, current: '', error: null };
+
+    function showLoadingScreen() {
+        document.getElementById('root').innerHTML = `
+            <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f3f4f6;font-family:'IBM Plex Sans',sans-serif;">
+                <div style="text-align:center;max-width:400px;">
+                    <div style="width:56px;height:56px;background:#7c3aed;border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;">
+                        <span style="color:white;font-size:18px;font-weight:700;font-family:'IBM Plex Mono',monospace;">SC</span>
+                    </div>
+                    <h2 style="color:#1f2937;font-size:18px;font-weight:600;margin-bottom:8px;">Cargando Dashboard v3</h2>
+                    <p id="loadStatus" style="color:#6b7280;font-size:13px;margin-bottom:24px;">Conectando a base de datos...</p>
+                    <div style="width:100%;height:4px;background:#e5e7eb;border-radius:4px;overflow:hidden;">
+                        <div id="loadBar" style="width:0%;height:100%;background:#7c3aed;border-radius:4px;transition:width 0.3s;"></div>
+                    </div>
+                    <p id="loadDetail" style="color:#9ca3af;font-size:11px;margin-top:12px;"></p>
+                </div>
+            </div>`;
+    }
+
+    function updateLoading(msg, pct, detail) {
+        const s = document.getElementById('loadStatus');
+        const b = document.getElementById('loadBar');
+        const d = document.getElementById('loadDetail');
+        if (s) s.textContent = msg;
+        if (b) b.style.width = pct + '%';
+        if (d) d.textContent = detail || '';
+    }
+
+    function parseMonto(val) {
+        if (val === null || val === undefined || val === '' || val === 'nan') return 0;
+        let s = String(val).trim().replace(/\$/g, '').replace(/\s/g, '');
+        // Punto decimal real: un solo punto + 1-2 dígitos al final (ej. "95200.00")
+        if (/^\d+\.\d{1,2}$/.test(s)) return Math.round(parseFloat(s));
+        // Formato US con coma de miles: "150,000" o "150,000.00" o "1,200,000.00"
+        // La coma va seguida de 3 dígitos; el string puede terminar en .NN (decimal US)
+        if (/,\d{3}/.test(s) && /^[\d,]+(\.\d{1,2})?$/.test(s)) return Math.round(parseFloat(s.replace(/,/g, '')));
+        // Formato chileno: puntos = miles, coma = decimal (ej. "1.413.510" o "1.413.510,50")
+        s = s.replace(/\./g, '').replace(',', '.');
+        const n = parseFloat(s);
+        return isNaN(n) ? 0 : Math.round(n);
+    }
+
+    function parseDate(val) {
+        if (!val || val === 'nan' || val === 'NaT' || val === '') return null;
+        const s = String(val).trim();
+        if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.substring(0, 10);
+        const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+        if (m) {
+            let p1 = parseInt(m[1]), p2 = parseInt(m[2]), year = m[3];
+            if (p1 > 12) return `${year}-${String(p2).padStart(2,'0')}-${String(p1).padStart(2,'0')}`;
+            if (p2 > 12) return `${year}-${String(p1).padStart(2,'0')}-${String(p2).padStart(2,'0')}`;
+            return `${year}-${String(p1).padStart(2,'0')}-${String(p2).padStart(2,'0')}`;
+        }
+        const m2 = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})/);
+        if (m2) {
+            return `${m2[3]}-${String(m2[2]).padStart(2,'0')}-${String(m2[1]).padStart(2,'0')}`;
+        }
+        if (s.includes('T')) return s.substring(0, 10);
+        return null;
+    }
+
+    async function fetchBatch(tables, label, retry = 0) {
+        const url = APPS_SCRIPT_URL + '?tables=' + encodeURIComponent(tables);
+        console.log('[LIVE] Fetching:', label);
+        try {
+            // El deployment publico de Apps Script responde con CORS
+            // Access-Control-Allow-Origin:* tras el redirect a
+            // googleusercontent, por lo que fetch() funciona cross-origin.
+            const response = await fetch(url, { redirect: 'follow' });
+            if (!response.ok) throw new Error(`Error ${response.status} al cargar ${label}`);
+            const data = await response.json();
+            if (data && data.error) throw new Error('Error Apps Script (' + label + '): ' + data.error);
+            console.log('[LIVE] OK:', label);
+            return data;
+        } catch (err) {
+            const MAX_RETRY = 5;
+            if (retry < MAX_RETRY) {
+                // Backoff exponencial + jitter. El endpoint Apps Script (cuenta
+                // consumer, cuota limitada) devuelve 404 / "Failed to fetch"
+                // transitorios en horario laboral cuando dashboard + informes +
+                // snapshot lo saturan. Reintentar espaciado los recupera.
+                const backoff = Math.min(20000, 1500 * Math.pow(2, retry)) + Math.floor(Math.random() * 1000);
+                console.warn(`[LIVE] Retry ${retry+1}/${MAX_RETRY} para ${label} en ${backoff}ms:`, err.message);
+                await new Promise(r => setTimeout(r, backoff));
+                return fetchBatch(tables, label, retry + 1);
+            }
+            throw err;
+        }
+    }
+
+    async function fetchAllData() {
+        updateLoading('Descargando datos...', 5, 'Conectando a Google Sheets (4 lotes en paralelo)');
+
+        // Lotes paralelos para evitar timeout. Ejecucion y Solpago van
+        // SEPARADOS: juntos (~40k filas / ~55MB en una sola respuesta) el
+        // navegador headless del generador de snapshot y los moviles fallan
+        // con "Failed to fetch". Divididos, cada respuesta es manejable.
+        const batch1 = fetchBatch('Proyectos,Beneficiario,Tipologias,Maestros,controlBGB,controlEEPP,Seguimiento,Seguimiento Cierre de Obras,Seguimiento_Cierre,SeguimientoCierre,documentacion,Documentacion', 'Lote 1: Proyectos+Benef');
+        const batch2 = fetchBatch('Despacho,soldepacho,Tabla_pago,Montos', 'Lote 2: Despachos');
+        const batch3 = fetchBatch('Ejecucion', 'Lote 3: Inspecciones');
+        const batch5 = fetchBatch('Solpago', 'Lote 5: Pagos');
+
+        let r1, r2, r3, r5, r4;
+        try {
+            updateLoading('Descargando lotes principales...', 10, 'Lotes principales en paralelo');
+            [r1, r2, r3, r5] = await Promise.all([batch1, batch2, batch3, batch5]);
+        } catch (e) {
+            throw new Error('Error al descargar datos: ' + e.message);
+        }
+
+        // Lote 4 (comentarios) separado y no bloquea si falla
+        try {
+            updateLoading('Descargando comentarios...', 25, 'Lote 4: Comentarios');
+            r4 = await fetchBatch('combenef', 'Lote 4: Comentarios Benef');
+        } catch (e) {
+            console.warn('[LIVE] Lote 4 (comentarios) fallo:', e.message);
+            r4 = { combenef: { rows: [] } };
+        }
+
+        updateLoading('Combinando datos...', 30, 'Todos los lotes recibidos');
+        return { ...r1, ...r2, ...r3, ...r5, ...r4 };
+    }
+
+    // Descarga el snapshot PROCESADO pre-generado (CDN GitHub). Mismo formato
+    // que el cache de localStorage (saveProcessedCache), por lo que se aplica
+    // con restoreFromCache. Trae `ts` (ms) para mostrar la antiguedad.
+    async function fetchSnapshot() {
+        const resp = await fetch(SNAPSHOT_URL + '?t=' + Date.now(), { cache: 'no-store' });
+        if (!resp.ok) throw new Error('Snapshot HTTP ' + resp.status);
+        return resp.json();
+    }
+
+    function processRawData(raw) {
+        updateLoading('Procesando proyectos...', 40);
+
+        // 1. PROYECTOS (ejecucion + finalizados)
+        const proyectosRaw = raw.Proyectos?.rows || [];
+        PROYECTOS_DATA = proyectosRaw
+            .filter(p => {
+                const est = (p.estado_general || '').toLowerCase();
+                if (!est.includes('ejecuci') && !est.includes('finalizado')) return false;
+                if (/prueba/i.test(p.NOMBRE_PROYECTO || '')) return false;
+                return true;
+            })
+            .map(p => {
+                const est = (p.estado_general || '').toLowerCase();
+                return {
+                    ID_proy: (s => /^\d+$/.test(s) ? 'P' + s : s)(String(p.ID_proy || '')),
+                    NOMBRE_PROYECTO: String(p.NOMBRE_PROYECTO || ''),
+                    COMUNA: String(p.COMUNA || ''),
+                    fecha_inicio: parseDate(p.fecha_inicio) || '',
+                    duracion: parseInt(p.duracion) || 0,
+                    estado: est.includes('finalizado') ? 'finalizado' : 'ejecucion'
+                };
+            })
+            .sort((a, b) => {
+                if (a.estado !== b.estado) return a.estado === 'ejecucion' ? -1 : 1;
+                return (b.fecha_inicio || '').localeCompare(a.fecha_inicio || '');
+            });
+
+        const idsProyActivos = new Set(PROYECTOS_DATA.map(p => p.ID_proy));
+
+        updateLoading('Procesando beneficiarios...', 45);
+
+        // 2. BENEFICIARIOS
+        const benRaw = raw.Beneficiario?.rows || [];
+        const estadosValidos = ['ejecuci', 'subsidiad', 'preparaci', 'terminad'];
+        // Normaliza IDs como "122" → "P122" para compatibilidad con AppSheet
+        const normPrId = id => { const s=String(id||'').trim(); return /^\d+$/.test(s)?('P'+s):s; };
+
+        // Tipologias dict
+        const tipRaw = raw.Tipologias?.rows || [];
+        const tipDict = {};
+        tipRaw.forEach(t => {
+            const id = String(t.IDU_tipol || '').trim();
+            if (id && id !== 'nan') {
+                const fam = String(t.Familia || '').trim();
+                const dorm = String(t.dormitorios || '').trim();
+                const plantas = String(t.plantas || '').trim();
+                const caract = String(t.caracterizacion || '').trim();
+                let label = (fam && fam !== 'nan') ? fam : 'Vivienda';
+                if (dorm && dorm !== 'nan' && dorm !== '0') label += ` ${dorm}D`;
+                if (plantas && plantas !== 'nan' && plantas !== '0') label += ` ${plantas}P`;
+                if (caract && caract !== 'nan' && caract.toLowerCase() !== 'none') label += ` ${caract}`;
+                tipDict[id] = label;
+            }
+        });
+
+        BENEFICIARIOS_DATA = benRaw
+            .filter(b => {
+                const proy = normPrId(b.ID_Proy);
+                const estado = (b.Estado || '').toLowerCase();
+                return idsProyActivos.has(proy) && estadosValidos.some(e => estado.includes(e));
+            })
+            .map(b => {
+                const tipViv = String(b['Tipologia Vivienda'] || '');
+                const tipRC = String(b['Tipologia RC'] || '');
+                const tipVivId = (tipViv && tipViv.toLowerCase() !== 'nan' && tipViv !== '') ? tipViv : '';
+                const tipRCId = (tipRC && tipRC.toLowerCase() !== 'nan' && tipRC !== '') ? tipRC : '';
+                const habilRaw = String(b['Habil para construir'] || '').toLowerCase();
+                const habil = habilRaw === 'si' || habilRaw === 'sí' || habilRaw === 'true' || habilRaw === '1';
+
+                // Fecha HPC
+                let fecha_hpc = '';
+                const fhpcRaw = String(b.fecha_habil_para_const || '').trim();
+                if (fhpcRaw && !['nan','','NaT','None'].includes(fhpcRaw.toLowerCase())) {
+                    fecha_hpc = parseDate(fhpcRaw) || '';
+                }
+
+                // Fecha Recepcion Definitiva (F_R_dom)
+                let fecha_recepcion = '';
+                const frdRaw = String(b.F_R_dom || '').trim();
+                if (frdRaw && !['nan','','NaT','None'].includes(frdRaw.toLowerCase())) {
+                    fecha_recepcion = parseDate(frdRaw) || '';
+                }
+
+                // Alerta logistica y obs seguimiento
+                const alertaLog = String(b.alerta_logistica || '').trim();
+                const alerta_logistica = (alertaLog && alertaLog.toLowerCase() !== 'nan') ? alertaLog : '';
+                const obsSeg = String(b['Observacion '] || b.Observacion || '').trim();
+                const obs_seguimiento = (obsSeg && obsSeg.toLowerCase() !== 'nan') ? obsSeg : '';
+
+                // Tipologia descriptiva - siempre usar vivienda como principal
+                let tipLabel = tipRCId ? 'Casa + RC' : 'Casa';
+                if (tipVivId && tipDict[tipVivId]) {
+                    tipLabel = tipDict[tipVivId];
+                    const proy = PROYECTOS_DATA.find(p => String(p.ID_proy) === String(b.ID_Proy));
+                    if (proy) tipLabel += ` ${proy.ID_proy} · ${proy.NOMBRE_PROYECTO}`;
+                } else if (tipRCId && tipDict[tipRCId]) {
+                    tipLabel = tipDict[tipRCId];
+                    const proy = PROYECTOS_DATA.find(p => String(p.ID_proy) === String(b.ID_Proy));
+                    if (proy) tipLabel += ` ${proy.ID_proy} · ${proy.NOMBRE_PROYECTO}`;
+                }
+
+                return {
+                    ID_Benef: String(b.ID_Benef || b.IDU_Benef || ''),
+                    ID_Proy: normPrId(b.ID_Proy),
+                    NOMBRES: String(b.NOMBRES || ''),
+                    APELLIDOS: String(b.APELLIDOS || ''),
+                    tipologia: tipLabel,
+                    tipologia_viv_id: tipVivId,
+                    tipologia_rc_id: tipRCId,
+                    habil: habil,
+                    fecha_hpc: fecha_hpc,
+                    fecha_recepcion: fecha_recepcion,
+                    has_te1: false,
+                    alerta_logistica: alerta_logistica,
+                    obs_seguimiento: obs_seguimiento
+                };
+            });
+
+        const idsBenef = new Set(BENEFICIARIOS_DATA.map(b => String(b.ID_Benef)));
+
+        // TE1 - triple fuente (ver app/SOURCES_OF_TRUTH.md):
+        //   1) Set pre-calculado BENEF_CON_TE1 (de hoja TE1 separada)
+        //   2) Columna(s) con 'te1' en el perfil Beneficiario (PDF cargado)
+        //   3) Columna te1 en Seguimiento (resuelto despues, ver L~720)
+        const normTE1 = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+        // Scan raw Beneficiario rows para columnas que contengan 'te1' (pero no te10, te11, te12)
+        const benefTE1FromProfile = new Set();
+        if (benRaw.length > 0) {
+            const sampleKeys = Object.keys(benRaw[0]);
+            const te1Cols = sampleKeys.filter(k => {
+                const n = normTE1(k);
+                return n.includes('te1') && !n.includes('te10') && !n.includes('te11') && !n.includes('te12');
+            });
+            if (te1Cols.length > 0) {
+                console.log('[LIVE] TE1: columnas detectadas en Beneficiario:', te1Cols);
+                benRaw.forEach(b => {
+                    const id = String(b.ID_Benef || b.IDU_Benef || '').trim();
+                    if (!id) return;
+                    for (const col of te1Cols) {
+                        const v = b[col];
+                        if (v !== null && v !== undefined && String(v).trim() !== '' && String(v).toLowerCase() !== 'nan' && String(v).toLowerCase() !== 'no' && String(v).toLowerCase() !== 'false') {
+                            benefTE1FromProfile.add(id);
+                            break;
+                        }
+                    }
+                });
+                console.log('[LIVE] TE1 desde perfil Beneficiario:', benefTE1FromProfile.size);
+            } else {
+                console.warn('[LIVE] TE1: no se encontraron columnas con "te1" en Beneficiario');
+            }
+        }
+
+        // Aplicar TE1 a BENEFICIARIOS_DATA (fuente 1 + 2; fuente 3 se aplica tras procesar Seguimiento)
+        let te1FromEmbedded = 0, te1FromProfile = 0;
+        BENEFICIARIOS_DATA.forEach(b => {
+            const id = String(b.ID_Benef);
+            const fromEmbedded = (typeof BENEF_CON_TE1 !== 'undefined') && BENEF_CON_TE1.has(id);
+            const fromProfile = benefTE1FromProfile.has(id);
+            if (fromEmbedded) te1FromEmbedded++;
+            if (fromProfile) te1FromProfile++;
+            b.has_te1 = fromEmbedded || fromProfile;
+            b._te1_sources = { embedded: fromEmbedded, profile: fromProfile, seguimiento: false };
+        });
+        console.log(`[LIVE] TE1 aplicado: embedded=${te1FromEmbedded}, profile=${te1FromProfile}`);
+
+        updateLoading('Procesando despachos...', 50);
+
+        // 3. DESPACHOS
+        const despRaw = raw.Despacho?.rows || [];
+        DESPACHOS_DATA = despRaw
+            .filter(d => idsBenef.has(String(d.ID_Benef || '')))
+            .map(d => {
+                const fecha = parseDate(d.Fecha);
+                return fecha ? {
+                    ID_Benef: String(d.ID_Benef || ''),
+                    Tipo_despacho: String(d.Tipo_despacho || ''),
+                    Fecha: fecha,
+                    Guia: String(d.Guia || '')
+                } : null;
+            }).filter(Boolean);
+
+        updateLoading('Procesando solicitudes...', 55);
+
+        // 4. SOLICITUDES
+        const solRaw = raw.soldepacho?.rows || [];
+        SOLICITUDES_DATA = solRaw
+            .filter(s => idsBenef.has(String(s.ID_Benef || '')))
+            .map(s => ({
+                ID_Benef: String(s.ID_Benef || ''),
+                Tipo_despacho: String(s.Tipo_despacho || ''),
+                Fecha: parseDate(s.Fecha) || '',
+                fecha_creacion: parseDate(s.fecha_creacion) || ''
+            }));
+
+        updateLoading('Procesando inspecciones...', 60);
+
+        // 5. INSPECCIONES (Ejecucion - sumar deltas)
+        function parseInspVal(val) {
+            if (val === null || val === undefined || val === '' || val === 'nan') return 0;
+            if (typeof val === 'number') return val <= 1.5 ? val : val / 100;
+            let s = String(val).trim().replace('%', '').replace(',', '.');
+            let n = parseFloat(s);
+            if (isNaN(n)) return 0;
+            return n > 1.5 ? n / 100 : n;
+        }
+
+        const ejRaw = raw.Ejecucion?.rows || [];
+        const inspMap = {};
+        const hasBarno = ejRaw.length > 0 && 'A_Art_Bano' in ejRaw[0] && !('A_Art_Baño' in ejRaw[0]);
+        const sampleRow = ejRaw.length > 0 ? ejRaw[0] : {};
+        const rcCols = Object.keys(sampleRow).filter(k => k.startsWith('AB_'));
+        const hasHab = 'A_Habilitacion' in sampleRow;
+
+        ejRaw.forEach(e => {
+            const idB = String(e.ID_Benef || e.ID_benef || '');
+            if (!idsBenef.has(idB)) return;
+            if (!inspMap[idB]) inspMap[idB] = {
+                ID_Benef: idB, partidas: {}, rc_vals: {},
+                hab_sum: 0, n_insp: 0, ultima_insp: '', cierre: {}
+            };
+            inspMap[idB].n_insp++;
+
+            Object.entries(VIV_COLUMNS).forEach(([col, info]) => {
+                let actualCol = col;
+                if (col === 'A_Art_Baño' && hasBarno) actualCol = 'A_Art_Bano';
+                const val = parseInspVal(e[actualCol]);
+                if (val > 0) {
+                    inspMap[idB].partidas[info.short] = Math.min(1, (inspMap[idB].partidas[info.short] || 0) + val);
+                }
+            });
+
+            rcCols.forEach(col => {
+                const val = parseInspVal(e[col]);
+                if (val > 0) {
+                    inspMap[idB].rc_vals[col] = Math.min(1, (inspMap[idB].rc_vals[col] || 0) + val);
+                }
+            });
+
+            if (hasHab) {
+                const val = parseInspVal(e['A_Habilitacion']);
+                if (val > 0) inspMap[idB].hab_sum = Math.min(1, inspMap[idB].hab_sum + val);
+            }
+
+            const fInsp = parseDate(e.Fecha_creacion || e.fecha_creacion || '');
+            if (fInsp && fInsp > inspMap[idB].ultima_insp) inspMap[idB].ultima_insp = fInsp;
+
+            Object.entries(CIERRE_COLS).forEach(([col, label]) => {
+                const val = String(e[col] || '').trim().toLowerCase();
+                if (val && val !== 'nan') {
+                    if (val === 'terminado') {
+                        inspMap[idB].cierre[label] = 1;           // verde gana siempre
+                    } else if (val === 'n/a' || val === 'na' || val === 'n.a.' || val === 'no aplica' || val === 'no_aplica' || val === 'no aplica' || val === 'no aplica.') {
+                        if (inspMap[idB].cierre[label] !== 1)
+                            inspMap[idB].cierre[label] = -1;      // N/A gana sobre pendiente
+                    } else if (inspMap[idB].cierre[label] !== 1 && inspMap[idB].cierre[label] !== -1) {
+                        inspMap[idB].cierre[label] = 0;           // rojo solo si aún no está verde ni N/A
+                    }
+                }
+                // Sin valor → clave no presente en cierre → gris (sin datos)
+            });
+        });
+
+        INSPECCIONES_DATA = Object.values(inspMap).map(insp => {
+            let pct_viv = 0;
+            Object.entries(VIV_COLUMNS).forEach(([col, info]) => {
+                pct_viv += Math.min(1, Math.max(0, insp.partidas[info.short] || 0)) * info.weight;
+            });
+            const rcValues = Object.values(insp.rc_vals);
+            const pct_rc = rcValues.length > 0
+                ? rcValues.reduce((s, v) => s + Math.min(1, Math.max(0, v)), 0) / rcValues.length : 0;
+            const pct_hab = Math.min(1, Math.max(0, insp.hab_sum));
+            const pct_total = pct_viv * 0.7 + pct_rc * 0.25 + pct_hab * 0.05;
+
+            const partidas100 = {};
+            Object.entries(insp.partidas).forEach(([k, v]) => {
+                partidas100[k] = Math.round(Math.min(1, Math.max(0, v)) * 100);
+            });
+
+            return {
+                ID_Benef: insp.ID_Benef,
+                pct_viv: Math.round(pct_viv * 1000) / 10,
+                pct_rc: Math.round(pct_rc * 1000) / 10,
+                pct_hab: Math.round(pct_hab * 1000) / 10,
+                pct_total: Math.round(pct_total * 1000) / 10,
+                ultima_insp: insp.ultima_insp,
+                n_insp: insp.n_insp,
+                partidas: partidas100,
+                cierre: insp.cierre
+            };
+        });
+
+        // 5.5 RECONSTRUCCION DE AVANCE MENSUAL (curva por proyecto desde deltas fechados)
+        // Reproduce los deltas de Ejecucion en orden de fecha aplicando el tope por
+        // partida (igual que INSPECCIONES_DATA) y toma una foto del pct_total acumulado
+        // al cierre de cada mes. avance(mes) = promedio sobre TODAS las viviendas del proyecto.
+        updateLoading('Reconstruyendo avance mensual...', 68);
+        AVANCE_MENSUAL_DATA = {};
+        try {
+            const mesKey = (iso) => { const s = parseDate(iso); return s ? s.substring(0, 7) : null; };
+            // agrupar filas por beneficiario (con mes valido)
+            const rowsByBenef = {};
+            ejRaw.forEach(e => {
+                const idB = String(e.ID_Benef || e.ID_benef || '');
+                if (!idsBenef.has(idB)) return;
+                const mk = mesKey(e.Fecha_creacion || e.fecha_creacion || e.Fecha_ingresada);
+                if (!mk) return;
+                (rowsByBenef[idB] = rowsByBenef[idB] || []).push({ mk, e });
+            });
+            // por beneficiario: replay acumulado (con tope) y snapshot pct_total por mes
+            const pctByBenefMonth = {};
+            Object.entries(rowsByBenef).forEach(([idB, rows]) => {
+                rows.sort((a, b) => a.mk.localeCompare(b.mk));
+                const part = {}, rcv = {}; let hab = 0;
+                const snaps = {};
+                const calcPct = () => {
+                    let pv = 0;
+                    Object.entries(VIV_COLUMNS).forEach(([col, info]) => { pv += Math.min(1, Math.max(0, part[info.short] || 0)) * info.weight; });
+                    const rvals = Object.values(rcv);
+                    const prc = rvals.length ? rvals.reduce((s, v) => s + Math.min(1, Math.max(0, v)), 0) / rvals.length : 0;
+                    const ph = Math.min(1, Math.max(0, hab));
+                    return (pv * 0.7 + prc * 0.25 + ph * 0.05) * 100;
+                };
+                rows.forEach(({ mk, e }) => {
+                    Object.entries(VIV_COLUMNS).forEach(([col, info]) => {
+                        let actualCol = col;
+                        if (col === 'A_Art_Baño' && hasBarno) actualCol = 'A_Art_Bano';
+                        const v = parseInspVal(e[actualCol]);
+                        if (v > 0) part[info.short] = Math.min(1, (part[info.short] || 0) + v);
+                    });
+                    rcCols.forEach(col => { const v = parseInspVal(e[col]); if (v > 0) rcv[col] = Math.min(1, (rcv[col] || 0) + v); });
+                    if (hasHab) { const v = parseInspVal(e['A_Habilitacion']); if (v > 0) hab = Math.min(1, hab + v); }
+                    snaps[mk] = calcPct(); // si hay varias filas en el mes, queda la ultima (acumulada)
+                });
+                pctByBenefMonth[idB] = snaps;
+            });
+            // viviendas por proyecto (todas las activas, para el promedio)
+            const benefDeProy = {};
+            BENEFICIARIOS_DATA.forEach(b => { const p = String(b.ID_Proy || ''); if (p) (benefDeProy[p] = benefDeProy[p] || []).push(String(b.ID_Benef)); });
+            Object.entries(benefDeProy).forEach(([pid, benefIds]) => {
+                const monthSet = new Set();
+                benefIds.forEach(id => { const s = pctByBenefMonth[id]; if (s) Object.keys(s).forEach(m => monthSet.add(m)); });
+                const meses = [...monthSet].sort();
+                if (!meses.length) return;
+                const nViv = benefIds.length || 1;
+                const colSum = new Array(meses.length).fill(0);
+                benefIds.forEach(id => {
+                    const s = pctByBenefMonth[id];
+                    let last = 0;
+                    meses.forEach((m, i) => { if (s && s[m] !== undefined) last = s[m]; colSum[i] += last; });
+                });
+                const serie = meses.map((m, i) => {
+                    const avance = Math.round((colSum[i] / nViv) * 10) / 10;
+                    return { mes: m, avance };
+                });
+                for (let i = 0; i < serie.length; i++) serie[i].gain = Math.round((serie[i].avance - (i > 0 ? serie[i - 1].avance : 0)) * 10) / 10;
+                AVANCE_MENSUAL_DATA[pid] = { serie, ultimoMes: meses[meses.length - 1], avanceActual: serie[serie.length - 1].avance };
+            });
+        } catch (err) {
+            console.warn('[AVANCE MENSUAL] Error reconstruyendo:', err.message);
+            AVANCE_MENSUAL_DATA = {};
+        }
+
+        updateLoading('Procesando pagos...', 70);
+
+        // 6. SOLPAGO
+        const spRaw = raw.Solpago?.rows || [];
+        SOLPAGO_DATA = spRaw
+            .filter(s => {
+                const estado = String(s.Estado || '').toLowerCase();
+                return estado.includes('aprobad') && idsBenef.has(String(s.ID_Benef || ''));
+            })
+            .map(s => {
+                const tipRaw = String(s.Tipologia || s['Tipología'] || s.tipologia || s.Tipo_pago || '');
+                const tl = tipRaw.toLowerCase();
+                const tipShort = (tl.includes('vivienda') || tl.includes(' viv.') || tl.includes('-viv.') || tl.includes('viv ') || tl.startsWith('viv')) ? 'Vivienda'
+                               : (tl.includes('bodega') || tl.includes('r.c') || tl.includes(' rc') || tl.includes('recinto')) ? 'R.C.'
+                               : '—';
+                return {
+                    ID_Benef: String(s.ID_Benef || ''),
+                    Familia_pago: String(s.Familia_pago || ''),
+                    Tipo_pago: String(s.Tipo_pago || ''),
+                    tipologia: tipShort,
+                    tipologia_full: tipRaw,
+                    monto: parseMonto(s.monto),
+                    fecha: parseDate(s.fecha || s.Fecha) || '',
+                    maestro: String(s.maestro || s.IDU_maestros || ''),
+                    Estado: 'Aprobado'
+                };
+            });
+
+        updateLoading('Procesando seguimiento de cierre...', 78);
+
+        // 6b. SEGUIMIENTO CIERRE DE OBRAS
+        // Tabla AppSheet con docs/hitos finales por beneficiario.
+        // Doc privada de reglas: app/SOURCES_OF_TRUTH.md
+        // Confirmado por el usuario 2026-05-19: la data real esta en la hoja "documentacion"
+        // del mismo Sheet (1JAxxP9W6LJzns5rmGIo7mfk227qMLwsq-gFMCvHU0Zk). La hoja "Seguimiento"
+        // tiene solo 1 fila vieja de P01 (legacy/test).
+        // Probamos varias variantes y nos quedamos con la que tenga MAS filas.
+        const SEG_TABLE_CANDIDATES = ['documentacion', 'Documentacion', 'Seguimiento Cierre de Obras', 'SeguimientoCierre', 'Seguimiento_Cierre', 'Seguimiento'];
+        let segRaw = [];
+        let segTableUsed = null;
+        const segCandidatesReport = [];
+        for (const _name of SEG_TABLE_CANDIDATES) {
+            const _rows = raw[_name]?.rows;
+            const _err = raw[_name]?.error;
+            const _count = Array.isArray(_rows) ? _rows.length : 0;
+            segCandidatesReport.push({ name: _name, rows: _count, error: _err || null });
+            if (_count > segRaw.length) {
+                segRaw = _rows;
+                segTableUsed = _name;
+            }
+        }
+        SEGUIMIENTO_DATA = {};
+        console.log('[LIVE] Seguimiento - candidatas evaluadas:', segCandidatesReport);
+        // Resolucion robusta: normaliza nombre de columna (lower, sin tildes/espacios/puntos)
+        // y matchea cuando TODOS los keywords aparecen Y NINGUNO de los exclude.
+        const normCol = (s) => String(s || '').toLowerCase()
+            .normalize('NFD').replace(/[\u0300-\u036f]/g, '')   // sin tildes
+            .replace(/[^a-z0-9]/g, '');                          // solo alfanumerico
+        const findColOne = (keys, mustHave, mustNotHave) => {
+            for (const k of keys) {
+                const n = normCol(k);
+                if (mustHave.every(m => n.includes(m)) && !(mustNotHave || []).some(x => n.includes(x))) {
+                    return k;
+                }
+            }
+            return null;
+        };
+        // Acepta una lista de alternativas [{must, not}, ...]; devuelve la primera columna que matchea
+        const findCol = (keys, alternatives) => {
+            for (const alt of alternatives) {
+                const found = findColOne(keys, alt.must, alt.not || []);
+                if (found) return found;
+            }
+            return null;
+        };
+        const valOf = (row, colName) => {
+            if (!colName) return '';
+            const v = row[colName];
+            if (v === null || v === undefined) return '';
+            const s = String(v).trim();
+            if (!s || s.toLowerCase() === 'nan') return '';
+            return s;
+        };
+        const isFilled = (v) => v && v !== '' && v.toLowerCase() !== 'nan' && v.toLowerCase() !== 'no' && v.toLowerCase() !== 'false' && v !== '0';
+
+        // Reglas de matching (mustHave, mustNotHave). Estas reglas estan documentadas en
+        // app/SOURCES_OF_TRUTH.md - mantenerlas sincronizadas.
+        // Cada checkpoint es un ARRAY de alternativas {must, not}. Se intenta cada una en orden.
+        // Nombres reales detectados en la hoja "Seguimiento" (sample del usuario 2026-05-19):
+        //   V_acsan (Visita Accion Sanitaria) / F_V_acsan (fecha)
+        //   R_aprobsan (Resol Aprob Sanitaria)
+        //   V_F1 / F_F1, V_DOM / F_V_DOM
+        //   Artef_elect (Artefactado electrico)
+        //   Empalme, T1 (no usado)
+        //   R_rdom (Recepcion DOM, numero del documento)
+        //   Observaciones_seg
+        // Ademas hay E_MU, F_E_MU, R_MU, E_antec_elect, F_E_antec_elect, R_factibilidad (no usados)
+        const SEG_RULES = {
+            te1: [
+                { must: ['te1'], not: ['te10','te11','te12'] },
+                { must: ['t1'],  not: ['te1','t10','t11','t12','tf1','ff1','vf1'] }  // Beneficiario.BT+ usa "T1" (no "TE1")
+            ],
+            visita_as: [
+                { must: ['vacsan'],     not: ['fvacsan'] },                     // V_acsan -> "vacsan" (boolean Si/No)
+                { must: ['visita','as'], not: ['dom','f1','resol','fecha'] },
+                { must: ['fvas'],        not: ['fvasr','fvasf'] },
+                { must: ['vas'],         not: ['fvas','fechavas','resol','dom','f1'] }
+            ],
+            resol_as: [
+                { must: ['aprobsan'],   not: [] },                              // R_aprobsan -> "raprobsan"
+                { must: ['resol','as'], not: ['dom','f1'] },
+                { must: ['fras'],       not: [] },
+                { must: ['ras'],        not: ['fras','fechara','fechaapr','rdom','rraprob'] }
+            ],
+            visita_f1: [
+                { must: ['visita','f1'], not: ['dom','fecha'] },
+                { must: ['fvf1'],        not: [] },
+                { must: ['vf1'],         not: ['fvf1','fechavf1'] }
+            ],
+            fecha_f1: [
+                { must: ['fecha','f1'], not: ['visita','dom','vf1','tf','t1'] },
+                { must: ['ff1'],        not: [] },
+                // Fallback documentacion: columna 'F1' (PDF Acta F1). Si esta el doc,
+                // implica que la visita ocurrio aun si F_F1 no fue cargado en Beneficiario.
+                { must: ['f1'],         not: ['ff1','vf1','tf','t1','visita','fecha','dom','art','empalm','recep'] }
+            ],
+            artefactado: [
+                { must: ['artef'], not: ['fartef'] }                            // Artef_elect, Artefactado
+            ],
+            empalme: [
+                { must: ['empalme'], not: [] }
+            ],
+            visita_dom: [
+                { must: ['visita','dom'], not: ['fecha'] },
+                { must: ['vdom'],         not: ['fvdom','fechavdom','rdom'] }
+            ],
+            fecha_v_dom: [
+                { must: ['fecha','visita','dom'], not: ['recep'] },
+                { must: ['fecha','vdom'],         not: ['recep'] },
+                { must: ['fvdom'],                not: ['recep'] },
+                { must: ['fecha','dom'],          not: ['recep'] }
+            ],
+            recepcion_dom: [
+                { must: ['rrdom'],         not: [] },                           // R_rdom -> "rrdom" (numero documento)
+                { must: ['recep','dom'],   not: ['fecha','factib'] },
+                { must: ['rdom'],          not: ['frdom','vdom','fvdom'] },
+                { must: ['nrecep'],        not: [] },
+                { must: ['numerorecep'],   not: [] }
+            ],
+            fecha_recep: [
+                { must: ['fecha','recep'], not: [] },
+                { must: ['frecep'],        not: ['nrecep'] },
+                { must: ['frdom'],         not: ['vdom','rrdom'] }  // F_R_dom de Beneficiario.BT+
+            ],
+            obs: [
+                { must: ['observ'], not: [] },
+                { must: ['coment'], not: [] },
+                { must: ['obs'],    not: ['observ'] }
+            ]
+        };
+
+        // Mapa global: qué columna real resolvió cada checkpoint (para debug panel)
+        window._SEG_COL_MAP = {};
+        const segKeysSample = segRaw.length > 0 ? Object.keys(segRaw[0]) : [];
+        for (const [k, alternatives] of Object.entries(SEG_RULES)) {
+            window._SEG_COL_MAP[k] = findCol(segKeysSample, alternatives);
+        }
+        window._SEG_RAW_COLS = segKeysSample;
+        window._SEG_TABLE_USED = segTableUsed;
+        window._SEG_SAMPLE_ROWS = segRaw.slice(0, 3);
+
+        // Detectar dinamicamente la columna que contiene el ID del beneficiario en Seguimiento
+        // (puede ser ID_Benef, ID_benef, IDU_Benef, ID_benef_seg, etc.)
+        const idColCandidates = segKeysSample.filter(k => {
+            const n = normCol(k);
+            return (n === 'idbenef' || n === 'idubenef' || n.startsWith('idbenef') || n.startsWith('idubenef'));
+        });
+        const idCol = idColCandidates[0] || null;
+        console.log('[LIVE] Seguimiento: columna ID detectada =', idCol, '(candidatos:', idColCandidates, ')');
+
+        // Fallback nombre→ID para "Seguimiento cierre de obras" (AppSheet no incluye ID_Benef).
+        // Esa vista muestra nombres como "Apellido[s] Nombre[s]"; BENEFICIARIOS_DATA tiene
+        // APELLIDOS y NOMBRES separados → construimos el índice en ambos órdenes.
+        const _segNameIdx = new Map();
+        BENEFICIARIOS_DATA.forEach(b => {
+            const apNom = normCol((String(b.APELLIDOS || '') + ' ' + String(b.NOMBRES || '')).trim());
+            const nomAp = normCol((String(b.NOMBRES || '') + ' ' + String(b.APELLIDOS || '')).trim());
+            const idStr = String(b.ID_Benef);
+            if (apNom) _segNameIdx.set(apNom, idStr);
+            if (nomAp && nomAp !== apNom) _segNameIdx.set(nomAp, idStr);
+        });
+        // Detectar columna "Nombre completo" en Seguimiento (primero nombre+completo, luego solo nombre)
+        const _segNombreCol = findColOne(segKeysSample, ['nombre', 'completo'], ['id', 'tipo', 'proyecto'])
+            || findColOne(segKeysSample, ['nombre'], ['id', 'tipo', 'proyecto', 'resol', 'visita', 'fecha', 'aprob']);
+        console.log('[LIVE] Seguimiento: col nombre para fallback =', _segNombreCol, '| nameIdx size =', _segNameIdx.size);
+
+        const unmatchedBenefs = [];
+        const matchedIds = [];
+        let skippedNoId = 0;
+        let _segNameMatchCount = 0;
+        segRaw.forEach(s => {
+            // Usar la columna detectada o fallback a las clasicas
+            let rawId = idCol ? s[idCol] : (s.ID_Benef ?? s.ID_benef ?? s.IDU_Benef);
+            let id = String(rawId == null ? '' : rawId).trim();
+            // Fallback por nombre cuando no hay ID o el ID no pertenece a BENEFICIARIOS_DATA
+            if ((!id || id === 'nan' || !idsBenef.has(id)) && _segNombreCol) {
+                const rawNombre = valOf(s, _segNombreCol);
+                const normNombre = normCol(rawNombre);
+                if (normNombre && _segNameIdx.has(normNombre)) {
+                    id = _segNameIdx.get(normNombre);
+                    _segNameMatchCount++;
+                }
+            }
+            if (!id || id === 'nan') { skippedNoId++; return; }
+            if (!idsBenef.has(id)) { unmatchedBenefs.push(id); return; }
+            matchedIds.push(id);
+            const keys = Object.keys(s);
+            const out = {};
+            for (const [k, alternatives] of Object.entries(SEG_RULES)) {
+                const colName = findCol(keys, alternatives);
+                out[k] = valOf(s, colName);
+            }
+            SEGUIMIENTO_DATA[id] = {
+                ...out,
+                _has: {
+                    visita_as:     isFilled(out.visita_as),
+                    resol_as:      isFilled(out.resol_as),
+                    visita_f1:     isFilled(out.visita_f1),
+                    fecha_f1:      isFilled(out.fecha_f1),
+                    artefactado:   isFilled(out.artefactado),
+                    empalme:       isFilled(out.empalme),
+                    visita_dom:    isFilled(out.visita_dom),
+                    fecha_v_dom:   isFilled(out.fecha_v_dom),
+                    recepcion_dom: isFilled(out.recepcion_dom),
+                    fecha_recep:   isFilled(out.fecha_recep)
+                }
+            };
+        });
+        // Diagnostico de match de IDs para el panel
+        window._SEG_DIAG = {
+            tableUsed: segTableUsed,
+            candidatesReport: segCandidatesReport,
+            segRawLen: segRaw.length,
+            segMatchedCount: matchedIds.length,
+            segUnmatchedCount: unmatchedBenefs.length,
+            segSkippedNoId: skippedNoId,
+            segNameMatchCount: _segNameMatchCount,
+            segNombreCol: _segNombreCol,
+            idCol: idCol,
+            idColCandidates: idColCandidates,
+            sampleUnmatched: unmatchedBenefs.slice(0, 10),
+            sampleBenefIds: BENEFICIARIOS_DATA.slice(0, 10).map(b => String(b.ID_Benef)),
+            benefDataLen: BENEFICIARIOS_DATA.length
+        };
+        console.log('[LIVE] Seguimiento: tabla usada =', segTableUsed || '(NINGUNA)', '| segRaw =', segRaw.length, '| matched =', matchedIds.length, '(por nombre:', _segNameMatchCount, ')| sin match =', unmatchedBenefs.length, '| sin ID =', skippedNoId);
+        console.log('[LIVE] Seguimiento idCol:', idCol, '| BENEFICIARIOS_DATA =', BENEFICIARIOS_DATA.length);
+        if (segRaw.length > 0) {
+            console.log('[LIVE] Columnas detectadas en Seguimiento[0]:', segKeysSample.join(' | '));
+            console.log('[LIVE] Match por checkpoint:', window._SEG_COL_MAP);
+            console.log('[LIVE] Seguimiento[0] muestra completa:', segRaw[0]);
+            if (unmatchedBenefs.length > 0) {
+                console.warn(`[LIVE] Seguimiento: ${unmatchedBenefs.length} filas con ID NO presentes en BENEFICIARIOS_DATA. Ejemplos: ${unmatchedBenefs.slice(0,10).join(', ')}`);
+                console.warn(`[LIVE] BENEFICIARIOS_DATA primeros IDs:`, BENEFICIARIOS_DATA.slice(0,10).map(b => b.ID_Benef));
+            }
+        } else {
+            console.warn('[LIVE] Seguimiento: 0 filas. Variantes probadas:', SEG_TABLE_CANDIDATES.join(', '), '— verificar nombre real de la hoja.');
+        }
+
+        // 6c. CIERRE DESDE BENEFICIARIO (columnas BT en adelante = idx 71+)
+        // Confirmado por el usuario: la informacion completa esta entre 'documentacion'
+        // (flags de existencia de documento) Y Beneficiario columnas BT+ (datos reales).
+        // Vista AppSheet asociada: "Centro de cierre documentaciones".
+        const benefAllCols = benRaw.length > 0 ? Object.keys(benRaw[0]) : [];
+        const benefCierreCols = benefAllCols.slice(71); // BT = columna 72 (1-indexed) = idx 71 (0-indexed)
+        console.log('[LIVE] Beneficiario - total columnas:', benefAllCols.length, '| columnas BT+ usadas para cierre:', benefCierreCols.length);
+        console.log('[LIVE] Beneficiario columnas BT+:', benefCierreCols);
+        window._BENEF_CIERRE_COLS = benefCierreCols;
+        window._BENEF_CIERRE_COL_MAP = {};
+        for (const [k, alternatives] of Object.entries(SEG_RULES)) {
+            window._BENEF_CIERRE_COL_MAP[k] = findCol(benefCierreCols, alternatives);
+        }
+        console.log('[LIVE] Beneficiario.BT+ match por checkpoint:', window._BENEF_CIERRE_COL_MAP);
+
+        // Mergeo: completa SEGUIMIENTO_DATA con datos de Beneficiario.BT+
+        // documentacion gana si tiene valor, Beneficiario.BT+ rellena los huecos
+        let benefCierreEnriched = 0;
+        if (benefCierreCols.length > 0) {
+            benRaw.forEach(b => {
+                const id = String(b.ID_Benef || b.IDU_Benef || '').trim();
+                if (!id || id === 'nan' || !idsBenef.has(id)) return;
+                const out = {};
+                for (const [k, alternatives] of Object.entries(SEG_RULES)) {
+                    const colName = findCol(benefCierreCols, alternatives);
+                    out[k] = valOf(b, colName);
+                }
+                const existing = SEGUIMIENTO_DATA[id] || { _has: {} };
+                let enriched = false;
+                const merged = { ...existing };
+                for (const k of Object.keys(SEG_RULES)) {
+                    // BT+ gana si tiene valor (es el dato real). documentacion queda como
+                    // fallback si BT+ esta vacio (ej: F1 acta cargada pero F_F1 sin fecha).
+                    if (out[k]) {
+                        merged[k] = out[k];
+                        enriched = true;
+                    }
+                }
+                merged._has = {
+                    visita_as:     isFilled(merged.visita_as),
+                    resol_as:      isFilled(merged.resol_as),
+                    visita_f1:     isFilled(merged.visita_f1),
+                    fecha_f1:      isFilled(merged.fecha_f1),
+                    artefactado:   isFilled(merged.artefactado),
+                    empalme:       isFilled(merged.empalme),
+                    visita_dom:    isFilled(merged.visita_dom),
+                    fecha_v_dom:   isFilled(merged.fecha_v_dom),
+                    recepcion_dom: isFilled(merged.recepcion_dom),
+                    fecha_recep:   isFilled(merged.fecha_recep)
+                };
+                SEGUIMIENTO_DATA[id] = merged;
+                if (enriched) benefCierreEnriched++;
+            });
+        }
+        console.log(`[LIVE] Cierre enriquecido desde Beneficiario.BT+: ${benefCierreEnriched} beneficiarios. Total con datos de cierre: ${Object.keys(SEGUIMIENTO_DATA).length}`);
+
+        // Update diagnostic
+        if (window._SEG_DIAG) {
+            window._SEG_DIAG.benefCierreColsCount = benefCierreCols.length;
+            window._SEG_DIAG.benefCierreEnriched = benefCierreEnriched;
+            window._SEG_DIAG.benefCierreColMap = window._BENEF_CIERRE_COL_MAP;
+            window._SEG_DIAG.segMatchedCount = Object.keys(SEGUIMIENTO_DATA).length;
+        }
+
+        // TE1 - fuente 3: columna te1 de Seguimiento. Se aplica ahora que SEGUIMIENTO_DATA esta listo.
+        let te1FromSeguimiento = 0;
+        BENEFICIARIOS_DATA.forEach(b => {
+            const seg = SEGUIMIENTO_DATA[String(b.ID_Benef)];
+            const fromSeg = !!(seg && seg.te1 && isFilled(seg.te1));
+            if (fromSeg) {
+                b.has_te1 = true;
+                if (b._te1_sources) b._te1_sources.seguimiento = true;
+                te1FromSeguimiento++;
+            }
+        });
+        console.log(`[LIVE] TE1 desde Seguimiento: ${te1FromSeguimiento}. Total con TE1: ${BENEFICIARIOS_DATA.filter(b => b.has_te1).length}/${BENEFICIARIOS_DATA.length}`);
+
+        updateLoading('Procesando maestros...', 80);
+
+        // 7. MAESTROS → MAESTROS_DATA (dict en v3)
+        const mRaw = raw.Maestros?.rows || [];
+        MAESTROS_DATA = {};
+        mRaw.forEach(m => {
+            const id = String(m.IDU_maestros || m.ID || '');
+            const nombre = String(m.Nombres || m.Nombre || m.NOMBRES || m.NOMBRE || '');
+            const apellido = String(m.Apellidos || m.Apellido || m.APELLIDOS || m.APELLIDO || '');
+            if (id && id !== 'nan') {
+                MAESTROS_DATA[id] = (nombre + ' ' + apellido).trim() || id;
+            }
+        });
+
+        updateLoading('Procesando presupuesto...', 85);
+
+        // 8. PRESUPUESTO (Tabla_pago por tipologia)
+        const tpRaw = raw.Tabla_pago?.rows || [];
+        PRESUPUESTO_DATA = {};
+        PRESUPUESTO_PARTIDA_DATA = {};
+        tpRaw.forEach(tp => {
+            const proy   = String(tp.ID_proy || '').trim();
+            const tipol  = String(tp.IDU_Tipol || '').trim();
+            const familia = String(tp.familia_pago || '').trim();
+            const partida = String(tp.tipo_pago || '').trim();
+            const monto = parseMonto(tp.monto);
+            if (proy && tipol && tipol !== 'nan' && familia && familia !== 'nan') {
+                if (!PRESUPUESTO_DATA[proy]) PRESUPUESTO_DATA[proy] = {};
+                if (!PRESUPUESTO_DATA[proy][tipol]) PRESUPUESTO_DATA[proy][tipol] = {};
+                PRESUPUESTO_DATA[proy][tipol][familia] = (PRESUPUESTO_DATA[proy][tipol][familia] || 0) + monto;
+                if (partida && partida !== 'nan') {
+                    if (!PRESUPUESTO_PARTIDA_DATA[proy]) PRESUPUESTO_PARTIDA_DATA[proy] = {};
+                    if (!PRESUPUESTO_PARTIDA_DATA[proy][tipol]) PRESUPUESTO_PARTIDA_DATA[proy][tipol] = {};
+                    if (!PRESUPUESTO_PARTIDA_DATA[proy][tipol][familia]) PRESUPUESTO_PARTIDA_DATA[proy][tipol][familia] = {};
+                    PRESUPUESTO_PARTIDA_DATA[proy][tipol][familia][partida] = (PRESUPUESTO_PARTIDA_DATA[proy][tipol][familia][partida] || 0) + monto;
+                }
+            }
+        });
+
+        updateLoading('Procesando garantías...', 92);
+
+        // 9. GARANTIAS (controlBGB)
+        // La columna Tipo_linea marca si la fila es una garantia vigente.
+        // "Sin Garantia" = liberada / no vigente (ej. convenio marco vencido) -> se excluye.
+        // Vacio = dato antiguo sin clasificar -> se mantiene (no asumir que no es garantia).
+        const bgbRaw = raw.controlBGB?.rows || [];
+        GARANTIAS_DATA = bgbRaw
+            .filter(g => idsProyActivos.has(String(g.ID_Proy || '')))
+            .filter(g => !/sin\s*garant/i.test(String(g.Tipo_linea || '')))
+            .map(g => {
+                const tipoTxt = String(g.Tipo || '').toLowerCase();
+                // Marco = garantia del convenio/asistencia tecnica SEREMI<->EGR (no del contrato de obra)
+                const esMarco = /convenio\s*marco/.test(tipoTxt);
+                // Entidad responsable: ATPK (EGR en proyectos recientes) vs Raices.
+                // Se infiere solo de la columna empresa (la Glosa es texto legal boilerplate
+                // que casi siempre menciona a la Entidad de Gestion Rural ATPK aunque la
+                // garantia sea de Raices, por lo que no sirve para clasificar).
+                const entTxt = String(g.empresa || '').toLowerCase();
+                const entidad = /atpk/.test(entTxt) ? 'ATPK' : 'Raíces';
+                const tipoCorto = esMarco ? 'Marco' : (/buena/.test(tipoTxt) ? 'Buena Ejec.' : (/fiel/.test(tipoTxt) ? 'Contrato' : String(g.Tipo || '')));
+                return {
+                    ID_Proy: String(g.ID_Proy || ''),
+                    tipo: String(g.Tipo || ''),
+                    tipo1: String(g.Tipo1 || ''),
+                    tipo_linea: String(g.Tipo_linea || ''),
+                    esMarco,
+                    entidad,
+                    tipoCorto,
+                    num_bol: String(g.num_bol || ''),
+                    banco: String(g.Banco || ''),
+                    monto_uf: parseInt(g.Monto) || 0,
+                    fecha_inicio: parseDate(g.Fecha_inic) || '',
+                    fecha_vcmto: parseDate(g.Fecha_vcmto) || ''
+                };
+            });
+
+        updateLoading('Procesando estados de pago...', 95);
+
+        // 10. ESTADOS DE PAGO (controlEEPP)
+        const parseMontoUF = (raw) => {
+            const s = String(raw || '0').trim();
+            if (!s || s === 'nan' || s === 'None') return 0;
+            if (s.includes(',') && s.includes('.')) {
+                return Math.round(parseFloat(s.replace(/\./g, '').replace(',', '.')) * 100) / 100;
+            } else if (s.includes(',')) {
+                return Math.round(parseFloat(s.replace(',', '.')) * 100) / 100;
+            } else {
+                return Math.round((parseFloat(s) || 0) * 100) / 100;
+            }
+        };
+        const eeppRaw = raw.controlEEPP?.rows || [];
+        EEPP_DATA = eeppRaw
+            .filter(ep => idsProyActivos.has(String(ep.ID_Proy || '')))
+            .map(ep => ({
+                ID_Proy: String(ep.ID_Proy || ''),
+                ID_Benef: String(ep.ID_Benef || ''),
+                Num_EP: String(ep.Num_EP || ''),
+                Monto: parseMontoUF(ep.Monto),
+                Estado: String(ep.Estado || ''),
+                Fecha: parseDate(ep.Fecha) || ''
+            }));
+
+        // 10.5 MONTO TOTAL POR PROYECTO (tabla Montos, en UF)
+        // El total por cobrar de un proyecto = suma de todas las columnas de
+        // monto de sus beneficiarios. Se EXCLUYE 'Factor' (es un multiplicador,
+        // no un monto). Verificado contra P119 (Ñuke Mapu) = 48.826,43 UF.
+        const MONTO_COLS = [
+            'Base', 'RAL', 'Ampliacion1', 'Ampliacion2', 'Terreno', 'Conexiones',
+            'Discapacidad', 'entorno', 'mejvivienda', 'premio_ahorro',
+            'A_Base', 'A_Amp1', 'A_Amp2', 'A_M_ent', 'A_M_viv',
+            'M_termico', 'M_eficiencia', 'Regularizacion', 'incremento',
+            'homologacion', 'ajuste_ppto'
+        ];
+        const montosRaw = raw.Montos?.rows || [];
+        MONTOS_PROY_DATA = {};
+        montosRaw.forEach(m => {
+            const pid = String(m.ID_proy || '');
+            if (!pid || !idsProyActivos.has(pid)) return;
+            const totalBenef = MONTO_COLS.reduce((acc, c) => acc + parseMontoUF(m[c]), 0);
+            if (!MONTOS_PROY_DATA[pid]) MONTOS_PROY_DATA[pid] = { total: 0, viviendas: 0 };
+            MONTOS_PROY_DATA[pid].total += totalBenef;
+            MONTOS_PROY_DATA[pid].viviendas += 1;
+        });
+
+        updateLoading('Procesando comentarios...', 97);
+
+        // 11. COMENTARIOS BENEFICIARIO (combenef)
+        const combenefRaw = raw.combenef?.rows || [];
+        COMENTARIOS_BENEF_DATA = [];
+        combenefRaw.forEach(c => {
+            const idB = String(c.ID_Benef || '');
+            if (!idsBenef.has(idB)) return;
+            const texto = String(c.comentario || '').trim();
+            if (!texto || texto === 'nan') return;
+            COMENTARIOS_BENEF_DATA.push({
+                ID_Benef: idB,
+                fecha: parseDate(c.fecha) || '',
+                texto: texto,
+                usuario: String(c.usuario || '')
+            });
+        });
+
+        updateLoading('Listo!', 100, `${PROYECTOS_DATA.length} proyectos, ${BENEFICIARIOS_DATA.length} beneficiarios, ${DESPACHOS_DATA.length} despachos, ${SOLPAGO_DATA.length} pagos`);
+    }
+
+    // ============================================================
+    // CACHE - Guarda datos PROCESADOS (no crudos) en localStorage
+    // ============================================================
+    const CACHE_KEY = 'scraices_v3_cache';
+    const CACHE_MAX_AGE = 4 * 60 * 60 * 1000; // 4 horas
+
+    function saveProcessedCache() {
+        try {
+            const payload = {
+                ts: Date.now(),
+                PROYECTOS_DATA,
+                BENEFICIARIOS_DATA,
+                DESPACHOS_DATA,
+                SOLICITUDES_DATA,
+                INSPECCIONES_DATA,
+                SOLPAGO_DATA,
+                MAESTROS_DATA,
+                PRESUPUESTO_DATA,
+                PRESUPUESTO_PARTIDA_DATA,
+                GARANTIAS_DATA,
+                EEPP_DATA,
+                COMENTARIOS_BENEF_DATA,
+                SEGUIMIENTO_DATA,
+                MONTOS_PROY_DATA,
+                AVANCE_MENSUAL_DATA
+            };
+            // Exponer el payload en memoria para el generador de snapshot
+            // (Playwright lo lee de window.__SNAPSHOT__). No tiene el limite de
+            // tamano de localStorage: el dataset procesado supera los ~4.5 MB.
+            try { window.__SNAPSHOT__ = payload; } catch (_) {}
+            const json = JSON.stringify(payload);
+            const sizeKB = Math.round(json.length / 1024);
+            if (sizeKB > 4500) {
+                console.warn('[CACHE] Datos procesados muy grandes (' + sizeKB + 'KB), no cachear');
+                return;
+            }
+            localStorage.setItem(CACHE_KEY, json);
+            console.log('[CACHE] Guardado:', sizeKB, 'KB');
+        } catch (e) {
+            console.warn('[CACHE] Error al guardar:', e.message);
+            try { localStorage.removeItem(CACHE_KEY); } catch(_) {}
+        }
+    }
+
+    function loadProcessedCache() {
+        try {
+            const stored = localStorage.getItem(CACHE_KEY);
+            if (!stored) return null;
+            const payload = JSON.parse(stored);
+            if (Date.now() - payload.ts > CACHE_MAX_AGE || !payload.PRESUPUESTO_PARTIDA_DATA) {
+                localStorage.removeItem(CACHE_KEY);
+                return null;
+            }
+            return payload;
+        } catch (e) {
+            console.warn('[CACHE] Error al leer:', e.message);
+            try { localStorage.removeItem(CACHE_KEY); } catch(_) {}
+            return null;
+        }
+    }
+
+    function restoreFromCache(cache) {
+        PROYECTOS_DATA = cache.PROYECTOS_DATA || [];
+        BENEFICIARIOS_DATA = cache.BENEFICIARIOS_DATA || [];
+        DESPACHOS_DATA = cache.DESPACHOS_DATA || [];
+        SOLICITUDES_DATA = cache.SOLICITUDES_DATA || [];
+        INSPECCIONES_DATA = cache.INSPECCIONES_DATA || [];
+        SOLPAGO_DATA = cache.SOLPAGO_DATA || [];
+        MAESTROS_DATA = cache.MAESTROS_DATA || {};
+        PRESUPUESTO_DATA = cache.PRESUPUESTO_DATA || {};
+        PRESUPUESTO_PARTIDA_DATA = cache.PRESUPUESTO_PARTIDA_DATA || {};
+        GARANTIAS_DATA = cache.GARANTIAS_DATA || [];
+        EEPP_DATA = cache.EEPP_DATA || [];
+        COMENTARIOS_BENEF_DATA = cache.COMENTARIOS_BENEF_DATA || [];
+        SEGUIMIENTO_DATA = cache.SEGUIMIENTO_DATA || {};
+        MONTOS_PROY_DATA = cache.MONTOS_PROY_DATA || {};
+        AVANCE_MENSUAL_DATA = cache.AVANCE_MENSUAL_DATA || {};
+    }
+
+    function formatCacheAge(ts) {
+        const mins = Math.round((Date.now() - ts) / 60000);
+        if (mins < 1) return 'hace menos de 1 min';
+        if (mins < 60) return `hace ${mins} min`;
+        const hrs = Math.floor(mins / 60);
+        return `hace ${hrs}h ${mins % 60}m`;
+    }
+
+    function showCacheBanner(ts) {
+        let banner = document.getElementById('cacheBanner');
+        if (!banner) {
+            banner = document.createElement('div');
+            banner.id = 'cacheBanner';
+            document.body.prepend(banner);
+        }
+        banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#fef3c7;color:#92400e;text-align:center;padding:6px 16px;font-size:12px;font-family:IBM Plex Sans,sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 1px 3px rgba(0,0,0,0.1);';
+        banner.innerHTML = '<span>Mostrando datos en cache (' + formatCacheAge(ts) + '). Actualizando en segundo plano...</span>';
+        // Empujar el contenido hacia abajo el alto del banner para no tapar
+        // el selector/titulo (el banner es position:fixed y queda encima).
+        try { document.body.style.paddingTop = (banner.offsetHeight || 34) + 'px'; } catch (_) {}
+    }
+
+    function removeCacheBanner() {
+        const b = document.getElementById('cacheBanner');
+        if (b) b.remove();
+        try { document.body.style.paddingTop = ''; } catch (_) {}
+    }
+
+    async function initLiveData() {
+        // 1. Intentar cache de datos procesados
+        const cached = loadProcessedCache();
+
+        if (cached) {
+            // Render inmediato con cache
+            restoreFromCache(cached);
+            renderApp();
+            showCacheBanner(cached.ts);
+            console.log('[CACHE] Render desde cache (' + formatCacheAge(cached.ts) + ')');
+
+            // Fetch fresco en segundo plano
+            try {
+                const raw = await fetchAllData();
+                processRawData(raw);
+                saveProcessedCache();
+                removeCacheBanner();
+                renderApp();
+                console.log('[LIVE] Datos actualizados en segundo plano');
+            } catch (err) {
+                // Mantener datos de cache, avisar que no se pudo actualizar
+                const b = document.getElementById('cacheBanner');
+                if (b) {
+                    b.style.background = '#fee2e2';
+                    b.style.color = '#991b1b';
+                    b.innerHTML = '<span>No se pudo actualizar: ' + err.message + '. Usando cache (' + formatCacheAge(cached.ts) + ')</span><button onclick="location.reload()" style="margin-left:12px;padding:3px 12px;background:#991b1b;color:white;border:none;border-radius:4px;cursor:pointer;font-size:11px;">Reintentar</button>';
+                    try { document.body.style.paddingTop = (b.offsetHeight || 34) + 'px'; } catch (_) {}
+                }
+            }
+        } else {
+            // Sin cache local: intentar snapshot pre-generado (CDN, rapido)
+            showLoadingScreen();
+            let snapshotOk = false;
+            try {
+                updateLoading('Cargando datos pre-cargados...', 15, 'Snapshot (CDN)');
+                const snap = await fetchSnapshot();
+                restoreFromCache(snap);
+                saveProcessedCache();
+                renderApp();
+                snapshotOk = true;
+                const snapTs = snap.ts || Date.now();
+                showCacheBanner(snapTs);
+                console.log('[SNAPSHOT] Render desde snapshot (' + formatCacheAge(snapTs) + ')');
+            } catch (e) {
+                console.warn('[SNAPSHOT] No disponible, carga en vivo:', e.message);
+            }
+
+            // Fetch en vivo: en segundo plano si el snapshot pinto algo;
+            // bloqueante (con loading screen) si no hubo snapshot.
+            try {
+                const raw = await fetchAllData();
+                processRawData(raw);
+                saveProcessedCache();
+                removeCacheBanner();
+                if (!snapshotOk) await new Promise(r => setTimeout(r, 300));
+                renderApp();
+                console.log('[LIVE] Datos en vivo cargados');
+            } catch (err) {
+                if (snapshotOk) {
+                    // Ya hay datos en pantalla: solo avisar que no se actualizo
+                    const b = document.getElementById('cacheBanner');
+                    if (b) {
+                        b.style.background = '#fee2e2';
+                        b.style.color = '#991b1b';
+                        b.innerHTML = '<span>No se pudo actualizar en vivo: ' + err.message + '. Mostrando snapshot.</span><button onclick="location.reload()" style="margin-left:12px;padding:3px 12px;background:#991b1b;color:white;border:none;border-radius:4px;cursor:pointer;font-size:11px;">Reintentar</button>';
+                        try { document.body.style.paddingTop = (b.offsetHeight || 34) + 'px'; } catch (_) {}
+                    }
+                    return;
+                }
+                document.getElementById('root').innerHTML = `
+                    <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f3f4f6;font-family:'IBM Plex Sans',sans-serif;">
+                        <div style="text-align:center;max-width:450px;padding:40px;">
+                            <div style="color:#ef4444;font-size:48px;margin-bottom:16px;">&#9888;</div>
+                            <h2 style="color:#1f2937;font-size:18px;font-weight:600;margin-bottom:8px;">Error al cargar datos</h2>
+                            <p style="color:#6b7280;font-size:13px;margin-bottom:16px;">${err.message}</p>
+                            <button onclick="location.reload()" style="padding:10px 24px;background:#7c3aed;color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;">Reintentar</button>
+                            <p style="color:#9ca3af;font-size:11px;margin-top:20px;">Si el problema persiste, verifica que el Apps Script este desplegado correctamente.</p>
+                        </div>
+                    </div>`;
+            }
+        }
+    }
+
+
+// ========== ETAPAS CONFIG ==========
+const ETAPAS_CONFIG = ETAPAS_CONFIG_FULL.etapas || {};
+const SECUENCIA_PRINCIPAL = ETAPAS_CONFIG_FULL.secuencia_principal || [];
+
+// ========== FAMILIA PAGO MAP ==========
+// Mapea cada Familia de pago a las etapas de despacho que le corresponden
+// Basado en tabla de partidas: Tipo → Familia
+const FAMILIA_PAGO_MAP = {
+    "01 - Fundaciones": ["01_FUNDACIONES", "12_ALCANTARILLADO"],
+    "02 - 1era Etapa": ["02_1ERA_ETAPA", "28_VENTANAS", "29_EIFS"],
+    "03 - 2da Etapa": ["03_2DA_ETAPA"],
+    "04 - Gasfiteria": ["13_GASFITERIA"],
+    "05 - Cerámica": ["07_CERAMICO_PISO", "08_CERAMICO_MURO"],
+    "06 - Pintura": ["09_PINTURA_EXT", "10_PINTURA_INT"],
+    "07 - Eléctricidad": [],
+    "08 - Obras Exteriores": ["14_OBRAS_EXT"]
+};
+const FAMILIA_LABELS = {
+    "01 - Fundaciones": "Fundaciones", "02 - 1era Etapa": "1era Etapa", "03 - 2da Etapa": "2da Etapa",
+    "04 - Gasfiteria": "Gasfiteria", "05 - Cerámica": "Cerámica", "06 - Pintura": "Pintura",
+    "07 - Eléctricidad": "Electricidad", "08 - Obras Exteriores": "OO.EE."
+};
+const FAMILIAS_CRITICAS = ["01 - Fundaciones", "02 - 1era Etapa", "03 - 2da Etapa", "04 - Gasfiteria", "05 - Cerámica"];
+// Partidas por familia (Viv = Vivienda, RC = Recinto Complementario)
+// Partidas por familia. IMPORTANTE: los nombres deben coincidir con VIV_COLUMNS[].short
+// (asi se indexan las partidas de inspeccion en INSPECCIONES_DATA). RC va en rc_vals aparte.
+const FAMILIA_PARTIDAS = {
+    "01 - Fundaciones": ["Fundaciones", "Radier", "Alcantarillado", "Alcant. Ext."],
+    "02 - 1era Etapa": ["Tabiques", "Techumbre", "Rev. Exterior", "Ventanas", "Cubierta", "Cielo", "Alero"],
+    "03 - 2da Etapa": ["Rev. Zona Seca", "Rev. Zona Húmeda", "Aisl. Muro", "Aisl. Cielo", "Puertas", "Molduras"],
+    "04 - Gasfiteria": ["Red Agua Pot.", "Art. Baño", "Art. Cocina", "Agua Pot. Ext."],
+    "05 - Cerámica": ["Cerámico Piso", "Cerámico Muro"],
+    "06 - Pintura": ["Pintura Ext.", "Pintura Int."],
+    "07 - Eléctricidad": ["Red Eléctrica", "Art. Eléctricos", "Inst. Eléc. Ext."],
+    "08 - Obras Exteriores": []
+};
+
+// ========== UTILITY FUNCTIONS ==========
+const getAvancePorFamilia = (idBenef) => {
+    const insp = INSPECCIONES_DATA.find(i => String(i.ID_Benef) === String(idBenef));
+    if (!insp || !insp.partidas) return {};
+    const result = {};
+    Object.entries(FAMILIA_PARTIDAS).forEach(([fam, partidas]) => {
+        const vals = partidas.map(p => insp.partidas[p] ?? null).filter(v => v !== null);
+        if (vals.length > 0) {
+            const pct = Math.round(vals.reduce((s,v) => s+v, 0) / vals.length);
+            const completas = vals.filter(v => v >= 100).length;
+            result[fam] = { pct, completas, total: vals.length, partidas: partidas.map(p => ({ nombre: p, valor: insp.partidas[p] ?? 0 })) };
+        }
+    });
+    return result;
+};
+
+const fechaChile = () => {
+    const d = new Date();
+    const o = d.getTimezoneOffset();
+    const cl = new Date(d.getTime() - (o * 60000) + (-3 * 3600000) - (-o * 60000));
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${cl.getFullYear()}-${pad(cl.getMonth()+1)}-${pad(cl.getDate())}T${pad(cl.getHours())}:${pad(cl.getMinutes())}`;
+};
+const formatPeso = (n) => "$" + Number(n).toLocaleString("es-CL");
+const getSolpago = (idBenef) => SOLPAGO_DATA.filter(s => String(s.ID_Benef) === String(idBenef));
+const getTotalPagado = (idBenef) => getSolpago(idBenef).reduce((s, p) => s + p.monto, 0);
+const getMaestroNombre = (id) => MAESTROS_DATA[id] || id || "Desconocido";
+const getInspeccion = (idBenef) => INSPECCIONES_DATA.find(i => String(i.ID_Benef) === String(idBenef)) || null;
+
+// Avance físico real por beneficiario desde AppSheet (via Firebase avance_benef)
+const _normClave = (s) => (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim().replace(/\s+/g,'_');
+const getAvanceBenef = (pid, nombres, apellidos) => {
+    const node = AVANCE_BENEF_DATA[pid];
+    if (!node) return null;
+    const key = _normClave(`${nombres} ${apellidos}`);
+    if (key in node) return node[key];
+    // Fallback: intersección de tokens (robusto ante orden Nombre/Apellido invertido)
+    const tokens = new Set(key.split('_').filter(Boolean));
+    let bestVal = null, bestScore = 0;
+    for (const [k, v] of Object.entries(node)) {
+        const score = k.split('_').filter(t => tokens.has(t)).length;
+        if (score > bestScore) { bestScore = score; bestVal = v; }
+    }
+    return (bestScore >= Math.max(2, tokens.size - 1)) ? bestVal : null;
+};
+
+// Familias excluidas de presupuesto y pagados (electricidad gestionada aparte)
+const FAMILIAS_EXCLUIDAS = new Set(['07 - Eléctricidad']);
+
+// Helpers para gráficos de avance M.O.
+const shortPeso = (v) => {
+    if (!v && v !== 0) return '';
+    const abs = Math.abs(v);
+    if (abs >= 1000000) return '$' + (v / 1000000).toFixed(1).replace('.', ',') + 'M';
+    if (abs >= 1000) return '$' + Math.round(v / 1000) + 'K';
+    return '$' + v;
+};
+
+const getBenefPresupuestoTotal = (benef) => {
+    const pBenef = PRESUPUESTO_DATA[benef.ID_Proy] || {};
+    const presViv = pBenef[benef.tipologia_viv_id] || {};
+    const presRC  = pBenef[benef.tipologia_rc_id] || {};
+    const ppBenef = PRESUPUESTO_PARTIDA_DATA[benef.ID_Proy] || {};
+    const allFams = new Set([...Object.keys(presViv), ...Object.keys(presRC)]);
+    let total = 0;
+    allFams.forEach(fam => {
+        if (fam === '07 - Eléctricidad') {
+            ['tipologia_viv_id', 'tipologia_rc_id'].forEach(tipKey => {
+                const byPart = (ppBenef[benef[tipKey]] || {})[fam] || {};
+                total += Object.entries(byPart)
+                    .filter(([p]) => p.toLowerCase().includes('postes'))
+                    .reduce((s, [, v]) => s + v, 0);
+            });
+        } else if (!FAMILIAS_EXCLUIDAS.has(fam)) {
+            total += (presViv[fam] || 0) + (presRC[fam] || 0);
+        }
+    });
+    return total;
+};
+
+const getBenefPaidFiltered = (idBenef) => {
+    const pagos = SOLPAGO_DATA.filter(p => p.ID_Benef === String(idBenef));
+    return pagos.filter(p => {
+        if (p.Familia_pago === '07 - Eléctricidad') return p.Tipo_pago.toLowerCase().includes('postes');
+        return !FAMILIAS_EXCLUIDAS.has(p.Familia_pago);
+    });
+};
+
+const buildMonthlyPayments = (pagos) => {
+    const byMonth = {};
+    pagos.forEach(p => {
+        if (!p.fecha) return;
+        const mk = p.fecha.substring(0, 7);
+        byMonth[mk] = (byMonth[mk] || 0) + p.monto;
+    });
+    const sorted = Object.entries(byMonth).sort(([a], [b]) => a.localeCompare(b));
+    let cumul = 0;
+    return sorted.map(([mk, amount]) => {
+        cumul += amount;
+        const [y, m] = mk.split('-');
+        const mnames = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+        return { mk, label: mnames[parseInt(m) - 1] + '-' + y.slice(2), amount, cumul };
+    });
+};
+
+const getPagosPorFamilia = (idBenef) => {
+    const pagos = getSolpago(idBenef);
+    // Clave compuesta: "Familia_pago|||tipologia" para desglosar Vivienda / Bodega / R.C.
+    const porFam = {};
+    pagos.forEach(p => {
+        if (p.Familia_pago === '07 - Eléctricidad') {
+            if (!p.Tipo_pago.toLowerCase().includes('postes')) return;
+        } else if (FAMILIAS_EXCLUIDAS.has(p.Familia_pago)) {
+            return;
+        }
+        const key = `${p.Familia_pago}|||${p.tipologia}`;
+        if (!porFam[key]) porFam[key] = { familia: p.Familia_pago, tipologia: p.tipologia, total: 0, count: 0, maestros: new Set() };
+        porFam[key].total += p.monto;
+        porFam[key].count++;
+        if (p.maestro && p.maestro !== 'nan') porFam[key].maestros.add(getMaestroNombre(p.maestro));
+    });
+    return porFam;
+};
+
+// Mapea UN segmento de tipo_despacho a su etapa correspondiente
+const mapearSegmento = (segmento) => {
+    if (!segmento) return null;
+    const t = segmento.toLowerCase().trim();
+    if (t.includes("fundacion") && !t.includes("eifs") && !t.includes("aislacion")) return "01_FUNDACIONES";
+    if (t.includes("alcantarillado")) return "12_ALCANTARILLADO";
+    if (t.includes("1era")) return "02_1ERA_ETAPA";
+    if (t.includes("ventana")) return "28_VENTANAS";
+    if (t.includes("eifs") || t.includes("aislacion fund")) return "29_EIFS";
+    if (t.includes("2da")) return "03_2DA_ETAPA";
+    if (t.includes("piso") && t.includes("ceram")) return "07_CERAMICO_PISO";
+    if (t.includes("07-") && t.includes("piso")) return "07_CERAMICO_PISO";
+    if (t.includes("muro") && t.includes("ceram")) return "08_CERAMICO_MURO";
+    if (t.includes("08-") && t.includes("muro")) return "08_CERAMICO_MURO";
+    if (t.includes("pintura ext") || t.includes("09-")) return "09_PINTURA_EXT";
+    if (t.includes("pintura int") || t.includes("10-")) return "10_PINTURA_INT";
+    if (t.includes("pintura") && t.includes("r.c")) return "09_PINTURA_EXT";
+    if (t.includes("gasfiter") || t.includes("sol. ac") || t.includes("artefact") || t.includes("cocina") || t.includes("calefont") || t.includes("art.ba") || t.includes("art. ba") || t.includes("baño") || t.includes("bano")) return "13_GASFITERIA";
+    if (t.includes("obra") && t.includes("ext")) return "14_OBRAS_EXT";
+    if (t.includes("ap ext") || t.includes("05-")) return "14_OBRAS_EXT";
+    return null;
+};
+
+// Mapea un tipo_despacho completo (puede contener multiples etapas separadas por coma)
+const mapearTipoDespacho = (tipo) => {
+    if (!tipo) return [];
+    const segmentos = tipo.split(',');
+    const etapas = [];
+    segmentos.forEach(seg => {
+        const key = mapearSegmento(seg);
+        if (key && !etapas.includes(key)) etapas.push(key);
+    });
+    return etapas;
+};
+
+// Clasificador FINO de despacho (solo para Validacion Cruzada CHECK 1).
+// A diferencia de mapearSegmento, separa alcantarillado interior/planta vs exterior
+// y separa Sol. AC de gasfiteria, para distinguir que material respalda cada familia de pago.
+const clasificarDespachoFino = (segmento) => {
+    if (!segmento) return [];
+    const t = segmento.toLowerCase().trim();
+    if (t.includes('alcantarillado') || t.includes('planta alc')) {
+        if (t.includes('exterior') || t.includes(' ext') || t.includes('-ext')) return ['alc_exterior'];
+        if (t.includes('interior') || t.includes('planta')) return ['alc_interior'];
+        return ['alc_interior', 'alc_exterior']; // sin calificar: cuenta para ambas (evita falso positivo)
+    }
+    // Agua potable interior (red AP) -> respalda la partida "Red Agua Pot."
+    if (!t.includes('exterior') && !t.includes(' ext') && ((t.includes('agua') && t.includes('potab')) || t.includes('red agua') || t.includes('ap interior') || t.includes('ap. interior') || t.includes('agua pot'))) {
+        return ['ap_interior'];
+    }
+    // Fundaciones incluye alcantarillado interior (planta): se instalan juntos.
+    // Consistente con CHECK1_FAMILIA_TAGS donde ambos respaldan "01 - Fundaciones".
+    if (t.includes('fundacion') && !t.includes('eifs') && !t.includes('aislacion')) return ['fundacion', 'alc_interior'];
+    if (t.includes('1era')) return ['1era'];
+    if (t.includes('ventana')) return ['ventana'];
+    if (t.includes('eifs') || t.includes('aislacion fund')) return ['eifs'];
+    if (t.includes('2da')) return ['2da'];
+    // Ceramico piso (07-) cubre ambas partidas: en obra llegan juntos piso y muro
+    if ((t.includes('piso') && t.includes('ceram')) || (t.includes('07-') && t.includes('piso'))) return ['ceramica_piso', 'ceramica_muro'];
+    if ((t.includes('muro') && t.includes('ceram')) || (t.includes('08-') && t.includes('muro'))) return ['ceramica_muro'];
+    if (t.includes('pintura int') || t.includes('10-')) return ['pintura_int'];
+    if (t.includes('pintura')) return ['pintura_ext']; // ext, r.c. o generico
+    if (t.includes('sol. ac') || t.includes('sol ac') || t.includes('cocina') || t.includes('calefon')) return ['sol_ac'];
+    if (t.includes('gasfiter') || t.includes('artefact') || t.includes('art.ba') || t.includes('art. ba') || t.includes('baño') || t.includes('bano')) return ['gasfiteria'];
+    return [];
+};
+const despachoTagsDe = (idBenef) => {
+    const tags = new Set();
+    DESPACHOS_DATA.filter(d => String(d.ID_Benef) === String(idBenef)).forEach(d => {
+        String(d.Tipo_despacho || '').split(',').forEach(seg => clasificarDespachoFino(seg).forEach(t => tags.add(t)));
+    });
+    return tags;
+};
+// Que tags de despacho respaldan el pago de cada familia (CHECK 1).
+// Electricidad (07) y Obras Exteriores (08) NO se evaluan: no figuran aqui.
+const CHECK1_FAMILIA_TAGS = {
+    "01 - Fundaciones": ['fundacion', 'alc_interior'],
+    "02 - 1era Etapa":  ['1era', 'ventana'],
+    "03 - 2da Etapa":   ['2da'],
+    "04 - Gasfiteria":  ['gasfiteria', 'sol_ac', 'alc_exterior'],
+    "05 - Cerámica":    ['ceramica_piso', 'ceramica_muro'],
+    "06 - Pintura":     ['pintura_ext', 'pintura_int']
+};
+
+// Mapa PARTIDA de inspeccion (VIV_COLUMNS[].short) -> despacho(s) que la respaldan (tags finos).
+// Usado por CHECK 2/3 para comparar a nivel PARTIDA y no de familia completa.
+// [] = no se evalua (Electricidad). EIFS no respalda ninguna partida (queda fuera).
+const PARTIDA_DESPACHO = {
+    "Fundaciones": ['fundacion'],
+    "Radier": ['fundacion'],
+    "Alcantarillado": ['alc_interior'],
+    "Tabiques": ['1era'],
+    "Techumbre": ['1era'],
+    "Rev. Exterior": ['1era'],
+    "Ventanas": ['ventana'],
+    "Cubierta": ['1era'],
+    "Cielo": ['1era'],
+    "Alero": ['1era'],
+    "Rev. Zona Seca": ['2da'],
+    "Rev. Zona Húmeda": ['2da'],
+    "Aisl. Muro": ['2da'],
+    "Aisl. Cielo": ['2da'],
+    "Puertas": ['2da'],
+    "Molduras": ['2da'],
+    "Cerámico Piso": ['ceramica_piso'],
+    "Cerámico Muro": ['ceramica_muro'],
+    "Pintura Ext.": ['pintura_ext'],
+    "Pintura Int.": ['pintura_int'],
+    "Red Agua Pot.": ['ap_interior'],
+    "Art. Baño": ['gasfiteria'],
+    "Art. Cocina": ['gasfiteria', 'sol_ac'],
+    "Agua Pot. Ext.": [],
+    "Alcant. Ext.": ['alc_exterior'],
+    "Red Eléctrica": [],
+    "Art. Eléctricos": [],
+    "Inst. Eléc. Ext.": []
+};
+// Inverso de PARTIDA_DESPACHO: despacho (tag) -> partidas de inspeccion que produce. Para CHECK 3.
+const DESPACHO_PARTIDAS = (() => {
+    const inv = {};
+    Object.entries(PARTIDA_DESPACHO).forEach(([partida, tags]) => {
+        (tags || []).forEach(t => { (inv[t] = inv[t] || []).push(partida); });
+    });
+    return inv;
+})();
+const DESPACHO_LABEL = {
+    fundacion: 'Fundaciones', alc_interior: 'Alcantarillado interior', alc_exterior: 'Alcantarillado exterior (fosa)',
+    '1era': '1era Etapa', ventana: 'Ventanas', '2da': '2da Etapa',
+    ceramica_piso: 'Cerámico Piso', ceramica_muro: 'Cerámico Muro',
+    pintura_ext: 'Pintura Exterior', pintura_int: 'Pintura Interior',
+    gasfiteria: 'Gasfitería', sol_ac: 'Sol. AC (cocina/calefón)', ap_interior: 'Agua Potable interior'
+};
+// Tags de despacho del beneficiario con su fecha MAS ANTIGUA (para medir dias sin inspeccion)
+const despachoTagsFechaDe = (idBenef) => {
+    const map = {};
+    DESPACHOS_DATA.filter(d => String(d.ID_Benef) === String(idBenef)).forEach(d => {
+        const fecha = d.Fecha || d.fecha;
+        if (!fecha) return;
+        String(d.Tipo_despacho || '').split(',').forEach(seg => clasificarDespachoFino(seg).forEach(tag => {
+            if (!map[tag] || new Date(fecha) < new Date(map[tag])) map[tag] = fecha;
+        }));
+    });
+    return map;
+};
+
+const calcularDias = (fecha) => {
+    if (!fecha) return null;
+    return Math.floor((new Date() - new Date(fecha)) / (1000 * 60 * 60 * 24));
+};
+
+// ========== ESTADO ETAPAS ==========
+const calcularEstadoEtapas = (idBenef) => {
+    // 1. Mapear DESPACHOS realizados
+    const despachos = DESPACHOS_DATA.filter(d => String(d.ID_Benef) === String(idBenef));
+    const etapasCompletadas = {};
+    despachos.forEach(d => {
+        const keys = mapearTipoDespacho(d.Tipo_despacho);
+        keys.forEach(key => {
+            if (!etapasCompletadas[key] || new Date(d.Fecha) > new Date(etapasCompletadas[key].fecha)) {
+                etapasCompletadas[key] = { fecha: d.Fecha, guia: d.Guia, dias: calcularDias(d.Fecha) };
+            }
+        });
+    });
+
+    // 2. Mapear SOLICITUDES de despacho
+    const solicitudes = SOLICITUDES_DATA.filter(s => String(s.ID_Benef) === String(idBenef));
+    const etapasSolicitadas = {};
+    solicitudes.forEach(s => {
+        const keys = mapearTipoDespacho(s.Tipo_despacho);
+        keys.forEach(key => {
+            const fechaSol = s.Fecha || s.fecha_creacion || '';
+            if (fechaSol && (!etapasSolicitadas[key] || new Date(fechaSol) > new Date(etapasSolicitadas[key]?.fecha || '1900-01-01'))) {
+                etapasSolicitadas[key] = { fecha: fechaSol, dias: calcularDias(fechaSol) };
+            }
+        });
+    });
+
+    // 3. Calcular estado de cada etapa
+    const resultado = {};
+    Object.entries(ETAPAS_CONFIG).forEach(([etapaKey, config]) => {
+        const nombre = config.nombre || etapaKey;
+        const dep = config.dependencia;
+        const tiempoOptimo = config.tiempo_optimo;
+        const tiempoAlerta = config.tiempo_alerta;
+        const info = { estado: "bloqueado", nombre, codigo: config.codigo, fechaDespacho: null, fechaSolicitud: null, guia: null, diasTranscurridos: null, diasSolicitud: null };
+
+        if (etapasCompletadas[etapaKey]) {
+            info.estado = "despachado";
+            info.fechaDespacho = etapasCompletadas[etapaKey].fecha;
+            info.guia = etapasCompletadas[etapaKey].guia;
+            info.diasTranscurridos = etapasCompletadas[etapaKey].dias;
+            if (etapasSolicitadas[etapaKey]) {
+                info.fechaSolicitud = etapasSolicitadas[etapaKey].fecha;
+            }
+        } else if (etapasSolicitadas[etapaKey]) {
+            info.estado = "solicitado";
+            info.fechaSolicitud = etapasSolicitadas[etapaKey].fecha;
+            info.diasSolicitud = etapasSolicitadas[etapaKey].dias;
+        } else if (dep) {
+            if (etapasCompletadas[dep]) {
+                const fechaDep = new Date(etapasCompletadas[dep].fecha);
+                const diasDesde = Math.floor((new Date() - fechaDep) / (1000*60*60*24));
+                const durDep = ETAPAS_CONFIG[dep]?.duracion || 0;
+                const diasEfectivos = Math.max(diasDesde - durDep, 0);
+                info.estado = "en_tiempo";
+                info.diasTranscurridos = diasEfectivos;
+                if (tiempoAlerta !== null && diasEfectivos >= tiempoAlerta) info.estado = "critico";
+                else if (tiempoOptimo !== null && diasEfectivos >= tiempoOptimo) info.estado = "atencion";
+            }
+        } else {
+            info.estado = "en_tiempo";
+            info.diasTranscurridos = 0;
+        }
+
+        resultado[etapaKey] = info;
+    });
+    return resultado;
+};
+
+const calcCoherencia = (idBenef, estadoEtapas) => {
+    const alertas = [];
+    const pagos = getSolpago(idBenef);
+    const insp = getInspeccion(idBenef);
+    const avanceFam = getAvancePorFamilia(idBenef);
+    // Tags de despacho fino para comparacion por partida (igual que CHECK 2)
+    const despachoTags = despachoTagsDe(idBenef);
+
+    // Alertas por familia: cruce Despacho + Pago + Inspeccion
+    Object.entries(FAMILIA_PAGO_MAP).forEach(([fam, etapasKeys]) => {
+        const pagosFam = pagos.filter(p => p.Familia_pago === fam);
+        const totalPagado = pagosFam.reduce((s, p) => s + p.monto, 0);
+        const tieneDespacho = etapasKeys.some(k => estadoEtapas[k]?.estado === "despachado");
+        const avance = avanceFam[fam];
+        const avPct = avance ? avance.pct : null;
+
+        // ROJO: Despacho + Pago pero inspeccion baja (<30%)
+        if (totalPagado > 0 && tieneDespacho && avPct !== null && avPct < 30) {
+            alertas.push({ tipo: "rojo", etapa: FAMILIA_LABELS[fam] || fam, msg: `Desp+Pago pero Insp ${avPct}% en ${FAMILIA_LABELS[fam]}` });
+        }
+        // ROJO: Inspeccion alta (>=70%) sin despacho de ESA PARTIDA especifica.
+        // Se evalua por partida (no por promedio familiar) para evitar que "Red Agua Pot."
+        // (despachada con "11 - Viv.Red agua potable", tag ap_interior) infle el promedio
+        // de gasfiteria y dispare la alerta aunque "Art.Baño/Cocina" no estén despachados.
+        else if (avance && avance.partidas && etapasKeys.length > 0) {
+            const sinDespacho = avance.partidas.filter(p => {
+                if (p.valor < 70) return false;
+                const backing = PARTIDA_DESPACHO[p.nombre];
+                if (!backing || backing.length === 0) return false;
+                return !backing.some(t => despachoTags.has(t));
+            });
+            if (sinDespacho.length > 0) {
+                const maxPct = Math.max(...sinDespacho.map(p => p.valor));
+                alertas.push({ tipo: "rojo", etapa: FAMILIA_LABELS[fam] || fam, msg: `Insp ${maxPct}% pero sin despacho en ${FAMILIA_LABELS[fam]}` });
+            }
+        }
+        // NARANJA: Despacho sin pago en familia critica
+        if (tieneDespacho && totalPagado === 0 && FAMILIAS_CRITICAS.includes(fam)) {
+            alertas.push({ tipo: "naranja", etapa: FAMILIA_LABELS[fam] || fam, msg: `Despacho sin pago M.O. en ${FAMILIA_LABELS[fam]}` });
+        }
+    });
+
+    // Alertas por solicitudes vencidas (solicitado hace mas de 8 dias sin despacho)
+    Object.entries(estadoEtapas).forEach(([key, info]) => {
+        if (info.estado === "solicitado" && info.diasSolicitud > 8) {
+            alertas.push({ tipo: "naranja", etapa: info.nombre, msg: `Solicitud hace ${info.diasSolicitud}d sin despacho` });
+        }
+    });
+
+    return alertas;
+};
+
+const getUltimaEtapa = (estadoEtapas) => {
+    let ultima = null;
+    SECUENCIA_PRINCIPAL.forEach(key => {
+        if (estadoEtapas[key]?.estado === "despachado") ultima = estadoEtapas[key];
+    });
+    return ultima;
+};
+
+const getProximaCritica = (estadoEtapas) => {
+    for (const key of SECUENCIA_PRINCIPAL) {
+        if (estadoEtapas[key]?.estado === "critico") return estadoEtapas[key];
+    }
+    return null;
+};
+
+const calcularAvance = (estadoEtapas) => {
+    const total = SECUENCIA_PRINCIPAL.length;
+    const despachadas = SECUENCIA_PRINCIPAL.filter(k => estadoEtapas[k]?.estado === "despachado").length;
+    return { despachadas, total, porcentaje: total > 0 ? Math.round((despachadas / total) * 100) : 0 };
+};
+
+const getEstadoGeneral = (estadoEtapas) => {
+    const estados = Object.values(estadoEtapas);
+    if (estados.some(e => e.estado === "critico")) return "critico";
+    if (estados.some(e => e.estado === "atencion")) return "atencion";
+    return "en_tiempo";
+};
+
+// ========== GRUPO COLORS & HELPERS ==========
+const ACTIVIDADES_HAB = ["Empalme", "Pre-F1", "Desarme", "Escombros", "Aseo"];
+
+// Verificación de cierre — orden y etiquetas para los badges (fuente: AppSheet Ejecucion)
+const CIERRE_BADGES = [
+    {label: "Empalme",   key: "E"},
+    {label: "Pre-F1",    key: "P"},
+    {label: "Desarme",   key: "D"},
+    {label: "Escombros", key: "R"},
+    {label: "Aseo",      key: "A"},
+];
+
+const CONSULTAS_ETAPA = {
+    "02_1ERA_ETAPA": "Postes instalados?",
+    "03_2DA_ETAPA": "TE1 solicitado?",
+    "08_CERAMICO_MURO": "Empalme solicitado?",
+    "13_GASFITERIA": "Accion Sanitaria?"
+};
+
+const GRUPO_COLORS = [
+    { bg:"bg-blue-50", border:"border-blue-200", text:"text-blue-700", accent:"bg-blue-500", light:"bg-blue-100", headerBg:"bg-blue-50", ring:"ring-blue-300" },
+    { bg:"bg-amber-50", border:"border-amber-200", text:"text-amber-700", accent:"bg-amber-500", light:"bg-amber-100", headerBg:"bg-amber-50", ring:"ring-amber-300" },
+    { bg:"bg-emerald-50", border:"border-emerald-200", text:"text-emerald-700", accent:"bg-emerald-500", light:"bg-emerald-100", headerBg:"bg-emerald-50", ring:"ring-emerald-300" },
+    { bg:"bg-rose-50", border:"border-rose-200", text:"text-rose-700", accent:"bg-rose-500", light:"bg-rose-100", headerBg:"bg-rose-50", ring:"ring-rose-300" },
+    { bg:"bg-violet-50", border:"border-violet-200", text:"text-violet-700", accent:"bg-violet-500", light:"bg-violet-100", headerBg:"bg-violet-50", ring:"ring-violet-300" }
+];
+
+function agruparViviendas(viviendas, grupos) {
+    const sortByInicio = (a, b) => (a.primerDespacho || "9999").localeCompare(b.primerDespacho || "9999");
+    if (!grupos || grupos.length === 0) {
+        const sorted = [...viviendas].sort(sortByInicio);
+        return [{ id:"_all", nombre:null, capataz:null, viviendas:sorted, colorIdx:-1 }];
+    }
+    const asignados = new Set();
+    const result = grupos.map((g, idx) => {
+        const vivs = g.beneficiarios.map(bid => viviendas.find(v => String(v.ID_Benef) === String(bid))).filter(Boolean);
+        vivs.sort(sortByInicio);
+        vivs.forEach(v => asignados.add(String(v.ID_Benef)));
+        return { id:g.id, nombre:g.nombre, capataz:g.capataz, comentario:g.comentario || '', viviendas:vivs, colorIdx:idx % GRUPO_COLORS.length };
+    });
+    const sinAsignar = viviendas.filter(v => !asignados.has(String(v.ID_Benef)));
+    if (sinAsignar.length > 0) {
+        sinAsignar.sort(sortByInicio);
+        result.push({ id:"_sin_asignar", nombre:"Sin Asignar", capataz:null, viviendas:sinAsignar, colorIdx:-1 });
+    }
+    return result;
+}
+
+function grupoResumen(vivs, cierresForzados = {}) {
+    const n = vivs.length;
+    const avanceDesp = n ? Math.round(vivs.reduce((s,v) => s + v.avance.porcentaje, 0) / n) : 0;
+    // Avance Insp.: promedio sobre TODAS las viviendas del grupo; las sin inspeccion cuentan 0%
+    const avanceInsp = n ? Math.round(vivs.reduce((s,v) => { const i = getInspeccion(v.ID_Benef); return s + (i ? i.pct_total : 0); }, 0) / n) : 0;
+    const criticas = vivs.filter(v => v.estadoGeneral === "critico").length;
+    // Terminada = tiene Recepcion Definitiva (RF) o cierre forzado registrado.
+    const terminadas = vivs.filter(v => !!v.fecha_recepcion || !!(cierresForzados[v.ID_Benef])).length;
+    const habiles = vivs.filter(v => v.habil).length;
+    const recepcionadas = vivs.filter(v => v.fecha_recepcion).length;
+    return { n, avanceDesp, avanceInsp, criticas, terminadas, habiles, recepcionadas };
+}
+
+// ========== ICONS ==========
+const IconHome = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>;
+const IconCheck = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>;
+const IconClock = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
+const IconAlert = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>;
+const IconWarning = () => <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.168 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd"/></svg>;
+const IconChevron = ({open}) => <svg className={`w-4 h-4 transition-transform ${open?"rotate-180":""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/></svg>;
+const IconChevronRight = () => <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>;
+const IconGrid = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>;
+const IconUsers = () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>;
+const IconEye = () => <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>;
+const IconDollar = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
+const IconSettings = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>;
+const IconTrending = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>;
+const IconSearch = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>;
+const IconGroup = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>;
+const IconDownload = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>;
+
+// ========== CORE COMPONENTS ==========
+const EstadoBadge = ({ estado }) => {
+    const colores = { critico: "bg-red-100 text-red-700", atencion: "bg-yellow-100 text-yellow-800", en_tiempo: "bg-green-100 text-green-700", despachado: "bg-blue-100 text-blue-700", solicitado: "bg-purple-100 text-purple-700", bloqueado: "bg-gray-100 text-gray-500" };
+    const labels = { critico: "CRITICO", atencion: "ATENCION", en_tiempo: "EN TIEMPO", despachado: "DESPACHADO", solicitado: "SOLICITADO", bloqueado: "BLOQUEADO" };
+    return <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${colores[estado] || colores.bloqueado}`}>{labels[estado] || estado}</span>;
+};
+
+const BarraProgreso = ({ porcentaje }) => (
+    <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+        <div className={`h-1.5 rounded-full transition-all ${porcentaje >= 80 ? "bg-green-500" : porcentaje >= 50 ? "bg-blue-500" : porcentaje >= 25 ? "bg-yellow-500" : "bg-red-500"}`} style={{ width: `${Math.min(porcentaje, 100)}%` }} />
+    </div>
+);
+
+const KPICard = ({ titulo, valor, icono, color, subtitulo }) => {
+    const colores = { blue: "border-blue-200", green: "border-green-200", yellow: "border-yellow-200", red: "border-red-200", violet: "border-violet-200", gray: "border-gray-200" };
+    const textColores = { blue: "text-blue-600", green: "text-green-600", yellow: "text-yellow-600", red: "text-red-600", violet: "text-violet-600", gray: "text-gray-600" };
+    return (
+        <div className={`bg-white border ${colores[color] || colores.gray} rounded-xl p-3 shadow-sm`}>
+            <div className="flex items-center gap-2 mb-1">
+                <span className={`${textColores[color] || textColores.gray}`}>{icono}</span>
+                <span className="text-[10px] text-gray-500 uppercase">{titulo}</span>
+            </div>
+            <p className={`text-xl font-bold font-mono ${textColores[color] || "text-gray-800"}`}>{valor}</p>
+            {subtitulo && <p className="text-[10px] text-gray-400 mt-0.5">{subtitulo}</p>}
+        </div>
+    );
+};
+
+const LineaTiempo = ({ estadoEtapas, fechaHPC }) => {
+    // Calcular Dia 0: fecha HPC, o si no existe, fecha fundacion
+    const fundFecha = estadoEtapas["01_FUNDACIONES"]?.fechaDespacho;
+    const dia0Str = fechaHPC || fundFecha || null;
+    const dia0 = dia0Str ? new Date(dia0Str) : null;
+    const hoy = new Date();
+    const diasHoy = dia0 ? Math.floor((hoy - dia0) / (1000*60*60*24)) : null;
+
+    // Calcular dias acumulados desde dia0 para cada etapa
+    const diasAcum = {};
+    const diasAcumSol = {};
+    if (dia0) {
+        SECUENCIA_PRINCIPAL.forEach(key => {
+            const info = estadoEtapas[key];
+            if (info?.estado === "despachado" && info.fechaDespacho) {
+                diasAcum[key] = Math.max(0, Math.floor((new Date(info.fechaDespacho) - dia0) / (1000*60*60*24)));
+            } else if (info?.estado === "solicitado" && info.fechaSolicitud) {
+                diasAcumSol[key] = Math.max(0, Math.floor((new Date(info.fechaSolicitud) - dia0) / (1000*60*60*24)));
+            }
+        });
+    }
+
+    const colores = { despachado: "bg-blue-500 text-white", solicitado: "bg-purple-500 text-white", en_tiempo: "bg-green-50 text-green-700 border border-green-200", atencion: "bg-yellow-50 text-yellow-700 border border-yellow-200", critico: "bg-red-50 text-red-700 border border-red-200 pulse-soft", bloqueado: "bg-gray-100 text-gray-400 border border-gray-200" };
+
+    // Delta: diferencia con la etapa anterior despachada o solicitada
+    const getAcumValue = (key) => diasAcum[key] ?? diasAcumSol[key] ?? null;
+    const getDelta = (idx) => {
+        const curr = getAcumValue(SECUENCIA_PRINCIPAL[idx]);
+        if (curr === null) return null;
+        for (let j = idx - 1; j >= 0; j--) {
+            const prev = getAcumValue(SECUENCIA_PRINCIPAL[j]);
+            if (prev !== null) return curr - prev;
+        }
+        return curr;
+    };
+
+    // Ultimo evento (despachado o solicitado) para calcular delta hasta HOY
+    let ultimoAcum = null;
+    for (let j = SECUENCIA_PRINCIPAL.length - 1; j >= 0; j--) {
+        const v = getAcumValue(SECUENCIA_PRINCIPAL[j]);
+        if (v !== null) { ultimoAcum = v; break; }
+    }
+    const deltaHoy = (diasHoy !== null && ultimoAcum !== null) ? diasHoy - ultimoAcum : null;
+
+    const formatFechaCorta = (iso) => { if (!iso) return ""; const p = iso.split("-"); return `${p[2]}/${p[1]}`; };
+
+    return (
+        <div className="flex items-stretch gap-0 overflow-x-auto hide-scrollbar">
+            {/* HPC / Dia 0 */}
+            <div className={`flex flex-col items-center rounded-l-lg px-2 py-1.5 ${dia0 ? "bg-emerald-600 text-white" : "bg-gray-200 text-gray-500"}`} style={{minWidth:"56px"}}>
+                <span className="text-[10px] font-bold">Dia 0</span>
+                <span className="text-[9px] leading-tight text-center mt-0.5">{fechaHPC ? "HPC" : fundFecha ? "Fund" : "---"}</span>
+            </div>
+            {SECUENCIA_PRINCIPAL.map((key, idx) => {
+                const info = estadoEtapas[key];
+                const config = ETAPAS_CONFIG[key];
+                const acum = diasAcum[key];
+                const acumSol = diasAcumSol[key];
+                const delta = getDelta(idx);
+
+                return (
+                    <React.Fragment key={key}>
+                        {/* Flecha con delta */}
+                        <div className="flex flex-col items-center justify-center px-0.5" style={{minWidth:"32px"}}>
+                            <div className={`h-0.5 w-full ${info?.estado === "despachado" ? "bg-blue-400" : info?.estado === "solicitado" ? "bg-purple-300" : "bg-gray-200"}`} />
+                            {delta !== null && <span className="text-[8px] text-gray-400 font-mono mt-0.5">+{delta}d</span>}
+                        </div>
+                        {/* Etapa */}
+                        <div className={`flex flex-col items-center px-2 py-1.5 ${colores[info?.estado || "bloqueado"]}`} style={{minWidth:"68px"}} title={acum !== undefined ? `Dia ${acum} desde inicio` : acumSol !== undefined ? `Solicitado dia ${acumSol} (${formatFechaCorta(info?.fechaSolicitud)})` : ""}>
+                            <span className="text-xs font-bold">
+                                {acum !== undefined ? `d${acum}` : acumSol !== undefined ? `d${acumSol}` : "—"}
+                            </span>
+                            <span className="text-[10px] leading-tight text-center mt-0.5">{config?.nombre || key}</span>
+                            {info?.estado === "solicitado" && <span className="text-[9px] opacity-75">{formatFechaCorta(info.fechaSolicitud)}</span>}
+                        </div>
+                    </React.Fragment>
+                );
+            })}
+            {/* HOY */}
+            {diasHoy !== null && (
+                <React.Fragment>
+                    <div className="flex flex-col items-center justify-center px-0.5" style={{minWidth:"32px"}}>
+                        <div className="h-0.5 w-full bg-gray-300" style={{backgroundImage:"repeating-linear-gradient(90deg, #d1d5db 0, #d1d5db 4px, transparent 4px, transparent 8px)"}} />
+                        {deltaHoy !== null && deltaHoy > 0 && <span className="text-[8px] text-gray-400 font-mono mt-0.5">+{deltaHoy}d</span>}
+                    </div>
+                    <div className="flex flex-col items-center rounded-r-lg px-2 py-1.5 bg-gray-700 text-white" style={{minWidth:"56px"}}>
+                        <span className="text-[10px] font-bold">d{diasHoy}</span>
+                        <span className="text-[9px] leading-tight text-center mt-0.5">HOY</span>
+                    </div>
+                </React.Fragment>
+            )}
+        </div>
+    );
+};
+
+// ===== VIVIENDA CARD =====
+// Estilo "TERMINADO" (Recepcion Definitiva): verde emerald-50 + achurado gris diagonal denso (6px)
+const RF_HATCH_STYLE = { backgroundColor: "#ecfdf5", backgroundImage: "repeating-linear-gradient(45deg, #94a3b8 0, #94a3b8 1.5px, transparent 1.5px, transparent 6px)" };
+// Estilo "CIERRE FORZADO": amber-50 + achurado diagonal ámbar
+const CF_HATCH_STYLE = { backgroundColor: "#fffbeb", backgroundImage: "repeating-linear-gradient(45deg, #d97706 0, #d97706 1.5px, transparent 1.5px, transparent 6px)" };
+// Halo blanco para mantener legible el texto del nombre sobre el achurado
+const RF_TEXT_SHADOW = { textShadow: "0 0 3px #fff, 0 0 5px #fff, 0 1px 1px #fff" };
+
+const ViviendaCard = ({ beneficiario, estadoEtapas, expanded, onToggle, grupoColor, obsCount, observaciones, addObservacion, deleteObservacion, actividades, toggleActividad, consultas, toggleConsulta, ocultarBeneficiario, resumenComentarios, cierreForzado, forzarCierre, deshacerCierre }) => {
+    const [obsTexto, setObsTexto] = React.useState("");
+    const [showObsInput, setShowObsInput] = React.useState(false);
+    const [showOcultarInput, setShowOcultarInput] = React.useState(false);
+    const [showCierreInput, setShowCierreInput] = React.useState(false);
+    const [motivoCierre, setMotivoCierre] = React.useState("");
+    const [motivoOcultar, setMotivoOcultar] = React.useState("");
+    const b = beneficiario;
+    const avance = b.avance || calcularAvance(estadoEtapas);
+    const insp = getInspeccion(b.ID_Benef);
+    const totalPagado = getTotalPagado(b.ID_Benef);
+    const alertas = calcCoherencia(b.ID_Benef, estadoEtapas);
+    const alertasRojas = alertas.filter(a => a.tipo === "rojo");
+    const alertasNaranjas = alertas.filter(a => a.tipo === "naranja");
+    const ultima = getUltimaEtapa(estadoEtapas);
+    const proximaCritica = getProximaCritica(estadoEtapas);
+    const solicitadas = Object.entries(estadoEtapas).filter(([,e]) => e.estado === "solicitado");
+    const estadoGeneral = b.estadoGeneral || getEstadoGeneral(estadoEtapas);
+
+    const recepDef = !!b.fecha_recepcion;
+    const hasCF = !!cierreForzado;
+    const borderClass = recepDef ? "border-l-4 border-l-emerald-500 border-emerald-200" : hasCF ? "border-l-4 border-l-amber-500 border-amber-200" : alertasRojas.length > 0 ? "border-l-4 border-l-red-500 border-red-200" : estadoGeneral === "critico" ? "border-l-4 border-l-red-500 border-red-100" : estadoGeneral === "atencion" ? "border-l-4 border-l-yellow-500 border-yellow-100" : "border border-gray-200";
+    const gc = grupoColor >= 0 ? GRUPO_COLORS[grupoColor] : null;
+
+    return (
+        <div className={`bg-white ${borderClass} rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow ${gc ? `ring-1 ${gc.ring}` : ""}`} style={recepDef ? RF_HATCH_STYLE : hasCF ? CF_HATCH_STYLE : undefined}>
+            <div className={`p-4 cursor-pointer transition-colors ${recepDef ? "hover:bg-white/40" : hasCF ? "hover:bg-amber-50/40" : "hover:bg-gray-50/80"}`} onClick={onToggle}>
+                <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                        <span className="text-gray-400"><IconChevron open={expanded} /></span>
+                        {gc && <div className={`w-1.5 h-10 rounded-full ${gc.accent}`} />}
+                        <span className={b.tipologia === "Casa + RC" ? "text-blue-600" : "text-gray-400"}><IconHome /></span>
+                        <div>
+                            <h3 className="font-semibold text-gray-800" style={(recepDef || hasCF) ? RF_TEXT_SHADOW : undefined}>{b.NOMBRES} {b.APELLIDOS} {obsCount > 0 && <span className="ml-1 inline-flex items-center gap-0.5 text-[9px] bg-amber-100 text-amber-700 border border-amber-300 rounded px-1 py-0.5 font-medium align-middle cursor-pointer" title={`${obsCount} observacion(es)`} onClick={(e) => { e.stopPropagation(); if (!expanded) onToggle(); }}>&#9998; {obsCount}</span>} {b.habil ? <span className="ml-1 text-[9px] bg-green-100 text-green-700 border border-green-300 rounded px-1 py-0.5 font-medium align-middle">Habilitado{b.fecha_hpc ? ` ${(() => { const p = b.fecha_hpc.split('-'); return `${p[2]}/${p[1]}/${p[0]}`; })()}` : ''}</span> : <span className="ml-1 text-[9px] bg-red-100 text-red-600 border border-red-300 rounded px-1 py-0.5 font-medium align-middle">No Habilitada</span>} {b.fecha_recepcion && (() => { const p = b.fecha_recepcion.split('-'); return <span className="ml-1 text-[9px] bg-blue-100 text-blue-700 border border-blue-300 rounded px-1 py-0.5 font-medium align-middle" title="Recepcion Definitiva">&#10003; Recepcion {`${p[2]}/${p[1]}/${p[0]}`}</span>; })()} {hasCF && !b.fecha_recepcion && <span className="ml-1 text-[9px] bg-amber-100 text-amber-700 border border-amber-400 rounded px-1 py-0.5 font-medium align-middle" title={cierreForzado.motivo || ''}>&#9888; Cierre forzado</span>} {b.alerta_logistica && <span className="ml-1 text-[9px] bg-amber-500 text-white border border-amber-600 rounded px-1.5 py-0.5 font-bold align-middle" title={b.alerta_logistica}>&#9888; Alerta</span>}</h3>
+                            <p className="text-xs text-gray-500" style={(recepDef || hasCF) ? RF_TEXT_SHADOW : undefined}>{b.tipologia}</p>
+                            {b.alerta_logistica && <p className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 mt-1 leading-snug" onClick={(e) => e.stopPropagation()}>{b.alerta_logistica}</p>}
+                            {b.obs_seguimiento && <p className="text-[10px] text-gray-500 bg-gray-50 border border-gray-200 rounded px-2 py-0.5 mt-0.5 italic" onClick={(e) => e.stopPropagation()}>{b.obs_seguimiento}</p>}
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <button onClick={(e) => { e.stopPropagation(); setShowOcultarInput(!showOcultarInput); }} className="p-1.5 rounded-lg text-gray-300 hover:text-gray-500 hover:bg-gray-100 transition-colors" title="Ocultar vivienda">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M3 3l18 18" /></svg>
+                        </button>
+                        <div className="text-right">
+                            <div className="flex items-center gap-2 mb-0.5">
+                                <span className="text-[10px] text-gray-400 w-8 font-mono">Desp</span>
+                                <span className="text-xs text-gray-500">{avance.despachadas}/{avance.total}</span>
+                                <span className="text-sm font-bold text-gray-700">{avance.porcentaje}%</span>
+                            </div>
+                            <div className="flex items-center gap-2 mb-0.5">
+                                <span className="text-[10px] text-gray-400 w-8 font-mono">Insp</span>
+                                <span className={`text-sm font-bold ${insp ? (insp.pct_total >= 90 ? "text-green-600" : insp.pct_total >= 50 ? "text-blue-600" : "text-orange-500") : "text-gray-300"}`}>{insp ? insp.pct_total + "%" : "—"}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] text-gray-400 w-8 font-mono">Pago</span>
+                                <span className={`text-sm font-bold ${totalPagado > 0 ? "text-violet-600" : "text-gray-300"}`}>{totalPagado > 0 ? formatPeso(totalPagado) : "—"}</span>
+                            </div>
+                            <div className="w-32 space-y-0.5 mt-1">
+                                <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden"><div className="triple-bar bg-blue-500" style={{width:`${avance.porcentaje}%`}} /></div>
+                                <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden"><div className="triple-bar bg-emerald-500" style={{width:`${insp ? insp.pct_total : 0}%`}} /></div>
+                                <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden"><div className="triple-bar bg-violet-500" style={{width:`${Math.min(avance.porcentaje, 100)}%`}} /></div>
+                            </div>
+                            <div className="flex gap-0.5 mt-1.5" title="Verificación de cierre — AppSheet">
+                                {CIERRE_BADGES.map(({label, key}) => {
+                                    const val = insp && insp.cierre != null && key in insp.cierre ? insp.cierre[key] : undefined;
+                                    const isNA = val === -1;
+                                    const cls = val === 1
+                                        ? "bg-green-500 text-white border-green-600 shadow-sm"
+                                        : isNA
+                                            ? "border-gray-400 text-gray-100"
+                                            : val === 0
+                                                ? "bg-red-100 text-red-500 border-red-300"
+                                                : "bg-gray-100 text-gray-300 border-gray-200";
+                                    const naStyle = isNA ? {background:'repeating-linear-gradient(45deg,#64748b,#64748b 2px,#94a3b8 2px,#94a3b8 6px)'} : {};
+                                    const ttl = val === 1 ? `${label}: Terminado` : isNA ? `${label}: No aplica` : val === 0 ? `${label}: Pendiente` : `${label}: Sin datos`;
+                                    return (
+                                        <span key={key} className={`w-6 h-6 rounded text-[7px] leading-tight font-bold border flex items-center justify-center ${cls}`} style={naStyle} title={ttl}>
+                                            {isNA ? '—' : label.substring(0, 2)}
+                                        </span>
+                                    );
+                                })}
+                            </div>
+                            {hasCF ? (
+                                <div className="mt-1.5 flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                                    <span className="inline-flex items-center gap-1 text-[9px] font-bold text-amber-700 bg-amber-50 border border-amber-300 rounded px-1.5 py-0.5" title={`Cierre forzado${cierreForzado.motivo ? ': ' + cierreForzado.motivo : ''} · ${cierreForzado.fecha || ''}`}>&#9888; Cierre forzado</span>
+                                    <button className="text-[9px] text-gray-300 hover:text-red-500 underline" onClick={() => deshacerCierre(b.ID_Benef)}>deshacer</button>
+                                </div>
+                            ) : showCierreInput ? (
+                                <div className="mt-1.5 p-2 bg-amber-50 border border-amber-200 rounded-lg" onClick={(e) => e.stopPropagation()}>
+                                    <div className="text-[10px] font-semibold text-amber-700 mb-1.5">Motivo del término forzado</div>
+                                    <textarea rows={2} placeholder="Ej: Terreno con servidumbre, propietario rechazó obra..." value={motivoCierre} onChange={(e) => setMotivoCierre(e.target.value)} className="w-full border border-amber-300 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-amber-400 focus:outline-none resize-none mb-1.5 bg-white" />
+                                    <div className="flex gap-2 justify-end">
+                                        <button onClick={() => { setShowCierreInput(false); setMotivoCierre(""); }} className="px-2 py-0.5 text-[10px] text-gray-500 hover:text-gray-700">Cancelar</button>
+                                        <button disabled={!motivoCierre.trim()} onClick={() => { forzarCierre(b.ID_Benef, motivoCierre); setShowCierreInput(false); setMotivoCierre(""); }} className="px-2 py-1 bg-amber-600 text-white text-[10px] rounded hover:bg-amber-700 font-medium disabled:opacity-40">Confirmar</button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <button className="mt-1.5 text-[9px] text-gray-300 hover:text-amber-600 border border-dashed border-gray-200 hover:border-amber-400 rounded px-1.5 py-0.5 transition-colors" onClick={(e) => { e.stopPropagation(); setShowCierreInput(true); }}>&#9888; Término forzado</button>
+                            )}
+                        </div>
+                        <div className="flex flex-col items-center gap-1">
+                            <EstadoBadge estado={estadoGeneral} />
+                            {alertasRojas.length > 0 && <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 rounded-full px-1.5 py-0.5 pulse-soft"><IconWarning /> {alertasRojas.length}</span>}
+                            {alertasRojas.length === 0 && alertasNaranjas.length > 0 && <span className="inline-flex items-center gap-1 text-[10px] font-bold text-orange-600 bg-orange-50 border border-orange-200 rounded-full px-1.5 py-0.5">{alertasNaranjas.length}</span>}
+                        </div>
+                    </div>
+                </div>
+                {showOcultarInput && (
+                    <div className="mx-4 mb-2 p-3 bg-gray-50 border border-gray-200 rounded-lg" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-2 mb-2">
+                            <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M3 3l18 18" /></svg>
+                            <span className="text-xs font-semibold text-gray-600">Ocultar vivienda</span>
+                        </div>
+                        <input type="text" placeholder="Motivo (opcional)..." value={motivoOcultar} onChange={(e) => setMotivoOcultar(e.target.value)}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500 focus:outline-none mb-2" />
+                        <div className="flex gap-2 justify-end">
+                            <button onClick={() => { setShowOcultarInput(false); setMotivoOcultar(""); }} className="px-3 py-1 text-xs text-gray-500 hover:text-gray-700">Cancelar</button>
+                            <button onClick={() => { ocultarBeneficiario(b.ID_Benef, motivoOcultar); setShowOcultarInput(false); setMotivoOcultar(""); }} className="px-3 py-1.5 bg-gray-700 text-white text-xs rounded-lg hover:bg-gray-800 font-medium">Ocultar</button>
+                        </div>
+                    </div>
+                )}
+                <LineaTiempo estadoEtapas={estadoEtapas} fechaHPC={b.fecha_hpc} />
+                <div className="mt-3 flex items-center justify-between text-sm">
+                    <div className="text-gray-500">
+                        {ultima ? <span>Ultima: <span className="text-gray-700 font-medium">{ultima.nombre}</span> — {ultima.guia ? `#${ultima.guia}` : ""} — <span className={estadoGeneral === "critico" ? "text-red-600 font-medium" : estadoGeneral === "atencion" ? "text-yellow-600" : "text-green-600"}>{ultima.diasTranscurridos}d</span></span> : <span className="text-yellow-600">Sin despachos registrados</span>}
+                    </div>
+                    <div className="flex items-center gap-3">
+                        {insp && <div className="flex items-center gap-1"><IconEye /><span className={insp.pct_total >= 90 ? "text-green-600" : insp.pct_total >= 50 ? "text-blue-600" : "text-orange-500"}>Insp: {insp.pct_total}%</span></div>}
+                        {solicitadas.length > 0 && <span className="text-[10px] bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full border border-purple-200">{solicitadas.length} solicitada{solicitadas.length > 1 ? "s" : ""}</span>}
+                    </div>
+                </div>
+                {alertasRojas.length > 0 && <div className="mt-3 p-2 bg-red-50 border border-red-300 rounded-lg">{alertasRojas.map((a,i) => <div key={i} className="flex items-center gap-2 text-red-700 text-sm"><span className="pulse-soft"><IconWarning /></span><span><strong>{a.etapa}:</strong> {a.msg}</span></div>)}</div>}
+                {alertasRojas.length === 0 && alertasNaranjas.length > 0 && <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded-lg">{alertasNaranjas.slice(0,2).map((a,i) => <div key={i} className="flex items-center gap-2 text-orange-600 text-sm"><IconWarning /><span><strong>{a.etapa}:</strong> {a.msg}</span></div>)}</div>}
+                {estadoGeneral === "critico" && proximaCritica && alertasRojas.length === 0 && <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded-lg"><div className="flex items-center gap-2 text-red-600 text-sm"><span className="pulse-soft"><IconWarning /></span><span><strong>{proximaCritica.nombre}</strong> atrasado {proximaCritica.diasTranscurridos} dias</span></div></div>}
+            </div>
+            {expanded && (
+                <div className="border-t border-gray-100 p-4 bg-gray-50">
+                    <h4 className="text-sm font-medium text-gray-700 mb-3">Detalle de Etapas (dias desde inicio)</h4>
+                    {(() => {
+                        const fundFecha = estadoEtapas["01_FUNDACIONES"]?.fechaDespacho;
+                        const dia0Str = b.fecha_hpc || fundFecha || null;
+                        const dia0 = dia0Str ? new Date(dia0Str) : null;
+                        const diasAcumDet = {};
+                        if (dia0) {
+                            SECUENCIA_PRINCIPAL.forEach(key => {
+                                const inf = estadoEtapas[key];
+                                if (inf?.estado === "despachado" && inf.fechaDespacho) {
+                                    diasAcumDet[key] = Math.max(0, Math.floor((new Date(inf.fechaDespacho) - dia0) / (1000*60*60*24)));
+                                }
+                            });
+                        }
+                        const getDeltaDet = (idx) => {
+                            const curr = diasAcumDet[SECUENCIA_PRINCIPAL[idx]];
+                            if (curr === undefined) return null;
+                            for (let j = idx - 1; j >= 0; j--) {
+                                const prev = diasAcumDet[SECUENCIA_PRINCIPAL[j]];
+                                if (prev !== undefined) return curr - prev;
+                            }
+                            return curr;
+                        };
+                        const formatFechaDet = (iso) => { if (!iso) return ""; const [y,m,d] = iso.split("-"); return `${d}/${m}`; };
+                        return (
+                            <div className="space-y-1.5 mb-4">
+                                <div className="flex items-center gap-3 text-sm mb-2 pb-2 border-b border-gray-200">
+                                    <div className="w-8 h-8 rounded-full bg-emerald-600 flex items-center justify-center text-white text-xs font-bold shadow">0</div>
+                                    <span className="text-gray-700 flex-1 font-medium">{b.fecha_hpc ? "Habilitacion para Construir" : fundFecha ? "Fundacion (sin fecha HPC)" : "Sin fecha de inicio"}</span>
+                                    <span className="text-emerald-600 font-mono text-xs">{dia0Str ? formatFechaDet(dia0Str) : "—"} — Dia 0</span>
+                                </div>
+                                {SECUENCIA_PRINCIPAL.map((key, idx) => {
+                                    const info = estadoEtapas[key];
+                                    const config = ETAPAS_CONFIG[key];
+                                    const coloresChip = { despachado: "bg-blue-500", solicitado: "bg-purple-500", en_tiempo: "bg-green-500", atencion: "bg-yellow-500", critico: "bg-red-500 pulse-soft", bloqueado: "bg-gray-300" };
+                                    const acum = diasAcumDet[key];
+                                    const delta = getDeltaDet(idx);
+                                    const consultaTexto = CONSULTAS_ETAPA[key];
+                                    const consDone = consultaTexto && consultas && consultas[key];
+                                    return (
+                                        <div key={key} className="flex items-center gap-3 text-sm">
+                                            <div className={`w-8 h-8 rounded-full ${coloresChip[info?.estado || "bloqueado"]} flex items-center justify-center text-white text-xs font-bold shadow`}>{info?.estado === "solicitado" ? "S" : config?.codigo || "?"}</div>
+                                            <span className="text-gray-700 flex-1">
+                                                {config?.nombre || key}
+                                                {consultaTexto && info?.estado === "despachado" && (
+                                                    <button onClick={(e) => { e.stopPropagation(); toggleConsulta(b.ID_Benef, key); }} className={`ml-2 inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded-full border cursor-pointer transition-all ${consDone ? "bg-green-100 text-green-700 border-green-300" : "bg-orange-100 text-orange-700 border-orange-300 pulse-soft"}`} title={consDone ? `${consultaTexto} Hecho (${consDone.fecha.replace('T', ' ')})` : `${consultaTexto} — Click para marcar`}>
+                                                        {consDone ? "✓" : "⚠"} {consultaTexto}
+                                                    </button>
+                                                )}
+                                            </span>
+                                            <span className="text-gray-500 flex items-center gap-2">
+                                                {info?.estado === "despachado" && (
+                                                    <span className="flex items-center gap-2">
+                                                        <span className="text-[10px] text-gray-400">{formatFechaDet(info.fechaDespacho)}</span>
+                                                        {delta !== null && <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-200 font-mono">+{delta}d</span>}
+                                                        <span className="font-mono font-bold text-blue-700">d{acum}</span>
+                                                        {info.guia && <span className="text-[10px] text-gray-400">#{info.guia}</span>}
+                                                    </span>
+                                                )}
+                                                {info?.estado === "solicitado" && <span className="text-purple-600">Solicitado hace {info.diasSolicitud}d</span>}
+                                                {info?.estado === "critico" && <span className="text-red-600">Esperando {info.diasTranscurridos}d</span>}
+                                                {info?.estado === "atencion" && <span className="text-yellow-600">Esperando {info.diasTranscurridos}d</span>}
+                                                {info?.estado === "en_tiempo" && <span className="text-green-600">Esperando {info.diasTranscurridos}d</span>}
+                                                {info?.estado === "bloqueado" && "Pendiente"}
+                                            </span>
+                                </div>
+                            );
+                        })}
+                            </div>
+                        );
+                    })()}
+                    {/* Inspecciones */}
+                    {insp ? (
+                        <div className="mt-4 pt-4 border-t border-gray-200">
+                            <h4 className="text-sm font-medium text-gray-700 mb-2">Avance por Inspecciones</h4>
+                            <div className="flex items-center gap-4 text-xs text-gray-500 mb-2">
+                                <span>Viv ({insp.has_rc ? "70" : "95"}%): <strong className="text-gray-700">{insp.pct_viv}%</strong></span>
+                                {insp.has_rc ? <span>RC (25%): <strong className="text-gray-700">{insp.pct_rc}%</strong></span> : <span className="text-gray-300">Sin RC</span>}
+                                <span>Hab (5%): <strong className="text-gray-700">{insp.pct_hab}%</strong></span>
+                                <span>Total: <strong className={insp.pct_total >= 90 ? "text-green-600" : "text-blue-600"}>{insp.pct_total}%</strong></span>
+                            </div>
+                            <div className="grid grid-cols-7 sm:grid-cols-14 gap-1">
+                                {Object.entries(insp.partidas || {}).map(([nombre, valor]) => (
+                                    <div key={nombre} className={`text-center rounded p-1 ${valor >= 100 ? "bg-green-100 text-green-700 border border-green-200" : valor > 0 ? "bg-yellow-50 text-yellow-700 border border-yellow-200" : "bg-gray-50 text-gray-400 border border-gray-200"}`} title={`${nombre}: ${valor}%`}>
+                                        <div className="font-mono text-[9px] leading-tight">{nombre}</div>
+                                        <div className="font-bold text-[10px]">{valor}%</div>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="mt-3 flex items-center gap-1.5 text-xs">
+                                <span className="text-gray-400 font-medium text-[10px]">Verif. cierre:</span>
+                                {CIERRE_BADGES.map(({label, key}) => {
+                                    const val = insp && insp.cierre != null && key in insp.cierre ? insp.cierre[key] : undefined;
+                                    const isNA = val === -1;
+                                    const cls = val === 1 ? "bg-green-500 text-white" : isNA ? "border border-gray-400 text-gray-100" : val === 0 ? "bg-red-100 text-red-400 border border-red-200" : "bg-gray-100 text-gray-300 border border-gray-200";
+                                    const naStyle = isNA ? {background:'repeating-linear-gradient(45deg,#64748b,#64748b 2px,#94a3b8 2px,#94a3b8 6px)'} : {};
+                                    return <span key={key} className={`inline-flex items-center justify-center w-6 h-5 rounded text-[9px] font-bold ${cls}`} style={naStyle} title={val === 1 ? `${label}: Terminado` : isNA ? `${label}: No aplica` : val === 0 ? `${label}: Pendiente` : `${label}: Sin datos`}>{isNA ? '—' : label.substring(0,2)}</span>;
+                                })}
+                            </div>
+                        </div>
+                    ) : <div className="mt-4 pt-4 border-t border-gray-200"><p className="text-xs text-gray-400">Sin registros de inspeccion</p></div>}
+                    {/* Pagos por Familia */}
+                    {(() => {
+                        const pagosFam = getPagosPorFamilia(b.ID_Benef);
+                        // Presupuesto por familia (Vivienda + R.C.) — debe calcularse antes del filtro
+                        const _presProy = PRESUPUESTO_DATA[b.ID_Proy] || {};
+                        const presViv = _presProy[b.tipologia_viv_id] || {};
+                        const presRC  = _presProy[b.tipologia_rc_id] || {};
+                        const _presPartProy = PRESUPUESTO_PARTIDA_DATA[b.ID_Proy] || {};
+                        const getPresPartida = (tipId, fam, keyword) => {
+                            const byPart = (_presPartProy[tipId] || {})[fam] || {};
+                            return Object.entries(byPart).filter(([p]) => p.toLowerCase().includes(keyword)).reduce((s,[,v]) => s+v, 0);
+                        };
+                        const getPresFam = (fam) => {
+                            if (fam === '07 - Eléctricidad') {
+                                return getPresPartida(b.tipologia_viv_id, fam, 'postes') + getPresPartida(b.tipologia_rc_id, fam, 'postes');
+                            }
+                            return FAMILIAS_EXCLUIDAS.has(fam) ? 0 : (presViv[fam] || 0) + (presRC[fam] || 0);
+                        };
+                        // Agregar filas de presupuesto sin pago asociado
+                        const familiasConPago = new Set(Object.values(pagosFam).map(d => d.familia));
+                        const allPresFams = new Set([
+                            ...Object.keys(presViv).filter(f => !FAMILIAS_EXCLUIDAS.has(f)),
+                            ...Object.keys(presRC).filter(f => !FAMILIAS_EXCLUIDAS.has(f))
+                        ]);
+                        allPresFams.forEach(fam => {
+                            if (!familiasConPago.has(fam) && getPresFam(fam) > 0) {
+                                pagosFam[fam + '|||—'] = { familia: fam, tipologia: '—', total: 0, count: 0, maestros: new Set() };
+                            }
+                        });
+                        // 07-Eléctricidad está en FAMILIAS_EXCLUIDAS (excluida del loop arriba)
+                        // pero tiene presupuesto de postes: agregar fila si no hay pagos de postes
+                        if (!familiasConPago.has('07 - Eléctricidad') && getPresFam('07 - Eléctricidad') > 0) {
+                            pagosFam['07 - Eléctricidad|||—'] = { familia: '07 - Eléctricidad', tipologia: '—', total: 0, count: 0, maestros: new Set() };
+                        }
+                        const entries = Object.entries(pagosFam)
+                            .filter(([,d]) => d.total > 0 || getPresFam(d.familia) > 0)
+                            .sort(([,a],[,b2]) => {
+                                const famCmp = a.familia.localeCompare(b2.familia);
+                                if (famCmp !== 0) return famCmp;
+                                return a.tipologia === 'Vivienda' ? -1 : 1;
+                            });
+                        if (entries.length === 0) return null;
+                        const totalViv = entries.filter(([,d]) => d.tipologia === 'Vivienda').reduce((s,[,d]) => s + d.total, 0);
+                        const totalRC  = entries.filter(([,d]) => d.tipologia === 'R.C.').reduce((s,[,d]) => s + d.total, 0);
+                        const totalGen = entries.reduce((s,[,d]) => s + d.total, 0);
+                        // totalPresGen: de-duplicar por familia para no doble-contar viv+RC
+                        const totalPresGen = [...new Set(entries.map(([,d]) => d.familia))].reduce((s, fam) => s + getPresFam(fam), 0);
+                        return (
+                            <div className="mt-4 pt-3 border-t border-gray-200">
+                                <h4 className="text-sm font-medium text-gray-700 mb-2">Pagos por Familia</h4>
+                                <table className="w-full text-sm">
+                                <thead><tr className="text-left text-gray-500 border-b border-gray-200 bg-white">
+                                    <th className="py-1.5 px-2 text-xs">Familia</th>
+                                    <th className="py-1.5 px-2 text-xs text-right">Por Presupuesto</th>
+                                    <th className="py-1.5 px-2 text-xs text-right">Total Pagado</th>
+                                    <th className="py-1.5 px-2 text-xs text-right">Diferencia</th>
+                                    <th className="py-1.5 px-2 text-xs text-center">#</th>
+                                    <th className="py-1.5 px-2 text-xs">Maestro</th>
+                                </tr></thead>
+                                <tbody>
+                                {entries.map(([key, data]) => {
+                                    const pres = getPresFam(data.familia);
+                                    const diff = pres > 0 ? pres - data.total : null;
+                                    const overBudget = diff !== null && diff < 0;
+                                    return (
+                                    <tr key={key} className={`border-b border-gray-100 ${overBudget ? 'bg-red-50' : ''}`}>
+                                        <td className="py-1.5 px-2 font-medium text-gray-700">{data.familia}</td>
+                                        <td className="py-1.5 px-2 text-right font-mono text-gray-500">{pres > 0 ? formatPeso(pres) : <span className="text-gray-300">—</span>}</td>
+                                        <td className={`py-1.5 px-2 text-right font-mono font-bold ${overBudget ? 'text-red-600' : 'text-violet-700'}`}>{formatPeso(data.total)}</td>
+                                        <td className={`py-1.5 px-2 text-right font-mono font-bold ${diff === null ? 'text-gray-300' : diff < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                            {diff === null ? '—' : formatPeso(diff)}
+                                        </td>
+                                        <td className="py-1.5 px-2 text-center text-gray-500">{data.count}</td>
+                                        <td className="py-1.5 px-2 text-gray-500 text-xs">{[...data.maestros].join(", ")}</td>
+                                    </tr>);
+                                })}
+                                {/* Filas de totales */}
+                                {totalViv > 0 && <tr className="border-t-2 border-green-200 bg-green-50">
+                                    <td className="py-1.5 px-2 font-semibold text-green-800 text-xs">Total Vivienda</td>
+                                    <td></td>
+                                    <td className="py-1.5 px-2 text-right font-mono font-bold text-green-800">{formatPeso(totalViv)}</td>
+                                    <td colSpan={3}></td>
+                                </tr>}
+                                {totalRC > 0 && <tr className="bg-blue-50">
+                                    <td className="py-1.5 px-2 font-semibold text-blue-800 text-xs">Total R.C.</td>
+                                    <td></td>
+                                    <td className="py-1.5 px-2 text-right font-mono font-bold text-blue-800">{formatPeso(totalRC)}</td>
+                                    <td colSpan={3}></td>
+                                </tr>}
+                                <tr className="border-t-2 border-gray-300 bg-gray-100">
+                                    <td className="py-2 px-2 font-bold text-gray-900 text-xs">TOTAL GENERAL</td>
+                                    <td className="py-2 px-2 text-right font-mono text-gray-500">{totalPresGen > 0 ? formatPeso(totalPresGen) : ''}</td>
+                                    <td className="py-2 px-2 text-right font-mono font-bold text-gray-900">{formatPeso(totalGen)}</td>
+                                    <td className={`py-2 px-2 text-right font-mono font-bold ${totalPresGen > 0 ? (totalPresGen - totalGen < 0 ? 'text-red-600' : 'text-green-600') : 'text-gray-300'}`}>
+                                        {totalPresGen > 0 ? formatPeso(totalPresGen - totalGen) : '—'}
+                                    </td>
+                                    <td colSpan={2}></td>
+                                </tr>
+                                </tbody></table>
+                            </div>
+                        );
+                    })()}
+                    {/* 4. Observaciones Criticas */}
+                    <div className="mt-4 pt-3 border-t border-gray-200">
+                        <div className="flex items-center justify-between mb-2">
+                            <h4 className="text-sm font-medium text-gray-700">Observaciones Criticas</h4>
+                            <button onClick={(e) => { e.stopPropagation(); setShowObsInput(!showObsInput); }} className="text-[10px] px-2 py-1 bg-amber-50 text-amber-700 border border-amber-300 rounded-lg hover:bg-amber-100 font-medium">+ Agregar</button>
+                        </div>
+                        {showObsInput && (
+                            <div className="flex gap-2 mb-3">
+                                <input type="text" value={obsTexto} onChange={(e) => setObsTexto(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && obsTexto.trim()) { addObservacion(b.ID_Benef, obsTexto.trim()); setObsTexto(""); setShowObsInput(false); } }} placeholder="Escribir observacion..." className="flex-1 text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:outline-none" autoFocus />
+                                <button onClick={() => { if (obsTexto.trim()) { addObservacion(b.ID_Benef, obsTexto.trim()); setObsTexto(""); setShowObsInput(false); } }} className="px-3 py-1.5 bg-amber-500 text-white rounded-lg text-xs font-medium hover:bg-amber-600">Guardar</button>
+                            </div>
+                        )}
+                        {observaciones && observaciones.length > 0 ? (
+                            <div className="space-y-2">
+                                {observaciones.map(obs => (
+                                    <div key={obs.id} className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg p-2.5">
+                                        <span className="text-amber-500 mt-0.5">&#9998;</span>
+                                        <div className="flex-1">
+                                            <p className="text-sm text-gray-700">{obs.texto}</p>
+                                            <p className="text-[10px] text-gray-400 mt-1">{obs.fecha.replace('T', ' ')}</p>
+                                        </div>
+                                        <button onClick={() => {
+                                            const pId = String(b.ID_Proy || '');
+                                            const ref = fbDB.ref('resumen_comentarios/' + pId + '/' + obs.id);
+                                            ref.once('value').then(snap => {
+                                                if (snap.exists()) {
+                                                    ref.remove();
+                                                } else {
+                                                    ref.set({
+                                                        texto: obs.texto,
+                                                        fecha: obs.fecha,
+                                                        tipo: 'observacion',
+                                                        beneficiarioId: String(b.ID_Benef),
+                                                        beneficiarioNombre: `${b.NOMBRES} ${b.APELLIDOS}`,
+                                                        tickedAt: Date.now()
+                                                    });
+                                                }
+                                            });
+                                        }} className={`text-xs px-1.5 py-0.5 rounded transition-colors ${typeof resumenComentarios !== 'undefined' && resumenComentarios[String(b.ID_Proy)] && resumenComentarios[String(b.ID_Proy)][obs.id] ? "text-amber-500 bg-amber-100" : "text-gray-300 hover:text-amber-500"}`} title="Mostrar en Informe Estado General (compartible)">&#9733;</button>
+                                        <button onClick={() => deleteObservacion(b.ID_Benef, obs.id)} className="text-red-400 hover:text-red-600 text-xs px-1" title="Eliminar">&times;</button>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-xs text-gray-400">Sin observaciones registradas</p>
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+// ===== HEADER PROYECTO =====
+const HeaderProyecto = ({ proy, garantiasProy, eeppResumen, kpis, avanceInsp = 0, nViviendas = 0, ganttProg = null }) => {
+    if (!proy) return null;
+    const [avanceGantt, setAvanceGantt] = React.useState(null);
+    React.useEffect(() => {
+        if (!proy?.ID_proy) return;
+        fetch(`https://scraices-dashboard-default-rtdb.firebaseio.com/avance_gantt/${proy.ID_proy}.json`)
+            .then(r => r.json()).then(d => setAvanceGantt(d)).catch(() => {});
+    }, [proy?.ID_proy]);
+    const progInfo = React.useMemo(() => {
+        if (!ganttProg || !ganttProg.inicio || (!ganttProg.finProg && !ganttProg.plazo)) return null;
+        const inicio = new Date(ganttProg.inicio);
+        const plazo = ganttProg.plazo || Math.round((new Date(ganttProg.finProg) - inicio) / 86400000);
+        const fin = ganttProg.finProg
+            ? new Date(ganttProg.finProg)
+            : new Date(inicio.getTime() + plazo * 86400000);
+        const hoy = new Date();
+        const diasRestantes = Math.floor((fin - hoy) / 86400000);
+        const diasTranscurridos = Math.max(0, Math.floor((hoy - inicio) / 86400000));
+        const pctTranscurrido = Math.min(100, Math.max(0, Math.round(diasTranscurridos / plazo * 100)));
+        let diasCierreVsProg = null, pctCierreProg = null;
+        if (kpis && kpis.esFinalizado && kpis.fechaFin) {
+            const fc = new Date(kpis.fechaFin);
+            if (!isNaN(fc.getTime())) {
+                diasCierreVsProg = Math.floor((fin - fc) / 86400000); // + = cerró antes del fin programa = a favor
+                pctCierreProg = Math.min(100, Math.max(0, Math.round((fc - inicio) / 86400000 / plazo * 100)));
+            }
+        }
+        return { inicio: ganttProg.inicio, fin: fin.toISOString().substring(0, 10), plazo, diasRestantes, diasTranscurridos, pctTranscurrido, diasCierreVsProg, pctCierreProg };
+    }, [ganttProg, kpis]);
+    const contratoInfo = React.useMemo(() => {
+        const fi = proy.fecha_inicio;
+        const dur = proy.duracion;
+        if (!fi || !dur) return null;
+        const inicio = new Date(fi);
+        const vencimiento = new Date(inicio);
+        vencimiento.setDate(vencimiento.getDate() + dur);
+        // Si finalizado, usar fecha de ultima recepcion en vez de hoy
+        const fechaRef = (kpis && kpis.esFinalizado && kpis.fechaFin) ? new Date(kpis.fechaFin) : new Date();
+        const diasRestantes = Math.floor((vencimiento - fechaRef) / (1000*60*60*24));
+        const diasTranscurridos = Math.max(0, Math.floor((fechaRef - inicio) / (1000*60*60*24)));
+        const pctTranscurrido = Math.min(100, Math.max(0, Math.round(diasTranscurridos / dur * 100)));
+        const diaMarca90 = dur - 90;
+        const pctMarca90 = dur > 90 ? Math.round(diaMarca90 / dur * 100) : null;
+        const fechaMarca90 = dur > 90 ? (() => { const d = new Date(inicio); d.setDate(d.getDate() + diaMarca90); return d.toISOString().substring(0,10); })() : null;
+        const enFaseCierre = !kpis?.esFinalizado && diasTranscurridos >= diaMarca90 && dur > 90;
+        // Marca de cierre real: ultima recepcion definitiva del proyecto, o fecha de marcado "Terminado"
+        let pctCierre = null, fechaCierre = null, diasCierreVsVenc = null;
+        if (kpis && kpis.fechaFin) {
+            const fc = new Date(kpis.fechaFin);
+            if (!isNaN(fc.getTime())) {
+                fechaCierre = String(kpis.fechaFin).substring(0, 10);
+                pctCierre = Math.round((fc - inicio) / 86400000 / dur * 100);
+                diasCierreVsVenc = Math.floor((vencimiento - fc) / 86400000); // + = antes del vencimiento, - = despues
+            }
+        }
+        return { inicio: fi, duracion: dur, vencimiento: vencimiento.toISOString().substring(0,10), diasRestantes, diasTranscurridos, pctTranscurrido, pctMarca90, fechaMarca90, enFaseCierre, pctCierre, fechaCierre, diasCierreVsVenc };
+    }, [proy, kpis]);
+
+    const formatFecha = (iso) => { if (!iso) return "—"; const [y,m,d] = iso.split("-"); return `${d}/${m}/${y}`; };
+    const formatUF = (val) => { if (!val && val !== 0) return "—"; return val.toLocaleString("es-CL", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " UF"; };
+
+    return (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+            {contratoInfo && (
+                <div className={`bg-white border rounded-lg p-3 shadow-sm ${contratoInfo.diasRestantes < 0 ? "border-red-300 bg-red-50" : contratoInfo.diasRestantes < 30 ? "border-yellow-300 bg-yellow-50" : "border-gray-200"}`}>
+                    <div className="flex items-center gap-2 mb-2">
+                        <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                        <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Contrato</span>
+                    </div>
+                    <div className="grid grid-cols-4 gap-2 text-xs">
+                        <div><p className="text-gray-400">Inicio</p><p className="font-semibold text-gray-700">{formatFecha(contratoInfo.inicio)}</p></div>
+                        <div><p className="text-gray-400">Plazo</p><p className="font-semibold text-gray-700">{contratoInfo.duracion} dias</p></div>
+                        <div><p className="text-gray-400">Vencimiento</p><p className="font-semibold text-gray-700">{formatFecha(contratoInfo.vencimiento)}</p></div>
+                        <div><p className="text-gray-400">Estado</p>
+                            {contratoInfo.diasRestantes < 0 ? <p className="font-bold text-red-600">VENCIDO ({Math.abs(contratoInfo.diasRestantes)}d)</p> :
+                             contratoInfo.diasRestantes < 30 ? <p className="font-bold text-yellow-600">{contratoInfo.diasRestantes}d restantes</p> :
+                             <p className="font-semibold text-green-600">{contratoInfo.diasRestantes}d restantes</p>}
+                        </div>
+                    </div>
+                    <div className="mt-2.5">
+                        <div className="flex items-center justify-between text-[9px] text-gray-400 mb-1">
+                            <span>{formatFecha(contratoInfo.inicio)}</span>
+                            <span className="font-semibold">{contratoInfo.diasTranscurridos}d / {contratoInfo.duracion}d ({contratoInfo.pctTranscurrido}%)</span>
+                            <span>{formatFecha(contratoInfo.vencimiento)}</span>
+                        </div>
+                        <div className="relative h-3 bg-gray-200 rounded-full overflow-hidden">
+                            <div className={`h-full rounded-full transition-all ${contratoInfo.pctTranscurrido >= 100 ? "bg-red-500" : contratoInfo.pctTranscurrido >= 80 ? "bg-amber-500" : contratoInfo.pctTranscurrido >= 50 ? "bg-blue-500" : "bg-green-500"}`} style={{width: `${Math.min(contratoInfo.pctTranscurrido, 100)}%`}}></div>
+                            {contratoInfo.pctMarca90 !== null && <div className="absolute inset-0 flex items-center" style={{left: `${contratoInfo.pctMarca90}%`}}>
+                                <div className="w-0.5 h-5 bg-red-600 rounded-full" style={{marginTop: "-4px"}} title={`Fase Cierre: ${formatFecha(contratoInfo.fechaMarca90)} (90d antes del vencimiento)`}></div>
+                            </div>}
+                            {contratoInfo.pctTranscurrido > 8 && contratoInfo.pctTranscurrido <= 100 && <div className="absolute inset-0 flex items-center" style={{left: `${Math.min(contratoInfo.pctTranscurrido, 100) - 1}%`}}>
+                                <div className="w-0.5 h-4 bg-gray-700 rounded-full" style={{marginTop: "-2px"}}></div>
+                            </div>}
+                            {contratoInfo.pctCierre !== null && <div className="absolute inset-0 flex items-center" style={{left: `${Math.max(0, Math.min(contratoInfo.pctCierre, 100))}%`}}>
+                                <div className="w-1 h-6 bg-emerald-600 rounded-full ring-1 ring-white" style={{marginTop: "-6px"}} title={`Cierre del proyecto: ${formatFecha(contratoInfo.fechaCierre)} (${kpis && kpis.finalizadoManual && !kpis.finalizadoRecep ? 'marcado Terminado' : 'ultima recepcion definitiva'})`}></div>
+                            </div>}
+                        </div>
+                        {contratoInfo.pctMarca90 !== null && <div className="flex items-center justify-end mt-0.5">
+                            <span className="text-[8px] text-red-500" style={{marginRight: `${100 - contratoInfo.pctMarca90 - 3}%`}}>&#9660; 90d</span>
+                        </div>}
+                        {contratoInfo.fechaCierre && <div className="mt-1 flex items-center gap-1.5 text-[10px]">
+                            <span className="inline-block w-2 h-2 rounded-full bg-emerald-600"></span>
+                            <span className="font-semibold text-emerald-700">{kpis && kpis.finalizadoManual && !kpis.finalizadoRecep ? "Terminado" : "Recepcion definitiva final"}: {formatFecha(contratoInfo.fechaCierre)}</span>
+                            {contratoInfo.diasCierreVsVenc !== null && <span className="text-gray-400">{contratoInfo.diasCierreVsVenc >= 0 ? `(${contratoInfo.diasCierreVsVenc}d antes del vencimiento)` : `(${Math.abs(contratoInfo.diasCierreVsVenc)}d despues del vencimiento)`}</span>}
+                        </div>}
+                        {contratoInfo.pctTranscurrido >= 100 && <p className="text-[9px] text-red-500 font-semibold mt-1 text-center">Plazo excedido por {contratoInfo.diasTranscurridos - contratoInfo.duracion} dias</p>}
+                        {contratoInfo.enFaseCierre && contratoInfo.diasRestantes >= 0 && <div className="mt-2 bg-red-50 border border-red-300 rounded-lg px-3 py-2">
+                            <p className="text-[10px] font-bold text-red-700 flex items-center gap-1">&#9888; Revision de cierre y notificacion a EGR</p>
+                            <p className="text-[9px] text-red-600 mt-0.5">Fase administrativa activa desde {formatFecha(contratoInfo.fechaMarca90)} — {contratoInfo.diasRestantes}d para vencimiento. Verificar estado de cierre del grupo.</p>
+                        </div>}
+                    </div>
+                </div>
+            )}
+            {progInfo && (
+                <div className={`bg-white border rounded-lg p-3 shadow-sm ${kpis?.esFinalizado ? (progInfo.diasCierreVsProg == null || progInfo.diasCierreVsProg >= 0 ? "border-green-300 bg-green-50" : "border-red-200 bg-red-50") : progInfo.diasRestantes < 0 ? "border-red-300 bg-red-50" : progInfo.diasRestantes < 30 ? "border-yellow-300 bg-yellow-50" : "border-gray-200"}`}>
+                    <div className="flex items-center gap-2 mb-2">
+                        <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                        <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Programa de Obra</span>
+                        {kpis?.esFinalizado && <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-green-600 text-white">CERRADO</span>}
+                    </div>
+                    <div className="grid grid-cols-4 gap-2 text-xs">
+                        <div><p className="text-gray-400">Inicio</p><p className="font-semibold text-gray-700">{formatFecha(progInfo.inicio)}</p></div>
+                        <div><p className="text-gray-400">Plazo</p><p className="font-semibold text-gray-700">{progInfo.plazo} dias</p></div>
+                        <div><p className="text-gray-400">Termino</p><p className="font-semibold text-gray-700">{formatFecha(progInfo.fin)}</p></div>
+                        <div><p className="text-gray-400">Estado</p>
+                            {kpis?.esFinalizado
+                                ? <p className="font-bold text-green-700">FINALIZADO</p>
+                                : progInfo.diasRestantes < 0 ? <p className="font-bold text-red-600">VENCIDO ({Math.abs(progInfo.diasRestantes)}d)</p>
+                                : progInfo.diasRestantes < 30 ? <p className="font-bold text-yellow-600">{progInfo.diasRestantes}d restantes</p>
+                                : <p className="font-semibold text-green-600">{progInfo.diasRestantes}d restantes</p>}
+                        </div>
+                    </div>
+                    <div className="mt-2.5">
+                        {kpis?.esFinalizado && progInfo.pctCierreProg !== null ? (
+                            <React.Fragment>
+                                <div className="flex items-center justify-between text-[9px] text-gray-400 mb-1">
+                                    <span>{formatFecha(progInfo.inicio)}</span>
+                                    <span className="font-semibold">{formatFecha(String(kpis.fechaFin || '').substring(0,10))} · {progInfo.pctCierreProg}% del plazo</span>
+                                    <span>{formatFecha(progInfo.fin)}</span>
+                                </div>
+                                <div className="relative h-3 rounded-full" style={{background:'#e5e7eb', overflow:'hidden'}}>
+                                    <div className={`absolute top-0 left-0 h-full ${progInfo.diasCierreVsProg >= 0 ? 'bg-green-500' : 'bg-red-400'}`} style={{width:`${progInfo.pctCierreProg}%`}}></div>
+                                    {progInfo.diasCierreVsProg > 0 && <div className="absolute top-0 h-full bg-green-200" style={{left:`${progInfo.pctCierreProg}%`, width:`${100 - progInfo.pctCierreProg}%`}}></div>}
+                                    <div className="absolute top-0 bottom-0 flex items-center" style={{left:`${progInfo.pctCierreProg}%`, transform:'translateX(-50%)'}}>
+                                        <div className={`w-1.5 h-5 rounded-full ring-1 ring-white ${progInfo.diasCierreVsProg >= 0 ? 'bg-green-700' : 'bg-red-700'}`} style={{marginTop:'-4px'}} title="Fecha de cierre del proyecto"></div>
+                                    </div>
+                                </div>
+                                <div className="mt-1 flex items-center gap-2 text-[9px] flex-wrap">
+                                    <span className="text-gray-500">&#9632; Finalizado el {formatFecha(String(kpis.fechaFin || '').substring(0,10))}</span>
+                                    {progInfo.diasCierreVsProg !== null && (
+                                        progInfo.diasCierreVsProg >= 0
+                                        ? <span className="font-bold text-green-700">+{progInfo.diasCierreVsProg}d a favor del programa</span>
+                                        : <span className="font-bold text-red-600">-{Math.abs(progInfo.diasCierreVsProg)}d sobre el programa</span>
+                                    )}
+                                    {avanceGantt?.actualizado && <span className="text-gray-400 ml-auto">Act: {formatFecha(avanceGantt.actualizado)}</span>}
+                                </div>
+                            </React.Fragment>
+                        ) : (
+                            <React.Fragment>
+                                <div className="flex items-center justify-between text-[9px] text-gray-400 mb-1">
+                                    <span>{formatFecha(progInfo.inicio)}</span>
+                                    <span className="font-semibold">{progInfo.diasTranscurridos}d / {progInfo.plazo}d ({progInfo.pctTranscurrido}%)</span>
+                                    <span>{formatFecha(progInfo.fin)}</span>
+                                </div>
+                                <div className="relative h-3 bg-gray-200 rounded-full overflow-hidden">
+                                    {avanceGantt?.pct != null && avanceGantt?.pct_prog != null
+                                        ? Number(avanceGantt.pct) >= Number(avanceGantt.pct_prog)
+                                            ? <React.Fragment>
+                                                {/* Adelanto: azul hasta prog, verde desde prog hasta real */}
+                                                <div className="absolute top-0 left-0 h-full bg-blue-400" style={{width:`${Math.min(Number(avanceGantt.pct_prog),100)}%`}}></div>
+                                                <div className="absolute top-0 h-full bg-green-500" style={{left:`${Math.min(Number(avanceGantt.pct_prog),100)}%`,width:`${Math.min(Number(avanceGantt.pct),100)-Math.min(Number(avanceGantt.pct_prog),100)}%`}}></div>
+                                                <div className="absolute top-0 bottom-0 flex items-center" style={{left:`${Math.min(Number(avanceGantt.pct_prog),100)}%`}}>
+                                                    <div className="w-0.5 h-5 bg-indigo-700 rounded-full" style={{marginTop:"-4px"}} title={`Prog: ${Number(avanceGantt.pct_prog).toFixed(2)}%`}></div>
+                                                </div>
+                                              </React.Fragment>
+                                            : <React.Fragment>
+                                                {/* Atraso: verde hasta real, rojo desde real hasta prog */}
+                                                <div className="absolute top-0 left-0 h-full bg-green-500" style={{width:`${Math.min(Number(avanceGantt.pct),100)}%`}}></div>
+                                                <div className="absolute top-0 h-full bg-red-300" style={{left:`${Math.min(Number(avanceGantt.pct),100)}%`,width:`${Math.min(Number(avanceGantt.pct_prog),100)-Math.min(Number(avanceGantt.pct),100)}%`}}></div>
+                                                <div className="absolute top-0 bottom-0 flex items-center" style={{left:`${Math.min(Number(avanceGantt.pct_prog),100)}%`}}>
+                                                    <div className="w-0.5 h-5 bg-red-700 rounded-full" style={{marginTop:"-4px"}} title={`Prog: ${Number(avanceGantt.pct_prog).toFixed(2)}%`}></div>
+                                                </div>
+                                              </React.Fragment>
+                                        : <React.Fragment>
+                                            {/* Sin datos: barra de tiempo transcurrido */}
+                                            <div className={`h-full rounded-full ${progInfo.pctTranscurrido>=100?"bg-red-500":progInfo.pctTranscurrido>=80?"bg-amber-500":"bg-blue-400"}`} style={{width:`${Math.min(progInfo.pctTranscurrido,100)}%`}}></div>
+                                          </React.Fragment>
+                                    }
+                                </div>
+                                {avanceGantt && (avanceGantt.pct != null || avanceGantt.pct_prog != null) && (
+                                    <div className="mt-1 flex items-center gap-2 text-[9px] flex-wrap">
+                                        {avanceGantt.pct != null && <span className="text-green-700 font-semibold">&#9632; Real: {Number(avanceGantt.pct).toFixed(2)}%</span>}
+                                        {avanceGantt.pct_prog != null && <span className="text-blue-600 font-semibold">&#9632; Prog: {Number(avanceGantt.pct_prog).toFixed(2)}%</span>}
+                                        {avanceGantt.pct != null && avanceGantt.pct_prog != null && (
+                                            Number(avanceGantt.pct) >= Number(avanceGantt.pct_prog)
+                                            ? <span className="font-bold text-green-600">+{(Number(avanceGantt.pct)-Number(avanceGantt.pct_prog)).toFixed(2)}% adelanto</span>
+                                            : <span className="font-bold text-red-600">{(Number(avanceGantt.pct)-Number(avanceGantt.pct_prog)).toFixed(2)}% atraso</span>
+                                        )}
+                                        {avanceGantt.actualizado && <span className="text-gray-400 ml-auto">Act: {formatFecha(avanceGantt.actualizado)}</span>}
+                                    </div>
+                                )}
+                                {progInfo.pctTranscurrido >= 100 && <p className="text-[9px] text-red-500 font-semibold mt-1 text-center">Plazo excedido por {progInfo.diasTranscurridos - progInfo.plazo} dias</p>}
+                            </React.Fragment>
+                        )}
+                    </div>
+                </div>
+            )}
+            {garantiasProy.length > 0 && (
+                <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
+                    <div className="flex items-center gap-2 mb-2">
+                        <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                        <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Garantias</span>
+                    </div>
+                    <div className="space-y-1.5">
+                        {garantiasProy.map((g, i) => {
+                            const esV = g.diasVcmto !== null && g.diasVcmto < 0;
+                            const porV = g.diasVcmto !== null && g.diasVcmto >= 0 && g.diasVcmto < 60;
+                            return (
+                                <div key={i} className={`flex items-center justify-between text-xs px-2 py-1 rounded ${esV ? "bg-red-50 text-red-700" : porV ? "bg-yellow-50 text-yellow-700" : "bg-gray-50 text-gray-600"}`}>
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className="font-semibold">{g.tipoCorto}</span>
+                                        {g.esMarco && <span className="px-1 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-700 border border-amber-200" title="Garantía del convenio marco SEREMI–EGR, no del contrato de obra">MARCO</span>}
+                                        <span className={`px-1 py-0.5 rounded text-[9px] font-bold border ${g.entidad === 'ATPK' ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`} title="Entidad responsable de la garantía">{g.entidad}</span>
+                                        <span className="text-gray-400">{g.tipo1} #{g.num_bol}</span>
+                                        {g.monto_uf > 0 && <span className="text-gray-400">UF {g.monto_uf.toLocaleString()}</span>}
+                                    </div>
+                                    <div className="font-semibold whitespace-nowrap">
+                                        {g.diasVcmto === null ? "Sin fecha" : esV ? `VENCIDA (${Math.abs(g.diasVcmto)}d)` : porV ? `${g.diasVcmto}d` : formatFecha(g.fecha_vcmto)}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+            <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
+                <div className="flex items-center gap-2 mb-2">
+                    <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                    <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Estados de Pago</span>
+                </div>
+                {(() => {
+                    const epId = String((proy && proy.ID_proy) || '');
+                    const mp = MONTOS_PROY_DATA[epId];
+                    const montoProy = mp ? mp.total : 0;
+                    const pagado = eeppResumen.pagado;
+                    const ingresado = eeppResumen.ingresado;
+                    const hayEP = eeppResumen.total > 0;
+                    const base = montoProy > 0 ? montoProy : (hayEP ? eeppResumen.total : 0);  // Total Proyecto
+                    // Siempre renderizar lo que haya: total (si hay Montos), avance de
+                    // inspecciones y EP. Nunca queda en blanco aunque todo sea 0 (proyecto
+                    // recien iniciado: inspecciones en 0%, sin monto cargado, sin EP).
+                    const pendiente = base > 0 ? Math.max(0, base - pagado - ingresado) : 0;
+                    const wpct = (n) => (base > 0 ? (n / base * 100) : 0);
+                    const wtxt = (n) => (base > 0 ? (n / base * 100).toFixed(0) + '%' : '—');
+                    return (
+                        <div>
+                            <div className="flex items-center justify-between mb-1">
+                                <span className="text-[10px] text-gray-400">{montoProy > 0 ? 'Total Proyecto' : (hayEP ? 'Total EP' : (nViviendas > 0 ? nViviendas + ' viviendas' : 'Estado de Pago'))}</span>
+                                {base > 0
+                                    ? <span className="text-[11px] font-mono font-bold text-violet-800">{formatUF(base)}</span>
+                                    : <span className="text-[10px] text-gray-400">sin monto cargado</span>}
+                            </div>
+                            <div className="relative mb-2" style={{ paddingTop: avanceInsp > 0 ? '12px' : '0' }}>
+                                <div className="flex rounded-full h-5 overflow-hidden bg-violet-100">
+                                    {pagado > 0 && <div className="bg-green-500 flex items-center justify-center text-[9px] font-bold text-white" style={{width:`${wpct(pagado)}%`}}>{wtxt(pagado)}</div>}
+                                    {ingresado > 0 && <div className="bg-yellow-400 flex items-center justify-center text-[9px] font-bold text-yellow-900" style={{width:`${wpct(ingresado)}%`}}>{wtxt(ingresado)}</div>}
+                                </div>
+                                {avanceInsp > 0 && (
+                                    <div className="absolute top-0 bottom-0 flex flex-col items-center pointer-events-none" style={{ left: `${Math.min(avanceInsp, 100)}%`, transform: 'translateX(-50%)' }} title={`Avance físico real (Gantt de control): ${avanceInsp}%`}>
+                                        <span className="text-[9px] font-bold text-red-600 leading-none">{avanceInsp.toFixed(2)}%</span>
+                                        <div className="w-0.5 bg-red-600 flex-1"></div>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="grid grid-cols-3 gap-1 text-[10px]">
+                                <div><span className="text-green-600 font-semibold">Pagado</span><br/><span className="font-mono font-bold text-gray-700">{formatUF(pagado)}</span> <span className="text-gray-400">· {wtxt(pagado)}</span></div>
+                                <div><span className="text-yellow-600 font-semibold">Ingresado</span><br/><span className="font-mono font-bold text-gray-700">{formatUF(ingresado)}</span> <span className="text-gray-400">· {wtxt(ingresado)}</span></div>
+                                <div><span className="text-violet-600 font-semibold">Pendiente</span><br/><span className="font-mono font-bold text-gray-700">{base > 0 ? formatUF(pendiente) : '—'}</span> <span className="text-gray-400">· {wtxt(pendiente)}</span></div>
+                            </div>
+                            <p className="text-[9px] text-red-500 mt-1 flex items-center gap-1"><span className="inline-block w-0.5 h-3 bg-red-600" />Avance físico real: {avanceInsp.toFixed(2)}%</p>
+                        </div>
+                    );
+                })()}
+            </div>
+        </div>
+    );
+};
+
+// ===== GRUPO HEADER =====
+const GrupoHeader = ({ grupo, colorIdx, open, onToggle, onUpdateComentario, cierresForzados = {} }) => {
+    if (!grupo.nombre) return null;
+    const c = colorIdx >= 0 ? GRUPO_COLORS[colorIdx] : { bg:"bg-gray-50", border:"border-gray-200", text:"text-gray-600", accent:"bg-gray-400" };
+    const res = grupoResumen(grupo.viviendas, cierresForzados);
+    const [editing, setEditing] = React.useState(false);
+    const [draft, setDraft] = React.useState(grupo.comentario || "");
+    React.useEffect(() => { setDraft(grupo.comentario || ""); }, [grupo.comentario]);
+
+    const stop = (e) => { e.stopPropagation(); };
+    const save = () => {
+        const t = draft.trim();
+        if (onUpdateComentario) onUpdateComentario(grupo.id, t);
+        setEditing(false);
+    };
+    const cancel = () => {
+        setDraft(grupo.comentario || "");
+        setEditing(false);
+    };
+
+    return (
+        <div className={`${c.bg} border ${c.border} rounded-xl p-3 cursor-pointer hover:shadow-sm transition-shadow`} onClick={onToggle}>
+            <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 flex-shrink-0">
+                    <div className={`w-8 h-8 ${c.accent} rounded-lg flex items-center justify-center`}>
+                        <span className="text-white text-xs font-bold">{grupo.nombre.replace("Grupo ","G")}</span>
+                    </div>
+                    <div>
+                        <div className="flex items-center gap-2">
+                            <h3 className={`text-sm font-bold ${c.text}`}>{grupo.nombre}</h3>
+                            {grupo.capataz && <span className="text-xs text-gray-500">— Capataz: <strong className="text-gray-700">{grupo.capataz}</strong></span>}
+                        </div>
+                        <div className="flex items-center gap-4 text-[10px] text-gray-500 mt-0.5">
+                            <span>{res.n} viviendas</span>
+                            <span>HPC: <strong className={res.habiles === res.n ? "text-green-600" : "text-orange-600"}>{res.habiles}/{res.n}</strong></span>
+                            <span title="Recepciones Definitivas">RF: <strong className={res.recepcionadas === res.n && res.n > 0 ? "text-green-600" : res.recepcionadas > 0 ? "text-blue-600" : "text-gray-400"}>{res.recepcionadas}/{res.n}</strong></span>
+                            <span>Desp: <strong className="text-blue-600">{res.avanceDesp}%</strong></span>
+                            <span>Insp: <strong className="text-emerald-600">{res.avanceInsp}%</strong></span>
+                            {res.criticas > 0 && <span className="text-red-600 font-semibold">{res.criticas} criticas</span>}
+                            {res.terminadas > 0 && <span className="text-green-600">{res.terminadas} terminadas</span>}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Nota del grupo (editable) */}
+                <div className="flex-1 min-w-0 max-w-2xl" onClick={stop}>
+                    {editing ? (
+                        <div className="flex items-center gap-1.5">
+                            <input
+                                type="text"
+                                value={draft}
+                                onChange={(e) => setDraft(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') cancel(); }}
+                                placeholder="Estado actual del grupo (ej: cubierta terminada, pendiente DOM)..."
+                                maxLength={200}
+                                autoFocus
+                                className="flex-1 text-xs px-2 py-1 bg-white border border-violet-300 rounded focus:outline-none focus:ring-2 focus:ring-violet-400"
+                            />
+                            <button onClick={save} className="text-[10px] px-2 py-1 bg-violet-600 text-white rounded font-medium hover:bg-violet-700">Guardar</button>
+                            <button onClick={cancel} className="text-[10px] px-2 py-1 text-gray-500 hover:text-gray-700">Cancelar</button>
+                        </div>
+                    ) : grupo.comentario ? (
+                        <div className="flex items-start gap-1.5 bg-white/60 border border-gray-200 rounded px-2 py-1 group">
+                            <svg className="w-3 h-3 text-amber-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/><path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd"/></svg>
+                            <p className="text-[11px] text-gray-700 italic flex-1 break-words">{grupo.comentario}</p>
+                            <button onClick={() => setEditing(true)} className="text-[10px] text-gray-400 hover:text-violet-600 opacity-0 group-hover:opacity-100 flex-shrink-0" title="Editar nota">Editar</button>
+                        </div>
+                    ) : (
+                        <button onClick={() => setEditing(true)} className="text-[10px] px-2 py-1 text-gray-400 border border-dashed border-gray-300 rounded hover:text-violet-600 hover:border-violet-300 hover:bg-violet-50 transition-colors">
+                            + Agregar nota del grupo
+                        </button>
+                    )}
+                </div>
+
+                <div className="flex items-center gap-3 flex-shrink-0">
+                    <div className="w-24 space-y-0.5">
+                        <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden"><div className="h-full rounded-full bg-blue-500" style={{width:`${res.avanceDesp}%`}} /></div>
+                        <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden"><div className="h-full rounded-full bg-emerald-500" style={{width:`${res.avanceInsp}%`}} /></div>
+                    </div>
+                    <IconChevron open={open} />
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ===== VIVIENDAS TAB =====
+const ViviendasTab = ({ viviendas, grupos, expandida, setExpandida, filtro, setFiltro, busqueda, setBusqueda, observaciones, addObservacion, deleteObservacion, showResumenObs, setShowResumenObs, actividades, toggleActividad, consultas, toggleConsulta, ocultados, ocultarBeneficiario, mostrarBeneficiario, onUpdateComentarioGrupo, resumenComentarios, cierresForzados = {}, forzarCierre, deshacerCierre }) => {
+    const [showOcultas, setShowOcultas] = React.useState(false);
+    const ocultadasProy = viviendas.filter(v => ocultados[v.ID_Benef]);
+    const vivVisibles = viviendas.filter(v => !ocultados[v.ID_Benef]);
+
+    const criticas = vivVisibles.filter(v => v.estadoGeneral === "critico").length;
+    const atencion_ = vivVisibles.filter(v => v.estadoGeneral === "atencion").length;
+    const enTiempo = vivVisibles.filter(v => v.estadoGeneral === "en_tiempo").length;
+
+    const vivFiltradas = React.useMemo(() => {
+        return vivVisibles.filter(v => {
+            if (busqueda && !`${v.NOMBRES} ${v.APELLIDOS}`.toLowerCase().includes(busqueda.toLowerCase())) return false;
+            if (filtro !== "todos" && v.estadoGeneral !== filtro) return false;
+            return true;
+        });
+    }, [vivVisibles, busqueda, filtro]);
+
+    const gruposData = agruparViviendas(vivFiltradas, grupos);
+    const [gruposAbiertos, setGruposAbiertos] = React.useState({});
+    const toggleGrupo = (gid) => setGruposAbiertos(prev => ({...prev, [gid]: prev[gid] === false ? true : false}));
+
+    return (
+        <div>
+            <div className="flex items-center gap-2 mb-4 flex-wrap">
+                {[["todos","Todas",vivVisibles.length],["critico","Criticas",criticas],["atencion","Atencion",atencion_],["en_tiempo","En Tiempo",enTiempo]].map(([k,l,c]) =>
+                    <button key={k} onClick={() => setFiltro(k)} className={`px-3 py-1.5 rounded-lg text-xs font-medium ${filtro===k ? "bg-violet-600 text-white shadow-sm" : "bg-white text-gray-500 border border-gray-200 hover:border-gray-300"}`}>{l} <span className="ml-1 opacity-60">{c}</span></button>
+                )}
+                <button onClick={() => setShowResumenObs("obs")} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-700 border border-amber-300 hover:bg-amber-100 flex items-center gap-1" title="Ver resumen general">&#9998; Resumen</button>
+                {ocultadasProy.length > 0 && (
+                    <button onClick={() => setShowOcultas(true)} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200 flex items-center gap-1.5" title="Ver viviendas ocultas">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M3 3l18 18" /></svg>
+                        Ocultas <span className="bg-gray-300 text-gray-700 text-[10px] px-1.5 py-0.5 rounded-full font-bold">{ocultadasProy.length}</span>
+                    </button>
+                )}
+                <div className="relative ml-auto">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"><IconSearch /></span>
+                    <input type="text" placeholder="Buscar beneficiario..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)}
+                        className="w-56 bg-white border border-gray-200 rounded-lg pl-10 pr-4 py-1.5 text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500 focus:outline-none" />
+                </div>
+            </div>
+            {/* Modal Viviendas Ocultas */}
+            {showOcultas && (
+                <div className="fixed inset-0 bg-black/40 z-[100] flex items-center justify-center p-4" onClick={() => setShowOcultas(false)}>
+                    <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+                        <div className="sticky top-0 bg-white border-b border-gray-200 px-5 py-3 flex items-center justify-between rounded-t-xl z-10">
+                            <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M3 3l18 18" /></svg>
+                                Viviendas Ocultas ({ocultadasProy.length})
+                            </h3>
+                            <button onClick={() => setShowOcultas(false)} className="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                            {ocultadasProy.map(v => {
+                                const info = ocultados[v.ID_Benef] || {};
+                                return (
+                                    <div key={v.ID_Benef} className="flex items-center justify-between px-4 py-3 bg-gray-50 rounded-lg border border-gray-200">
+                                        <div className="flex-1 min-w-0">
+                                            <div className="font-semibold text-sm text-gray-800 truncate">{v.NOMBRES} {v.APELLIDOS}</div>
+                                            <div className="text-[11px] text-gray-500">{v.tipologia}</div>
+                                            {info.motivo && <div className="text-[11px] text-gray-500 mt-1 italic bg-white px-2 py-1 rounded border border-gray-100">{info.motivo}</div>}
+                                            {info.fecha && <div className="text-[10px] text-gray-400 mt-0.5">Oculta desde: {info.fecha.replace('T', ' ')}</div>}
+                                        </div>
+                                        <button onClick={() => mostrarBeneficiario(v.ID_Benef)} className="ml-3 px-3 py-1.5 bg-violet-600 text-white text-[11px] font-semibold rounded-lg hover:bg-violet-700 shrink-0 flex items-center gap-1">
+                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                            Mostrar
+                                        </button>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <div className="px-5 py-3 border-t border-gray-100 flex justify-between items-center">
+                            <button onClick={() => { ocultadasProy.forEach(v => mostrarBeneficiario(v.ID_Benef)); setShowOcultas(false); }} className="text-xs text-violet-600 hover:text-violet-800 font-semibold">Mostrar todas</button>
+                            <button onClick={() => setShowOcultas(false)} className="px-4 py-1.5 bg-gray-800 text-white text-xs rounded-lg hover:bg-gray-700">Cerrar</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Modal Resumen con 3 tabs */}
+            {showResumenObs && (() => {
+                const [resTab, setResTab] = [showResumenObs, setShowResumenObs];
+                const actualTab = typeof resTab === "string" ? resTab : "obs";
+                const setActualTab = (t) => setResTab(t || true);
+                const closeModal = () => setResTab(false);
+
+                // IDs del proyecto actual
+                const vivIds = new Set(viviendas.map(v => String(v.ID_Benef)));
+
+                // Consultas gatilladas: recorrer viviendas y ver cuales tienen etapas despachadas con consulta
+                const consultasData = viviendas.flatMap(v => {
+                    const estados = v.estadoEtapas || {};
+                    return Object.entries(CONSULTAS_ETAPA).filter(([etKey]) => estados[etKey]?.estado === "despachado").map(([etKey, pregunta]) => {
+                        const done = consultas[v.ID_Benef] && consultas[v.ID_Benef][etKey];
+                        return { idBenef: v.ID_Benef, nombre: `${v.NOMBRES} ${v.APELLIDOS}`, etapa: ETAPAS_CONFIG[etKey]?.nombre || etKey, pregunta, done, etKey };
+                    });
+                });
+                const consPendientes = consultasData.filter(c => !c.done);
+                const consHechas = consultasData.filter(c => c.done);
+
+                // Actividades 5%: recorrer viviendas
+                const actData = viviendas.map(v => {
+                    const benActs = actividades[v.ID_Benef] || {};
+                    const hechas = ACTIVIDADES_HAB.filter(a => benActs[a]);
+                    const pendientes = ACTIVIDADES_HAB.filter(a => !benActs[a]);
+                    return { idBenef: v.ID_Benef, nombre: `${v.NOMBRES} ${v.APELLIDOS}`, benActs, hechas, pendientes, pct: hechas.length };
+                });
+                const actConAlgo = actData.filter(a => a.hechas.length > 0);
+                const actCompletas = actData.filter(a => a.hechas.length === 5);
+                const actParciales = actData.filter(a => a.hechas.length > 0 && a.hechas.length < 5);
+
+                // Observaciones filtradas por proyecto
+                const obsProy = Object.entries(observaciones).filter(([id, obs]) => vivIds.has(String(id)) && obs.length > 0);
+
+                // Comentarios Beneficiario filtrados por proyecto
+                const comBenefProy = COMENTARIOS_BENEF_DATA.filter(c => vivIds.has(String(c.ID_Benef)));
+
+                const tabBtns = [
+                    ["obs", `Observaciones (${obsProy.length})`],
+                    ["cons", `Consultas (${consPendientes.length} pend.)`],
+                    ["act5", `Actividades 5% (${actCompletas.length}/${viviendas.length})`],
+                    ["combenef", `Comentarios (${comBenefProy.length})`]
+                ];
+
+                return (
+                    <div className="fixed inset-0 bg-black/40 z-[100] flex items-center justify-center p-4" onClick={closeModal}>
+                        <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+                            <div className="sticky top-0 bg-white border-b border-gray-200 px-5 py-3 flex items-center justify-between rounded-t-xl z-10">
+                                <h3 className="text-lg font-bold text-gray-800">Resumen</h3>
+                                <button onClick={closeModal} className="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+                            </div>
+                            <div className="flex border-b border-gray-200 bg-gray-50 px-5">
+                                {tabBtns.map(([k, label]) => (
+                                    <button key={k} onClick={() => setActualTab(k)} className={`px-4 py-2.5 text-xs font-medium border-b-2 transition-colors ${actualTab === k ? "border-violet-600 text-violet-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}>{label}</button>
+                                ))}
+                            </div>
+                            <div className="flex-1 overflow-y-auto p-5">
+                                {/* Tab Observaciones */}
+                                {actualTab === "obs" && (
+                                    <div className="space-y-3">
+                                        {obsProy.map(([idBenef, obs]) => {
+                                            const v = viviendas.find(vv => String(vv.ID_Benef) === String(idBenef));
+                                            const nombre = v ? `${v.NOMBRES} ${v.APELLIDOS}` : idBenef;
+                                            return (
+                                                <div key={idBenef} className="border border-amber-200 rounded-lg overflow-hidden">
+                                                    <div className="bg-amber-50 px-4 py-2 border-b border-amber-200">
+                                                        <span className="font-semibold text-gray-800 text-sm">{nombre}</span>
+                                                        <span className="text-[10px] text-gray-400 ml-2">{obs.length} obs.</span>
+                                                    </div>
+                                                    <div className="p-3 space-y-1.5">
+                                                        {obs.map(o => (
+                                                            <div key={o.id} className="flex items-start gap-2 text-sm">
+                                                                <span className="text-amber-400 mt-0.5">&#8226;</span>
+                                                                <span className="text-gray-700 flex-1">{o.texto}</span>
+                                                                <span className="text-[10px] text-gray-400 whitespace-nowrap">{o.fecha.replace('T', ' ')}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                        {obsProy.length === 0 && <p className="text-gray-400 text-center py-8">Sin observaciones en este proyecto</p>}
+                                    </div>
+                                )}
+                                {/* Tab Consultas */}
+                                {actualTab === "cons" && (
+                                    <div className="space-y-4">
+                                        {consPendientes.length > 0 && (
+                                            <div>
+                                                <h4 className="text-sm font-bold text-orange-700 mb-2 flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-orange-500 pulse-soft"></span> Pendientes ({consPendientes.length})</h4>
+                                                <div className="border border-orange-200 rounded-lg overflow-hidden">
+                                                    <table className="w-full text-sm">
+                                                        <thead><tr className="bg-orange-50 text-orange-800 text-xs"><th className="py-2 px-3 text-left">Beneficiario</th><th className="py-2 px-3 text-left">Etapa</th><th className="py-2 px-3 text-left">Consulta</th><th className="py-2 px-2 w-16"></th></tr></thead>
+                                                        <tbody>
+                                                            {consPendientes.map((c, i) => (
+                                                                <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-orange-50/30"}>
+                                                                    <td className="py-1.5 px-3 text-gray-800 font-medium">{c.nombre}</td>
+                                                                    <td className="py-1.5 px-3 text-gray-600">{c.etapa}</td>
+                                                                    <td className="py-1.5 px-3 text-orange-700 font-medium">{c.pregunta}</td>
+                                                                    <td className="py-1.5 px-2"><button onClick={() => toggleConsulta(c.idBenef, c.etKey)} className="text-[10px] bg-green-100 text-green-700 border border-green-300 rounded px-2 py-0.5 hover:bg-green-200">Hecho</button></td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        )}
+                                        {consHechas.length > 0 && (
+                                            <div>
+                                                <h4 className="text-sm font-bold text-green-700 mb-2 flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-green-500"></span> Respondidas ({consHechas.length})</h4>
+                                                <div className="border border-green-200 rounded-lg overflow-hidden">
+                                                    <table className="w-full text-sm">
+                                                        <thead><tr className="bg-green-50 text-green-800 text-xs"><th className="py-2 px-3 text-left">Beneficiario</th><th className="py-2 px-3 text-left">Etapa</th><th className="py-2 px-3 text-left">Consulta</th><th className="py-2 px-3 text-left">Fecha</th></tr></thead>
+                                                        <tbody>
+                                                            {consHechas.map((c, i) => (
+                                                                <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-green-50/30"}>
+                                                                    <td className="py-1.5 px-3 text-gray-800">{c.nombre}</td>
+                                                                    <td className="py-1.5 px-3 text-gray-600">{c.etapa}</td>
+                                                                    <td className="py-1.5 px-3 text-green-700">{c.pregunta}</td>
+                                                                    <td className="py-1.5 px-3 text-[10px] text-gray-500">{c.done.fecha.replace('T', ' ')}</td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        )}
+                                        {consultasData.length === 0 && <p className="text-gray-400 text-center py-8">No hay consultas gatilladas aun (ninguna etapa con consulta ha sido despachada)</p>}
+                                    </div>
+                                )}
+                                {/* Tab Actividades 5% */}
+                                {actualTab === "act5" && (
+                                    <div className="space-y-4">
+                                        <div className="flex items-center gap-4 text-sm mb-3">
+                                            <span className="text-gray-600">Completas: <strong className="text-green-600">{actCompletas.length}</strong></span>
+                                            <span className="text-gray-600">Parciales: <strong className="text-amber-600">{actParciales.length}</strong></span>
+                                            <span className="text-gray-600">Sin iniciar: <strong className="text-gray-400">{viviendas.length - actConAlgo.length}</strong></span>
+                                            <span className="text-gray-600">Total: <strong>{viviendas.length}</strong></span>
+                                        </div>
+                                        <div className="border border-gray-200 rounded-lg overflow-hidden">
+                                            <table className="w-full text-sm">
+                                                <thead><tr className="bg-gray-50 text-gray-600 text-xs">
+                                                    <th className="py-2 px-3 text-left">Beneficiario</th>
+                                                    {ACTIVIDADES_HAB.map(a => <th key={a} className="py-2 px-2 text-center w-20">{a}</th>)}
+                                                    <th className="py-2 px-2 text-center w-12">%</th>
+                                                </tr></thead>
+                                                <tbody>
+                                                    {actData.filter(a => a.hechas.length > 0 || a.pendientes.length < 5).concat(actData.filter(a => a.hechas.length === 0 && a.pendientes.length === 5)).map((row, i) => (
+                                                        <tr key={row.idBenef} className={row.hechas.length === 5 ? "bg-green-50/50" : i % 2 === 0 ? "bg-white" : "bg-gray-50/30"}>
+                                                            <td className="py-1.5 px-3 text-gray-800 font-medium">{row.nombre}</td>
+                                                            {ACTIVIDADES_HAB.map(act => {
+                                                                const done = row.benActs[act];
+                                                                return (
+                                                                    <td key={act} className="py-1.5 px-2 text-center">
+                                                                        <button onClick={() => toggleActividad(row.idBenef, act)} className={`w-6 h-6 rounded text-xs font-bold border transition-all ${done ? "bg-green-500 text-white border-green-600" : "bg-gray-100 text-gray-300 border-gray-200 hover:border-gray-400"}`} title={done ? `Hecho: ${done.fecha.replace('T', ' ')}` : "Pendiente"}>
+                                                                            {done ? "✓" : "·"}
+                                                                        </button>
+                                                                    </td>
+                                                                );
+                                                            })}
+                                                            <td className="py-1.5 px-2 text-center font-mono font-bold text-xs">
+                                                                <span className={row.pct === 5 ? "text-green-600" : row.pct > 0 ? "text-amber-600" : "text-gray-300"}>{row.pct}%</span>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
+                                {/* Tab Comentarios Beneficiario */}
+                                {actualTab === "combenef" && (
+                                    <div className="space-y-4">
+                                        <div className="flex items-center gap-4 text-sm mb-3">
+                                            <span className="text-gray-600">Total: <strong>{comBenefProy.length}</strong></span>
+                                        </div>
+                                        {comBenefProy.length > 0 ? (
+                                            <div className="space-y-3">
+                                                {(() => {
+                                                    const grouped = {};
+                                                    comBenefProy.forEach(c => {
+                                                        if (!grouped[c.ID_Benef]) grouped[c.ID_Benef] = [];
+                                                        grouped[c.ID_Benef].push(c);
+                                                    });
+                                                    return Object.entries(grouped).map(([idBenef, coms]) => {
+                                                        const v = viviendas.find(vv => String(vv.ID_Benef) === String(idBenef));
+                                                        const nombre = v ? `${v.NOMBRES} ${v.APELLIDOS}` : idBenef;
+                                                        const sorted = coms.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+                                                        return (
+                                                            <div key={idBenef} className="border border-violet-200 rounded-lg overflow-hidden">
+                                                                <div className="bg-violet-50 px-4 py-2 border-b border-violet-200 flex items-center justify-between">
+                                                                    <span className="font-semibold text-gray-800 text-sm">{nombre}</span>
+                                                                    <span className="text-[10px] text-gray-400">{coms.length} comentario{coms.length !== 1 ? 's' : ''}</span>
+                                                                </div>
+                                                                <div className="p-3 space-y-1.5 max-h-48 overflow-y-auto">
+                                                                    {sorted.map((c, i) => (
+                                                                        <div key={i} className="flex items-start gap-2 text-sm">
+                                                                            <span className="text-violet-400 mt-0.5">&#8226;</span>
+                                                                            <span className="text-gray-700 flex-1">{c.texto}</span>
+                                                                            <div className="text-right shrink-0">
+                                                                                {c.fecha && <div className="text-[10px] text-gray-400 whitespace-nowrap">{c.fecha}</div>}
+                                                                                {c.usuario && <div className="text-[9px] text-gray-300">{c.usuario}</div>}
+                                                                            </div>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    });
+                                                })()}
+                                            </div>
+                                        ) : (
+                                            <p className="text-gray-400 text-center py-8">Sin comentarios de beneficiario para este proyecto</p>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
+            <div className="space-y-3">
+                {gruposData.map(grupo => (
+                    <div key={grupo.id}>
+                        <GrupoHeader grupo={grupo} colorIdx={grupo.colorIdx} open={gruposAbiertos[grupo.id] !== false} onToggle={() => toggleGrupo(grupo.id)} onUpdateComentario={onUpdateComentarioGrupo} cierresForzados={cierresForzados} />
+                        {(gruposAbiertos[grupo.id] !== false) && (
+                            <div className={`space-y-2 ${grupo.nombre ? "ml-2 pl-3 border-l-2 " + (grupo.colorIdx >= 0 ? GRUPO_COLORS[grupo.colorIdx].border : "border-gray-200") : ""} mt-2`}>
+                                {grupo.viviendas.map(v =>
+                                    <ViviendaCard key={v.ID_Benef} beneficiario={v} estadoEtapas={v.estadoEtapas} expanded={expandida === v.ID_Benef} onToggle={() => setExpandida(expandida === v.ID_Benef ? null : v.ID_Benef)} grupoColor={grupo.colorIdx} obsCount={(observaciones[v.ID_Benef] || []).length} observaciones={observaciones[v.ID_Benef] || []} addObservacion={addObservacion} deleteObservacion={deleteObservacion} actividades={actividades[v.ID_Benef] || {}} toggleActividad={toggleActividad} consultas={consultas[v.ID_Benef] || {}} toggleConsulta={toggleConsulta} ocultarBeneficiario={ocultarBeneficiario} resumenComentarios={resumenComentarios} cierreForzado={cierresForzados[v.ID_Benef] || null} forzarCierre={forzarCierre} deshacerCierre={deshacerCierre} />
+                                )}
+                            </div>
+                        )}
+                    </div>
+                ))}
+                {vivFiltradas.length === 0 && (
+                    <div className="text-center py-12 text-gray-400 bg-white rounded-lg border border-gray-200">
+                        <IconUsers />
+                        <p className="mt-3">No se encontraron viviendas</p>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+// ===== MATRIZ DE AVANCE CON GRUPOS =====
+const MatrizAvance = ({ viviendas, grupos }) => {
+    const gruposData = agruparViviendas(viviendas, grupos);
+    return (
+        <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-x-auto">
+            <table className="w-full text-sm">
+                <thead>
+                    <tr className="text-left text-gray-500 border-b border-gray-200 bg-gray-50">
+                        <th className="py-2 px-3 sticky left-0 bg-gray-50 z-10 min-w-[180px]">Beneficiario</th>
+                        {SECUENCIA_PRINCIPAL.map(key => (
+                            <th key={key} className="py-2 px-2 text-center text-xs">{ETAPAS_CONFIG[key]?.nombre}</th>
+                        ))}
+                        <th className="py-2 px-2 text-center text-xs">Insp%</th>
+                        <th className="py-2 px-2 text-center text-xs">Pagado</th>
+                        <th className="py-2 px-2 text-center text-xs">Coher.</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {gruposData.map(grupo => (
+                        <React.Fragment key={grupo.id}>
+                            {grupo.nombre && (
+                                <tr className={grupo.colorIdx >= 0 ? GRUPO_COLORS[grupo.colorIdx].headerBg : "bg-gray-100"}>
+                                    <td colSpan={SECUENCIA_PRINCIPAL.length + 4} className="py-2 px-3">
+                                        <div className="flex items-center gap-2">
+                                            {grupo.colorIdx >= 0 && <div className={`w-3 h-3 rounded ${GRUPO_COLORS[grupo.colorIdx].accent}`}/>}
+                                            <span className={`text-xs font-bold ${grupo.colorIdx >= 0 ? GRUPO_COLORS[grupo.colorIdx].text : "text-gray-600"}`}>{grupo.nombre}</span>
+                                            {grupo.capataz && <span className="text-[10px] text-gray-500">— {grupo.capataz}</span>}
+                                            <span className="text-[10px] text-gray-400 ml-2">{grupo.viviendas.length} viv.</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            )}
+                            {grupo.viviendas.sort((a, b) => (a.primerDespacho || "9999").localeCompare(b.primerDespacho || "9999")).map(v => {
+                                const insp = getInspeccion(v.ID_Benef);
+                                const totalPag = getTotalPagado(v.ID_Benef);
+                                const alerts = calcCoherencia(v.ID_Benef, v.estadoEtapas);
+                                const alertasRojas = alerts.filter(a => a.tipo === "rojo");
+                                const alertasNaranjas = alerts.filter(a => a.tipo === "naranja");
+                                return (
+                                    <tr key={v.ID_Benef} className="border-b border-gray-100 hover:bg-gray-50">
+                                        <td className="py-2 px-3 sticky left-0 bg-white z-10">
+                                            <div className="flex items-center gap-1.5">
+                                                {grupo.colorIdx >= 0 && <div className={`w-1 h-4 rounded-full ${GRUPO_COLORS[grupo.colorIdx].accent}`}/>}
+                                                <div>
+                                                    <div className="font-medium text-gray-800 text-xs">{v.NOMBRES} {v.APELLIDOS}</div>
+                                                    <div className="text-[10px] text-gray-400">{v.tipologia}</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        {SECUENCIA_PRINCIPAL.map(key => {
+                                            const info = v.estadoEtapas[key];
+                                            const colores = {
+                                                despachado: "bg-blue-500 text-white",
+                                                solicitado: "bg-purple-500 text-white",
+                                                en_tiempo: "bg-green-400 text-white",
+                                                atencion: "bg-yellow-400 text-yellow-900",
+                                                critico: "bg-red-500 text-white animate-pulse",
+                                                bloqueado: "bg-gray-200 text-gray-400"
+                                            };
+                                            const tooltipParts = [info?.nombre + ": " + (info?.estado || "bloqueado")];
+                                            if (info?.estado === "despachado") {
+                                                tooltipParts.push("Despacho: " + (info.fechaDespacho || "") + " (" + (info.diasTranscurridos || 0) + "d)");
+                                                if (info.fechaSolicitud) tooltipParts.push("Solicitud: " + info.fechaSolicitud);
+                                            } else if (info?.estado === "solicitado") {
+                                                tooltipParts.push("Solicitud: " + (info.fechaSolicitud || "") + " (hace " + (info.diasSolicitud || 0) + "d)");
+                                            } else if (info?.diasTranscurridos) {
+                                                tooltipParts.push(info.diasTranscurridos + " dias desde dependencia");
+                                            }
+                                            return (
+                                                <td key={key} className="py-2 px-1 text-center">
+                                                    <div
+                                                        className={`matrix-cell inline-flex items-center justify-center rounded-md text-[10px] font-bold w-8 h-8 ${colores[info?.estado || "bloqueado"]}`}
+                                                        title={tooltipParts.join(" | ")}
+                                                    >
+                                                        {info?.estado === "despachado" ? "D" + (info.diasTranscurridos || "") :
+                                                          info?.estado === "solicitado" ? "S" + (info.diasSolicitud || "") :
+                                                          info?.estado === "bloqueado" ? "—" :
+                                                          "+" + (info?.diasTranscurridos || 0) + "d"}
+                                                    </div>
+                                                </td>
+                                            );
+                                        })}
+                                        <td className="py-2 px-2 text-center">
+                                            <span className={`font-mono font-bold text-xs ${
+                                                insp ? (insp.pct_total >= 90 ? "text-green-600" : insp.pct_total >= 50 ? "text-blue-600" : "text-orange-500") : "text-gray-300"
+                                            }`}>
+                                                {insp ? insp.pct_total + "%" : "—"}
+                                            </span>
+                                        </td>
+                                        <td className="py-2 px-2 text-center">
+                                            <span className="font-mono text-xs text-violet-700">{totalPag > 0 ? formatPeso(totalPag) : "—"}</span>
+                                        </td>
+                                        <td className="py-2 px-2 text-center">
+                                            {alertasRojas.length > 0 ? (
+                                                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-100 text-red-600 text-[10px] font-bold coherence-pulse" title={alertasRojas.map(a => a.msg).join("; ")}>{alertasRojas.length}</span>
+                                            ) : alertasNaranjas.length > 0 ? (
+                                                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-orange-100 text-orange-600 text-[10px] font-bold" title={alertasNaranjas.map(a => a.msg).join("; ")}>{alertasNaranjas.length}</span>
+                                            ) : (
+                                                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-100 text-green-600 text-[10px] font-bold">OK</span>
+                                            )}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </React.Fragment>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+};
+
+// ===== DISTRIBUCIÓN + TIMELINE =====
+const DistribucionTab = ({ viviendas }) => {
+    const distribucion = React.useMemo(() => {
+        return SECUENCIA_PRINCIPAL.map(etapaKey => {
+            const config = ETAPAS_CONFIG[etapaKey];
+            const despachadas = viviendas.filter(v => v.estadoEtapas[etapaKey]?.estado === "despachado").length;
+            const esperando = viviendas.filter(v => {
+                const st = v.estadoEtapas[etapaKey]?.estado;
+                return st && st !== "despachado" && st !== "bloqueado";
+            }).length;
+            const criticas = viviendas.filter(v => v.estadoEtapas[etapaKey]?.estado === "critico").length;
+            return { key: etapaKey, nombre: config?.nombre || etapaKey, despachadas, esperando, criticas };
+        });
+    }, [viviendas]);
+    const maxBarWidth = Math.max(...distribucion.map(d => d.despachadas + d.esperando), 1);
+
+    return (
+        <div className="space-y-6">
+            <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-6">
+                <h3 className="text-sm font-medium text-gray-700 mb-4">Distribución por Etapa — Cuellos de Botella</h3>
+                <div className="space-y-3">
+                    {distribucion.map(d => (
+                        <div key={d.key} className="flex items-center gap-3">
+                            <span className="text-xs text-gray-600 w-28 text-right font-medium">{d.nombre}</span>
+                            <div className="flex-1 flex items-center gap-1">
+                                <div className="flex-1 bg-gray-100 rounded-full h-6 overflow-hidden flex">
+                                    <div className="bg-blue-500 h-6 flex items-center justify-center text-white text-[10px] font-bold transition-all" style={{ width: `${(d.despachadas / maxBarWidth) * 100}%`, minWidth: d.despachadas > 0 ? "20px" : "0" }}>
+                                        {d.despachadas > 0 ? d.despachadas : ""}
+                                    </div>
+                                    <div className={`${d.criticas > 0 ? "bg-red-400" : "bg-yellow-400"} h-6 flex items-center justify-center text-[10px] font-bold transition-all`} style={{ width: `${(d.esperando / maxBarWidth) * 100}%`, minWidth: d.esperando > 0 ? "20px" : "0" }}>
+                                        {d.esperando > 0 ? d.esperando : ""}
+                                    </div>
+                                </div>
+                                <span className="text-xs text-gray-500 w-20">
+                                    {d.despachadas}D / {d.esperando}E
+                                    {d.criticas > 0 && <span className="text-red-600 font-bold ml-1">({d.criticas} crit)</span>}
+                                </span>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+                <div className="flex gap-4 mt-4 text-xs text-gray-500">
+                    <div className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-blue-500" /><span>Despachado</span></div>
+                    <div className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-yellow-400" /><span>Esperando</span></div>
+                    <div className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-red-400" /><span>Con Críticos</span></div>
+                </div>
+                {(() => {
+                    const bottleneck = distribucion.reduce((max, d) => d.esperando > max.esperando ? d : max, distribucion[0]);
+                    if (bottleneck && bottleneck.esperando >= 3) return (
+                        <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                            <div className="flex items-center gap-2 text-red-700 text-sm font-medium">
+                                <IconWarning />
+                                <span>Cuello de botella: {bottleneck.esperando} casas esperando <strong>{bottleneck.nombre}</strong></span>
+                            </div>
+                        </div>
+                    );
+                    return null;
+                })()}
+            </div>
+
+            {/* Timeline del Proyecto */}
+            <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-6">
+                <h3 className="text-sm font-medium text-gray-700 mb-4">Timeline de Proyecto — Avance por Casa</h3>
+                <div className="space-y-1.5">
+                    {viviendas.filter(v => v.numDespachos > 0).sort((a, b) => {
+                        const fa = a.estadoEtapas["01_FUNDACIONES"]?.fechaDespacho || "Z";
+                        const fb = b.estadoEtapas["01_FUNDACIONES"]?.fechaDespacho || "Z";
+                        return fa.localeCompare(fb);
+                    }).map(v => {
+                        const fund = v.estadoEtapas["01_FUNDACIONES"];
+                        if (!fund?.fechaDespacho) return null;
+                        const inicio = new Date(fund.fechaDespacho);
+                        const hoy = new Date();
+                        const maxDias = Math.max(Math.floor((hoy - inicio) / (1000*60*60*24)), 1);
+                        return (
+                            <div key={v.ID_Benef} className="flex items-center gap-2">
+                                <span className="text-[10px] text-gray-600 w-28 text-right truncate" title={`${v.NOMBRES} ${v.APELLIDOS}`}>
+                                    {v.APELLIDOS}
+                                </span>
+                                <div className="flex-1 bg-gray-100 rounded h-5 relative overflow-hidden">
+                                    {SECUENCIA_PRINCIPAL.map(key => {
+                                        const info = v.estadoEtapas[key];
+                                        if (info?.estado !== "despachado" || !info?.fechaDespacho) return null;
+                                        const dia = Math.floor((new Date(info.fechaDespacho) - inicio) / (1000*60*60*24));
+                                        const left = (dia / maxDias) * 100;
+                                        return (
+                                            <div
+                                                key={key}
+                                                className="absolute top-0 h-5 bg-blue-500 rounded-sm flex items-center justify-center"
+                                                style={{ left: `${Math.min(left, 98)}%`, width: "12px" }}
+                                                title={`${info.nombre}: Día ${dia + 1}`}
+                                            >
+                                                <span className="text-white text-[7px] font-bold">{ETAPAS_CONFIG[key]?.codigo}</span>
+                                            </div>
+                                        );
+                                    })}
+                                    <div className="absolute top-0 right-0 h-5 w-0.5 bg-red-400" title="Hoy" />
+                                </div>
+                                <span className="text-[10px] text-gray-400 w-10 font-mono">{maxDias}d</span>
+                            </div>
+                        );
+                    })}
+                </div>
+                <div className="flex items-center gap-4 mt-3 text-[10px] text-gray-400">
+                    <span>Cada marcador = etapa despachada</span>
+                    <span className="flex items-center gap-1"><div className="w-0.5 h-3 bg-red-400" />Hoy</span>
+                    <span>Ancho = días desde fundación</span>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ===== RESUMEN FINANCIERO =====
+const FinancieroTab = ({ viviendas }) => {
+    const resumenFinanciero = React.useMemo(() => {
+        const porFamilia = {};
+        let totalViaticos = 0, totalMO = 0, totalOtros = 0;
+        viviendas.forEach(v => {
+            const pagos = getSolpago(v.ID_Benef);
+            pagos.forEach(p => {
+                if (!porFamilia[p.Familia_pago]) porFamilia[p.Familia_pago] = { total: 0, count: 0 };
+                porFamilia[p.Familia_pago].total += p.monto;
+                porFamilia[p.Familia_pago].count++;
+                if (p.Familia_pago === "Viatico") totalViaticos += p.monto;
+                else if (FAMILIAS_CRITICAS.includes(p.Familia_pago)) totalMO += p.monto;
+                else totalOtros += p.monto;
+            });
+        });
+        return { porFamilia, totalViaticos, totalMO, totalOtros };
+    }, [viviendas]);
+
+    const totalPagado = viviendas.reduce((s, v) => s + getTotalPagado(v.ID_Benef), 0);
+
+    return (
+        <div className="space-y-6">
+            <div className="grid grid-cols-3 gap-4">
+                <div className="bg-white border border-amber-200 rounded-xl p-4 shadow-sm">
+                    <p className="text-amber-600 text-xs font-medium">Viáticos</p>
+                    <p className="text-xl font-bold text-amber-700 mt-1 font-mono">{formatPeso(resumenFinanciero.totalViaticos)}</p>
+                    <p className="text-[10px] text-gray-400 mt-1">{viviendas.length > 0 ? formatPeso(Math.round(resumenFinanciero.totalViaticos / viviendas.length)) : "$0"} / casa</p>
+                </div>
+                <div className="bg-white border border-violet-200 rounded-xl p-4 shadow-sm">
+                    <p className="text-violet-600 text-xs font-medium">Mano de Obra (ruta crítica)</p>
+                    <p className="text-xl font-bold text-violet-700 mt-1 font-mono">{formatPeso(resumenFinanciero.totalMO)}</p>
+                    <p className="text-[10px] text-gray-400 mt-1">{viviendas.length > 0 ? formatPeso(Math.round(resumenFinanciero.totalMO / viviendas.length)) : "$0"} / casa</p>
+                </div>
+                <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+                    <p className="text-gray-500 text-xs font-medium">Otros (Pintura, Elec, Ext, etc.)</p>
+                    <p className="text-xl font-bold text-gray-700 mt-1 font-mono">{formatPeso(resumenFinanciero.totalOtros)}</p>
+                    <p className="text-[10px] text-gray-400 mt-1">{viviendas.length > 0 ? formatPeso(Math.round(resumenFinanciero.totalOtros / viviendas.length)) : "$0"} / casa</p>
+                </div>
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+                <h3 className="text-sm font-medium text-gray-700 mb-3">Composición del Gasto</h3>
+                {(() => {
+                    const total = resumenFinanciero.totalViaticos + resumenFinanciero.totalMO + resumenFinanciero.totalOtros;
+                    if (total === 0) return <p className="text-gray-400 text-sm">Sin pagos registrados</p>;
+                    const pctV = (resumenFinanciero.totalViaticos / total * 100).toFixed(1);
+                    const pctM = (resumenFinanciero.totalMO / total * 100).toFixed(1);
+                    const pctO = (resumenFinanciero.totalOtros / total * 100).toFixed(1);
+                    return (
+                        <div>
+                            <div className="flex rounded-full h-8 overflow-hidden mb-2">
+                                <div className="bg-amber-400 flex items-center justify-center text-xs font-bold text-amber-900" style={{ width: `${pctV}%` }}>{pctV}%</div>
+                                <div className="bg-violet-500 flex items-center justify-center text-xs font-bold text-white" style={{ width: `${pctM}%` }}>{pctM}%</div>
+                                <div className="bg-gray-400 flex items-center justify-center text-xs font-bold text-white" style={{ width: `${pctO}%` }}>{pctO}%</div>
+                            </div>
+                            <div className="flex gap-4 text-xs text-gray-500">
+                                <span className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-amber-400" />Viáticos ({pctV}%)</span>
+                                <span className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-violet-500" />M.O. ({pctM}%)</span>
+                                <span className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-gray-400" />Otros ({pctO}%)</span>
+                                <span className="font-medium text-gray-700">Total: {formatPeso(total)}</span>
+                            </div>
+                        </div>
+                    );
+                })()}
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+                <table className="w-full text-sm">
+                    <thead>
+                        <tr className="text-left text-gray-500 border-b border-gray-200 bg-gray-50">
+                            <th className="py-2 px-4">Familia de Pago</th>
+                            <th className="py-2 px-4 text-right">Total Pagado</th>
+                            <th className="py-2 px-4 text-center"># Pagos</th>
+                            <th className="py-2 px-4 text-right">Promedio</th>
+                            <th className="py-2 px-4 text-right">Por Casa</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {Object.entries(resumenFinanciero.porFamilia).sort((a, b) => b[1].total - a[1].total).map(([fam, data]) => (
+                            <tr key={fam} className={`border-b border-gray-100 ${fam === "Viatico" ? "bg-amber-50/50" : ""}`}>
+                                <td className="py-2 px-4 font-medium text-gray-700">{fam}</td>
+                                <td className="py-2 px-4 text-right font-mono font-bold text-violet-700">{formatPeso(data.total)}</td>
+                                <td className="py-2 px-4 text-center text-gray-500">{data.count}</td>
+                                <td className="py-2 px-4 text-right font-mono text-gray-600">{formatPeso(Math.round(data.total / data.count))}</td>
+                                <td className="py-2 px-4 text-right font-mono text-gray-500">{formatPeso(Math.round(data.total / viviendas.length))}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                    <tfoot>
+                        <tr className="border-t-2 border-gray-300 bg-gray-50 font-bold">
+                            <td className="py-2 px-4 text-gray-800">TOTAL PROYECTO</td>
+                            <td className="py-2 px-4 text-right font-mono text-violet-800">{formatPeso(totalPagado)}</td>
+                            <td className="py-2 px-4 text-center text-gray-600">{Object.values(resumenFinanciero.porFamilia).reduce((s, d) => s + d.count, 0)}</td>
+                            <td className="py-2 px-4"></td>
+                            <td className="py-2 px-4 text-right font-mono text-gray-600">{formatPeso(Math.round(totalPagado / viviendas.length))}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    );
+};
+
+// ===== GRÁFICO AVANCE PAGOS M.O. — Curvas S patrón + real =====
+const MOAvanceChart = ({ timeline, patronTimeline, totalPres, compact = false }) => {
+    if (!timeline || timeline.length === 0) return null;
+
+    const H = compact ? 118 : 185;
+    const W = 700;
+    const ML = 56, MR = 12, MT = compact ? 10 : 26, MB = compact ? 22 : 28;
+    const cW = W - ML - MR, cH = H - MT - MB;
+
+    // Unify month axis from both timelines
+    const allMks = [...new Set([
+        ...timeline.map(t => t.mk),
+        ...(patronTimeline || []).map(t => t.mk)
+    ])].sort();
+    const n = allMks.length;
+    if (n === 0) return null;
+
+    const mnames = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+    const mkLabel = (mk) => { const [y, m] = mk.split('-'); return mnames[parseInt(m)-1] + '-' + y.slice(2); };
+
+    // Map real payments: carry-forward up to last payment month
+    const realMap = {};
+    timeline.forEach(t => { realMap[t.mk] = t.cumul; });
+    const lastRealMk = timeline[timeline.length - 1].mk;
+    const realPoints = [];
+    let carry = 0;
+    allMks.forEach((mk, i) => {
+        if (realMap[mk] !== undefined) carry = realMap[mk];
+        if (mk <= lastRealMk) realPoints.push({ idx: i, cumul: carry });
+    });
+
+    // Map patron (programmed) points
+    const patronMap = {};
+    (patronTimeline || []).forEach(t => { patronMap[t.mk] = t.cumul; });
+    const patronPoints = allMks
+        .map((mk, i) => ({ idx: i, cumul: patronMap[mk] }))
+        .filter(p => p.cumul !== undefined);
+
+    const maxVal = Math.max(
+        ...realPoints.map(p => p.cumul),
+        ...patronPoints.map(p => p.cumul),
+        totalPres || 0, 1
+    ) * 1.06;
+
+    const xStep = n > 1 ? cW / (n - 1) : cW;
+    const sx = (i) => ML + i * xStep;
+    const sy = (v) => MT + cH - Math.max(0, Math.min(1, v / maxVal)) * cH;
+
+    const smoothCubic = (points) => {
+        if (points.length === 0) return '';
+        if (points.length === 1) return `M${sx(points[0].idx).toFixed(1)},${sy(points[0].cumul).toFixed(1)}`;
+        const tension = 0.38;
+        let d = `M${sx(points[0].idx).toFixed(1)},${sy(points[0].cumul).toFixed(1)}`;
+        for (let i = 0; i < points.length - 1; i++) {
+            const p0 = points[Math.max(0, i-1)];
+            const p1 = points[i];
+            const p2 = points[i+1];
+            const p3 = points[Math.min(points.length-1, i+2)];
+            const cp1x = sx(p1.idx) + (sx(p2.idx) - sx(p0.idx)) * tension;
+            const cp1y = sy(p1.cumul) + (sy(p2.cumul) - sy(p0.cumul)) * tension;
+            const cp2x = sx(p2.idx) - (sx(p3.idx) - sx(p1.idx)) * tension;
+            const cp2y = sy(p2.cumul) - (sy(p3.cumul) - sy(p1.cumul)) * tension;
+            d += ` C${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${sx(p2.idx).toFixed(1)},${sy(p2.cumul).toFixed(1)}`;
+        }
+        return d;
+    };
+
+    const realPath  = smoothCubic(realPoints);
+    const patronPath = patronPoints.length > 1 ? smoothCubic(patronPoints) : null;
+    const areaPath = realPath && realPoints.length > 0
+        ? realPath + ` L${sx(realPoints[realPoints.length-1].idx).toFixed(1)},${(MT+cH).toFixed(1)} L${sx(realPoints[0].idx).toFixed(1)},${(MT+cH).toFixed(1)} Z`
+        : null;
+
+    const yTicks = [0, 0.25, 0.5, 0.75, 1].map(f => maxVal * f);
+    const labelEvery = n > 24 ? 4 : n > 14 ? 2 : 1;
+
+    return (
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{height:`${H}px`}}>
+            {/* Grid lines */}
+            {yTicks.map((v, i) => (
+                <g key={i}>
+                    <line x1={ML} y1={sy(v)} x2={W-MR} y2={sy(v)} stroke="#f3f4f6" strokeWidth="1"/>
+                    <text x={ML-4} y={sy(v)+3} textAnchor="end" fontSize={compact?7:8} fill="#9ca3af">{shortPeso(v)}</text>
+                </g>
+            ))}
+            {/* Presupuesto ceiling */}
+            {totalPres > 0 && (
+                <line x1={ML} y1={sy(totalPres)} x2={W-MR} y2={sy(totalPres)} stroke="#c4b5fd" strokeWidth="1" strokeDasharray="5,4" opacity="0.7"/>
+            )}
+            {/* Area under real curve */}
+            {areaPath && <path d={areaPath} fill="#7c3aed" fillOpacity="0.07"/>}
+            {/* Curva patrón (programada) */}
+            {patronPath && (
+                <path d={patronPath} fill="none" stroke="#f59e0b" strokeWidth={compact ? 1.5 : 2} strokeDasharray="7,3" strokeLinecap="round" strokeLinejoin="round" opacity="0.9"/>
+            )}
+            {/* Curva real */}
+            {realPath && (
+                <path d={realPath} fill="none" stroke="#7c3aed" strokeWidth={compact ? 2 : 2.5} strokeLinecap="round" strokeLinejoin="round"/>
+            )}
+            {/* Endpoint dots */}
+            {realPoints.length > 0 && <circle cx={sx(realPoints[realPoints.length-1].idx)} cy={sy(realPoints[realPoints.length-1].cumul)} r={compact ? 3 : 4} fill="#7c3aed" stroke="white" strokeWidth="1.5"/>}
+            {patronPoints.length > 0 && <circle cx={sx(patronPoints[patronPoints.length-1].idx)} cy={sy(patronPoints[patronPoints.length-1].cumul)} r={compact ? 2.5 : 3.5} fill="#f59e0b" stroke="white" strokeWidth="1.5"/>}
+            {/* X-axis labels */}
+            {allMks.map((mk, i) => i % labelEvery === 0 ? (
+                <text key={mk} x={sx(i)} y={H-3} textAnchor="middle" fontSize={compact ? 6 : 7} fill="#9ca3af">{mkLabel(mk)}</text>
+            ) : null)}
+            {/* Axes */}
+            <line x1={ML} y1={MT} x2={ML} y2={MT+cH} stroke="#e5e7eb" strokeWidth="1"/>
+            <line x1={ML} y1={MT+cH} x2={W-MR} y2={MT+cH} stroke="#e5e7eb" strokeWidth="1"/>
+            {/* Legend (solo en modo normal) */}
+            {!compact && patronPath && (
+                <g>
+                    <line x1={ML+4} y1={MT-10} x2={ML+18} y2={MT-10} stroke="#7c3aed" strokeWidth="2.5"/>
+                    <circle cx={ML+22} cy={MT-10} r="2.5" fill="#7c3aed"/>
+                    <text x={ML+26} y={MT-7} fontSize="7" fill="#6b7280">Real</text>
+                    <line x1={ML+54} y1={MT-10} x2={ML+68} y2={MT-10} stroke="#f59e0b" strokeWidth="2" strokeDasharray="6,3"/>
+                    <circle cx={ML+72} cy={MT-10} r="2.5" fill="#f59e0b"/>
+                    <text x={ML+76} y={MT-7} fontSize="7" fill="#6b7280">Patrón (% plazo × presup.)</text>
+                </g>
+            )}
+        </svg>
+    );
+};
+
+// ===== GRÁFICO % M.O. PAGADO vs % AVANCE REAL =====
+const MOPctChart = ({ timeline, totalPres, avanceSerie }) => {
+    if (!timeline || timeline.length === 0) return null;
+    const H = 185, W = 700;
+    const ML = 44, MR = 12, MT = 26, MB = 28;
+    const cW = W - ML - MR, cH = H - MT - MB;
+    const moMap = {};
+    timeline.forEach(t => { moMap[t.mk] = totalPres > 0 ? Math.min(100, t.cumul / totalPres * 100) : 0; });
+    const lastMOMk = timeline[timeline.length - 1].mk;
+    const avMap = {};
+    (avanceSerie || []).forEach(t => { avMap[t.mes] = t.avance; });
+    const lastAvMk = avanceSerie?.length ? avanceSerie[avanceSerie.length - 1].mes : null;
+    const allMks = [...new Set([...timeline.map(t => t.mk), ...(avanceSerie || []).map(t => t.mes)])].sort();
+    const n = allMks.length; if (!n) return null;
+    const mnames = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+    const mkLabel = mk => { const [y, m] = mk.split('-'); return mnames[parseInt(m)-1] + '-' + y.slice(2); };
+    const moPts = [], avPts = [];
+    let carryMO = 0, carryAv = 0;
+    allMks.forEach((mk, i) => {
+        if (moMap[mk] !== undefined) carryMO = moMap[mk];
+        if (mk <= lastMOMk) moPts.push({ idx: i, pct: carryMO });
+        if (avMap[mk] !== undefined) carryAv = avMap[mk];
+        if (lastAvMk && mk <= lastAvMk) avPts.push({ idx: i, pct: carryAv });
+    });
+    const xStep = n > 1 ? cW / (n - 1) : cW;
+    const sx = i => ML + i * xStep;
+    const sy = pct => MT + cH - Math.max(0, Math.min(1, pct / 100)) * cH;
+    const smoothCubic = (points) => {
+        if (!points.length) return '';
+        if (points.length === 1) return `M${sx(points[0].idx).toFixed(1)},${sy(points[0].pct).toFixed(1)}`;
+        const T = 0.38;
+        let d = `M${sx(points[0].idx).toFixed(1)},${sy(points[0].pct).toFixed(1)}`;
+        for (let i = 0; i < points.length - 1; i++) {
+            const p0 = points[Math.max(0, i-1)], p1 = points[i], p2 = points[i+1], p3 = points[Math.min(points.length-1, i+2)];
+            const cp1x = sx(p1.idx) + (sx(p2.idx) - sx(p0.idx)) * T;
+            const cp1y = sy(p1.pct) + (sy(p2.pct) - sy(p0.pct)) * T;
+            const cp2x = sx(p2.idx) - (sx(p3.idx) - sx(p1.idx)) * T;
+            const cp2y = sy(p2.pct) - (sy(p3.pct) - sy(p1.pct)) * T;
+            d += ` C${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${sx(p2.idx).toFixed(1)},${sy(p2.pct).toFixed(1)}`;
+        }
+        return d;
+    };
+    const moPath = smoothCubic(moPts);
+    const avPath = avPts.length > 1 ? smoothCubic(avPts) : null;
+    const moArea = moPath && moPts.length ? moPath + ` L${sx(moPts[moPts.length-1].idx).toFixed(1)},${(MT+cH).toFixed(1)} L${sx(moPts[0].idx).toFixed(1)},${(MT+cH).toFixed(1)} Z` : null;
+    const yTicks = [0, 25, 50, 75, 100];
+    const labelEvery = n > 24 ? 4 : n > 14 ? 2 : 1;
+    const curMO = moPts.length ? Math.round(moPts[moPts.length-1].pct) : 0;
+    const curAv = avPts.length ? Math.round(avPts[avPts.length-1].pct) : 0;
+    return (
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{height:`${H}px`}}>
+            {yTicks.map((v, i) => (
+                <g key={i}>
+                    <line x1={ML} y1={sy(v)} x2={W-MR} y2={sy(v)} stroke={v===100?'#e5e7eb':'#f3f4f6'} strokeWidth="1"/>
+                    <text x={ML-4} y={sy(v)+3} textAnchor="end" fontSize={8} fill="#9ca3af">{v}%</text>
+                </g>
+            ))}
+            {moArea && <path d={moArea} fill="#7c3aed" fillOpacity="0.07"/>}
+            {avPath && <path d={avPath} fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>}
+            {moPath && <path d={moPath} fill="none" stroke="#7c3aed" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>}
+            {moPts.length > 0 && <circle cx={sx(moPts[moPts.length-1].idx)} cy={sy(moPts[moPts.length-1].pct)} r="4" fill="#7c3aed" stroke="white" strokeWidth="1.5"/>}
+            {avPts.length > 0 && <circle cx={sx(avPts[avPts.length-1].idx)} cy={sy(avPts[avPts.length-1].pct)} r="3.5" fill="#10b981" stroke="white" strokeWidth="1.5"/>}
+            {allMks.map((mk, i) => i % labelEvery === 0 ? (
+                <text key={mk} x={sx(i)} y={H-3} textAnchor="middle" fontSize={7} fill="#9ca3af">{mkLabel(mk)}</text>
+            ) : null)}
+            <line x1={ML} y1={MT} x2={ML} y2={MT+cH} stroke="#e5e7eb" strokeWidth="1"/>
+            <line x1={ML} y1={MT+cH} x2={W-MR} y2={MT+cH} stroke="#e5e7eb" strokeWidth="1"/>
+            <g>
+                <line x1={ML+4} y1={MT-10} x2={ML+18} y2={MT-10} stroke="#7c3aed" strokeWidth="2.5"/>
+                <circle cx={ML+22} cy={MT-10} r="2.5" fill="#7c3aed"/>
+                <text x={ML+26} y={MT-7} fontSize="7" fill="#6b7280">% M.O. pagado ({curMO}%)</text>
+                {avPath && <>
+                    <line x1={ML+124} y1={MT-10} x2={ML+138} y2={MT-10} stroke="#10b981" strokeWidth="2.5"/>
+                    <circle cx={ML+142} cy={MT-10} r="2.5" fill="#10b981"/>
+                    <text x={ML+146} y={MT-7} fontSize="7" fill="#6b7280">% Avance real ({curAv}%)</text>
+                </>}
+            </g>
+        </svg>
+    );
+};
+
+// ===== MANO DE OBRA =====
+const ManoDeObraTab = ({ viviendas }) => {
+    const [expandido, setExpandido] = React.useState(null);
+    const [ganttProg, setGanttProg] = React.useState({});
+
+    React.useEffect(() => {
+        fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/gantt_programa.json')
+            .then(r => r.json())
+            .then(d => setGanttProg(d || {}))
+            .catch(() => {});
+    }, []);
+
+    const { maestros, casasProyArr } = React.useMemo(() => {
+        const idsProyecto = new Set(viviendas.map(v => String(v.ID_Benef)));
+        const pagosProyecto = SOLPAGO_DATA.filter(s => idsProyecto.has(String(s.ID_Benef)));
+        const hoy = new Date();
+        const hace30dias = new Date(hoy.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+        const maestrosMap = {};
+        pagosProyecto.forEach(p => {
+            const mid = p.maestro;
+            if (!mid || mid === 'nan' || mid === '') return;
+            if (!maestrosMap[mid]) {
+                maestrosMap[mid] = {
+                    id: mid, nombre: getMaestroNombre(mid), totalPagado: 0, numPagos: 0,
+                    casas: new Set(), familias: {}, fechas: [], casasDetalle: {}
+                };
+            }
+            const m = maestrosMap[mid];
+            m.totalPagado += p.monto;
+            m.numPagos++;
+            m.casas.add(String(p.ID_Benef));
+            m.familias[p.Familia_pago] = (m.familias[p.Familia_pago] || 0) + p.monto;
+            if (p.fecha && p.fecha !== '') m.fechas.push(new Date(p.fecha));
+            const cid = String(p.ID_Benef);
+            if (!m.casasDetalle[cid]) m.casasDetalle[cid] = { familias: {}, total: 0 };
+            m.casasDetalle[cid].familias[p.Familia_pago] = (m.casasDetalle[cid].familias[p.Familia_pago] || 0) + p.monto;
+            m.casasDetalle[cid].total += p.monto;
+        });
+
+        const maestrosArr = Object.values(maestrosMap).map(m => {
+            const fechasValidas = m.fechas.filter(f => !isNaN(f.getTime()));
+            const ultimoPago = fechasValidas.length > 0 ? new Date(Math.max(...fechasValidas)) : null;
+            const primerPago = fechasValidas.length > 0 ? new Date(Math.min(...fechasValidas)) : null;
+            const diasDesdeUltimo = ultimoPago ? Math.floor((hoy - ultimoPago) / (1000*60*60*24)) : null;
+            return {
+                ...m, numCasas: m.casas.size, ultimoPago, primerPago, diasDesdeUltimo,
+                inactivo: diasDesdeUltimo !== null && diasDesdeUltimo > 30
+            };
+        }).sort((a, b) => b.totalPagado - a.totalPagado);
+
+        const casasArr = viviendas.map(v => ({
+            id: String(v.ID_Benef),
+            nombre: `${v.NOMBRES} ${v.APELLIDOS}`
+        }));
+
+        return { maestros: maestrosArr, casasProyArr: casasArr };
+    }, [viviendas]);
+
+    const activos = maestros.filter(m => !m.inactivo);
+    const inactivos = maestros.filter(m => m.inactivo);
+    const totalPagadoMO = maestros.reduce((s, m) => s + m.totalPagado, 0);
+
+    // Datos de avance de pagos M.O.
+    const avanceData = React.useMemo(() => {
+        const proyId = viviendas.length > 0 ? String(viviendas[0].ID_Proy) : null;
+        const proyTotalPres = viviendas.reduce((s, v) => s + getBenefPresupuestoTotal(v), 0);
+
+        // Curva patrón: presupuesto × (días transcurridos / plazo de programa Gantt) por mes.
+        // Usa fechas del Gantt de control (Firebase gantt_programa.json: pg.inicio, pg.plazo, pg.finProg),
+        // NO el plazo de contrato. La curva se extiende hasta pg.finProg para mostrar
+        // la trayectoria completa que alcanza el 100% del presupuesto al término de programa.
+        const buildPatronTimeline = (totalPres) => {
+            if (totalPres <= 0 || !proyId) return [];
+            const pg = ganttProg[proyId];
+            if (!pg || !pg.inicio || (!pg.finProg && !pg.plazo)) return [];
+            const inicio = new Date(pg.inicio);
+            if (isNaN(inicio.getTime())) return [];
+            // Fin de programa: preferir finProg, o bien inicio + plazo días
+            const finProg = pg.finProg
+                ? new Date(pg.finProg)
+                : new Date(inicio.getTime() + pg.plazo * 86400000);
+            if (isNaN(finProg.getTime())) return [];
+            const plazo = Math.round((finProg - inicio) / 86400000); // días totales del programa
+            if (plazo <= 0) return [];
+            const mnames = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+            const result = [];
+            let cur = new Date(inicio.getFullYear(), inicio.getMonth(), 1);
+            const endMonth = new Date(finProg.getFullYear(), finProg.getMonth(), 1);
+            while (cur <= endMonth) {
+                const eom = new Date(cur.getFullYear(), cur.getMonth() + 1, 0); // último día del mes
+                const diasTranscurridos = Math.max(0, (eom - inicio) / 86400000);
+                const t = Math.min(1, diasTranscurridos / plazo); // 0→1 a lo largo del programa
+                const pct = (1 - Math.cos(Math.PI * t)) / 2 * 100; // S-curve cosenoidal
+                const cumul = totalPres * pct / 100;
+                const mk = `${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}`;
+                const label = mnames[cur.getMonth()] + '-' + String(cur.getFullYear()).slice(2);
+                result.push({ mk, label, cumul });
+                cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
+            }
+            return result;
+        };
+
+        const allPagos = viviendas.flatMap(v => getBenefPaidFiltered(v.ID_Benef));
+        const proyTimeline = buildMonthlyPayments(allPagos);
+        const proyPatronTimeline = buildPatronTimeline(proyTotalPres);
+
+        const porBenef = viviendas.map(v => {
+            const totalPres = getBenefPresupuestoTotal(v);
+            const pagos = getBenefPaidFiltered(v.ID_Benef);
+            const timeline = buildMonthlyPayments(pagos);
+            const patronTimeline = buildPatronTimeline(totalPres);
+            const totalPaid = pagos.reduce((s, p) => s + p.monto, 0);
+            return { benef: v, totalPres, timeline, patronTimeline, totalPaid };
+        });
+        const avanceSerie = (AVANCE_MENSUAL_DATA[proyId] || {}).serie || [];
+        return { proyTimeline, proyTotalPres, proyPatronTimeline, porBenef, avanceSerie };
+    }, [viviendas, ganttProg]);
+
+    const _hoyMk = new Date().toISOString().slice(0,7);
+    const _pMatches = avanceData.proyPatronTimeline.filter(p => p.mk <= _hoyMk);
+    const patronHoy = _pMatches.length > 0
+        ? _pMatches[_pMatches.length - 1].cumul
+        : (avanceData.proyPatronTimeline.length > 0 ? avanceData.proyPatronTimeline[avanceData.proyPatronTimeline.length - 1].cumul : 0);
+
+    return (
+        <div className="space-y-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm">
+                    <p className="text-gray-500 text-[10px]">Maestros</p>
+                    <p className="text-2xl font-bold text-gray-800">{maestros.length}</p>
+                </div>
+                <div className="bg-white border border-green-200 rounded-xl p-3 shadow-sm">
+                    <p className="text-gray-500 text-[10px]">Activos (ult. 30d)</p>
+                    <p className="text-2xl font-bold text-green-600">{activos.length}</p>
+                </div>
+                <div className="bg-white border border-red-200 rounded-xl p-3 shadow-sm">
+                    <p className="text-gray-500 text-[10px]">Inactivos (+30d)</p>
+                    <p className="text-2xl font-bold text-red-600">{inactivos.length}</p>
+                </div>
+                <div className="bg-white border border-violet-200 rounded-xl p-3 shadow-sm">
+                    <p className="text-gray-500 text-[10px]">Total Pagado M.O.</p>
+                    <p className={`font-bold text-violet-700 font-mono ${totalPagadoMO >= 100000000 ? "text-xs" : totalPagadoMO >= 10000000 ? "text-sm" : "text-lg"}`}>{formatPeso(totalPagadoMO)}</p>
+                </div>
+            </div>
+
+            {/* Curvas S — Resumen Proyecto (2 gráficos lado a lado) */}
+            {avanceData.proyTimeline.length > 0 && (
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                {/* Gráfico 1: CLP Real vs Patrón */}
+                <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                    <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+                        <h3 className="text-sm font-semibold text-gray-700">M.O. Real vs Patrón</h3>
+                        <div className="flex flex-wrap gap-3 mt-1 text-[10px] text-gray-500">
+                            <span>Presup.: <strong className="text-gray-700">{formatPeso(avanceData.proyTotalPres)}</strong></span>
+                            <span>Real: <strong className="text-violet-700">{formatPeso(avanceData.proyTimeline[avanceData.proyTimeline.length-1]?.cumul || 0)}</strong></span>
+                            {avanceData.proyPatronTimeline.length > 0 && (
+                                <span>Patrón hoy: <strong className="text-amber-600">{formatPeso(patronHoy)}</strong></span>
+                            )}
+                        </div>
+                    </div>
+                    <div className="px-3 pb-3 pt-1">
+                        <MOAvanceChart timeline={avanceData.proyTimeline} patronTimeline={avanceData.proyPatronTimeline} totalPres={avanceData.proyTotalPres}/>
+                    </div>
+                </div>
+                {/* Gráfico 2: % M.O. pagado vs % Avance real */}
+                <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                    <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+                        <h3 className="text-sm font-semibold text-gray-700">% M.O. Pagado vs % Avance Real</h3>
+                        <p className="text-[10px] text-gray-400 mt-0.5">Comparación porcentual acumulada — escala 0–100%</p>
+                    </div>
+                    <div className="px-3 pb-3 pt-1">
+                        <MOPctChart timeline={avanceData.proyTimeline} totalPres={avanceData.proyTotalPres} avanceSerie={avanceData.avanceSerie}/>
+                    </div>
+                </div>
+            </div>
+            )}
+
+            {/* Curva S por Beneficiario */}
+            {avanceData.porBenef.some(d => d.timeline.length > 0) && (
+            <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+                    <h3 className="text-sm font-semibold text-gray-700">Curva S de Pagos M.O. — Por Beneficiario</h3>
+                    <p className="text-[10px] text-gray-400">Acumulado pagado · línea punteada = presupuesto</p>
+                </div>
+                <div className="p-3 grid grid-cols-1 lg:grid-cols-2 gap-3">
+                    {avanceData.porBenef.filter(d => d.timeline.length > 0).map(d => {
+                        const pctPag = d.totalPres > 0 ? Math.round(d.totalPaid / d.totalPres * 100) : 0;
+                        const patronNow = d.patronTimeline.length > 0 ? d.patronTimeline[d.patronTimeline.length-1].cumul : null;
+                        return (
+                        <div key={d.benef.ID_Benef} className="border border-gray-100 rounded-lg p-2">
+                            <div className="flex items-center justify-between mb-1">
+                                <span className="text-[11px] font-semibold text-gray-700 truncate max-w-[55%]">{d.benef.NOMBRES} {d.benef.APELLIDOS}</span>
+                                <div className="flex gap-2 text-[9px]">
+                                    <span className="text-violet-600 font-mono">{formatPeso(d.totalPaid)}</span>
+                                    <span className="text-gray-400 font-mono">{pctPag}% pag.</span>
+                                    {patronNow !== null && <span className="text-amber-500 font-mono">{d.totalPres > 0 ? Math.round(patronNow/d.totalPres*100) : 0}% patrón</span>}
+                                </div>
+                            </div>
+                            <MOAvanceChart timeline={d.timeline} patronTimeline={d.patronTimeline} totalPres={d.totalPres} compact={true}/>
+                        </div>
+                        );
+                    })}
+                </div>
+            </div>
+            )}
+
+            <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
+                    <div>
+                        <h3 className="text-sm font-semibold text-gray-700">Maestros del Proyecto</h3>
+                        <p className="text-[10px] text-gray-400">Click para expandir detalle</p>
+                    </div>
+                    <div className="flex gap-3 text-[10px]">
+                        <span className="text-green-600 font-semibold">{activos.length} activos</span>
+                        <span className="text-red-600 font-semibold">{inactivos.length} inactivos</span>
+                    </div>
+                </div>
+                <table className="w-full text-[11px]">
+                    <thead>
+                        <tr className="bg-gray-50 border-b border-gray-200 text-gray-500">
+                            <th className="text-left pl-3 pr-1 py-1.5 font-medium w-[50px]"></th>
+                            <th className="text-left px-2 py-1.5 font-medium">Maestro</th>
+                            <th className="text-center px-1 py-1.5 font-medium">Casas</th>
+                            <th className="text-right px-2 py-1.5 font-medium">Pagado</th>
+                            <th className="text-center px-1 py-1.5 font-medium">Ult. Pago</th>
+                            <th className="text-center px-1 py-1.5 font-medium">Días</th>
+                            <th className="text-left px-2 py-1.5 font-medium">Familias</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {maestros.map(m => (
+                            <React.Fragment key={m.id}>
+                                <tr className={`border-b border-gray-100 hover:bg-violet-50/40 cursor-pointer transition-colors ${m.inactivo ? 'bg-red-50/30' : ''}`} onClick={() => setExpandido(expandido === m.id ? null : m.id)}>
+                                    <td className="pl-3 pr-1 py-2">
+                                        <span className={`inline-block w-[42px] text-center px-1 py-0.5 rounded-full text-[8px] font-bold ${m.inactivo ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>
+                                            {m.inactivo ? "INACT" : "ACTIV"}
+                                        </span>
+                                    </td>
+                                    <td className="px-2 py-2">
+                                        <div className="font-medium text-gray-800">{m.nombre}</div>
+                                    </td>
+                                    <td className="px-1 py-2 text-center font-mono font-bold text-gray-700">{m.numCasas}</td>
+                                    <td className="px-2 py-2 text-right font-mono font-bold text-violet-700">{formatPeso(m.totalPagado)}</td>
+                                    <td className={`px-1 py-2 text-center font-mono text-[10px] ${m.inactivo ? 'text-red-600 font-semibold' : 'text-gray-500'}`}>
+                                        {m.ultimoPago ? m.ultimoPago.toLocaleDateString('es-CL') : '-'}
+                                    </td>
+                                    <td className={`px-1 py-2 text-center font-mono text-[10px] ${m.diasDesdeUltimo > 60 ? 'text-red-600 font-bold' : m.diasDesdeUltimo > 30 ? 'text-orange-500 font-semibold' : 'text-gray-400'}`}>
+                                        {m.diasDesdeUltimo !== null ? m.diasDesdeUltimo + "d" : '-'}
+                                    </td>
+                                    <td className="px-2 py-2">
+                                        <div className="flex flex-wrap gap-0.5">
+                                            {Object.keys(m.familias).map(f => (
+                                                <span key={f} className="px-1.5 py-0 bg-violet-50 text-violet-600 rounded text-[9px]">{FAMILIA_LABELS[f] || f}</span>
+                                            ))}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {expandido === m.id && (
+                                    <tr>
+                                        <td colSpan={7} className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                                                <div>
+                                                    <h4 className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Casas ({m.numCasas})</h4>
+                                                    <div className="space-y-1">
+                                                        {Array.from(m.casas).map(cid => {
+                                                            const det = m.casasDetalle[cid];
+                                                            const v = viviendas.find(vv => String(vv.ID_Benef) === cid);
+                                                            const nombre = v ? `${v.NOMBRES} ${v.APELLIDOS}` : cid;
+                                                            return (
+                                                                <div key={cid} className="flex items-center justify-between gap-2 text-[10px] py-1 border-b border-gray-100">
+                                                                    <span className="text-gray-700 font-medium truncate">{nombre}</span>
+                                                                    <span className="font-mono text-gray-600 text-[9px]">{formatPeso(det?.total || 0)}</span>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Distribución por Familia</h4>
+                                                    <div className="space-y-1">
+                                                        {Object.entries(m.familias).sort((a,b) => b[1]-a[1]).map(([fam, monto]) => {
+                                                            const pct = m.totalPagado > 0 ? (monto / m.totalPagado * 100) : 0;
+                                                            const isV = fam === "Viatico" || fam === "10 - Viatico";
+                                                            return (
+                                                                <div key={fam} className="flex items-center gap-1.5 text-[10px]">
+                                                                    <span className={`w-[55px] truncate text-right ${isV ? 'text-amber-600' : 'text-gray-600'}`}>{FAMILIA_LABELS[fam] || fam}</span>
+                                                                    <div className="flex-1 bg-gray-200 rounded-full h-1.5">
+                                                                        <div className={`h-1.5 rounded-full ${isV ? 'bg-amber-400' : 'bg-violet-500'}`} style={{ width: `${Math.min(pct, 100)}%` }} />
+                                                                    </div>
+                                                                    <span className="font-mono text-gray-500 w-[50px] text-right text-[9px]">{formatPeso(monto)}</span>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Actividad</h4>
+                                                    <div className="space-y-2 text-[10px]">
+                                                        <div className="flex justify-between"><span className="text-gray-500">Primer pago</span><span className="font-mono text-gray-700">{m.primerPago ? m.primerPago.toLocaleDateString('es-CL') : '-'}</span></div>
+                                                        <div className="flex justify-between"><span className="text-gray-500">Último pago</span><span className={`font-mono ${m.inactivo ? 'text-red-600 font-semibold' : 'text-gray-700'}`}>{m.ultimoPago ? m.ultimoPago.toLocaleDateString('es-CL') : '-'}</span></div>
+                                                        <div className="flex justify-between"><span className="text-gray-500">Total pagos</span><span className="font-mono text-gray-700">{m.numPagos}</span></div>
+                                                        <div className="flex justify-between"><span className="text-gray-500">Días sin pago</span><span className={`font-mono ${m.diasDesdeUltimo > 60 ? 'text-red-600 font-bold' : m.diasDesdeUltimo > 30 ? 'text-orange-500' : 'text-gray-700'}`}>{m.diasDesdeUltimo !== null ? m.diasDesdeUltimo : '-'}</span></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                )}
+                            </React.Fragment>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+
+            {/* Cobertura por Vivienda */}
+            <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+                    <h3 className="text-sm font-semibold text-gray-700">Cobertura por Vivienda</h3>
+                    <p className="text-[10px] text-gray-400">Por cada casa: maestros asignados y familias ejecutadas</p>
+                </div>
+                <div className="p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2" style={{ maxHeight: '600px', overflowY: 'auto' }}>
+                    {casasProyArr.map(casa => {
+                        const maestrosCasa = maestros.filter(m => m.casas.has(casa.id)).map(m => ({
+                            nombre: m.nombre, inactivo: m.inactivo,
+                            familias: Object.entries(m.casasDetalle[casa.id]?.familias || {}).filter(([f]) => f !== "Viatico" && f !== "10 - Viatico"),
+                            total: m.casasDetalle[casa.id]?.total || 0
+                        })).sort((a,b) => b.total - a.total);
+                        const totalCasa = maestrosCasa.reduce((s, mc) => s + mc.total, 0);
+                        if (maestrosCasa.length === 0) return null;
+                        return (
+                            <div key={casa.id} className="border border-gray-100 rounded-lg p-2.5 hover:border-violet-200 transition-colors">
+                                <div className="flex items-center justify-between mb-1.5">
+                                    <span className="text-[11px] font-semibold text-gray-800 truncate max-w-[65%]">{casa.nombre}</span>
+                                    <span className="text-[9px] font-mono text-violet-600 font-bold">{formatPeso(totalCasa)}</span>
+                                </div>
+                                <div className="space-y-1">
+                                    {maestrosCasa.map((mc, i) => (
+                                        <div key={i} className="flex items-center gap-1.5">
+                                            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${mc.inactivo ? 'bg-red-400' : 'bg-green-400'}`} />
+                                            <span className="text-[9px] text-gray-600 truncate max-w-[90px]">{mc.nombre.split(' ').slice(0,2).join(' ')}</span>
+                                            <div className="flex gap-0.5 flex-1 flex-wrap justify-end">
+                                                {mc.familias.map(([f, monto]) => (
+                                                    <span key={f} className="px-0.5 py-0 bg-violet-50 text-violet-600 rounded text-[7px] font-mono" title={`${FAMILIA_LABELS[f] || f}: ${formatPeso(monto)}`}>
+                                                        {(FAMILIA_LABELS[f] || f).substring(0,3)}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ===== ESTADOS DE PAGO =====
+const EstadosPagoTab = ({ viviendas }) => {
+    const idsProyecto = new Set(viviendas.map(v => String(v.ID_Benef)));
+    const eeppProy = EEPP_DATA.filter(ep => idsProyecto.has(String(ep.ID_Benef)));
+
+    const eeppResumen = React.useMemo(() => {
+        const pagado = eeppProy.filter(e => e.Estado.includes("Pagado"));
+        const ingresado = eeppProy.filter(e => e.Estado.includes("Ingresado"));
+        const prep = eeppProy.filter(e => !e.Estado.includes("Pagado") && !e.Estado.includes("Ingresado"));
+        const montoPag = pagado.reduce((s, e) => s + e.Monto, 0);
+        const montoIng = ingresado.reduce((s, e) => s + e.Monto, 0);
+        const montoPrep = prep.reduce((s, e) => s + e.Monto, 0);
+        return { pagado: montoPag, ingresado: montoIng, preparacion: montoPrep, total: montoPag + montoIng + montoPrep, countPag: pagado.length, countIng: ingresado.length, countPrep: prep.length };
+    }, [eeppProy]);
+
+    const formatUF = (val) => {
+        if (!val && val !== 0) return '—';
+        return val.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' UF';
+    };
+    const formatFecha = (iso) => {
+        if (!iso) return '—';
+        const [y,m,d] = iso.split('-');
+        return `${d}/${m}/${y}`;
+    };
+
+    // Agrupar por EP
+    const epsPorNum = {};
+    eeppProy.forEach(ep => {
+        const num = ep.Num_EP || '?';
+        if (!epsPorNum[num]) epsPorNum[num] = { num, fecha: '', monto: 0, beneficiarios: 0, pagado: 0, ingresado: 0, prep: 0, estado: '' };
+        epsPorNum[num].monto += ep.Monto;
+        epsPorNum[num].beneficiarios++;
+        if (!epsPorNum[num].fecha && ep.Fecha) epsPorNum[num].fecha = ep.Fecha;
+        if (ep.Estado.includes("Pagado")) epsPorNum[num].pagado++;
+        else if (ep.Estado.includes("Ingresado")) epsPorNum[num].ingresado++;
+        else epsPorNum[num].prep++;
+    });
+    const epsArr = Object.values(epsPorNum).filter(e => e.num && String(e.num).trim()).sort((a, b) => parseInt(a.num) - parseInt(b.num));
+    epsArr.forEach(ep => {
+        if (ep.pagado === ep.beneficiarios) ep.estado = "Pagado";
+        else if (ep.ingresado > 0 && ep.pagado === 0 && ep.prep === 0) ep.estado = "Ingresado";
+        else if (ep.prep === ep.beneficiarios) ep.estado = "En Preparación";
+        else ep.estado = "Mixto";
+    });
+
+    // Detalle por beneficiario
+    const epNums = epsArr.map(e => e.num);
+    const benefMap = {};
+    eeppProy.forEach(ep => {
+        const bid = String(ep.ID_Benef);
+        if (!benefMap[bid]) benefMap[bid] = { id: bid, eps: {}, total: 0, pagado: 0 };
+        benefMap[bid].eps[ep.Num_EP] = { monto: ep.Monto, estado: ep.Estado };
+        benefMap[bid].total += ep.Monto;
+        if (ep.Estado.includes("Pagado")) benefMap[bid].pagado += ep.Monto;
+    });
+    const benefArr = Object.values(benefMap).sort((a, b) => b.total - a.total);
+    const getNombreBenef = (id) => {
+        const v = viviendas.find(vv => String(vv.ID_Benef) === id);
+        return v ? `${v.NOMBRES} ${v.APELLIDOS}` : id;
+    };
+
+    const montoPag = eeppResumen.pagado;
+    const montoIng = eeppResumen.ingresado;
+    const montoPrep = eeppResumen.preparacion;
+    const montoTotal = eeppResumen.total;
+
+    // Monto total POR COBRAR del proyecto completo (tabla Montos, en UF).
+    const projId = (eeppProy[0] && eeppProy[0].ID_Proy) || (viviendas[0] && viviendas[0].ID_Proy) || '';
+    const montoProyInfo = MONTOS_PROY_DATA[projId] || null;
+    const montoProy = montoProyInfo ? montoProyInfo.total : 0;
+    const vivProy = montoProyInfo ? montoProyInfo.viviendas : 0;
+    const facturado = montoTotal;                                  // total de EP cargados (pag+ing+prep), informativo
+    const cobrado = montoPag;                                      // SOLO Pagado cuenta como facturado/cobrado
+    const porFacturar = montoProy > 0 ? Math.max(0, montoProy - cobrado) : 0;   // Total - Pagado (Ingresado aun NO se factura)
+    const sinIniciar = montoProy > 0 ? Math.max(0, montoProy - facturado) : 0;  // resto sin EP cargado
+    const pct = (n, d) => (d > 0 ? (n / d * 100) : 0);
+    const fmtPct = (n) => n.toFixed(1) + '%';
+
+    // Avance físico real desde Gantt de control (AVANCE_GANTT_DATA), no checkpoints de inspección.
+    const avanceInsp = projId && AVANCE_GANTT_DATA[projId] != null
+        ? Number(AVANCE_GANTT_DATA[projId].pct)
+        : 0;
+    const avanceInspFmt = avanceInsp.toFixed(2) + '%';
+
+    return (
+        <div className="space-y-6">
+            {montoProy > 0 && (
+                <div className="bg-gradient-to-r from-violet-50 to-white border border-violet-200 rounded-xl p-4 shadow-sm">
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                        <div>
+                            <p className="text-violet-700 text-xs font-medium">Total por cobrar (proyecto)</p>
+                            <p className="text-2xl font-bold text-violet-800 mt-1 font-mono">{formatUF(montoProy)}</p>
+                            <p className="text-[10px] text-gray-400 mt-1">{vivProy} viviendas · tabla Montos</p>
+                        </div>
+                        <div>
+                            <p className="text-green-600 text-xs font-medium">Pagado (cobrado)</p>
+                            <p className="text-2xl font-bold text-green-700 mt-1 font-mono">{formatUF(montoPag)}</p>
+                            <p className="text-[10px] text-gray-400 mt-1">{fmtPct(pct(montoPag, montoProy))} del proyecto</p>
+                        </div>
+                        <div>
+                            <p className="text-yellow-600 text-xs font-medium">Ingresado (en trámite)</p>
+                            <p className="text-2xl font-bold text-yellow-700 mt-1 font-mono">{formatUF(montoIng)}</p>
+                            <p className="text-[10px] text-gray-400 mt-1">aún no facturado · {fmtPct(pct(montoIng, montoProy))}</p>
+                        </div>
+                        <div>
+                            <p className="text-gray-500 text-xs font-medium">Por facturar (Total − Pagado)</p>
+                            <p className="text-2xl font-bold text-gray-700 mt-1 font-mono">{formatUF(porFacturar)}</p>
+                            <p className="text-[10px] text-gray-400 mt-1">{fmtPct(pct(porFacturar, montoProy))} del proyecto</p>
+                        </div>
+                    </div>
+                </div>
+            )}
+            <div className="grid grid-cols-3 gap-4">
+                <div className="bg-white border border-green-200 rounded-xl p-4 shadow-sm">
+                    <p className="text-green-600 text-xs font-medium">Pagado</p>
+                    <p className="text-xl font-bold text-green-700 mt-1 font-mono">{formatUF(montoPag)}</p>
+                    <p className="text-[10px] text-gray-400 mt-1">{eeppResumen.countPag} líneas EP</p>
+                </div>
+                <div className="bg-white border border-yellow-200 rounded-xl p-4 shadow-sm">
+                    <p className="text-yellow-600 text-xs font-medium">Ingresado (esperando pago)</p>
+                    <p className="text-xl font-bold text-yellow-700 mt-1 font-mono">{formatUF(montoIng)}</p>
+                    <p className="text-[10px] text-gray-400 mt-1">{eeppResumen.countIng} líneas EP</p>
+                </div>
+                <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+                    <p className="text-gray-500 text-xs font-medium">En Preparación</p>
+                    <p className="text-xl font-bold text-gray-700 mt-1 font-mono">{formatUF(montoPrep)}</p>
+                    <p className="text-[10px] text-gray-400 mt-1">{eeppResumen.countPrep} líneas EP</p>
+                </div>
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+                <h3 className="text-sm font-medium text-gray-700 mb-3">
+                    Progreso de Cobro {montoProy > 0 ? '(sobre el total del proyecto)' : '(sobre EP cargados)'}
+                </h3>
+                {(() => {
+                    if (montoTotal === 0 && montoProy === 0) return <p className="text-gray-400 text-sm">Sin EP registrados</p>;
+                    // Denominador: total del proyecto si existe; si no, total de EP cargados.
+                    const base = montoProy > 0 ? montoProy : montoTotal;
+                    const pctP = pct(montoPag, base).toFixed(1);
+                    const pctI = pct(montoIng, base).toFixed(1);
+                    const pctR = pct(montoPrep, base).toFixed(1);
+                    const pctS = montoProy > 0 ? pct(sinIniciar, base).toFixed(1) : '0.0';
+                    return (
+                        <div>
+                            <div className="relative mb-2" style={{ paddingTop: avanceInsp > 0 ? '15px' : '0' }}>
+                                <div className="flex rounded-full h-8 overflow-hidden bg-gray-100">
+                                    {montoPag > 0 && <div className="bg-green-500 flex items-center justify-center text-xs font-bold text-white" style={{ width: `${pctP}%` }}>{pctP}%</div>}
+                                    {montoIng > 0 && <div className="bg-yellow-400 flex items-center justify-center text-xs font-bold text-yellow-900" style={{ width: `${pctI}%` }}>{pctI}%</div>}
+                                    {montoPrep > 0 && <div className="bg-gray-300 flex items-center justify-center text-xs font-bold text-gray-600" style={{ width: `${pctR}%` }}>{pctR}%</div>}
+                                    {montoProy > 0 && sinIniciar > 0 && <div className="bg-violet-100 flex items-center justify-center text-[10px] font-semibold text-violet-500" style={{ width: `${pctS}%` }}>{pctS}%</div>}
+                                </div>
+                                {avanceInsp > 0 && (
+                                    <div className="absolute top-0 bottom-0 flex flex-col items-center pointer-events-none" style={{ left: `${Math.min(avanceInsp, 100)}%`, transform: 'translateX(-50%)' }} title={`Avance físico real (Gantt de control): ${avanceInsp}%`}>
+                                        <span className="text-[10px] font-bold text-red-600 whitespace-nowrap leading-none mb-0.5">{avanceInspFmt}</span>
+                                        <div className="w-0.5 bg-red-600 flex-1"></div>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="flex flex-wrap gap-4 text-xs text-gray-500">
+                                <span className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-green-500" />Pagado / cobrado ({pctP}%)</span>
+                                <span className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-yellow-400" />Ingresado ({pctI}%)</span>
+                                <span className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-gray-300" />En Prep. ({pctR}%)</span>
+                                {montoProy > 0 && <span className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-violet-100 border border-violet-200" />Sin iniciar ({pctS}%)</span>}
+                                {avanceInsp > 0 && <span className="flex items-center gap-1"><div className="w-0.5 h-3 bg-red-600" />Avance físico real ({avanceInspFmt})</span>}
+                                <span className="font-medium text-gray-700 ml-auto">
+                                    {montoProy > 0
+                                        ? <>Cobrado (pagado) {formatUF(montoPag)} / Total proyecto {formatUF(montoProy)} · Por facturar {formatUF(porFacturar)}</>
+                                        : <>Total EP: {formatUF(montoTotal)}</>}
+                                </span>
+                            </div>
+                        </div>
+                    );
+                })()}
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+                <table className="w-full text-sm">
+                    <thead>
+                        <tr className="text-left text-gray-500 border-b border-gray-200 bg-gray-50">
+                            <th className="py-2 px-4">EP #</th>
+                            <th className="py-2 px-4">Fecha</th>
+                            <th className="py-2 px-4 text-center">Beneficiarios</th>
+                            <th className="py-2 px-4 text-right">Monto</th>
+                            <th className="py-2 px-4 text-center">Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {epsArr.map(ep => (
+                            <tr key={ep.num} className={`border-b border-gray-100 ${
+                                ep.estado === "Pagado" ? "bg-green-50/50" :
+                                ep.estado === "Ingresado" ? "bg-yellow-50/50" : ""
+                            }`}>
+                                <td className="py-2 px-4 font-bold text-gray-800">EP {ep.num}</td>
+                                <td className="py-2 px-4 text-gray-600">{formatFecha(ep.fecha)}</td>
+                                <td className="py-2 px-4 text-center text-gray-600">{ep.beneficiarios}</td>
+                                <td className="py-2 px-4 text-right font-mono font-bold text-gray-800">{formatUF(ep.monto)}</td>
+                                <td className="py-2 px-4 text-center">
+                                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                                        ep.estado === "Pagado" ? "bg-green-100 text-green-700" :
+                                        ep.estado === "Ingresado" ? "bg-yellow-100 text-yellow-700" :
+                                        ep.estado === "Mixto" ? "bg-blue-100 text-blue-700" :
+                                        "bg-gray-100 text-gray-600"
+                                    }`}>{ep.estado}</span>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                    <tfoot>
+                        <tr className="border-t-2 border-gray-300 bg-gray-50">
+                            <td className="py-2 px-4 text-gray-600" colSpan={2}>Total EP cargados (Pag.+Ing.+Prep.)</td>
+                            <td className="py-2 px-4 text-center text-gray-500 text-xs">{viviendas.length} benef.</td>
+                            <td className="py-2 px-4 text-right font-mono text-gray-700">{formatUF(montoTotal)}</td>
+                            <td className="py-2 px-4 text-center text-[10px] text-gray-400">{montoProy > 0 ? fmtPct(pct(montoTotal, montoProy)) + ' del proy.' : ''}</td>
+                        </tr>
+                        <tr className="bg-green-50/60 font-semibold">
+                            <td className="py-2 px-4 text-green-700" colSpan={3}>Pagado (cobrado)</td>
+                            <td className="py-2 px-4 text-right font-mono text-green-700">{formatUF(montoPag)}</td>
+                            <td className="py-2 px-4 text-center text-[10px] text-green-600">{montoProy > 0 ? fmtPct(pct(montoPag, montoProy)) : ''}</td>
+                        </tr>
+                        {montoProy > 0 && (
+                            <tr className="bg-gray-50">
+                                <td className="py-2 px-4 text-gray-600" colSpan={3}>Por facturar (Total − Pagado)</td>
+                                <td className="py-2 px-4 text-right font-mono text-gray-600">{formatUF(porFacturar)}</td>
+                                <td className="py-2 px-4 text-center text-[10px] text-gray-400">{fmtPct(pct(porFacturar, montoProy))}</td>
+                            </tr>
+                        )}
+                        {montoProy > 0 && (
+                            <tr className="border-t border-violet-200 bg-violet-50 font-bold">
+                                <td className="py-2 px-4 text-violet-800" colSpan={2}>TOTAL PROYECTO (por cobrar)</td>
+                                <td className="py-2 px-4 text-center text-violet-600 text-[10px]">{vivProy} viviendas</td>
+                                <td className="py-2 px-4 text-right font-mono text-violet-800">{formatUF(montoProy)}</td>
+                                <td className="py-2 px-4 text-center text-[10px] text-violet-500">100%</td>
+                            </tr>
+                        )}
+                    </tfoot>
+                </table>
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+                    <h3 className="text-sm font-semibold text-gray-700">Detalle por Beneficiario</h3>
+                    <p className="text-[10px] text-gray-400">Monto EP por beneficiario vs avance de obra. Diferencia positiva = obra adelante del cobro.</p>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                        <thead>
+                            <tr className="text-left text-gray-500 border-b border-gray-200 bg-gray-50">
+                                <th className="py-2 px-3 sticky left-0 bg-gray-50 z-10 min-w-[160px]">Beneficiario</th>
+                                {epNums.map(n => (
+                                    <th key={n} className="py-2 px-2 text-center text-xs min-w-[80px]">EP {n}</th>
+                                ))}
+                                <th className="py-2 px-2 text-right text-xs">Total EP</th>
+                                <th className="py-2 px-2 text-center text-xs">% Cobrado</th>
+                                <th className="py-2 px-2 text-center text-xs">Avance</th>
+                                <th className="py-2 px-2 text-center text-xs">Diferencia</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {benefArr.map(b => {
+                                const pctCobrado = b.total > 0 ? Math.round(b.pagado / b.total * 100) : 0;
+                                const insp = getInspeccion(b.id);
+                                const avance = insp ? insp.pct_total : 0;
+                                const diff = avance - pctCobrado;
+                                return (
+                                    <tr key={b.id} className="border-b border-gray-100 hover:bg-gray-50">
+                                        <td className="py-1.5 px-3 sticky left-0 bg-white z-10">
+                                            <span className="text-xs font-medium text-gray-800">{getNombreBenef(b.id)}</span>
+                                        </td>
+                                        {epNums.map(n => {
+                                            const ep = b.eps[n];
+                                            if (!ep) return <td key={n} className="py-1.5 px-2 text-center text-gray-300 text-xs">—</td>;
+                                            return (
+                                                <td key={n} className={`py-1.5 px-2 text-center text-xs font-mono ${
+                                                    ep.estado.includes("Pagado") ? "bg-green-50 text-green-700 font-semibold" :
+                                                    ep.estado.includes("Ingresado") ? "bg-yellow-50 text-yellow-700" :
+                                                    "bg-gray-50 text-gray-500"
+                                                }`}>
+                                                    {formatUF(ep.monto)}
+                                                </td>
+                                            );
+                                        })}
+                                        <td className="py-1.5 px-2 text-right font-mono font-bold text-xs text-gray-800">{formatUF(b.total)}</td>
+                                        <td className="py-1.5 px-2 text-center">
+                                            <span className={`font-mono font-bold text-xs ${pctCobrado >= 80 ? "text-green-600" : pctCobrado >= 40 ? "text-yellow-600" : "text-gray-500"}`}>{pctCobrado}%</span>
+                                        </td>
+                                        <td className="py-1.5 px-2 text-center">
+                                            <span className={`font-mono font-bold text-xs ${avance >= 80 ? "text-green-600" : avance >= 40 ? "text-blue-600" : "text-orange-500"}`}>{avance}%</span>
+                                        </td>
+                                        <td className="py-1.5 px-2 text-center">
+                                            <span className={`font-mono font-bold text-xs ${diff > 10 ? "text-green-600" : diff < -10 ? "text-red-600" : "text-gray-500"}`}>
+                                                {diff > 0 ? "+" : ""}{diff}%
+                                            </span>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+                <div className="px-4 py-2 border-t border-gray-100 text-[9px] text-gray-400">
+                    <span className="inline-block w-3 h-3 rounded-sm bg-green-50 border border-green-200 mr-1 align-middle" /> Pagado
+                    <span className="inline-block w-3 h-3 rounded-sm bg-yellow-50 border border-yellow-200 mr-1 ml-3 align-middle" /> Ingresado
+                    <span className="inline-block w-3 h-3 rounded-sm bg-gray-50 border border-gray-200 mr-1 ml-3 align-middle" /> En Preparación
+                    <span className="ml-4">Diferencia = Avance obra - % Cobrado. Positivo (verde) = obra adelante del cobro.</span>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ===== EXPORTAR INFORME COMPARTIBLE (snapshot HTML autocontenido) =====
+// Genera un HTML standalone con los datos del proyecto incrustados. Navegacion por
+// tabs inferiores (General + un tab por grupo), mobile-first, con boton Descargar PDF
+// (window.print + @media print que pagina por grupo). NO incluye diagnostico interno.
+function exportarInformeCompartible({ proy, gruposDatos, kpisCheckpoints, CHECKPOINTS }) {
+    const cps = CHECKPOINTS.map(c => ({ key: c.key, label: c.label }));
+    const grupos = gruposDatos.map(g => ({
+        id: String(g.id),
+        nombre: g.nombre || (g.id === '_all' ? 'Todas las viviendas' : 'Sin Asignar'),
+        capataz: g.capataz || '',
+        comentario: g.comentario || '',
+        viviendas: g.viviendas.map(v => ({
+            nombre: `${v.NOMBRES || ''} ${v.APELLIDOS || ''}`.trim() || String(v.ID_Benef),
+            tipologia: v.tipologia || '',
+            pct: (v.pctTotal != null ? v.pctTotal : null),
+            flags: cps.reduce((acc, c) => { acc[c.key] = !!(v.flags && v.flags[c.key]); return acc; }, {})
+        }))
+    }));
+    const kpis = kpisCheckpoints.map(k => ({ label: k.label, n: k.n, total: k.total }));
+    const payload = {
+        proyecto: proy ? `${proy.ID_proy} · ${proy.NOMBRE_PROYECTO}` : 'Proyecto',
+        comuna: proy ? proy.COMUNA : '',
+        generadoEl: new Date().toLocaleString('es-CL'),
+        checkpoints: cps,
+        kpis,
+        grupos
+    };
+    const html = construirHTMLInforme(payload);
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const fechaStr = new Date().toISOString().substring(0, 10);
+    const safe = (payload.proyecto || 'proyecto').replace(/[^a-z0-9]/gi, '_').substring(0, 40);
+    a.href = url;
+    a.download = `Informe_Cierre_${safe}_${fechaStr}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function construirHTMLInforme(payload) {
+    const jsonData = JSON.stringify(payload).replace(/</g, '\\u003c');
+    // CSS y JS de la pagina generada (sin backticks para evitar conflicto con el template literal externo)
+    const css = [
+        "*{box-sizing:border-box;margin:0;padding:0}",
+        "body{font-family:'IBM Plex Sans',system-ui,-apple-system,sans-serif;background:#f3f4f6;color:#1f2937;padding-bottom:64px;font-size:14px}",
+        ".topbar{position:sticky;top:0;z-index:10;background:#7c3aed;color:#fff;padding:12px 16px;box-shadow:0 1px 4px rgba(0,0,0,.15)}",
+        ".topbar h1{font-size:16px;font-weight:700}",
+        ".topbar .sub{font-size:11px;opacity:.85;margin-top:2px}",
+        ".pdf-btn{position:fixed;top:10px;right:12px;z-index:20;background:#fff;color:#7c3aed;border:none;border-radius:8px;padding:6px 10px;font-size:12px;font-weight:600;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.2)}",
+        ".wrap{max-width:1000px;margin:0 auto;padding:12px}",
+        ".card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 1px 2px rgba(0,0,0,.04)}",
+        ".card h2{font-size:16px;font-weight:700;margin-bottom:4px}",
+        ".card h3{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:#6b7280;margin-bottom:8px}",
+        ".muted{color:#6b7280;font-size:12px}",
+        ".nota{margin-top:6px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:6px 10px;font-size:12px;font-style:italic;color:#374151}",
+        ".kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(58px,1fr));gap:6px}",
+        ".kpi{border:1px solid #e5e7eb;border-radius:8px;padding:6px 4px;text-align:center}",
+        ".kpi.g{background:#f0fdf4;border-color:#bbf7d0;color:#15803d}",
+        ".kpi.a{background:#fffbeb;border-color:#fde68a;color:#b45309}",
+        ".kpi.x{background:#f9fafb;border-color:#e5e7eb;color:#6b7280}",
+        ".kpi .kl{font-size:9px;font-weight:600;opacity:.8}",
+        ".kpi .kn{font-size:18px;font-weight:700;line-height:1.1}",
+        ".kpi .kt{font-size:9px;opacity:.6}",
+        ".grow{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #f3f4f6}",
+        ".grow:last-child{border-bottom:none}",
+        ".tablewrap{overflow-x:auto;-webkit-overflow-scrolling:touch}",
+        "table{border-collapse:collapse;width:100%;font-size:12px}",
+        "th,td{padding:5px 6px;text-align:center;border-bottom:1px solid #f3f4f6;white-space:nowrap}",
+        "th{background:#f9fafb;font-size:9px;text-transform:uppercase;color:#6b7280;font-weight:600;position:sticky;top:0}",
+        "th.sticky,td.sticky{position:sticky;left:0;background:#fff;text-align:left;z-index:1;min-width:150px}",
+        "th.sticky{background:#f9fafb}",
+        ".bn{font-weight:600;font-size:12px}",
+        ".bt{font-size:10px;color:#9ca3af}",
+        ".ok{color:#16a34a;font-weight:700}",
+        ".no{color:#d1d5db}",
+        ".pct{font-weight:700;font-family:'IBM Plex Mono',monospace}",
+        ".bottom-tabs{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #e5e7eb;display:flex;overflow-x:auto;white-space:nowrap;z-index:15;box-shadow:0 -1px 4px rgba(0,0,0,.06)}",
+        ".bottom-tabs button{flex:0 0 auto;border:none;background:none;padding:10px 14px;font-size:12px;color:#6b7280;cursor:pointer;border-top:2px solid transparent}",
+        ".bottom-tabs button.active{color:#7c3aed;border-top-color:#7c3aed;font-weight:600;background:#faf5ff}",
+        "#printall{display:none}",
+        "@media print{",
+        "  .topbar{position:static}.pdf-btn,.bottom-tabs,#content{display:none!important}",
+        "  #printall{display:block!important}",
+        "  body{background:#fff;padding-bottom:0;font-size:11px}",
+        "  .tab-section{page-break-after:always}.tab-section:last-child{page-break-after:auto}",
+        "  .card{box-shadow:none;border:1px solid #d1d5db}",
+        "  th.sticky,td.sticky{position:static}",
+        "  .kpi.g{background:#f0fdf4!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}",
+        "}"
+    ].join("\n");
+
+    const script = [
+        "(function(){",
+        "var D=window.__INFORME__;var cps=D.checkpoints;",
+        "function mark(on){return on?'<span class=\"ok\">&#10003;</span>':'<span class=\"no\">&middot;</span>';}",
+        "function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}",
+        "function renderGeneral(){",
+        "  var h='';",
+        "  h+='<div class=\"card\"><h2>'+esc(D.proyecto)+'</h2><div class=\"muted\">'+esc(D.comuna)+' &middot; Generado: '+esc(D.generadoEl)+'</div></div>';",
+        "  h+='<div class=\"card\"><h3>Resumen de checkpoints</h3><div class=\"kpis\">';",
+        "  D.kpis.forEach(function(k){var pct=k.total?Math.round(k.n/k.total*100):0;var cls=pct>=80?'g':(pct>=40?'a':'x');h+='<div class=\"kpi '+cls+'\"><div class=\"kl\">'+esc(k.label)+'</div><div class=\"kn\">'+k.n+'</div><div class=\"kt\">/'+k.total+'</div></div>';});",
+        "  h+='</div></div>';",
+        "  h+='<div class=\"card\"><h3>Grupos ('+D.grupos.length+')</h3>';",
+        "  D.grupos.forEach(function(g){var n=g.viviendas.length;var rec=g.viviendas.filter(function(v){return v.flags.fecha_recep;}).length;var hpc=g.viviendas.filter(function(v){return v.flags.hpc;}).length;h+='<div class=\"grow\"><div><b>'+esc(g.nombre)+'</b>'+(g.capataz?' <span class=\"muted\">- '+esc(g.capataz)+'</span>':'')+'</div><div class=\"muted\">'+n+' viv. &middot; HPC '+hpc+'/'+n+' &middot; RF '+rec+'/'+n+'</div></div>';});",
+        "  h+='</div>';return h;",
+        "}",
+        "function renderGrupo(g){",
+        "  var h='<div class=\"card\"><h2>'+esc(g.nombre)+'</h2>';",
+        "  if(g.capataz)h+='<div class=\"muted\">Capataz: <b>'+esc(g.capataz)+'</b></div>';",
+        "  if(g.comentario)h+='<div class=\"nota\">Nota del coordinador: '+esc(g.comentario)+'</div>';",
+        "  h+='</div>';",
+        "  h+='<div class=\"card tablewrap\"><table><thead><tr><th class=\"sticky\">Beneficiario</th>';",
+        "  cps.forEach(function(c){h+='<th>'+esc(c.label)+'</th>';});",
+        "  h+='<th>% Av</th></tr></thead><tbody>';",
+        "  g.viviendas.forEach(function(v){var rf=v.flags.fecha_recep;var trS=rf?' style=\"background-color:#ecfdf5;background-image:repeating-linear-gradient(45deg,#94a3b8 0,#94a3b8 1.5px,transparent 1.5px,transparent 6px);\"':'';var tdS=rf?' style=\"background:#d1fae5;\"':'';h+='<tr'+trS+'><td class=\"sticky\"'+tdS+'><div class=\"bn\">'+esc(v.nombre)+(rf?' <span style=\"font-size:8.5px;font-weight:700;color:#047857;background:#a7f3d0;border-radius:4px;padding:1px 4px;\">&#10003; RF</span>':'')+'</div><div class=\"bt\">'+esc(v.tipologia)+'</div></td>';cps.forEach(function(c){h+='<td>'+mark(v.flags[c.key])+'</td>';});h+='<td class=\"pct\">'+(v.pct!=null?v.pct+'%':'-')+'</td></tr>';});",
+        "  h+='</tbody></table></div>';return h;",
+        "}",
+        "var tabs=[{id:'_general',label:'General'}].concat(D.grupos.map(function(g){return {id:g.id,label:g.nombre};}));",
+        "var active='_general';",
+        "function render(){var app=document.getElementById('content');if(active==='_general'){app.innerHTML=renderGeneral();}else{var g=null;D.grupos.forEach(function(x){if(x.id===active)g=x;});app.innerHTML=g?renderGrupo(g):'';}Array.prototype.forEach.call(document.querySelectorAll('.bottom-tabs button'),function(b){if(b.getAttribute('data-id')===active)b.classList.add('active');else b.classList.remove('active');});}",
+        "function buildNav(){var nav=document.getElementById('nav');nav.innerHTML='';tabs.forEach(function(t){var b=document.createElement('button');b.textContent=t.label;b.setAttribute('data-id',t.id);b.onclick=function(){active=t.id;render();window.scrollTo(0,0);};nav.appendChild(b);});}",
+        "function buildPrint(){var p=document.getElementById('printall');var h='<div class=\"tab-section\">'+renderGeneral()+'</div>';D.grupos.forEach(function(g){h+='<div class=\"tab-section\">'+renderGrupo(g)+'</div>';});p.innerHTML=h;}",
+        "buildNav();render();buildPrint();",
+        "document.getElementById('pdfbtn').onclick=function(){window.print();};",
+        "})();"
+    ].join("\n");
+
+    return [
+        "<!DOCTYPE html>",
+        "<html lang=\"es\">",
+        "<head>",
+        "<meta charset=\"UTF-8\">",
+        "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
+        "<title>Informe Cierre - " + escapeHtmlBasic(payload.proyecto) + "</title>",
+        "<style>" + css + "</style>",
+        "</head>",
+        "<body>",
+        "<div class=\"topbar\"><h1>Informe de Estado de Cierre</h1><div class=\"sub\">" + escapeHtmlBasic(payload.proyecto) + " &middot; " + escapeHtmlBasic(payload.comuna) + "</div></div>",
+        "<button class=\"pdf-btn\" id=\"pdfbtn\">Descargar PDF</button>",
+        "<div class=\"wrap\"><div id=\"content\"></div></div>",
+        "<div class=\"wrap\" id=\"printall\"></div>",
+        "<nav class=\"bottom-tabs\" id=\"nav\"></nav>",
+        "<script>window.__INFORME__=" + jsonData + ";</scr" + "ipt>",
+        "<script>" + script + "</scr" + "ipt>",
+        "</body>",
+        "</html>"
+    ].join("\n");
+}
+
+function escapeHtmlBasic(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// SVG line chart como string (para reportes HTML/PDF, sin React). Autoescala (no parte de 0).
+function svgLineChartString({ meses, valores, color, fillColor, fmtMes, fmtV }) {
+    if (!meses || meses.length === 0) {
+        return '<div style="color:#94a3b8;font-size:12px;padding:24px;text-align:center;border:1px dashed #e2e8f0;border-radius:8px;">Sin datos en el periodo</div>';
+    }
+    const w = 760, h = 150;
+    const pad = { top: 18, right: 16, bottom: 24, left: 16 };
+    const iw = w - pad.left - pad.right, ih = h - pad.top - pad.bottom;
+    const n = meses.length;
+    const max = Math.max(...valores), min = Math.min(...valores);
+    const range = max - min || max || 1;
+    const yMax = max + range * 0.15, yMin = Math.max(0, min - range * 0.15);
+    const yDen = yMax - yMin || 1;
+    const xStep = n > 1 ? iw / (n - 1) : 0;
+    const pts = meses.map((m, i) => {
+        const x = n > 1 ? pad.left + i * xStep : pad.left + iw / 2;
+        const y = pad.top + ih * (1 - (valores[i] - yMin) / yDen);
+        return { x: +x.toFixed(1), y: +y.toFixed(1), v: valores[i], m };
+    });
+    const line = pts.map((p, i) => (i === 0 ? 'M' : 'L') + ' ' + p.x + ' ' + p.y).join(' ');
+    const baseY = (pad.top + ih).toFixed(1);
+    const area = line + ' L ' + pts[n - 1].x + ' ' + baseY + ' L ' + pts[0].x + ' ' + baseY + ' Z';
+    let svg = '<svg viewBox="0 0 ' + w + ' ' + h + '" style="width:100%;height:150px;">';
+    [pad.top, pad.top + ih / 2, pad.top + ih].forEach(y => {
+        svg += '<line x1="' + pad.left + '" y1="' + y + '" x2="' + (w - pad.right) + '" y2="' + y + '" stroke="#e5e7eb" stroke-width="0.5"/>';
+    });
+    svg += '<path d="' + area + '" fill="' + fillColor + '"/>';
+    svg += '<path d="' + line + '" stroke="' + color + '" stroke-width="2" fill="none" stroke-linejoin="round" stroke-linecap="round"/>';
+    pts.forEach(p => {
+        svg += '<circle cx="' + p.x + '" cy="' + p.y + '" r="3" fill="' + color + '" stroke="#fff" stroke-width="1.5"/>';
+        svg += '<text x="' + p.x + '" y="' + (p.y - 7).toFixed(1) + '" text-anchor="middle" font-size="9" fill="#475569" font-weight="600">' + escapeHtmlBasic(fmtV(p.v)) + '</text>';
+        svg += '<text x="' + p.x + '" y="' + (h - 7) + '" text-anchor="middle" font-size="9" fill="#94a3b8">' + escapeHtmlBasic(fmtMes(p.m)) + '</text>';
+    });
+    svg += '</svg>';
+    return svg;
+}
+
+// ===== LINE CHART CARD =====
+// Mini-grafico de linea con autoescala (no parte de 0). Tooltip de info en titulo,
+// tooltip por punto al hover. SVG inline para no agregar dependencias.
+const LineChartCard = ({ titulo, badge, badgeColor, color, fillColor, info, meses, valores, fmtVal, fmtVCorto, fmtMes, emptyMsg }) => {
+    const [hoverIdx, setHoverIdx] = React.useState(null);
+    if (!meses || meses.length === 0) {
+        return (
+            <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
+                <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-xs font-semibold text-gray-700">{titulo}</h3>
+                </div>
+                <p className="text-[11px] text-gray-400 py-4 text-center">{emptyMsg}</p>
+            </div>
+        );
+    }
+    // Geometria del SVG
+    const w = 600, h = 110;
+    const pad = { top: 14, right: 12, bottom: 22, left: 12 };
+    const iw = w - pad.left - pad.right;
+    const ih = h - pad.top - pad.bottom;
+    const n = meses.length;
+    const max = Math.max(...valores);
+    const min = Math.min(...valores);
+    // Autoescala con 10% de margen arriba y abajo (no fuerza Y=0)
+    const range = max - min || max || 1;
+    const yMax = max + range * 0.15;
+    const yMin = Math.max(0, min - range * 0.15);
+    const yDen = yMax - yMin || 1;
+    const xStep = n > 1 ? iw / (n - 1) : 0;
+    const points = meses.map((m, i) => {
+        const x = n > 1 ? pad.left + i * xStep : pad.left + iw / 2;
+        const y = pad.top + ih * (1 - (valores[i] - yMin) / yDen);
+        return { x, y, v: valores[i], m };
+    });
+    // Linea path
+    const pathLine = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
+    // Area path (cerrada abajo)
+    const pathArea = pathLine + ` L ${points[n-1].x.toFixed(1)} ${(pad.top + ih).toFixed(1)} L ${points[0].x.toFixed(1)} ${(pad.top + ih).toFixed(1)} Z`;
+    // Lineas guia horizontales (3 niveles)
+    const gridY = [pad.top, pad.top + ih/2, pad.top + ih];
+    return (
+        <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
+            <div className="flex items-center justify-between mb-2 gap-2">
+                <div className="flex items-center gap-1.5">
+                    <h3 className="text-xs font-semibold text-gray-700">{titulo}</h3>
+                    <span title={info} className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-gray-200 text-gray-600 text-[9px] font-bold cursor-help hover:bg-gray-300" style={{lineHeight: '1'}}>i</span>
+                </div>
+                {badge && <span className={`text-[10px] font-medium ${badgeColor || 'text-gray-500'}`}>{badge}</span>}
+            </div>
+            <div className="relative">
+                <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="w-full" style={{height: '110px'}}>
+                    {/* gridlines */}
+                    {gridY.map((y, i) => (
+                        <line key={i} x1={pad.left} y1={y} x2={w - pad.right} y2={y} stroke="#e5e7eb" strokeWidth="0.5" strokeDasharray={i === 1 ? '2 2' : ''} />
+                    ))}
+                    {/* area + linea */}
+                    <path d={pathArea} fill={fillColor} />
+                    <path d={pathLine} stroke={color} strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                    {/* puntos */}
+                    {points.map((p, i) => (
+                        <g key={i}>
+                            <circle cx={p.x} cy={p.y} r={hoverIdx === i ? 5 : 3} fill={color} stroke="white" strokeWidth="1.5"
+                                    onMouseEnter={() => setHoverIdx(i)} onMouseLeave={() => setHoverIdx(null)}
+                                    style={{cursor: 'pointer', transition: 'r 0.1s'}}>
+                                <title>{`${fmtMes(p.m)}: ${fmtVal(p.v)}`}</title>
+                            </circle>
+                            {/* etiqueta del eje X */}
+                            <text x={p.x} y={h - 6} textAnchor="middle" fontSize="9" fill="#9ca3af">{fmtMes(p.m)}</text>
+                        </g>
+                    ))}
+                    {/* tooltip flotante en hover */}
+                    {hoverIdx !== null && (
+                        <g pointerEvents="none">
+                            <line x1={points[hoverIdx].x} y1={pad.top} x2={points[hoverIdx].x} y2={pad.top + ih} stroke={color} strokeWidth="0.5" strokeDasharray="2 2" opacity="0.6" />
+                            <text x={points[hoverIdx].x} y={Math.max(pad.top + 8, points[hoverIdx].y - 8)} textAnchor="middle" fontSize="10" fontWeight="600" fill="#374151">
+                                {fmtVCorto(points[hoverIdx].v)}
+                            </text>
+                        </g>
+                    )}
+                </svg>
+                {/* Min/Max labels overlay */}
+                <div className="absolute top-3 right-3 text-[9px] text-gray-400 font-mono pointer-events-none">
+                    Max: {fmtVCorto(max)} · Min: {fmtVCorto(min)}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ===== ESTADO GENERAL (Informe de Cierre de Obras por Proyecto) =====
+// Cruce: BENEFICIARIOS_DATA (HPC) + BENEF_CON_TE1 (TE1) + SEGUIMIENTO_DATA (hitos cierre AppSheet)
+//        + SOLPAGO_DATA (Aprobado, ritmo mensual MO) + INSPECCIONES_DATA / Ejecucion (ritmo avance)
+//
+// Privacidad: este informe se comparte FUERA del depto, por lo tanto:
+//   - Solo se muestran observaciones de Firebase que tengan la ESTRELLA activada
+//     (registradas en resumen_comentarios/{ID_Proy}/{obs.id})
+//   - NO se muestran observaciones de AppSheet (campos internos operativos)
+
+const CURVAS_S_CONFIG = {
+    'P119': [
+        { id: '1KiVjijm4qbERK74yiMCO6hwlr5gDr1jZ', label: 'Total Proyecto Â· Ã‘uke Mapu' },
+        { id: '1gPvtdJoc3FN_NL6NuUyFjq-DIMxV1eEg', label: 'Todos los Grupos Â· Ã‘uke Mapu' },
+        { id: '12G5xCWjkRodEyqEXorsSqtQn31pGZd0y', label: 'Grupo 1 Â· Ã‘uke Mapu' },
+        { id: '1ruCqItMDFYL_xCFlE0ftCH3Bsv4Co0fN', label: 'Grupo 2 Â· Ã‘uke Mapu' },
+        { id: '1-0gO91GOhMCzPk1RLBj-InkY0luao7XJ', label: 'Grupo 3 Â· Ã‘uke Mapu' },
+        { id: '19-OPTIVVh9QiVLgUs14E7nKwtorYlXum', label: 'Grupo 4 Â· Ã‘uke Mapu' },
+        { id: '1xOzhmtukt4ZlMZte18W1mYafOP46WtRq', label: 'Grupo 5 Â· Ã‘uke Mapu' },
+    ],
+    'P38': [
+        { id: '18fNqtEHY8hNFKX1o0AgPfPR_-H4tpLXZ', label: 'Total Proyecto Â· Aliwen' },
+        { id: '1fQiYGC4TeyQhWUhs1p5b8xPMuBMPnynZ', label: 'Todos los Grupos Â· Aliwen' },
+        { id: '1IEKAttqVuBrN9Dw5r2Bxn9mLXeiXELl8', label: 'Grupo 1 Â· Aliwen' },
+        { id: '10ajEFlkeGURmfsaPQ9Oldg4w59dnCNJN', label: 'Grupo 2 Â· Aliwen' },
+    ],
+    'P126': [
+        { id: '15FN2jNY6riMQ8ricvHr8kbDN7riNizFm', label: 'Total Proyecto Â· El MaitÃ©n' },
+        { id: '1yMU4lBwm9f_d2rgtrunx9YIOQAE9P_HD', label: 'Todos los Grupos Â· El MaitÃ©n' },
+        { id: '1IfDp1B7Z0ZksDrnu72G9kh1rBZiPO8dA', label: 'Grupo 1 Â· El MaitÃ©n' },
+        { id: '1o6a1QJP21CovIUEUuQ-0IjvXA0TW1lOC', label: 'Grupo 2 Â· El MaitÃ©n' },
+        { id: '1My5YGZ8kyvR71RA2nzcyqsEzb_1JaTpH', label: 'Grupo 3 Â· El MaitÃ©n' },
+        { id: '1b2B4uSPaThhenWC-X3g01YRxAssRLHXb', label: 'Grupo 4 Â· El MaitÃ©n' },
+        { id: '1rybApbcQW_KICSkJcJ3mUjjvfJrKzBBG', label: 'Grupo 5 Â· El MaitÃ©n' },
+        { id: '1hCW4VNGWcdjGNFJ23D70eLlMnt2XT2mV', label: 'Grupo Rezagados Â· El MaitÃ©n' },
+    ],
+    'P39': [
+        { id: '1NIRKzHMfOXb4jxG23DK3fJMmYwGkW4Lv', label: 'Total Proyecto Â· El Coihue' },
+        { id: '1gtbVP2J-yVo68N1Ih884wYz-3VS-GoLl', label: 'Todos los Grupos Â· El Coihue' },
+        { id: '1KsEQMNZoTcbX4_0sCVeiQI_UvbcVz67i', label: 'Grupo 1 Â· El Coihue' },
+        { id: '1XQr2fbVAHCLtJ1TO0HN2ofim0sts60kU', label: 'Grupo 2 Â· El Coihue' },
+        { id: '1QjM1uf9yRDqx6VgYGoUwy1RxDycDqmge', label: 'Grupo 3 Â· El Coihue' },
+    ],
+    'P127': [
+        { id: '12TKdyPswLAnq7nmQUakjp-uBr1XCKAHi', label: 'Total Proyecto Â· Nuevo Cunco' },
+        { id: '1qSoXitleM36h8978LXy8xBbktPsFOGA-', label: 'Todos los Grupos Â· Nuevo Cunco' },
+        { id: '1s1CQ_5erPiFZZi3hJsNaV9U39fnyzkS3', label: 'Grupo 1 Â· Nuevo Cunco' },
+        { id: '1KKIBBMT_Yd3IbzmUsEbWvEMmSvRyCRsn', label: 'Grupo 2 Â· Nuevo Cunco' },
+        { id: '1Y8BIdpxsYIXq3jcA-vuywtOJKYfbPuAm', label: 'Grupo 3 Â· Nuevo Cunco' },
+        { id: '1B46cpBHsiaPcRXz50EdLFgh7guYbUjfI', label: 'Grupo 4 Â· Nuevo Cunco' },
+    ],
+    'P12': [
+        { id: '1lhPiVePHUyPoet8PgT4u79sQNDy_zp7c', label: 'Total Proyecto Â· Juan Huilcan Tolten' },
+        { id: '1rQhsHGfOkO1bmFVjqXP-f5U-c9qv3_S-', label: 'Todos los Grupos Â· Juan Huilcan Tolten' },
+        { id: '1yBq6akxkaX0yK_Vrb9qRq0QMQQKjkvZV', label: 'Grupo 1 Â· Juan Huilcan Tolten' },
+    ],
+    'P14': [
+        { id: '1PPgkJmKEVJWh5u5RwHTPgbV_3HEOBIJr', label: 'Total Proyecto Â· Com. Madihue' },
+        { id: '1lF1UpCQJHaKUQ6na0-607ld9xsOWOKsk', label: 'Todos los Grupos Â· Com. Madihue' },
+        { id: '1dTSuAQsQ0BeytiZVLoM2MfHWudUfPF-q', label: 'Grupo 1 Â· Com. Madihue' },
+    ],
+    'P116': [
+        { id: '1xD_Nd8M5UeAewqSXS5hUId72o8uho9qV', label: 'Total Proyecto Â· Sonia Quilaleo' },
+        { id: '1mvZCLSMZ8eR8moN-TQQHmyU9Autfz_nG', label: 'Todos los Grupos Â· Sonia Quilaleo' },
+        { id: '1RWQL4odsQQmMO4Y8BnSU9eGxgGg7neM2', label: 'Grupo 1 Â· Sonia Quilaleo' },
+    ],
+    'P31': [
+        { id: '1OUrFMC4gb0IrPiM3GtxWs1zGOTZngmEV', label: 'Total Proyecto Â· Trovolhue' },
+        { id: '1DvwYhnrkSJE_V7RxfEN9R15KXdNjO8Sf', label: 'Todos los Grupos Â· Trovolhue' },
+        { id: '1YLvOjGYJ9xQzc5ptUlVn3Q4n1MHU5Ef2', label: 'Grupo 1 Â· Trovolhue' },
+    ],
+    'P131': [
+        { id: '1xT8Nm1x4G-MTpSiu4a6YzuAgfthOfuUb', label: 'Total Proyecto Â· RaÃ­ces de Melipeuco' },
+        { id: '1jMeSAmX1FaMB3vHJiUqfdsg6u7J21dCk', label: 'Todos los Grupos Â· RaÃ­ces de Melipeuco' },
+        { id: '1_fm1asE-eKPhDYdnCeMvB8pMzn8I6xSW', label: 'Grupo 1 Â· RaÃ­ces de Melipeuco' },
+        { id: '1MxkD_063Vx5iW5lNgalbS-aUr-3TZ1tt', label: 'Grupo 2 Â· RaÃ­ces de Melipeuco' },
+    ],
+    'P28': [
+        { id: '1OKt3PNsH0kWbXgOA48OqQocm4GLrocEQ', label: 'Total Proyecto Â· Elsa Pinchulaf' },
+        { id: '1j-YaYTXG8ALrOjbgKN_1J6-g3z02AP3h', label: 'Todos los Grupos Â· Elsa Pinchulaf' },
+        { id: '1SysvMZldwhdRsk8Pbg9M_Iv9BoXzlaPT', label: 'Grupo 1 Â· Elsa Pinchulaf' },
+    ],
+};
+
+const EstadoGeneralTab = ({ viviendas, observaciones, grupos, resumenComentarios, proyectoSel, proy, garantiasProy = [], muestrasProy = [], muestrasResumen = null, kpis = null, cierresForzados = {} }) => {
+    const [expandida, setExpandida] = React.useState(null);
+    const [busqueda, setBusqueda] = React.useState("");
+    const [filtro, setFiltro] = React.useState("todas"); // todas | pendientes | recepcionadas
+    const [grupoColapsado, setGrupoColapsado] = React.useState({}); // {grupoId: true/false}
+    const [showCapatazMenu, setShowCapatazMenu] = React.useState(false);
+    const [avanceGanttData, setAvanceGanttData] = React.useState({});
+    React.useEffect(() => {
+        fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/avance_gantt.json')
+            .then(r => r.json()).then(d => { AVANCE_GANTT_DATA = d || {}; setAvanceGanttData(d || {}); }).catch(() => {});
+        fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/avance_benef.json')
+            .then(r => r.json()).then(d => { AVANCE_BENEF_DATA = d || {}; }).catch(() => {});
+    }, []);
+
+    // ── Generador de Informe PDF Semanal ─────────────────────────────────────
+    // Computa todas las piezas del informe (compartido por el PDF y la version HTML navegable)
+    const construirInforme = () => {
+        const hoy = new Date();
+        const inicioAnio = new Date(hoy.getFullYear(), 0, 1);
+        const semana = Math.ceil(((hoy - inicioAnio) / 86400000 + inicioAnio.getDay() + 1) / 7);
+        const opcFecha = { day: '2-digit', month: '2-digit', year: 'numeric' };
+        const fechaCorte = hoy.toLocaleDateString('es-CL', opcFecha);
+        const fechaGen   = hoy.toLocaleString('es-CL', { ...opcFecha, hour: '2-digit', minute: '2-digit' });
+        const proyNombre = proy ? `${proy.ID_proy} · ${proy.NOMBRE_PROYECTO}` : proyectoSel;
+
+        // KPIs
+        // Avance Real: promedio sobre TODAS las viviendas del proyecto; las sin inspeccion cuentan 0%
+        const conInsp   = viviendas.filter(v => getInspeccion(v.ID_Benef));
+        const avanceReal = viviendas.length
+            ? Math.round(viviendas.reduce((s, v) => { const i = getInspeccion(v.ID_Benef); return s + (i ? i.pct_total : 0); }, 0) / viviendas.length)
+            : 0;
+        // Terminada = tiene Recepcion Definitiva (RF) o cierre forzado.
+        const terminadas = viviendas.filter(v => !!v.fecha_recepcion || !!(cierresForzados[v.ID_Benef])).length;
+        const criticos  = viviendas.filter(v => v.estadoGeneral === "critico").length;
+        // Avance Gantt: dato del nodo avance_gantt/{pid} en Firebase
+        const _ag      = avanceGanttData[proyectoSel] || null;
+        const agPct    = _ag ? _ag.pct : null;
+        const agColor  = agPct == null ? '#94a3b8' : agPct >= 80 ? '#16a34a' : agPct >= 50 ? '#2563eb' : '#dc2626';
+
+        // Datos por grupo (usa 'datos' procesado: trae flags de checkpoints, obsPublicas y comentario)
+        const gruposData = agruparViviendas(datos, grupos);
+
+        // Checkpoints completos del proyecto
+        const cpKpisHtml = kpisCheckpoints.map(k => {
+            const pct = k.total ? Math.round(k.n / k.total * 100) : 0;
+            const col = pct >= 80 ? '#16a34a' : pct >= 40 ? '#b45309' : '#64748b';
+            const bg = pct >= 80 ? '#f0fdf4' : pct >= 40 ? '#fffbeb' : '#f8fafc';
+            const bd = pct >= 80 ? '#bbf7d0' : pct >= 40 ? '#fde68a' : '#e2e8f0';
+            return `<div style="border:1px solid ${bd};border-radius:8px;padding:7px 3px;text-align:center;background:${bg};"><div style="font-size:8.5px;font-weight:600;color:#64748b;">${escapeHtmlBasic(k.label)}</div><div style="font-size:17px;font-weight:700;color:${col};line-height:1.1;">${k.n}</div><div style="font-size:8.5px;color:#94a3b8;">/ ${k.total}</div></div>`;
+        }).join('');
+
+        // Graficos de ritmo (SVG inline)
+        const chartMO = svgLineChartString({ meses: ritmoMOProy.meses, valores: ritmoMOProy.valores, color: '#7c3aed', fillColor: 'rgba(124,58,237,0.10)', fmtMes, fmtV: (v) => fmtCorto(v) });
+        const chartDesp = svgLineChartString({ meses: ritmoAvanceProy.meses, valores: ritmoAvanceProy.valores, color: '#10b981', fillColor: 'rgba(16,185,129,0.10)', fmtMes, fmtV: (v) => String(v) });
+
+        // Tabla resumen por grupo
+        let tablaGruposHtml = '<table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="background:#f8fafc;">'
+            + ['Grupo', 'Capataz', 'Viv.', 'Avance Insp.', 'Recep.', 'Críticas'].map((h, i) =>
+                `<th style="padding:7px 10px;text-align:${i < 2 ? 'left' : 'center'};font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:#64748b;border-bottom:1px solid #e2e8f0;">${h}</th>`).join('')
+            + '</tr></thead><tbody>';
+        gruposData.forEach(g => {
+            if (g.viviendas.length === 0) return;
+            const res = grupoResumen(g.viviendas, cierresForzados);
+            const rec = g.viviendas.filter(v => v.flags && v.flags.fecha_recep).length;
+            const avCol = res.avanceInsp >= 80 ? '#16a34a' : res.avanceInsp >= 50 ? '#2563eb' : '#dc2626';
+            tablaGruposHtml += `<tr style="border-bottom:1px solid #f1f5f9;">
+                <td style="padding:7px 10px;font-weight:600;">${escapeHtmlBasic(g.nombre || 'Sin Asignar')}</td>
+                <td style="padding:7px 10px;color:#475569;">${escapeHtmlBasic(g.capataz || '—')}</td>
+                <td style="padding:7px 10px;text-align:center;">${res.n}</td>
+                <td style="padding:7px 10px;text-align:center;font-weight:700;color:${avCol};">${res.avanceInsp}%</td>
+                <td style="padding:7px 10px;text-align:center;">${rec}/${res.n}</td>
+                <td style="padding:7px 10px;text-align:center;color:${res.criticas > 0 ? '#dc2626' : '#94a3b8'};font-weight:${res.criticas > 0 ? '700' : '400'};">${res.criticas}</td>
+            </tr>`;
+        });
+        tablaGruposHtml += '</tbody></table>';
+
+        // Comentarios reales: nota del coordinador + comentarios con estrella, por grupo
+        let comentariosHtml = '';
+        gruposData.forEach(g => {
+            if (g.viviendas.length === 0) return;
+            const items = [];
+            if (g.comentario) {
+                items.push(`<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;margin-bottom:6px;font-size:12px;"><span style="font-size:9px;font-weight:700;text-transform:uppercase;color:#b45309;">Nota del coordinador</span><div style="margin-top:2px;font-style:italic;color:#374151;">${escapeHtmlBasic(g.comentario)}</div></div>`);
+            }
+            g.viviendas.forEach(v => {
+                (v.obsPublicas || []).forEach(o => {
+                    const fch = (o.fecha || '').toString().substring(0, 10);
+                    items.push(`<div style="padding:6px 12px;margin-bottom:5px;font-size:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;"><span style="font-weight:600;color:#1a1a2e;">${escapeHtmlBasic((v.NOMBRES || '') + ' ' + (v.APELLIDOS || ''))}</span> <span style="font-size:10px;color:#94a3b8;">${fch}</span><div style="color:#374151;margin-top:1px;">${escapeHtmlBasic(o.texto || '')}</div></div>`);
+                });
+            });
+            if (items.length > 0) {
+                comentariosHtml += `<div style="margin-bottom:14px;break-inside:avoid;"><div style="font-size:13px;font-weight:700;color:#1a1a2e;margin-bottom:6px;">${escapeHtmlBasic(g.nombre || 'Sin Asignar')}</div>${items.join('')}</div>`;
+            }
+        });
+        if (!comentariosHtml) {
+            comentariosHtml = '<div style="color:#94a3b8;font-size:12px;padding:16px;text-align:center;border:1px dashed #e2e8f0;border-radius:8px;">Sin notas del coordinador ni comentarios marcados con estrella en este proyecto.</div>';
+        }
+
+        // Pagina de detalle por grupo: KPIs, tabla por vivienda y ultimos 2 comentarios por beneficiario
+        const estadoColor = { critico: '#dc2626', atencion: '#b45309', en_tiempo: '#16a34a', despachado: '#2563eb', solicitado: '#7c3aed', bloqueado: '#6b7280' };
+        const estadoLabel = { critico: 'Crítico', atencion: 'Atención', en_tiempo: 'En tiempo', despachado: 'Despachado', solicitado: 'Solicitado', bloqueado: 'Bloqueado' };
+        const totalCp = CHECKPOINTS.length;
+        const gruposPaginas = [];
+        gruposData.forEach(g => {
+            if (g.viviendas.length === 0) return;
+            const res = grupoResumen(g.viviendas, cierresForzados);
+            const rec = g.viviendas.filter(v => v.flags && v.flags.fecha_recep).length;
+            const avCol = res.avanceInsp >= 80 ? '#16a34a' : res.avanceInsp >= 50 ? '#2563eb' : '#dc2626';
+            const miniKpis = `<div class="gp-kpis">
+                <div class="gp-kpi"><div class="v">${res.n}</div><div class="l">Viviendas</div></div>
+                <div class="gp-kpi"><div class="v" style="color:${avCol};">${res.avanceInsp}%</div><div class="l">Avance Insp.</div></div>
+                <div class="gp-kpi"><div class="v" style="color:#16a34a;">${res.terminadas}</div><div class="l">Terminadas</div></div>
+                <div class="gp-kpi"><div class="v">${rec}/${res.n}</div><div class="l">Recepcionadas</div></div>
+                <div class="gp-kpi"><div class="v" style="color:${res.criticas > 0 ? '#dc2626' : '#6b7280'};">${res.criticas}</div><div class="l">Críticas</div></div>
+            </div>`;
+            const nota = g.comentario
+                ? `<div class="gp-nota"><span>Nota del coordinador</span><div>${escapeHtmlBasic(g.comentario)}</div></div>`
+                : '';
+            let vivRows = '';
+            g.viviendas.forEach(v => {
+                const pct = v.pctTotal != null ? v.pctTotal + '%' : '—';
+                const pctCol = v.pctTotal == null ? '#94a3b8' : v.pctTotal >= 80 ? '#16a34a' : v.pctTotal >= 50 ? '#2563eb' : '#dc2626';
+                const ec = estadoColor[v.estadoGeneral] || '#6b7280';
+                const el = estadoLabel[v.estadoGeneral] || (v.estadoGeneral || '—');
+                const rfDone = !!v.fecha_recepcion;
+                const recv = rfDone ? 'Sí' : ((v.flags && v.flags.fecha_recep) ? 'Sí' : '—');
+                // Beneficiario TERMINADO (RF) -> achurado verde+gris en sus filas del informe
+                const rowBg = rfDone ? 'background-color:#ecfdf5;background-image:repeating-linear-gradient(45deg,#94a3b8 0,#94a3b8 1.5px,transparent 1.5px,transparent 6px);' : '';
+                const nameShadow = rfDone ? 'text-shadow:0 0 3px #fff,0 0 5px #fff;' : '';
+                const chips = CHECKPOINTS.map(cp => {
+                    const on = !!(v.flags && v.flags[cp.key]);
+                    const st = on
+                        ? 'background:#dcfce7;color:#166534;border:1px solid #bbf7d0;'
+                        : 'background:#f1f5f9;color:#94a3b8;border:1px solid #e2e8f0;';
+                    return `<span style="display:inline-block;font-size:8.5px;font-weight:600;padding:2px 6px;border-radius:5px;margin:0 3px 3px 0;${st}">${escapeHtmlBasic(cp.label)}</span>`;
+                }).join('');
+                vivRows += `<tr style="${rowBg}">
+                    <td style="padding:7px 10px 2px;font-weight:600;${nameShadow}">${escapeHtmlBasic((v.NOMBRES || '') + ' ' + (v.APELLIDOS || ''))}${rfDone ? ' <span style="font-size:8.5px;font-weight:700;color:#047857;background:#d1fae5;border:1px solid #6ee7b7;border-radius:4px;padding:1px 4px;white-space:nowrap;">&#10003; RF</span>' : ''}</td>
+                    <td style="padding:7px 10px 2px;text-align:center;font-weight:700;color:${pctCol};">${pct}</td>
+                    <td style="padding:7px 10px 2px;text-align:center;color:#475569;">${v.completados}/${totalCp}</td>
+                    <td style="padding:7px 10px 2px;text-align:center;"><span style="font-size:10px;font-weight:700;color:${rfDone ? '#047857' : ec};">${rfDone ? 'Terminada (RF)' : el}</span></td>
+                    <td style="padding:7px 10px 2px;text-align:center;">${recv}</td>
+                </tr>
+                <tr style="border-bottom:1px solid #e2e8f0;${rowBg}"><td colspan="5" style="padding:0 10px 8px;">${chips}</td></tr>`;
+            });
+            const vivTable = `<table style="width:100%;border-collapse:collapse;font-size:11.5px;"><thead><tr style="background:#f8fafc;">${['Beneficiario', 'Avance Insp.', 'Checkpoints', 'Estado', 'Recep.'].map((h, i) => `<th style="padding:6px 10px;text-align:${i === 0 ? 'left' : 'center'};font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:#64748b;border-bottom:1px solid #e2e8f0;">${h}</th>`).join('')}</tr></thead><tbody>${vivRows}</tbody></table>
+                <div style="font-size:9px;color:#94a3b8;margin-top:5px;">Checkpoints por beneficiario: <span style="display:inline-block;background:#dcfce7;color:#166534;border:1px solid #bbf7d0;border-radius:4px;padding:1px 5px;font-weight:600;">cumplido</span> <span style="display:inline-block;background:#f1f5f9;color:#94a3b8;border:1px solid #e2e8f0;border-radius:4px;padding:1px 5px;font-weight:600;">pendiente</span></div>`;
+            let comBenef = '';
+            g.viviendas.forEach(v => {
+                const obs = (observaciones && observaciones[v.ID_Benef]) ? observaciones[v.ID_Benef].slice() : [];
+                if (obs.length === 0) return;
+                obs.sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
+                const ult = obs.slice(0, 2);
+                comBenef += `<div style="margin-bottom:8px;break-inside:avoid;"><div style="font-size:12px;font-weight:600;color:#1a1a2e;">${escapeHtmlBasic((v.NOMBRES || '') + ' ' + (v.APELLIDOS || ''))}</div>${ult.map(o => {
+                    const fch = String(o.fecha || '').replace('T', ' ').substring(0, 16);
+                    return `<div style="font-size:11.5px;color:#374151;padding:4px 10px;border-left:3px solid #cbd5e1;margin-top:3px;background:#f8fafc;border-radius:0 6px 6px 0;">${escapeHtmlBasic(o.texto || '')} <span style="font-size:9px;color:#94a3b8;">${fch}</span></div>`;
+                }).join('')}</div>`;
+            });
+            if (!comBenef) comBenef = '<div style="color:#94a3b8;font-size:11.5px;padding:8px 0;">Sin comentarios registrados en este grupo.</div>';
+            const contenidoGrupo = `
+                <div class="gp-head">
+                    <div><div class="gp-title">${escapeHtmlBasic(g.nombre || 'Sin Asignar')}</div><div class="gp-sub">Capataz: ${escapeHtmlBasic(g.capataz || '—')}</div></div>
+                    <div class="gp-badge">${res.n} viv.</div>
+                </div>
+                ${miniKpis}
+                ${nota}
+                <div class="sec-title">Detalle por Vivienda</div>
+                ${vivTable}`;
+            gruposPaginas.push({ nombre: g.nombre || 'Sin Asignar', contenidoHtml: contenidoGrupo });
+        });
+
+        // Curvas S images
+        const curvasConf = CURVAS_S_CONFIG[proyectoSel] || [];
+        const curvasHtml = curvasConf.length > 0
+            ? curvasConf.map(c => `
+                <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;break-inside:avoid;">
+                  <div style="background:#f8fafc;padding:6px 12px;font-size:11px;font-weight:600;color:#475569;border-bottom:1px solid #e2e8f0;">${escapeHtmlBasic(c.label)}</div>
+                  <img src="https://drive.google.com/thumbnail?id=${c.id}&sz=w800&t=${Math.floor(Date.now()/3600000)}" style="width:100%;display:block;" alt="${escapeHtmlBasic(c.label)}" loading="lazy"/>
+                </div>`).join('')
+            : `<div style="grid-column:1/-1;color:#94a3b8;font-size:12px;padding:20px;text-align:center;border:1px dashed #e2e8f0;border-radius:8px;">Las curvas S se actualizan automáticamente cada lunes 08:00.<br>Verifica que el proyecto tenga curvas S configuradas.</div>`;
+
+        const avColor = avanceReal >= 80 ? '#16a34a' : avanceReal >= 50 ? '#2563eb' : '#dc2626';
+
+        // ── Resumen administrativo: Contrato, Garantias y Muestras de Hormigon ──
+        const fmtFechaInf = (iso) => { if (!iso) return '—'; const p = String(iso).substring(0, 10).split('-'); return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : String(iso); };
+
+        let contratoCard;
+        if (proy && proy.fecha_inicio && proy.duracion) {
+            const fi = proy.fecha_inicio;
+            const dur = proy.duracion;
+            const inicio = new Date(fi);
+            const vencimiento = new Date(inicio); vencimiento.setDate(vencimiento.getDate() + dur);
+            const fechaRef = (kpis && kpis.esFinalizado && kpis.fechaFin) ? new Date(kpis.fechaFin) : new Date();
+            const diasRestantes = Math.floor((vencimiento - fechaRef) / 86400000);
+            const diasTranscurridos = Math.max(0, Math.floor((fechaRef - inicio) / 86400000));
+            const pctTranscurrido = Math.min(100, Math.max(0, Math.round(diasTranscurridos / dur * 100)));
+            const pctMarca90 = dur > 90 ? Math.round((dur - 90) / dur * 100) : null;
+            const venIso = vencimiento.toISOString().substring(0, 10);
+            const estadoTxt = diasRestantes < 0 ? `Vencido (${Math.abs(diasRestantes)}d)` : `${diasRestantes}d restantes`;
+            const estadoCol = diasRestantes < 0 ? '#dc2626' : diasRestantes < 30 ? '#b45309' : '#16a34a';
+            const barCol = pctTranscurrido >= 100 ? '#ef4444' : pctTranscurrido >= 80 ? '#f59e0b' : pctTranscurrido >= 50 ? '#3b82f6' : '#22c55e';
+            contratoCard = `<div class="rc-card">
+                <div class="rc-h">Contrato</div>
+                <div class="rc-grid4">
+                    <div><div class="rc-l">Inicio</div><div class="rc-v">${fmtFechaInf(fi)}</div></div>
+                    <div><div class="rc-l">Plazo</div><div class="rc-v">${dur} días</div></div>
+                    <div><div class="rc-l">Vencimiento</div><div class="rc-v">${fmtFechaInf(venIso)}</div></div>
+                    <div><div class="rc-l">Estado</div><div class="rc-v" style="color:${estadoCol};">${estadoTxt}</div></div>
+                </div>
+                <div style="margin-top:10px;">
+                    <div style="display:flex;justify-content:space-between;font-size:9px;color:#94a3b8;margin-bottom:3px;"><span>${fmtFechaInf(fi)}</span><span style="font-weight:600;">${diasTranscurridos}d / ${dur}d (${pctTranscurrido}%)</span><span>${fmtFechaInf(venIso)}</span></div>
+                    <div style="position:relative;height:10px;background:#e5e7eb;border-radius:6px;overflow:hidden;"><div style="height:100%;width:${Math.min(pctTranscurrido, 100)}%;background:${barCol};border-radius:6px;"></div>${pctMarca90 !== null ? `<div style="position:absolute;top:0;bottom:0;left:${pctMarca90}%;width:2px;background:#dc2626;"></div>` : ''}</div>
+                    ${pctMarca90 !== null ? `<div style="font-size:8px;color:#ef4444;text-align:right;margin-top:1px;">&#9660; 90d (fase cierre)</div>` : ''}
+                </div>
+            </div>`;
+        } else {
+            contratoCard = `<div class="rc-card"><div class="rc-h">Contrato</div><div style="color:#94a3b8;font-size:11px;padding:8px 0;">Sin datos de contrato (fecha de inicio / duración).</div></div>`;
+        }
+
+        const garantiasItems = (garantiasProy && garantiasProy.length > 0)
+            ? garantiasProy.map(g => {
+                const esV = g.diasVcmto !== null && g.diasVcmto < 0;
+                const porV = g.diasVcmto !== null && g.diasVcmto >= 0 && g.diasVcmto < 60;
+                const tipoCorto = g.tipoCorto || (g.tipo && g.tipo.includes('Fiel') ? 'Fiel Cumpl.' : g.tipo && g.tipo.includes('Buena') ? 'Buena Ejec.' : (g.tipo || '—'));
+                const right = g.diasVcmto === null ? 'Sin fecha' : esV ? `Vencida (${Math.abs(g.diasVcmto)}d)` : porV ? `${g.diasVcmto}d` : fmtFechaInf(g.fecha_vcmto);
+                const col = esV ? '#dc2626' : porV ? '#b45309' : '#475569';
+                const bg = esV ? '#fef2f2' : porV ? '#fffbeb' : '#f8fafc';
+                const marcoTag = g.esMarco ? ` <span style="font-size:9px;font-weight:700;color:#b45309;background:#fef3c7;border:1px solid #fde68a;border-radius:4px;padding:1px 4px;">MARCO</span>` : '';
+                const entCol = g.entidad === 'ATPK' ? { c: '#4338ca', b: '#e0e7ff', bd: '#c7d2fe' } : { c: '#475569', b: '#f1f5f9', bd: '#e2e8f0' };
+                const entTag = g.entidad ? ` <span style="font-size:9px;font-weight:700;color:${entCol.c};background:${entCol.b};border:1px solid ${entCol.bd};border-radius:4px;padding:1px 4px;">${escapeHtmlBasic(g.entidad)}</span>` : '';
+                return `<div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;padding:5px 8px;border-radius:6px;background:${bg};margin-bottom:4px;"><span><strong>${escapeHtmlBasic(tipoCorto)}</strong>${marcoTag}${entTag} <span style="color:#94a3b8;">${escapeHtmlBasic(g.tipo1 || '')} #${escapeHtmlBasic(g.num_bol || '')}</span>${g.monto_uf > 0 ? ` <span style="color:#94a3b8;">UF ${Number(g.monto_uf).toLocaleString('es-CL')}</span>` : ''}</span><span style="font-weight:600;color:${col};white-space:nowrap;">${escapeHtmlBasic(right)}</span></div>`;
+            }).join('')
+            : '<div style="color:#94a3b8;font-size:11px;padding:8px 0;">Sin garantías registradas.</div>';
+        const garantiasCard = `<div class="rc-card"><div class="rc-h">Garantías</div>${garantiasItems}</div>`;
+
+        const muestras = Array.isArray(muestrasProy) ? muestrasProy : [];
+        const mr = muestrasResumen || { okCount: 0, malaPend: 0, pendientes: 0, requeridas: (viviendas.length ? Math.ceil(viviendas.length / 6) : 0), completo: false, total: muestras.length };
+        const cobCol = mr.completo ? '#16a34a' : (mr.malaPend > 0 ? '#dc2626' : '#b45309');
+        const cobTxt = mr.completo ? 'Completo' : (mr.malaPend > 0 ? (mr.malaPend + ' mala(s) por re-tomar') : ('Faltan ' + Math.max(mr.requeridas - mr.okCount, 0) + ' OK'));
+        const muestrasHtml = `<div class="mh-strip">
+            <span class="mh-it"><b>${mr.total}</b> muestras</span>
+            <span class="mh-it"><b style="color:#16a34a;">${mr.okCount}</b> OK</span>
+            <span class="mh-it">requeridas <b>${mr.requeridas}</b></span>
+            ${mr.malaPend > 0 ? `<span class="mh-it"><b style="color:#dc2626;">${mr.malaPend}</b> mala(s) por re-tomar</span>` : ''}
+            <span class="mh-it">Estado: <b style="color:${cobCol};">${cobTxt}</b></span>
+        </div>`;
+
+        const css = `
+*{margin:0;padding:0;box-sizing:border-box;font-family:'IBM Plex Sans',Arial,sans-serif;}
+body{background:#fff;padding:36px;color:#1a1a2e;max-width:940px;margin:0 auto;}
+@media print{
+  body{padding:0;max-width:100%;}
+  .no-print{display:none!important;}
+  @page{margin:15mm;size:A4;}
+  img{max-height:280px;object-fit:contain;}
+}
+.sec-title{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#8B2332;margin:26px 0 12px;display:flex;align-items:center;gap:10px;}
+.sec-title::after{content:'';flex:1;height:1px;background:#e2e8f0;}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:4px;}
+.kpi{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;text-align:center;}
+.kpi-v{font-size:28px;font-weight:700;line-height:1;}
+.kpi-l{font-size:10px;color:#64748b;margin-top:5px;text-transform:uppercase;letter-spacing:.05em;}
+.cp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(48px,1fr));gap:6px;}
+.charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.chart-box{border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;break-inside:avoid;}
+.chart-box .ct{font-size:11px;font-weight:600;color:#475569;margin-bottom:2px;}
+.chart-box .cs{font-size:9px;color:#94a3b8;margin-bottom:4px;}
+.grupos-table{break-inside:avoid;}
+.curvas-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.footer{margin-top:36px;padding-top:16px;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;}
+.print-btn{position:fixed;top:20px;right:20px;background:#8B2332;color:#fff;border:none;border-radius:8px;padding:11px 22px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.18);z-index:999;}
+.print-btn:hover{background:#6d1a27;}
+.grupo-page{margin-top:30px;}
+.gp-head{display:flex;justify-content:space-between;align-items:center;padding-bottom:12px;border-bottom:3px solid #8B2332;margin-bottom:16px;}
+.gp-title{font-size:20px;font-weight:700;color:#1a1a2e;line-height:1.1;}
+.gp-sub{font-size:12px;color:#64748b;margin-top:3px;}
+.gp-badge{background:#1a1a2e;color:#fff;padding:5px 15px;border-radius:20px;font-size:12px;font-weight:600;flex-shrink:0;}
+.gp-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px;}
+.gp-kpi{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 6px;text-align:center;}
+.gp-kpi .v{font-size:21px;font-weight:700;line-height:1;color:#1a1a2e;}
+.gp-kpi .l{font-size:9px;color:#64748b;margin-top:4px;text-transform:uppercase;letter-spacing:.04em;}
+.gp-nota{background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;margin-bottom:6px;font-size:12px;}
+.gp-nota span{font-size:9px;font-weight:700;text-transform:uppercase;color:#b45309;}
+.gp-nota div{margin-top:2px;font-style:italic;color:#374151;}
+.resumen-cards{display:grid;grid-template-columns:1.7fr 1fr;gap:14px;align-items:start;}
+.rc-card{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;}
+.rc-h{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#64748b;margin-bottom:8px;}
+.rc-grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+.rc-l{font-size:9px;color:#94a3b8;}
+.rc-v{font-size:12px;font-weight:700;color:#1a1a2e;margin-top:1px;}
+.mh-strip{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:8px 14px;font-size:11.5px;color:#475569;}
+.mh-it{white-space:nowrap;}
+.mh-it b{color:#1a1a2e;font-weight:700;}
+@media print{ .page-break{page-break-before:always;} .grupo-page{margin-top:0;} .resumen-cards{grid-template-columns:1.7fr 1fr;} }`;
+
+        const headerHtml = `<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;padding-bottom:18px;border-bottom:3px solid #8B2332;">
+  <div style="display:flex;align-items:center;gap:14px;">
+    <div style="width:52px;height:52px;background:#8B2332;border-radius:14px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:19px;flex-shrink:0;">SC</div>
+    <div>
+      <div style="font-size:22px;font-weight:700;color:#1a1a2e;line-height:1.1;">SG Raíces</div>
+      <div style="font-size:13px;color:#64748b;margin-top:3px;">Informe de Avance Semanal</div>
+      <div style="font-size:13px;color:#475569;margin-top:5px;">Proyecto: <strong style="color:#1a1a2e;">${escapeHtmlBasic(proyNombre)}</strong></div>
+    </div>
+  </div>
+  <div style="text-align:right;flex-shrink:0;">
+    <div style="background:#1a1a2e;color:#fff;padding:5px 15px;border-radius:20px;font-size:12px;font-weight:600;display:inline-block;">Semana ${semana}</div>
+    <div style="font-size:11px;color:#94a3b8;margin-top:7px;">Corte: ${fechaCorte}</div>
+    <div style="font-size:11px;color:#94a3b8;margin-top:3px;">Generado: ${fechaGen}</div>
+  </div>
+</div>`;
+
+        const portadaHtml = `
+<div class="sec-title">Contrato y Garantías</div>
+<div class="resumen-cards">
+  ${contratoCard}
+  ${garantiasCard}
+</div>
+
+<div class="sec-title">Muestras de Hormigón</div>
+${muestrasHtml}
+
+<div class="sec-title">Estado del Proyecto</div>
+<div class="kpis">
+  <div class="kpi" style="border-left:3px solid ${agColor};"><div class="kpi-v" style="color:${agColor};">${agPct != null ? agPct + '%' : '—'}</div><div class="kpi-l">Avance Real<br><span style="font-size:8px;color:#94a3b8;">${_ag ? _ag.n + '/' + _ag.total + ' benef. · Datos Control' : 'Sin datos Gantt'}</span></div></div>
+  <div class="kpi"><div class="kpi-v" style="color:${avColor};">${avanceReal}%</div><div class="kpi-l">Avance Real (Insp.)<br><span style="font-size:8px;color:#94a3b8;">${conInsp.length}/${viviendas.length} con insp. · sin insp = 0%</span></div></div>
+  <div class="kpi"><div class="kpi-v" style="color:#1e3a5f;">${viviendas.length}</div><div class="kpi-l">Beneficiarios</div></div>
+  <div class="kpi"><div class="kpi-v" style="color:#16a34a;">${terminadas}</div><div class="kpi-l">Terminadas</div></div>
+  <div class="kpi"><div class="kpi-v" style="color:${criticos > 0 ? '#dc2626' : '#6b7280'};">${criticos}</div><div class="kpi-l">Críticas</div></div>
+</div>
+
+<div class="sec-title">Checkpoints del Proyecto</div>
+<div class="cp-grid">${cpKpisHtml}</div>
+
+<div class="sec-title">Ritmo de Pagos M.O. y Despachos</div>
+<div class="charts-grid">
+  <div class="chart-box"><div class="ct">Ritmo Pagos M.O.</div><div class="cs">Ciclo de pago 25 a 25 &middot; solo aprobados &middot; eje autoescalado</div>${chartMO}</div>
+  <div class="chart-box"><div class="ct">Ritmo Despachos</div><div class="cs">Cantidad de despachos por mes calendario</div>${chartDesp}</div>
+</div>
+
+<div class="sec-title">Curvas S de Control</div>
+<div class="curvas-grid">${curvasHtml}</div>
+<div style="display:flex;gap:18px;font-size:10px;color:#94a3b8;margin-top:10px;margin-bottom:4px;">
+  <span><span style="display:inline-block;width:20px;height:3px;background:#22c55e;border-radius:2px;vertical-align:middle;margin-right:4px;"></span>% Real</span>
+  <span><span style="display:inline-block;width:20px;height:0;border-top:2px dashed #3b82f6;vertical-align:middle;margin-right:4px;"></span>% Programado</span>
+  <span><span style="display:inline-block;width:20px;height:0;border-top:2px dashed #ef4444;vertical-align:middle;margin-right:4px;opacity:.6;"></span>% Proyectado</span>
+</div>
+
+<div class="sec-title">Resumen por Grupo</div>
+<div class="grupos-table">${tablaGruposHtml}</div>
+
+<div class="sec-title">Comentarios Destacados</div>
+${comentariosHtml}`;
+
+        const footerHtml = `<div class="footer">
+  <div>SG Raíces — Panel de Control v3 · Datos desde AppSheet y Google Sheets</div>
+  <div>Generado: ${fechaGen}</div>
+</div>`;
+
+        return { meta: { proyNombre, proyectoSel, semana, fechaCorte, fechaGen }, css, headerHtml, portadaHtml, footerHtml, gruposPaginas, contratoCard, muestrasHtml, gruposData };
+    };
+
+    // Helper: genera sección HTML de despachos del período actual (mes1).
+    // data = {titulo, meses, beneficiarios:[{nombre,capataz,mes1}]}
+    // capatazFiltro = string para filtrar (Capataz), null para todos (Residente)
+    const _generarSeccionDespachos = (data, capatazFiltro, soloSol = false, tituloOverride = null) => {
+        if (!data || !data.beneficiarios || !data.beneficiarios.length) return '';
+        const _norm = s => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
+        // Aplicar filtro de capataz al universo completo
+        let todoBens = data.beneficiarios;
+        if (capatazFiltro) {
+            const nc = _norm(capatazFiltro);
+            let f = todoBens.filter(b => _norm(b.capataz) === nc);
+            if (!f.length) f = todoBens.filter(b => { const bc = _norm(b.capataz); return bc.includes(nc) || nc.includes(bc); });
+            todoBens = f;
+        }
+
+        // Bens con despacho esta semana
+        let bens = todoBens;
+        if (soloSol) {
+            bens = bens.map(b => {
+                const etapas = (b.mes1 || '').split(',').map(p => p.trim()).filter(p => p && !p.startsWith('[MC]'));
+                return etapas.length ? Object.assign({}, b, {mes1: etapas.join(', ')}) : null;
+            }).filter(Boolean);
+        } else {
+            bens = bens.filter(b => b.mes1 && b.mes1.trim());
+        }
+
+        // Bens con pendientes vencidos
+        const bensVenc = todoBens.filter(b => b.vencidos && b.vencidos.length > 0);
+
+        if (!bens.length && !bensVenc.length) return '';
+
+        const mostrarCap = !capatazFiltro;
+
+        // Calcular rango lunes–viernes de la semana actual
+        const _semRango = (() => {
+            const hoy = new Date(); hoy.setHours(0,0,0,0);
+            const dow = hoy.getDay();
+            const diffLun = dow === 0 ? -6 : 1 - dow;
+            const lun = new Date(hoy.getTime() + diffLun * 86400000);
+            const vie = new Date(lun.getTime() + 4 * 86400000);
+            const fmt = d => `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`;
+            return `${fmt(lun)} al ${fmt(vie)}`;
+        })();
+
+        const titulo = tituloOverride || (capatazFiltro
+            ? `Despachos planificados — Capataz: ${capatazFiltro}`
+            : `Despachos planificados — ${data.titulo || ''}`);
+        const colCapTh = mostrarCap
+            ? '<th style="padding:7px 8px;background:#334155;color:#cbd5e1;font-size:10px;text-align:center;white-space:nowrap;">Capataz</th>'
+            : '';
+        const _fmtEtapas = (texto) => {
+            if (!texto || texto === '—') return '<span style="color:#d1d5db;">—</span>';
+            return texto.split(',').map(p => p.trim()).filter(Boolean).map(p => {
+                let color, bg, label;
+                if (p.startsWith('[SOL]')) { color='#0f766e'; bg='#ccfbf1'; label=p.slice(5).trim(); }
+                else if (p.startsWith('[MC]')) { color='#92400e'; bg='#fef3c7'; label=p.slice(4).trim(); }
+                else { color='#374151'; bg='#f3f4f6'; label=p; }
+                return `<span style="display:inline-block;margin:1px 2px;padding:1px 5px;border-radius:4px;background:${bg};color:${color};font-size:10px;white-space:nowrap;">${label}</span>`;
+            }).join('');
+        };
+
+        // ── Tabla semana actual ────────────────────────────────────────────
+        let htmlSemana = '';
+        if (bens.length) {
+            const filas = bens.map((b, i) => {
+                const bg = i % 2 === 0 ? '#ffffff' : '#f8fafc';
+                const celCap = mostrarCap
+                    ? `<td style="padding:5px 8px;font-size:10px;color:#6b7280;border-bottom:1px solid #e2e8f0;white-space:nowrap;">${b.capataz || ''}</td>`
+                    : '';
+                return `<tr style="background:${bg};"><td style="padding:5px 12px;font-size:11px;color:#111827;border-bottom:1px solid #e2e8f0;">${b.nombre}</td>${celCap}<td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;">${_fmtEtapas(b.mes1)}</td></tr>`;
+            }).join('');
+            const leyenda = soloSol
+                ? `<span><span style="background:#ccfbf1;color:#0f766e;border-radius:3px;padding:1px 5px;font-weight:600;">[SOL]</span> Solicitud confirmada</span>`
+                : `<span><span style="background:#ccfbf1;color:#0f766e;border-radius:3px;padding:1px 5px;font-weight:600;">[SOL]</span> Solicitud confirmada</span><span><span style="background:#fef3c7;color:#92400e;border-radius:3px;padding:1px 5px;font-weight:600;">[MC]</span> Proyección Monte Carlo</span>`;
+            htmlSemana = `<div style="background:#1e293b;border-radius:8px 8px 0 0;padding:10px 16px;"><div style="font-size:12px;font-weight:700;color:#f1f5f9;">${titulo}</div><div style="font-size:11px;color:#94a3b8;margin-top:2px;">Semana del ${_semRango} · ${bens.length} beneficiario(s) con despacho planificado</div></div><div style="overflow-x:auto;border:1px solid #e2e8f0;border-radius:0 0 8px 8px;"><table style="border-collapse:collapse;width:100%;"><thead><tr><th style="padding:7px 12px;background:#334155;color:#cbd5e1;font-size:10px;text-align:left;min-width:160px;">Beneficiario</th>${colCapTh}<th style="padding:7px 8px;background:#334155;color:#cbd5e1;font-size:10px;text-align:left;">Etapas a despachar</th></tr></thead><tbody>${filas}</tbody></table><div style="padding:8px 12px;background:#f8fafc;border-top:1px solid #e2e8f0;font-size:10px;color:#6b7280;display:flex;gap:12px;flex-wrap:wrap;">${leyenda}</div></div>`;
+        } else {
+            htmlSemana = `<div style="background:#1e293b;border-radius:8px 8px 0 0;padding:10px 16px;"><div style="font-size:12px;font-weight:700;color:#f1f5f9;">${titulo}</div><div style="font-size:11px;color:#94a3b8;margin-top:2px;">Semana del ${_semRango} · Sin despachos programados</div></div>`;
+        }
+
+        // ── Tabla pendientes vencidos ──────────────────────────────────────
+        let htmlVenc = '';
+        if (bensVenc.length) {
+            const _fmtFecha = iso => {
+                if (!iso) return '—';
+                const [y,m,d] = iso.split('-');
+                const meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+                return `${d} ${meses[+m-1]} ${y}`;
+            };
+            const filasV = bensVenc.flatMap((b, bi) =>
+                b.vencidos.map((v, vi) => {
+                    const bg = (bi + vi) % 2 === 0 ? '#fff7ed' : '#fef3c7';
+                    const celCap = mostrarCap
+                        ? `<td style="padding:5px 8px;font-size:10px;color:#6b7280;border-bottom:1px solid #fde68a;white-space:nowrap;">${b.capataz || ''}</td>`
+                        : '';
+                    const desc = v.descripcion ? `<span style="font-size:10px;color:#92400e;display:block;margin-top:2px;">${v.descripcion}</span>` : '';
+                    return `<tr style="background:${bg};"><td style="padding:5px 12px;font-size:11px;color:#111827;border-bottom:1px solid #fde68a;">${b.nombre}${desc}</td>${celCap}<td style="padding:5px 8px;font-size:10px;color:#b45309;border-bottom:1px solid #fde68a;white-space:nowrap;">${_fmtFecha(v.fecha)}</td><td style="padding:5px 8px;border-bottom:1px solid #fde68a;">${_fmtEtapas(v.tipo)}</td></tr>`;
+                })
+            ).join('');
+            const colCapThV = mostrarCap
+                ? '<th style="padding:7px 8px;background:#92400e;color:#fef3c7;font-size:10px;text-align:center;white-space:nowrap;">Capataz</th>'
+                : '';
+            htmlVenc = `<div style="margin-top:12px;overflow-x:auto;border:1px solid #fde68a;border-radius:8px;"><div style="background:#92400e;border-radius:8px 8px 0 0;padding:8px 16px;display:flex;align-items:center;gap:8px;"><span style="font-size:14px;">⚠️</span><div><div style="font-size:12px;font-weight:700;color:#fef3c7;">Pendientes vencidos — sin despachar a la fecha</div><div style="font-size:11px;color:#fde68a;margin-top:1px;">${bensVenc.length} beneficiario(s) con material pendiente</div></div></div><table style="border-collapse:collapse;width:100%;"><thead><tr><th style="padding:7px 12px;background:#b45309;color:#fef3c7;font-size:10px;text-align:left;min-width:160px;">Beneficiario / Material</th>${colCapThV}<th style="padding:7px 8px;background:#b45309;color:#fef3c7;font-size:10px;text-align:left;white-space:nowrap;">Fecha programada</th><th style="padding:7px 8px;background:#b45309;color:#fef3c7;font-size:10px;text-align:left;">Etapa</th></tr></thead><tbody>${filasV}</tbody></table></div>`;
+        }
+
+        return `<div style="margin-top:24px;page-break-inside:avoid;">${htmlSemana}${htmlVenc}</div>`;
+    };
+
+    // ── CSS + JS compartido para informes HTML navegables (residente / capataz) ──────────────
+    const _CSS_INF = `<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f4f8;color:#1a1a2e;font-size:14px;}
+.cnt{max-width:1080px;margin:0 auto;padding:0 0 40px;}
+.hdr{background:#0f172a;color:#fff;padding:14px 24px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100;flex-wrap:wrap;}
+.hdr h1{font-size:15px;font-weight:700;line-height:1.3;flex:1 1 auto;}
+.hdr-sub{font-size:11px;color:#94a3b8;white-space:nowrap;}
+.tabs{background:#1e293b;display:flex;padding:0 24px;gap:2px;position:sticky;top:53px;z-index:99;}
+.tab-btn{background:none;border:none;color:#94a3b8;font-size:12px;font-weight:600;padding:11px 16px;cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;}
+.tab-btn.active{color:#fff;border-bottom-color:#3b82f6;}
+.tab-btn:hover:not(.active){color:#e2e8f0;}
+.obra-jumper-wrap{position:relative;margin-left:auto;align-self:center;max-width:240px;}
+.obra-jumper-input{width:100%;background:#0f172a;color:#cbd5e1;border:1px solid #334155;border-radius:6px;padding:5px 28px 5px 10px;font-size:11px;font-weight:600;outline:none;box-sizing:border-box;cursor:pointer;}
+.obra-jumper-input::placeholder{color:#64748b;font-weight:400;}
+.obra-jumper-input:focus{border-color:#3b82f6;}
+.obra-jumper-arrow{position:absolute;right:8px;top:50%;transform:translateY(-50%);pointer-events:none;color:#64748b;font-size:9px;}
+.obra-jumper-list{display:none;position:absolute;top:calc(100% + 2px);right:0;min-width:100%;max-width:340px;background:#1e293b;border:1px solid #334155;border-radius:6px;max-height:280px;overflow-y:auto;z-index:999;box-shadow:0 4px 16px rgba(0,0,0,.4);list-style:none;margin:0;padding:0;}
+.obra-jumper-list.open{display:block;}
+.obra-jumper-item{padding:7px 10px;font-size:11px;color:#e2e8f0;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.obra-jumper-item:hover,.obra-jumper-item.oj-active{background:#334155;color:#fff;}
+.obra-jumper-item.oj-hidden{display:none;}
+.sec{display:none;}.sec.active{display:block;}
+.blk{background:#fff;margin:12px;border-radius:10px;padding:20px 24px;border:1px solid #e2e8f0;}
+.ftr{background:#f8fafc;border-top:1px solid #e2e8f0;padding:12px 24px;display:flex;gap:8px;justify-content:flex-end;align-items:center;flex-wrap:wrap;}
+.btn{padding:8px 14px;border:1px solid #d1d5db;border-radius:6px;background:#fff;cursor:pointer;font-size:12px;font-weight:600;color:#374151;}
+.btn:hover{background:#f3f4f6;}
+.btn-dark{background:#0f172a;color:#fff;border-color:#0f172a;}.btn-dark:hover{background:#1e293b;}
+.sg{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:5px;margin-bottom:8px;}
+.sc{padding:3px 7px;border-radius:5px;border:1px solid #e2e8f0;background:#f8fafc;display:flex;align-items:baseline;gap:5px;overflow:hidden;}
+.scl{font-size:9px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;flex-shrink:0;}
+.scv{font-size:11px;font-weight:700;color:#0f172a;font-family:monospace;}
+.scd{font-size:9px;color:#94a3b8;}
+.cg{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-top:12px;}
+.cc{border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;}
+.ch{background:#f8fafc;padding:10px 12px;font-size:11px;font-weight:600;color:#475569;border-bottom:1px solid #e2e8f0;}
+.tc{overflow:auto;max-height:520px;margin-top:12px;border:1px solid #e2e8f0;border-radius:6px;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+table thead{background:#f8fafc;}
+table th{padding:9px 11px;text-align:left;font-weight:700;color:#475569;border-bottom:2px solid #e2e8f0;position:sticky;top:0;background:#f8fafc;z-index:2;font-size:10px;text-transform:uppercase;}
+table td{padding:8px 11px;border-bottom:1px solid #f1f5f9;color:#334155;}
+table tr:hover td{background:#f8fafc;}
+table th:first-child,table td:first-child{position:sticky;left:0;background:white;z-index:1;border-right:1px solid #e2e8f0;min-width:160px;}
+table th:first-child{background:#f8fafc;z-index:3;}
+table tr:hover td:first-child{background:#f8fafc;}
+h3.sh{font-size:13px;color:#333;margin:18px 0 9px;display:flex;align-items:center;gap:8px;}
+h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
+@media (max-width:768px){.tabs{padding:0 8px;flex-wrap:wrap;}.tab-btn{font-size:11px;padding:9px 10px;flex:1 1 auto;text-align:center;min-width:0;}.obra-jumper-wrap{margin-left:0;width:calc(100% - 16px);max-width:100%;margin:4px 8px 6px;}.blk{margin:8px;padding:14px 12px;}.sg{grid-template-columns:1fr 1fr;}}
+@media print{.ftr{display:none;}.tabs{display:none;}.sec{display:block!important;}.blk{page-break-after:always;border:none;border-radius:0;margin:0;}}
+.seg-dot{cursor:help;display:inline-block;}
+</style>`;
+    const _JS_INF = '<scr'+'ipt>function mst(t,b){document.querySelectorAll(\'.sec\').forEach(s=>s.classList.remove(\'active\'));document.querySelectorAll(\'.tab-btn\').forEach(x=>x.classList.remove(\'active\'));document.getElementById(\'s-\'+t).classList.add(\'active\');b.classList.add(\'active\');}function jumpToObra(idx){if(idx===\'\')return;var sec=document.querySelector(\'.sec.active\');var block=sec&&sec.querySelector(\'.obra-block[data-obra="\'+idx+\'"]\');if(block)block.scrollIntoView({behavior:\'smooth\',block:\'start\'});}(function(){var w=document.getElementById(\'ojWrap\'),inp=document.getElementById(\'ojInput\'),lst=document.getElementById(\'ojList\');if(!w)return;function openL(){lst.classList.add(\'open\');}function closeL(){lst.classList.remove(\'open\');inp.value=\'\';}inp.addEventListener(\'focus\',openL);inp.addEventListener(\'click\',openL);inp.addEventListener(\'input\',function(){var q=this.value.toLowerCase();lst.querySelectorAll(\'.obra-jumper-item\').forEach(function(li){li.classList.toggle(\'oj-hidden\',q&&!li.textContent.toLowerCase().includes(q));});openL();});lst.addEventListener(\'click\',function(e){var li=e.target.closest(\'.obra-jumper-item\');if(!li)return;jumpToObra(li.dataset.idx);closeL();});document.addEventListener(\'click\',function(e){if(!w.contains(e.target))closeL();});})();</scr'+'ipt>';
+
+    // ── Construye las 6 secciones de tabs para residente o capataz ────────────────────────────
+    const _buildSecciones = (vivs, grps, curvasFiltro, capatazDesp, ganttRaw, despachosData) => {
+        const hoy = new Date();
+        const esc = escapeHtmlBasic;
+        const fF = (iso) => { if (!iso) return '—'; const p = String(iso).substring(0,10).split('-'); return p.length===3 ? `${p[2]}/${p[1]}/${p[0]}` : String(iso); };
+        const ck = (ok) => ok ? `<span style="color:#16a34a;font-weight:700;">✓</span>` : `<span style="color:#e5e7eb;">—</span>`;
+        const tot = vivs.length;
+
+        // ── RESUMEN ────────────────────────────────────────────────────────────────────────────
+        const avPct = tot ? Math.round(vivs.reduce((s,v) => s+(v.pctTotal||0),0)/tot) : 0;
+        const conInsp = vivs.filter(v => v.pctTotal != null).length;
+        const terminadas = vivs.filter(v => !!v.fecha_recepcion || !!(cierresForzados[v.ID_Benef])).length;
+        const criticos = vivs.filter(v => v.estadoGeneral === 'critico').length;
+        const _ag = avanceGanttData[proyectoSel] || null;
+        const agPct = _ag ? _ag.pct : null;
+        const agC = agPct == null ? '#94a3b8' : agPct>=80 ? '#16a34a' : agPct>=50 ? '#2563eb' : '#dc2626';
+        const avC = avPct>=80 ? '#16a34a' : avPct>=50 ? '#2563eb' : '#dc2626';
+
+        let sR = `<div class="blk"><div class="sg" style="grid-template-columns:repeat(auto-fit,minmax(110px,1fr));margin-bottom:14px;">
+<div class="sc" style="border-left:3px solid ${agC};"><div class="scl">Avance Real (Gantt)</div><div class="scv" style="color:${agC};">${agPct!=null?Number(agPct).toFixed(2)+'%':'—'}</div><div class="scd">${_ag?_ag.n+'/'+_ag.total+' benef.':'Sin datos'}</div></div>
+<div class="sc" style="border-left:3px solid ${avC};"><div class="scl">Avance Insp.</div><div class="scv" style="color:${avC};">${Number(avPct).toFixed(2)}%</div><div class="scd">${conInsp}/${tot} inspeccionadas</div></div>
+<div class="sc"><div class="scl">Viviendas</div><div class="scv">${tot}</div><div class="scd">Beneficiarios</div></div>
+<div class="sc" style="border-left:3px solid #16a34a;"><div class="scl">Terminadas</div><div class="scv" style="color:#16a34a;">${terminadas}</div><div class="scd">RF + cierre forzado</div></div>
+<div class="sc" style="border-left:3px solid ${criticos>0?'#dc2626':'#94a3b8'};"><div class="scl">Críticas</div><div class="scv" style="color:${criticos>0?'#dc2626':'#6b7280'};">${criticos}</div><div class="scd">Estado crítico</div></div>
+</div>`;
+
+        if (proy && proy.fecha_inicio && proy.duracion && !capatazDesp) {
+            const cIni=proy.fecha_inicio,cDur=proy.duracion;
+            const cFin=(()=>{const d=new Date(cIni);d.setDate(d.getDate()+cDur);return d.toISOString().substring(0,10);})();
+            const cDR=Math.floor((new Date(cFin)-hoy)/86400000);
+            const cEst=cDR<0?`Vencido (${Math.abs(cDR)}d)`:`${cDR}d restantes`;
+            const cC=cDR<0?'#dc2626':cDR<30?'#b45309':'#16a34a';
+            const cP=Math.min(100,Math.round((cDur-Math.max(0,cDR))/cDur*100));
+            const cB=cP>=100?'#ef4444':cP>=80?'#f59e0b':cP>=50?'#3b82f6':'#22c55e';
+            sR += `<h3 class="sh">📄 Contrato</h3>
+<div class="sg" style="grid-template-columns:repeat(4,1fr);">
+<div class="sc"><div class="scl">Inicio</div><div style="font-size:11px;font-weight:700;">${fF(cIni)}</div></div>
+<div class="sc"><div class="scl">Plazo</div><div style="font-size:11px;font-weight:700;">${cDur} días</div></div>
+<div class="sc"><div class="scl">Término</div><div style="font-size:11px;font-weight:700;">${fF(cFin)}</div></div>
+<div class="sc"><div class="scl">Estado</div><div style="font-size:11px;font-weight:700;color:${cC};">${cEst}</div></div>
+</div>
+<div style="display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;margin:6px 0 3px;"><span>${fF(cIni)}</span><span style="font-weight:600;">${cP}% transcurrido</span><span>${fF(cFin)}</span></div>
+<div style="height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden;margin-bottom:12px;"><div style="height:100%;width:${cP}%;background:${cB};border-radius:6px;"></div></div>`;
+        }
+
+        const pg = ganttRaw[proyectoSel] || null;
+        if (pg && pg.inicio && pg.finProg) {
+            const dR=Math.floor((new Date(pg.finProg)-hoy)/86400000);
+            const pgE=dR<0?`Vencido (${Math.abs(dR)}d)`:`${dR}d restantes`;
+            const pgC=dR<0?'#dc2626':dR<30?'#b45309':'#16a34a';
+            const pgProg = _ag != null ? Math.min(100, _ag.pct_prog ?? _ag.pct ?? 0) : null;
+            const pgP = pgProg !== null ? pgProg : (pg.plazo>0?Math.min(100,Math.round((pg.plazo-Math.max(0,dR))/pg.plazo*100)):0);
+            const pgB = pgP>=100?'#ef4444':pgP>=80?'#f59e0b':pgP>=50?'#3b82f6':'#22c55e';
+            sR += `<h3 class="sh">📋 Programa de Obra</h3>
+<div class="sg" style="grid-template-columns:repeat(4,1fr);">
+<div class="sc"><div class="scl">Inicio</div><div style="font-size:11px;font-weight:700;">${fF(pg.inicio)}</div></div>
+<div class="sc"><div class="scl">Plazo</div><div style="font-size:11px;font-weight:700;">${pg.plazo} días</div></div>
+<div class="sc"><div class="scl">Término</div><div style="font-size:11px;font-weight:700;">${fF(pg.finProg)}</div></div>
+<div class="sc"><div class="scl">Estado</div><div style="font-size:11px;font-weight:700;color:${pgC};">${pgE}</div></div>
+</div>
+<div style="display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;margin:6px 0 3px;"><span>${fF(pg.inicio)}</span><span style="font-weight:600;">${pgProg !== null ? Number(pgProg).toFixed(2) + '% programado' : '—'}</span><span>${fF(pg.finProg)}</span></div>
+<div style="height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden;margin-bottom:12px;"><div style="height:100%;width:${pgP}%;background:${pgB};border-radius:6px;"></div></div>`;
+        } else {
+            sR += `<h3 class="sh">📋 Programa de Obra</h3><p style="color:#94a3b8;font-size:12px;padding:6px 0 12px;">Sin datos de programa disponibles.</p>`;
+        }
+
+        sR += `<h3 class="sh">📊 Resumen por Grupo</h3>
+<div class="tc"><table><thead><tr><th>Grupo</th><th>Capataz</th><th style="text-align:center;">Viv.</th><th style="text-align:center;">Avance</th><th style="text-align:center;">Terminadas</th><th style="text-align:center;">Críticas</th></tr></thead><tbody>`;
+        grps.forEach(g => {
+            if (g.viviendas.length === 0) return;
+            const res=grupoResumen(g.viviendas,cierresForzados);
+            const aC=res.avanceInsp>=80?'#16a34a':res.avanceInsp>=50?'#2563eb':'#dc2626';
+            sR += `<tr><td style="font-weight:600;">${esc(g.nombre||'Sin Asignar')}</td><td>${esc(g.capataz||'—')}</td><td style="text-align:center;">${res.n}</td><td style="text-align:center;font-weight:700;color:${aC};">${res.avanceInsp}%</td><td style="text-align:center;color:#16a34a;">${res.terminadas}</td><td style="text-align:center;color:${res.criticas>0?'#dc2626':'#6b7280'};font-weight:${res.criticas>0?700:400};">${res.criticas}</td></tr>`;
+        });
+        sR += `</tbody></table></div></div>`;
+
+        // ── CHECKPOINTS ───────────────────────────────────────────────────────────────────────
+        const CP_OBR = CHECKPOINTS.filter(cp => !['V.AS','V.F1','F.V.DOM','F.Recep'].includes(cp.label));
+        let sCk = `<div class="blk"><div class="sg" style="grid-template-columns:repeat(auto-fill,minmax(55px,1fr));margin-bottom:20px;">`;
+        CP_OBR.forEach(cp => {
+            const n=vivs.filter(v=>v.flags&&v.flags[cp.key]).length;
+            const pct=tot?Math.round(n/tot*100):0;
+            const col=n===tot?'#16a34a':n>0?'#2563eb':'#6b7280';
+            sCk += `<div style="text-align:center;padding:4px 2px;border-radius:4px;border:1px solid #e2e8f0;background:#f8fafc;"><div style="font-size:9px;font-weight:700;color:#64748b;text-transform:uppercase;white-space:nowrap;">${cp.label}</div><div style="font-size:12px;font-weight:700;color:${col};">${n}</div><div style="font-size:8px;color:#94a3b8;">/${tot}·${pct}%</div></div>`;
+        });
+        sCk += `</div><div class="tc"><table style="min-width:520px;white-space:nowrap;">
+<thead><tr><th>Beneficiario</th>${CP_OBR.map(cp=>`<th style="text-align:center;">${cp.label}</th>`).join('')}<th style="text-align:center;">Recep.</th></tr></thead><tbody>`;
+        vivs.forEach(v => {
+            const p=v.pctTotal,pT=p!=null?`${p}%`:'—';
+            const pC=p==null?'#94a3b8':p>=80?'#16a34a':p>=50?'#2563eb':'#dc2626';
+            const rfOk=!!v.fecha_recepcion||!!(cierresForzados[v.ID_Benef]);
+            const nm=esc((v.NOMBRES||'')+' '+(v.APELLIDOS||''));
+            sCk += `<tr${rfOk?' style="background:#f0fdf4;"':''}><td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${nm}">${nm} <span style="font-size:10px;font-weight:700;color:${pC};">${pT}</span></td>${CP_OBR.map(cp=>`<td style="text-align:center;">${ck(v.flags&&v.flags[cp.key])}</td>`).join('')}<td style="text-align:center;">${ck(rfOk)}</td></tr>`;
+        });
+        sCk += `</tbody></table></div></div>`;
+
+        // ── CURVAS S ──────────────────────────────────────────────────────────────────────────
+        let sCurv = `<div class="blk"><div class="cg">`;
+        if (curvasFiltro.length > 0) {
+            curvasFiltro.forEach(c => { sCurv += `<div class="cc"><div class="ch">${esc(c.label)}</div><img src="https://drive.google.com/thumbnail?id=${c.id}&sz=w800&t=${Math.floor(Date.now()/3600000)}" style="width:100%;display:block;" alt="${esc(c.label)}" loading="lazy"/></div>`; });
+        } else {
+            sCurv += `<div style="color:#94a3b8;font-size:13px;padding:32px;text-align:center;grid-column:1/-1;">Sin curvas S configuradas para este proyecto.</div>`;
+        }
+        sCurv += `</div></div>`;
+
+        // ── RITMOS Y COMENTARIOS ──────────────────────────────────────────────────────────────
+        const fMR = (ym) => { if(!ym||ym.length<7)return ym; const [y,m]=ym.split('-'); const ms=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']; return `${ms[parseInt(m,10)-1]}'${y.slice(2)}`; };
+        const fCR = (n) => n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(0)+'k':String(n);
+        const bMO={}; vivs.forEach(v=>(v.pagosBenef||[]).forEach(p=>{if(!p.fecha)return;const mm=p.fecha.match(/^(\d{4})-(\d{2})-(\d{2})/);if(!mm)return;let yr=parseInt(mm[1]),mo=parseInt(mm[2]),dy=parseInt(mm[3]);if(dy>=25){mo++;if(mo>12){mo=1;yr++;}}const ym=`${yr}-${String(mo).padStart(2,'0')}`;bMO[ym]=(bMO[ym]||0)+p.monto;}));
+        const oMO=Object.keys(bMO).sort().slice(-12);
+        const bD={}; vivs.forEach(v=>DESPACHOS_DATA.filter(x=>String(x.ID_Benef)===String(v.ID_Benef)).forEach(x=>{if(!x.Fecha)return;const ym=x.Fecha.substring(0,7);bD[ym]=(bD[ym]||0)+1;}));
+        const oD=Object.keys(bD).sort().slice(-12);
+        const svgMO=svgLineChartString({meses:oMO,valores:oMO.map(k=>bMO[k]),color:'#7c3aed',fillColor:'rgba(124,58,237,0.10)',fmtMes:fMR,fmtV:fCR});
+        const svgD=svgLineChartString({meses:oD,valores:oD.map(k=>bD[k]),color:'#10b981',fillColor:'rgba(16,185,129,0.10)',fmtMes:fMR,fmtV:(v)=>String(v)});
+        let sRit=`<div class="blk"><div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+<div><div style="font-size:12px;font-weight:600;color:#333;margin-bottom:8px;">Ritmo Mano de Obra (ciclo 25-25)</div>${svgMO}</div>
+<div><div style="font-size:12px;font-weight:600;color:#333;margin-bottom:8px;">Ritmo Despachos (por mes)</div>${svgD}</div>
+</div><h3 class="sh">⭐ Comentarios Destacados</h3>`;
+        let comH='';
+        grps.forEach(g=>{if(g.viviendas.length===0)return;const items=[];if(g.comentario)items.push(`<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;margin-bottom:6px;"><span style="font-size:9px;font-weight:700;text-transform:uppercase;color:#b45309;">Nota del coordinador</span><div style="margin-top:2px;font-style:italic;font-size:12px;color:#374151;">${esc(g.comentario)}</div></div>`);g.viviendas.forEach(v=>(v.obsPublicas||[]).forEach(o=>{const fch=(o.fecha||'').toString().substring(0,10);items.push(`<div style="padding:6px 12px;margin-bottom:5px;font-size:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;"><span style="font-weight:600;color:#1a1a2e;">${esc((v.NOMBRES||'')+' '+(v.APELLIDOS||''))}</span> <span style="font-size:10px;color:#94a3b8;">${fch}</span><div style="color:#374151;margin-top:1px;">${esc(o.texto||'')}</div></div>`);}));if(items.length)comH+=`<div style="margin-bottom:14px;"><div style="font-size:13px;font-weight:700;color:#1a1a2e;margin-bottom:6px;">${esc(g.nombre||'Sin Asignar')}</div>${items.join('')}</div>`;});
+        sRit += (comH || `<div style="color:#94a3b8;font-size:12px;padding:16px;text-align:center;border:1px dashed #e2e8f0;border-radius:8px;">Sin comentarios destacados.</div>`) + `</div>`;
+
+        // ── VIVIENDAS ─────────────────────────────────────────────────────────────────────────
+        let sViv=`<div class="blk">`;
+        grps.forEach(g=>{if(g.viviendas.length===0)return;sViv+=`<div style="margin-bottom:24px;"><div style="font-size:12px;font-weight:700;color:#1a1a2e;background:#f1f5f9;border:1px solid #e2e8f0;padding:7px 12px;border-radius:7px;margin-bottom:8px;">${esc(g.nombre||'Sin Asignar')}${g.capataz?` · <span style="font-weight:400;color:#64748b;">Capataz: ${esc(g.capataz)}</span>`:''} <span style="font-weight:400;color:#94a3b8;">(${g.viviendas.length} viv.)</span></div>
+<div class="tc"><table style="min-width:520px;white-space:nowrap;">
+<thead><tr><th>Beneficiario</th><th>Avance</th><th style="text-align:center;">HPC</th><th style="text-align:center;">TE1</th><th style="text-align:center;">R.AS</th><th style="text-align:center;">F1</th><th style="text-align:center;">Artef.</th><th style="text-align:center;">Empalme</th><th style="text-align:center;">Recep.</th></tr></thead><tbody>`;
+            g.viviendas.forEach(v=>{const p=v.pctTotal,pT=p!=null?`${p}%`:'—',pC=p==null?'#94a3b8':p>=80?'#16a34a':p>=50?'#2563eb':'#dc2626';const fl=v.flags||{};const rfOk=!!v.fecha_recepcion||!!(cierresForzados[v.ID_Benef]);const nm=esc((v.NOMBRES||'')+' '+(v.APELLIDOS||''));sViv+=`<tr${rfOk?' style="background:#f0fdf4;"':''}><td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${nm}">${nm}</td><td style="font-weight:700;color:${pC};">${pT}</td><td style="text-align:center;">${ck(fl.hpc)}</td><td style="text-align:center;">${ck(fl.te1)}</td><td style="text-align:center;">${ck(fl.resol_as)}</td><td style="text-align:center;">${ck(fl.fecha_f1)}</td><td style="text-align:center;">${ck(fl.artefactado)}</td><td style="text-align:center;">${ck(fl.empalme)}</td><td style="text-align:center;">${ck(rfOk)}</td></tr>`;});
+            sViv+=`</tbody></table></div></div>`;});
+        sViv+=`</div>`;
+
+        // ── DESPACHOS ─────────────────────────────────────────────────────────────────────────
+        let sDesp=`<div class="blk">`;
+        if(despachosData&&despachosData.beneficiarios&&despachosData.beneficiarios.length){
+            sDesp+=_generarSeccionDespachos(despachosData,capatazDesp,!capatazDesp)||`<p style="color:#94a3b8;text-align:center;padding:32px;">Sin despachos para este filtro.</p>`;
+        } else {
+            sDesp+=`<p style="color:#94a3b8;font-size:13px;text-align:center;padding:48px;">Sin datos de despachos disponibles para este proyecto.</p>`;
+        }
+        sDesp+=`</div>`;
+
+        return {sR, sCk, sCurv, sRit, sViv, sDesp};
+    };
+
+    // ── Ensambla HTML completo y dispara descarga + nueva pestaña ─────────────────────────────
+    const _emitirInformeHTML = (titulo, subtitulo, semana, fechaGen, secs, obras=[]) => {
+        const TABS=[['resumen','Resumen'],['checkpoints','Checkpoints'],['curvas','Curvas S'],['ritmos','Ritmos y comentarios'],['viviendas','Viviendas'],['despachos','Despachos'],['mo','M.O.']];
+        const tabsHtml=TABS.map(([k,l],i)=>`<button class="tab-btn${i===0?' active':''}" onclick="mst('${k}',this)">${l}</button>`).join('');
+        const ojHtml=obras.length>1?`<div class="obra-jumper-wrap" id="ojWrap"><input class="obra-jumper-input" id="ojInput" type="text" placeholder="&#128269; Ir a obra..." autocomplete="off"><span class="obra-jumper-arrow">&#9660;</span><ul class="obra-jumper-list" id="ojList">${obras.map((o,i)=>`<li class="obra-jumper-item" data-idx="${i}">${escapeHtmlBasic(o.nombre)}</li>`).join('')}</ul></div>`:'';
+        const secsHtml=TABS.map(([k],i)=>`<div class="sec${i===0?' active':''}" id="s-${k}">${secs[i]}</div>`).join('');
+        const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>${titulo} — Sem ${semana}</title>${_CSS_INF}</head><body>
+<div class="cnt">
+  <div class="hdr"><span style="font-size:20px;">🏗️</span><h1>${titulo}</h1><span class="hdr-sub">${subtitulo}</span></div>
+  <div class="tabs">${tabsHtml}${ojHtml}</div>
+  <div class="content">${secsHtml}</div>
+  <div class="ftr"><span style="font-size:11px;color:#94a3b8;">Generado: ${fechaGen}</span><button class="btn btn-dark" onclick="window.print();">🖨️ Imprimir / PDF</button></div>
+</div>${_JS_INF}</body></html>`;
+        return html;
+    };
+
+    // ── Reporte residente HTML (multi-obra) ────────────────────────────────────────────────────
+    const generarInformeResidenteHTML = async () => {
+        const hoy = new Date();
+        const sem = Math.ceil(((hoy - new Date(hoy.getFullYear(),0,1))/86400000 + new Date(hoy.getFullYear(),0,1).getDay()+1)/7);
+        const fechaGen = hoy.toLocaleString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+
+        const normStr = s => (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+
+        // Fetch Firebase: gantt, grupos, observaciones, avance_gantt
+        let ganttRaw={}, gruposRaw={}, obsRaw={}, avGanttLocal={};
+        try {
+            const [rG,rGr,rObs,rAg] = await Promise.all([
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/gantt_programa.json'),
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/grupos.json'),
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/observaciones.json'),
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/avance_gantt.json')
+            ]);
+            ganttRaw=(await rG.json())||{}; gruposRaw=(await rGr.json())||{}; obsRaw=(await rObs.json())||{}; avGanttLocal=(await rAg.json())||{};
+        } catch(_e){}
+
+        // Nombre del residente: desde grupos del proyecto actual en Firebase
+        const resNombre = ((gruposRaw[proyectoSel]||[]).map(g=>g.residente).filter(Boolean)[0]) || null;
+
+        // Proyectos del residente: buscar en grupos de todos los proyectos
+        let proysList = [];
+        if (resNombre) {
+            const normR = normStr(resNombre);
+            proysList = PROYECTOS_DATA.filter(pr => {
+                const grps = gruposRaw[pr.ID_proy] || [];
+                return grps.some(g => { const nG=normStr(g.residente||''); return nG&&(nG===normR||nG.includes(normR)||normR.includes(nG)); });
+            });
+        }
+        // Fallback: solo proyecto actual
+        if (!proysList.length) proysList = proy ? [proy] : PROYECTOS_DATA.filter(p=>p.ID_proy===proyectoSel);
+
+        // Fetch despachos para todos los proyectos del residente
+        const despMap = {};
+        await Promise.all(proysList.map(async pr => {
+            try { const r=await fetch(`https://scraices-dashboard-default-rtdb.firebaseio.com/despachos_data/${pr.ID_proy}.json`); despMap[pr.ID_proy]=await r.json(); } catch(_e){ despMap[pr.ID_proy]=null; }
+        }));
+
+        // Enriquecer beneficiarios de proyectos ajenos (agrega pctTotal, flags, pagosBenef, etc.)
+        const enrich = v => {
+            const seg=SEGUIMIENTO_DATA[String(v.ID_Benef)]||{_has:{}};
+            const ins=getInspeccion(v.ID_Benef);
+            const desp=DESPACHOS_DATA.filter(x=>String(x.ID_Benef)===String(v.ID_Benef)).sort((a,b)=>(a.Fecha||'').localeCompare(b.Fecha||''));
+            return {...v, pctTotal:ins?ins.pct_total:null, estadoGeneral:null,
+                flags:{hpc:!!v.habil,te1:!!v.has_te1,resol_as:!!seg._has.resol_as,fecha_f1:!!seg._has.fecha_f1,
+                       artefactado:!!seg._has.artefactado,empalme:!!seg._has.empalme,
+                       fecha_recep:!!(v.fecha_recepcion||seg._has.fecha_recep)},
+                pagosBenef:getSolpago(v.ID_Benef), obsPublicas:[],
+                avance:{porcentaje:0}, primerDespacho:desp.length?desp[0].Fecha:null};
+        };
+
+        // Construir datos por proyecto
+        const proyData = proysList.map(pr => {
+            const esCurrent = String(pr.ID_proy)===String(proyectoSel);
+            const vivs = esCurrent ? datos : BENEFICIARIOS_DATA.filter(b=>String(b.ID_Proy)===String(pr.ID_proy)).map(enrich);
+            const grps = agruparViviendas(vivs, gruposRaw[pr.ID_proy]||[]);
+            const tot=vivs.length;
+            const avPct=tot?Math.round(vivs.reduce((s,v)=>s+(v.pctTotal||0),0)/tot):0;
+            const conInsp=vivs.filter(v=>v.pctTotal!=null).length;
+            const terminadas=vivs.filter(v=>!!v.fecha_recepcion||!!(cierresForzados[v.ID_Benef])).length;
+            const _ag=avGanttLocal[pr.ID_proy]||avanceGanttData[pr.ID_proy]||null; const agPct=_ag?_ag.pct:null;
+            const pg=ganttRaw[pr.ID_proy]||null;
+            const pgDR=pg&&pg.finProg?Math.floor((new Date(pg.finProg)-hoy)/86400000):null;
+            const pgPct=pg&&pg.plazo>0?Math.min(100,Math.round((pg.plazo-Math.max(0,pgDR||0))/pg.plazo*100)):0;
+            const pgProgPct=_ag!=null?Math.min(100,_ag.pct_prog??_ag.pct??0):null;
+            const cIni=pr.fecha_inicio||null,cDur=pr.duracion||0;
+            const cFin=(cIni&&cDur>0)?(()=>{const d=new Date(cIni);d.setDate(d.getDate()+cDur);return d.toISOString().substring(0,10);})():null;
+            const cDR=cFin?Math.floor((new Date(cFin)-hoy)/86400000):null;
+            const cPct=(cDur>0&&cFin)?Math.min(100,Math.round((cDur-Math.max(0,cDR||0))/cDur*100)):0;
+            const curvas=CURVAS_S_CONFIG[pr.ID_proy]||[];
+            const nombre=`${pr.ID_proy} · ${pr.NOMBRE_PROYECTO}`;
+            const obs=obsRaw[pr.ID_proy]||{};
+            const habilitadas=vivs.filter(v=>v.habil).length;
+            const enEjecucion=vivs.filter(v=>DESPACHOS_DATA.some(d=>String(d.ID_Benef)===String(v.ID_Benef))).length;
+            const diff=agPct!==null&&pg?Math.round((agPct-pgPct)*100)/100:null;
+            const recepDom=vivs.filter(v=>{const seg=SEGUIMIENTO_DATA[String(v.ID_Benef)];return seg&&seg._has&&seg._has.recepcion_dom;}).length;
+            const todasRecep=tot>0&&recepDom===tot;
+            const _ufr=todasRecep?vivs.map(v=>{const seg=SEGUIMIENTO_DATA[String(v.ID_Benef)];const fd=v.fecha_recepcion||(seg&&seg.fecha_recep)||null;return fd?new Date(fd):null;}).filter(f=>f&&!isNaN(f.getTime())):[]; 
+            const ultimaFR=_ufr.length?new Date(Math.max(..._ufr.map(f=>f.getTime()))):null;
+            let pgDiasRFrozen=pgDR,pgDiasRColor=null,pgDiasRText=null;
+            if(todasRecep&&pg&&pg.finProg&&ultimaFR){const df=Math.floor((new Date(pg.finProg)-ultimaFR)/86400000);pgDiasRFrozen=df;pgDiasRColor=df>=0?'#16a34a':'#dc2626';pgDiasRText=(df>=0?'+':'')+df+'d';}
+            const _pctPend=tot>0?(tot-recepDom)/tot*100:0;
+            const circleHtml=(todasRecep&&pgDiasRFrozen>=0)?'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#16a34a;vertical-align:middle;" class="seg-dot" title="Todas con Recep. DOM completadas dentro del plazo" data-tip="Todas con Recep. DOM completadas dentro del plazo"></span>':(pgDR!==null&&pgDR<=90)?'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#dc2626;vertical-align:middle;" class="seg-dot" title="90 días o menos al término del programa" data-tip="90 días o menos al término del programa"></span>':(recepDom>0&&pg&&pg.plazo>0?(()=>{const pctEl=Math.max(0,pg.plazo-Math.max(0,pgDR??0))/pg.plazo*100;return pctEl>=80?'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#eab308;vertical-align:middle;" class="seg-dot" title="Más del 80% del plazo transcurrido, más de 90d al término" data-tip="Más del 80% del plazo transcurrido, más de 90d al término"></span>':'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#9ca3af;vertical-align:middle;" class="seg-dot" title="Con Recep. DOM, menos del 80% del plazo transcurrido" data-tip="Con Recep. DOM, menos del 80% del plazo transcurrido"></span>';})():'')
+            return {pr,vivs,grps,curvas,tot,avPct,conInsp,terminadas,_ag,agPct,pg,pgDR,pgPct,pgProgPct,cIni,cDur,cFin,cDR,cPct,despachos:despMap[pr.ID_proy],nombre,obs,esCurrent,habilitadas,enEjecucion,diff,recepDom,todasRecep,pgDiasRFrozen,pgDiasRColor,pgDiasRText,circleHtml};
+        });
+
+        // Helpers de render
+        const esc=escapeHtmlBasic;
+        const ck=ok=>ok?`<span style="color:#16a34a;font-weight:700;">✓</span>`:`<span style="color:#e5e7eb;">—</span>`;
+        const fF=iso=>{if(!iso)return'—';const p=String(iso).substring(0,10).split('-');return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:String(iso);};
+        const fMR=ym=>{if(!ym||ym.length<7)return ym;const[y,m]=ym.split('-');const ms=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];return`${ms[parseInt(m,10)-1]}'${y.slice(2)}`;};
+        const fCR=n=>n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(0)+'k':String(n);
+        const CP_OBR=CHECKPOINTS.filter(cp=>!['V.AS','V.F1','F.V.DOM','F.Recep'].includes(cp.label));
+        const bC=p=>p>=100?'#ef4444':p>=80?'#f59e0b':p>=50?'#3b82f6':'#22c55e';
+        const agColor=p=>p==null?'#94a3b8':p>=80?'#16a34a':p>=50?'#2563eb':'#dc2626';
+        const avColor=p=>p>=80?'#16a34a':p>=50?'#2563eb':'#dc2626';
+        const prjHdr=nm=>`<div style="background:#0f172a;color:#f1f5f9;font-size:12px;font-weight:700;padding:8px 12px;border-radius:7px;margin-bottom:12px;">🏗️ ${esc(nm)}</div>`;
+        const barRow=(ini,pct,fin,lbl)=>`<div style="display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;margin:6px 0 3px;"><span>${ini}</span><span style="font-weight:600;">${lbl||pct+'% transcurrido'}</span><span>${fin}</span></div><div style="height:8px;background:#e5e7eb;border-radius:6px;overflow:hidden;margin-bottom:12px;"><div style="height:100%;width:${pct}%;background:${bC(pct)};border-radius:6px;"></div></div>`;
+
+        // ── RESUMEN: tabla ejecutiva + detalle por obra ──────────────────────────────────────
+        let sR=`<div class="blk"><h3 class="sh">📋 Resumen ejecutivo de proyectos</h3><div style="overflow-x:auto;overflow-y:auto;max-height:420px;-webkit-overflow-scrolling:touch;">
+<table style="min-width:900px;border-collapse:collapse;font-size:10px;white-space:nowrap;">
+<thead style="position:sticky;top:0;z-index:1;">
+<tr style="background:#f1f5f9;">
+  <th rowspan="2" style="padding:5px 6px;border:1px solid #e2e8f0;text-align:left;font-size:9px;text-transform:uppercase;color:#475569;">Proyecto</th>
+  <th colspan="3" style="padding:4px 6px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Avance (%)</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;background:#fef9c3;" title="% Avance Real − % Avance Programa">% Real<br>- % Prog</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Inicio<br>Prog.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Término<br>Prog.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Pzo.<br>Cont.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Pzo.<br>Prog.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Rest.<br>Cont.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Rest.<br>Prog.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Tot.<br>Viv.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Hab.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;text-transform:uppercase;color:#475569;" title="Con al menos 1 despacho realizado">Viv. en<br>Ejec.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;background:#f0fdf4;cursor:help;" title="Cantidad de beneficiarios con Recepción Definitiva DOM">Recep.<br>DOM</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;cursor:help;" title="Indicador de estado RECEP DOM vs plazo de programa">Est.<br>RECEP</th>
+</tr>
+<tr style="background:#f8fafc;">
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;width:72px;min-width:72px;" title="% Avance de contrato">% Cont.</th>
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;width:72px;min-width:72px;" title="% Avance según programa de obra (por fechas Gantt)">% Prog.</th>
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;width:72px;min-width:72px;" title="% Avance real (Curvas S)">% Real</th>
+</tr>
+</thead><tbody>`;
+        const sortedProyData=[...proyData].sort((a,b)=>{
+            if(a.pgDR===null&&b.pgDR===null)return 0;
+            if(a.pgDR===null)return 1; if(b.pgDR===null)return -1;
+            return b.pgDR-a.pgDR;
+        });
+        let _fc90r=true;
+        sortedProyData.forEach(d=>{
+            const isCrit90=d.pgDR!==null&&d.pgDR<=90;
+            if(isCrit90&&_fc90r){_fc90r=false;sR+=`<tr style="height:0;"><td colspan="16" style="padding:0;border:none;border-top:3px solid #dc2626;"></td></tr>`;}
+            const rowBg=isCrit90?'background:#fff1f2;':'';
+            const dCol=d.diff===null?'#94a3b8':d.diff>=0?'#16a34a':'#dc2626';
+            const dBg=d.diff===null?'':d.diff>=0?'#f0fdf4':'#fef2f2';
+            const dTxt=d.diff===null?'—':(d.diff>=0?'+':'')+Number(d.diff).toFixed(2)+'%';
+            const cRCol=d.cDR===null?'#94a3b8':d.cDR<0?'#dc2626':d.cDR<30?'#b45309':'#374151';
+            const pRCol=d.pgDR===null?'#94a3b8':d.pgDR<=90?'#dc2626':'#374151';
+            sR+=`<tr style="border-bottom:1px solid #f1f5f9;${rowBg}">
+  <td style="padding:5px 6px;border-right:1px solid #f1f5f9;font-size:10px;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(d.nombre)}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${d.cPct!==null?Number(d.cPct).toFixed(2)+'%':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${d.pg?Number(d.pgPct).toFixed(2)+'%':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:${d.diff!==null?(d.diff>=5?'#16a34a':d.diff>=0?'#2563eb':'#dc2626'):'#94a3b8'};">${d.agPct!==null?Number(d.agPct).toFixed(2)+'%':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;font-weight:700;color:${dCol};background:${dBg};">${dTxt}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${fF(d.pg?.inicio||null)}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${fF(d.pg?.finProg||null)}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${d.cDur?d.cDur+'d':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${d.pg?.plazo?d.pg.plazo+'d':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:${cRCol};">${d.cDR!==null?d.cDR+'d':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:${d.pgDiasRColor||pRCol};font-weight:${(d.todasRecep||isCrit90)?'700':'400'};">${d.pgDiasRText||(d.pgDiasRFrozen!==null?d.pgDiasRFrozen+'d':'—')}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${d.tot}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${d.habilitadas}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;font-weight:700;color:#2563eb;">${d.enEjecucion}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;font-weight:700;color:${d.todasRecep?'#16a34a':'#374151'};">${d.recepDom}/${d.tot}</td>
+  <td style="padding:4px 4px;text-align:center;">${d.circleHtml}</td>
+</tr>`;
+        });
+        sR+=`</tbody></table></div></div>`;
+
+        // Bloque detallado por obra
+        proyData.forEach((d,pi)=>{
+            const agC=agColor(d.agPct),avC=avColor(d.avPct),agB=(d.agPct??0)>=80?'#16a34a':(d.agPct??0)>=50?'#3b82f6':(d.agPct??0)>=25?'#f59e0b':'#ef4444',avB=d.avPct>=80?'#16a34a':d.avPct>=50?'#3b82f6':d.avPct>=25?'#f59e0b':'#ef4444';
+            sR+=`<div class="obra-block blk" data-obra="${pi}" style="border-left:4px solid #0f172a;">${prjHdr(d.nombre)}
+<div class="sg" style="margin-bottom:14px;">
+<div class="sc" style="border-left:3px solid ${agC};"><div class="scl">Avance Real (Gantt)</div><div class="scv" style="color:${agC};">${d.agPct!=null?Number(d.agPct).toFixed(2)+'%':'—'}</div><div class="scd">${d._ag?d._ag.n+'/'+d._ag.total+' benef.':'Sin datos'}</div></div>
+<div class="sc" style="border-left:3px solid ${avC};"><div class="scl">Avance Insp.</div><div class="scv" style="color:${avC};">${Number(d.avPct).toFixed(2)}%</div><div class="scd">${d.conInsp}/${d.tot} inspeccionadas</div></div>
+<div class="sc"><div class="scl">Viviendas</div><div class="scv">${d.tot}</div><div class="scd">Beneficiarios</div></div>
+<div class="sc" style="border-left:3px solid #16a34a;"><div class="scl">Terminadas</div><div class="scv" style="color:#16a34a;">${d.terminadas}</div><div class="scd">RF + cierre forzado</div></div>
+</div>`;
+            if(d.cIni&&d.cFin){const cC=d.cDR<0?'#dc2626':d.cDR<30?'#b45309':'#16a34a';const cEst=d.cDR<0?`Vencido (${Math.abs(d.cDR)}d)`:`${d.cDR}d restantes`;
+                sR+=`<h3 class="sh">📄 Contrato</h3><div class="sg" style="grid-template-columns:repeat(4,1fr);">
+<div class="sc"><div class="scl">Inicio</div><div style="font-size:11px;font-weight:700;">${fF(d.cIni)}</div></div>
+<div class="sc"><div class="scl">Término</div><div style="font-size:11px;font-weight:700;">${fF(d.cFin)}</div></div>
+<div class="sc"><div class="scl">Plazo</div><div style="font-size:11px;font-weight:700;">${d.cDur} días</div></div>
+<div class="sc"><div class="scl">Estado</div><div style="font-size:11px;font-weight:700;color:${cC};">${cEst}</div></div>
+</div>${barRow(fF(d.cIni),d.cPct,fF(d.cFin))}`;}
+            if(d.pg&&d.pg.inicio&&d.pg.finProg){const pgC=d.pgDR<0?'#dc2626':d.pgDR<30?'#b45309':'#16a34a';const pgE=d.pgDR<0?`Vencido (${Math.abs(d.pgDR)}d)`:`${d.pgDR}d restantes`;
+                sR+=`<h3 class="sh">📋 Programa de Obra</h3><div class="sg" style="grid-template-columns:repeat(4,1fr);">
+<div class="sc"><div class="scl">Inicio</div><div style="font-size:11px;font-weight:700;">${fF(d.pg.inicio)}</div></div>
+<div class="sc"><div class="scl">Término</div><div style="font-size:11px;font-weight:700;">${fF(d.pg.finProg)}</div></div>
+<div class="sc"><div class="scl">Plazo</div><div style="font-size:11px;font-weight:700;">${d.pg.plazo} días</div></div>
+<div class="sc"><div class="scl">Estado</div><div style="font-size:11px;font-weight:700;color:${pgC};">${pgE}</div></div>
+</div>${barRow(fF(d.pg.inicio),d.pgProgPct!==null?d.pgProgPct:d.pgPct,fF(d.pg.finProg),d.pgProgPct!==null?Number(d.pgProgPct).toFixed(2)+'% programado':null)}`;}
+            sR+=`<h3 class="sh">📊 Avance real a la fecha</h3>
+<div class="sg" style="grid-template-columns:repeat(auto-fit,minmax(110px,1fr));">
+<div class="sc" style="border-left:3px solid ${agC};"><div class="scl">Avance Real</div><div class="scv" style="color:${agC};">${d.agPct!=null?Number(d.agPct).toFixed(2)+'%':'—'}</div></div>
+<div class="sc"><div class="scl">Inspeccionadas</div><div class="scv">${d.conInsp}/${d.tot}</div><div class="scd">viviendas</div></div>
+<div class="sc"><div class="scl">Terminadas</div><div class="scv" style="color:#16a34a;">${d.terminadas}</div><div class="scd">con recepción</div></div>
+</div>
+<div style="display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;margin:6px 0 3px;"><span>0%</span><span style="font-weight:600;color:${agC};">${d.agPct!=null?Number(d.agPct).toFixed(2)+'%':'0.00%'} completado</span><span>100%</span></div>
+<div style="height:8px;background:#e5e7eb;border-radius:6px;overflow:hidden;"><div style="height:100%;width:${d.agPct??0}%;background:${agB};border-radius:6px;"></div></div>
+</div>`;
+        });
+
+        // ── CHECKPOINTS por obra ─────────────────────────────────────────────────────────────
+        let sCk='';
+        proyData.forEach((d,pi)=>{
+            sCk+=`<div class="obra-block blk" data-obra="${pi}" style="border-left:4px solid #0f172a;">${prjHdr(d.nombre)}<div class="sg" style="grid-template-columns:repeat(auto-fill,minmax(55px,1fr));margin-bottom:16px;">`;
+            CP_OBR.forEach(cp=>{const n=d.vivs.filter(v=>v.flags&&v.flags[cp.key]).length;const pct=d.tot?Math.round(n/d.tot*100):0;const col=n===d.tot?'#16a34a':n>0?'#2563eb':'#6b7280';sCk+=`<div style="text-align:center;padding:4px 2px;border-radius:4px;border:1px solid #e2e8f0;background:#f8fafc;"><div style="font-size:9px;font-weight:700;color:#64748b;text-transform:uppercase;white-space:nowrap;">${cp.label}</div><div style="font-size:12px;font-weight:700;color:${col};">${n}</div><div style="font-size:8px;color:#94a3b8;">/${d.tot}·${pct}%</div></div>`;});
+            sCk+=`</div><div class="tc"><table style="min-width:520px;white-space:nowrap;"><thead><tr><th>Beneficiario</th>${CP_OBR.map(cp=>`<th style="text-align:center;">${cp.label}</th>`).join('')}<th style="text-align:center;">Recep.</th></tr></thead><tbody>`;
+            d.vivs.forEach(v=>{const p=v.pctTotal,pT=p!=null?`${p}%`:'—',pC=p==null?'#94a3b8':p>=80?'#16a34a':p>=50?'#2563eb':'#dc2626';const rfOk=!!v.fecha_recepcion||!!(cierresForzados[v.ID_Benef]);const nm=esc((v.NOMBRES||'')+' '+(v.APELLIDOS||''));sCk+=`<tr${rfOk?' style="background:#f0fdf4;"':''}><td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${nm}">${nm} <span style="font-size:10px;font-weight:700;color:${pC};">${pT}</span></td>${CP_OBR.map(cp=>`<td style="text-align:center;">${ck(v.flags&&v.flags[cp.key])}</td>`).join('')}<td style="text-align:center;">${ck(rfOk)}</td></tr>`;});
+            sCk+=`</tbody></table></div></div>`;
+        });
+
+        // ── CURVAS S por obra ────────────────────────────────────────────────────────────────
+        let sCurv='';
+        proyData.forEach((d,pi)=>{
+            sCurv+=`<div class="obra-block blk" data-obra="${pi}" style="border-left:4px solid #0f172a;">${prjHdr(d.nombre)}`;
+            if(d.curvas.length>0){sCurv+=`<div class="cg">`;d.curvas.forEach(c=>{sCurv+=`<div class="cc"><div class="ch">${esc(c.label)}</div><img src="https://drive.google.com/thumbnail?id=${c.id}&sz=w800&t=${Math.floor(Date.now()/3600000)}" style="width:100%;display:block;" alt="${esc(c.label)}" loading="lazy"/></div>`;});sCurv+=`</div>`;}
+            else sCurv+=`<div style="color:#94a3b8;font-size:13px;padding:16px;text-align:center;">Sin curvas S configuradas.</div>`;
+            sCurv+=`</div>`;
+        });
+
+        // ── RITMOS Y COMENTARIOS por obra ────────────────────────────────────────────────────
+        let sRit='';
+        proyData.forEach((d,pi)=>{
+            const bMO={};d.vivs.forEach(v=>(v.pagosBenef||[]).forEach(p=>{if(!p.fecha)return;const mm=p.fecha.match(/^(\d{4})-(\d{2})-(\d{2})/);if(!mm)return;let yr=parseInt(mm[1]),mo=parseInt(mm[2]),dy=parseInt(mm[3]);if(dy>=25){mo++;if(mo>12){mo=1;yr++;}}const ym=`${yr}-${String(mo).padStart(2,'0')}`;bMO[ym]=(bMO[ym]||0)+p.monto;}));
+            const oMO=Object.keys(bMO).sort().slice(-12);
+            const bD={};d.vivs.forEach(v=>DESPACHOS_DATA.filter(x=>String(x.ID_Benef)===String(v.ID_Benef)).forEach(x=>{if(!x.Fecha)return;const ym=x.Fecha.substring(0,7);bD[ym]=(bD[ym]||0)+1;}));
+            const oD=Object.keys(bD).sort().slice(-12);
+            const svgMO=svgLineChartString({meses:oMO,valores:oMO.map(k=>bMO[k]),color:'#7c3aed',fillColor:'rgba(124,58,237,0.10)',fmtMes:fMR,fmtV:fCR});
+            const svgD=svgLineChartString({meses:oD,valores:oD.map(k=>bD[k]),color:'#10b981',fillColor:'rgba(16,185,129,0.10)',fmtMes:fMR,fmtV:(v)=>String(v)});
+            let comH='';
+            d.grps.forEach(g=>{if(!g.viviendas||g.viviendas.length===0)return;const items=[];if(g.comentario)items.push(`<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;margin-bottom:6px;"><span style="font-size:9px;font-weight:700;text-transform:uppercase;color:#b45309;">Nota del coordinador</span><div style="margin-top:2px;font-style:italic;font-size:12px;color:#374151;">${esc(g.comentario)}</div></div>`);
+                g.viviendas.forEach(v=>{
+                    (v.obsPublicas||[]).forEach(o=>{const fch=(o.fecha||'').toString().substring(0,10);items.push(`<div style="padding:6px 12px;margin-bottom:5px;font-size:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;"><span style="font-weight:600;color:#1a1a2e;">${esc((v.NOMBRES||'')+' '+(v.APELLIDOS||''))}</span> <span style="font-size:10px;color:#94a3b8;">${fch}</span><div style="color:#374151;margin-top:1px;">${esc(o.texto||'')}</div></div>`);});
+                    if(!v.obsPublicas||!v.obsPublicas.length){const obsV=d.obs[String(v.ID_Benef)]||{};Object.values(obsV).filter(o=>o.destacar||o.starred).forEach(o=>{const fch=(o.fecha||'').toString().substring(0,10);items.push(`<div style="padding:6px 12px;margin-bottom:5px;font-size:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;"><span style="font-weight:600;color:#1a1a2e;">${esc((v.NOMBRES||'')+' '+(v.APELLIDOS||''))}</span> <span style="font-size:10px;color:#94a3b8;">${fch}</span><div style="color:#374151;margin-top:1px;">${esc(o.texto||o.comentario||'')}</div></div>`);})}
+                });
+                if(items.length)comH+=`<div style="margin-bottom:14px;"><div style="font-size:13px;font-weight:700;color:#1a1a2e;margin-bottom:6px;">${esc(g.nombre||'Sin Asignar')}</div>${items.join('')}</div>`;});
+            sRit+=`<div class="obra-block blk" data-obra="${pi}" style="border-left:4px solid #0f172a;">${prjHdr(d.nombre)}<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;"><div><div style="font-size:12px;font-weight:600;color:#333;margin-bottom:8px;">Ritmo M.O. (ciclo 25-25)</div>${svgMO}</div><div><div style="font-size:12px;font-weight:600;color:#333;margin-bottom:8px;">Ritmo Despachos</div>${svgD}</div></div><h3 class="sh">⭐ Comentarios Destacados</h3>${comH||`<div style="color:#94a3b8;font-size:12px;padding:16px;text-align:center;border:1px dashed #e2e8f0;border-radius:8px;">Sin comentarios destacados.</div>`}</div>`;
+        });
+
+        // ── VIVIENDAS por obra ───────────────────────────────────────────────────────────────
+        let sViv='';
+        proyData.forEach((d,pi)=>{
+            sViv+=`<div class="obra-block blk" data-obra="${pi}" style="border-left:4px solid #0f172a;">${prjHdr(d.nombre)}`;
+            d.grps.forEach(g=>{if(!g.viviendas||g.viviendas.length===0)return;sViv+=`<div style="margin-bottom:24px;"><div style="font-size:12px;font-weight:700;color:#1a1a2e;background:#f1f5f9;border:1px solid #e2e8f0;padding:7px 12px;border-radius:7px;margin-bottom:8px;">${esc(g.nombre||'Sin Asignar')}${g.capataz?` · <span style="font-weight:400;color:#64748b;">Capataz: ${esc(g.capataz)}</span>`:''} <span style="font-weight:400;color:#94a3b8;">(${g.viviendas.length} viv.)</span></div><div class="tc"><table style="min-width:520px;white-space:nowrap;"><thead><tr><th>Beneficiario</th><th>Avance</th><th style="text-align:center;">HPC</th><th style="text-align:center;">TE1</th><th style="text-align:center;">R.AS</th><th style="text-align:center;">F1</th><th style="text-align:center;">Artef.</th><th style="text-align:center;">Empalme</th><th style="text-align:center;">Recep.</th></tr></thead><tbody>`;g.viviendas.forEach(v=>{const p=v.pctTotal,pT=p!=null?`${p}%`:'—',pC=p==null?'#94a3b8':p>=80?'#16a34a':p>=50?'#2563eb':'#dc2626';const fl=v.flags||{};const rfOk=!!v.fecha_recepcion||!!(cierresForzados[v.ID_Benef]);const nm=esc((v.NOMBRES||'')+' '+(v.APELLIDOS||''));sViv+=`<tr${rfOk?' style="background:#f0fdf4;"':''}><td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${nm}">${nm}</td><td style="font-weight:700;color:${pC};">${pT}</td><td style="text-align:center;">${ck(fl.hpc)}</td><td style="text-align:center;">${ck(fl.te1)}</td><td style="text-align:center;">${ck(fl.resol_as)}</td><td style="text-align:center;">${ck(fl.fecha_f1)}</td><td style="text-align:center;">${ck(fl.artefactado)}</td><td style="text-align:center;">${ck(fl.empalme)}</td><td style="text-align:center;">${ck(rfOk)}</td></tr>`;});sViv+=`</tbody></table></div></div>`;});
+            sViv+=`</div>`;
+        });
+
+        // ── DESPACHOS por obra (solo SOL) ────────────────────────────────────────────────────
+        let sDesp='';
+        proyData.forEach((d,pi)=>{
+            sDesp+=`<div class="obra-block blk" data-obra="${pi}" style="border-left:4px solid #0f172a;">${prjHdr(d.nombre)}`;
+            if(d.despachos&&d.despachos.beneficiarios&&d.despachos.beneficiarios.length)sDesp+=_generarSeccionDespachos(d.despachos,null,true)||`<p style="color:#94a3b8;text-align:center;padding:16px;">Sin despachos programados.</p>`;
+            else sDesp+=`<p style="color:#94a3b8;font-size:13px;text-align:center;padding:16px;">Sin datos de despachos disponibles.</p>`;
+            sDesp+=`</div>`;
+        });
+
+        // ── MANO DE OBRA por obra ────────────────────────────────────────────────────────────
+        // Genera SVG curva S (real + patrón) como string
+        const svgMOCurvaS = (timeline, patronTimeline, totalPres, W=680, H=165) => {
+            if (!timeline || timeline.length === 0) return '<div style="color:#94a3b8;font-size:12px;padding:16px;text-align:center;border:1px dashed #e2e8f0;border-radius:8px;">Sin pagos M.O. registrados</div>';
+            const ML=56, MR=14, MT=22, MB=26, cW=W-ML-MR, cH=H-MT-MB;
+            const allMks=[...new Set([...timeline.map(t=>t.mk),...(patronTimeline||[]).map(t=>t.mk)])].sort();
+            const n=allMks.length; if(!n)return'';
+            const MNS=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+            const mkLbl=mk=>{const[y,m]=mk.split('-');return MNS[parseInt(m)-1]+'-'+y.slice(2);};
+            const realMap={}; timeline.forEach(t=>{realMap[t.mk]=t.cumul;});
+            const lastRealMk=timeline[timeline.length-1].mk;
+            const realPts=[]; let carry=0;
+            allMks.forEach((mk,i)=>{if(realMap[mk]!==undefined)carry=realMap[mk];if(mk<=lastRealMk)realPts.push({i,c:carry});});
+            const patMap={}; (patronTimeline||[]).forEach(t=>{patMap[t.mk]=t.cumul;});
+            const patPts=allMks.map((mk,i)=>({i,c:patMap[mk]})).filter(p=>p.c!==undefined);
+            const maxVal=Math.max(...realPts.map(p=>p.c),...patPts.map(p=>p.c),totalPres||0,1)*1.06;
+            const xStep=n>1?cW/(n-1):cW;
+            const sxN=i=>ML+i*xStep, syN=v=>MT+cH-Math.max(0,Math.min(1,v/maxVal))*cH;
+            const f1=v=>v.toFixed(1);
+            const shortP=v=>{const a=Math.abs(v);if(a>=1e6)return(v/1e6).toFixed(1)+'M';if(a>=1e3)return Math.round(v/1e3)+'k';return String(Math.round(v));};
+            const cubicPath=pts=>{
+                if(!pts.length)return'';
+                if(pts.length===1)return`M${f1(sxN(pts[0].i))},${f1(syN(pts[0].c))}`;
+                const T=0.38; let d=`M${f1(sxN(pts[0].i))},${f1(syN(pts[0].c))}`;
+                for(let k=0;k<pts.length-1;k++){
+                    const p0=pts[Math.max(0,k-1)],p1=pts[k],p2=pts[k+1],p3=pts[Math.min(pts.length-1,k+2)];
+                    const cp1x=f1(sxN(p1.i)+(sxN(p2.i)-sxN(p0.i))*T);
+                    const cp1y=f1(syN(p1.c)+(syN(p2.c)-syN(p0.c))*T);
+                    const cp2x=f1(sxN(p2.i)-(sxN(p3.i)-sxN(p1.i))*T);
+                    const cp2y=f1(syN(p2.c)-(syN(p3.c)-syN(p1.c))*T);
+                    d+=` C${cp1x},${cp1y} ${cp2x},${cp2y} ${f1(sxN(p2.i))},${f1(syN(p2.c))}`;
+                }
+                return d;
+            };
+            const rPath=cubicPath(realPts);
+            const pPath=patPts.length>1?cubicPath(patPts):null;
+            const aPath=rPath&&realPts.length?rPath+` L${f1(sxN(realPts[realPts.length-1].i))},${f1(MT+cH)} L${f1(sxN(realPts[0].i))},${f1(MT+cH)} Z`:'';
+            const yTks=[0,.25,.5,.75,1].map(f=>maxVal*f);
+            const lbEvery=n>24?4:n>14?2:1;
+            let svg=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:${H}px;display:block;">`;
+            yTks.forEach(v=>{svg+=`<line x1="${ML}" y1="${f1(syN(v))}" x2="${W-MR}" y2="${f1(syN(v))}" stroke="#f3f4f6" stroke-width="1"/>`;svg+=`<text x="${ML-4}" y="${f1(syN(v)+3)}" text-anchor="end" font-size="8" fill="#9ca3af">${shortP(v)}</text>`;});
+            if(totalPres>0)svg+=`<line x1="${ML}" y1="${f1(syN(totalPres))}" x2="${W-MR}" y2="${f1(syN(totalPres))}" stroke="#c4b5fd" stroke-width="1" stroke-dasharray="5,4" opacity="0.7"/>`;
+            if(aPath)svg+=`<path d="${aPath}" fill="#7c3aed" fill-opacity="0.07"/>`;
+            if(pPath)svg+=`<path d="${pPath}" fill="none" stroke="#f59e0b" stroke-width="2" stroke-dasharray="7,3" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>`;
+            if(rPath)svg+=`<path d="${rPath}" fill="none" stroke="#7c3aed" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+            if(realPts.length){const lp=realPts[realPts.length-1];svg+=`<circle cx="${f1(sxN(lp.i))}" cy="${f1(syN(lp.c))}" r="4" fill="#7c3aed" stroke="white" stroke-width="1.5"/>`;}
+            if(patPts.length){const lp=patPts[patPts.length-1];svg+=`<circle cx="${f1(sxN(lp.i))}" cy="${f1(syN(lp.c))}" r="3.5" fill="#f59e0b" stroke="white" stroke-width="1.5"/>`;}
+            allMks.forEach((mk,i)=>{if(i%lbEvery===0)svg+=`<text x="${f1(sxN(i))}" y="${H-3}" text-anchor="middle" font-size="7" fill="#9ca3af">${mkLbl(mk)}</text>`;});
+            svg+=`<line x1="${ML}" y1="${MT}" x2="${ML}" y2="${f1(MT+cH)}" stroke="#e5e7eb" stroke-width="1"/>`;
+            svg+=`<line x1="${ML}" y1="${f1(MT+cH)}" x2="${W-MR}" y2="${f1(MT+cH)}" stroke="#e5e7eb" stroke-width="1"/>`;
+            if(pPath){svg+=`<line x1="${ML+4}" y1="${MT-10}" x2="${ML+18}" y2="${MT-10}" stroke="#7c3aed" stroke-width="2.5"/><circle cx="${ML+22}" cy="${MT-10}" r="2.5" fill="#7c3aed"/><text x="${ML+26}" y="${MT-7}" font-size="7" fill="#6b7280">Real</text>`;svg+=`<line x1="${ML+54}" y1="${MT-10}" x2="${ML+68}" y2="${MT-10}" stroke="#f59e0b" stroke-width="2" stroke-dasharray="6,3"/><circle cx="${ML+72}" cy="${MT-10}" r="2.5" fill="#f59e0b"/><text x="${ML+76}" y="${MT-7}" font-size="7" fill="#6b7280">Patrón (% plazo × presup.)</text>`;}
+            svg+='</svg>';
+            return svg;
+        };
+
+        // SVG: % M.O. pagado vs % Avance real (curvas S porcentuales)
+        const svgMOComparePctS = (timeline, totalPres, avanceSerie, W=680, H=165) => {
+            if (!timeline || timeline.length === 0) return '<div style="color:#94a3b8;font-size:12px;padding:16px;text-align:center;border:1px dashed #e2e8f0;border-radius:8px;">Sin datos</div>';
+            const ML=46, MR=14, MT=22, MB=26, cW=W-ML-MR, cH=H-MT-MB;
+            const moMap={}; timeline.forEach(t=>{moMap[t.mk]=totalPres>0?Math.min(100,t.cumul/totalPres*100):0;});
+            const lastMOMk=timeline[timeline.length-1].mk;
+            const avMap={}; (avanceSerie||[]).forEach(t=>{avMap[t.mes]=t.avance;});
+            const lastAvMk=avanceSerie?.length?avanceSerie[avanceSerie.length-1].mes:null;
+            const allMks=[...new Set([...timeline.map(t=>t.mk),...(avanceSerie||[]).map(t=>t.mes)])].sort();
+            const n=allMks.length; if(!n)return'';
+            const MNS=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+            const mkLbl=mk=>{const[y,m]=mk.split('-');return MNS[parseInt(m)-1]+'-'+y.slice(2);};
+            const moPts=[],avPts=[]; let carryMO=0,carryAv=0;
+            allMks.forEach((mk,i)=>{
+                if(moMap[mk]!==undefined)carryMO=moMap[mk];
+                if(mk<=lastMOMk)moPts.push({i,p:carryMO});
+                if(avMap[mk]!==undefined)carryAv=avMap[mk];
+                if(lastAvMk&&mk<=lastAvMk)avPts.push({i,p:carryAv});
+            });
+            const xStep=n>1?cW/(n-1):cW;
+            const sxN=i=>ML+i*xStep, syN=p=>MT+cH-Math.max(0,Math.min(1,p/100))*cH;
+            const f1=v=>v.toFixed(1);
+            const cubicPath=pts=>{
+                if(!pts.length)return''; if(pts.length===1)return`M${f1(sxN(pts[0].i))},${f1(syN(pts[0].p))}`;
+                const T=0.38; let d=`M${f1(sxN(pts[0].i))},${f1(syN(pts[0].p))}`;
+                for(let k=0;k<pts.length-1;k++){
+                    const p0=pts[Math.max(0,k-1)],p1=pts[k],p2=pts[k+1],p3=pts[Math.min(pts.length-1,k+2)];
+                    d+=` C${f1(sxN(p1.i)+(sxN(p2.i)-sxN(p0.i))*T)},${f1(syN(p1.p)+(syN(p2.p)-syN(p0.p))*T)} ${f1(sxN(p2.i)-(sxN(p3.i)-sxN(p1.i))*T)},${f1(syN(p2.p)-(syN(p3.p)-syN(p1.p))*T)} ${f1(sxN(p2.i))},${f1(syN(p2.p))}`;
+                }
+                return d;
+            };
+            const moPath=cubicPath(moPts), avPath=avPts.length>1?cubicPath(avPts):null;
+            const aPath=moPath&&moPts.length?moPath+` L${f1(sxN(moPts[moPts.length-1].i))},${f1(MT+cH)} L${f1(sxN(moPts[0].i))},${f1(MT+cH)} Z`:'';
+            const lbEvery=n>24?4:n>14?2:1;
+            const curMO=moPts.length?Math.round(moPts[moPts.length-1].p):0;
+            const curAv=avPts.length?Math.round(avPts[avPts.length-1].p):0;
+            let svg=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:${H}px;display:block;">`;
+            [0,25,50,75,100].forEach(v=>{svg+=`<line x1="${ML}" y1="${f1(syN(v))}" x2="${W-MR}" y2="${f1(syN(v))}" stroke="${v===100?'#e5e7eb':'#f3f4f6'}" stroke-width="1"/>`;svg+=`<text x="${ML-4}" y="${f1(syN(v)+3)}" text-anchor="end" font-size="8" fill="#9ca3af">${v}%</text>`;});
+            if(aPath)svg+=`<path d="${aPath}" fill="#7c3aed" fill-opacity="0.07"/>`;
+            if(avPath)svg+=`<path d="${avPath}" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+            if(moPath)svg+=`<path d="${moPath}" fill="none" stroke="#7c3aed" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+            if(moPts.length){const lp=moPts[moPts.length-1];svg+=`<circle cx="${f1(sxN(lp.i))}" cy="${f1(syN(lp.p))}" r="4" fill="#7c3aed" stroke="white" stroke-width="1.5"/>`;}
+            if(avPts.length){const lp=avPts[avPts.length-1];svg+=`<circle cx="${f1(sxN(lp.i))}" cy="${f1(syN(lp.p))}" r="3.5" fill="#10b981" stroke="white" stroke-width="1.5"/>`;}
+            allMks.forEach((mk,i)=>{if(i%lbEvery===0)svg+=`<text x="${f1(sxN(i))}" y="${H-3}" text-anchor="middle" font-size="7" fill="#9ca3af">${mkLbl(mk)}</text>`;});
+            svg+=`<line x1="${ML}" y1="${MT}" x2="${ML}" y2="${f1(MT+cH)}" stroke="#e5e7eb" stroke-width="1"/>`;
+            svg+=`<line x1="${ML}" y1="${f1(MT+cH)}" x2="${W-MR}" y2="${f1(MT+cH)}" stroke="#e5e7eb" stroke-width="1"/>`;
+            svg+=`<line x1="${ML+4}" y1="${MT-10}" x2="${ML+18}" y2="${MT-10}" stroke="#7c3aed" stroke-width="2.5"/><circle cx="${ML+22}" cy="${MT-10}" r="2.5" fill="#7c3aed"/><text x="${ML+26}" y="${MT-7}" font-size="7" fill="#6b7280">% M.O. pagado (${curMO}%)</text>`;
+            if(avPath)svg+=`<line x1="${ML+128}" y1="${MT-10}" x2="${ML+142}" y2="${MT-10}" stroke="#10b981" stroke-width="2.5"/><circle cx="${ML+146}" cy="${MT-10}" r="2.5" fill="#10b981"/><text x="${ML+150}" y="${MT-7}" font-size="7" fill="#6b7280">% Avance real (${curAv}%)</text>`;
+            svg+='</svg>';
+            return svg;
+        };
+
+        const buildPatronMO = (pg, totalPres) => {
+            if (!pg || !pg.inicio || (!pg.finProg && !pg.plazo) || totalPres <= 0) return [];
+            const inicio=new Date(pg.inicio); if(isNaN(inicio.getTime()))return[];
+            const finProg=pg.finProg?new Date(pg.finProg):new Date(inicio.getTime()+pg.plazo*86400000);
+            if(isNaN(finProg.getTime()))return[];
+            const plazo=Math.round((finProg-inicio)/86400000); if(plazo<=0)return[];
+            const MNS=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+            const result=[]; let cur=new Date(inicio.getFullYear(),inicio.getMonth(),1);
+            const endM=new Date(finProg.getFullYear(),finProg.getMonth(),1);
+            while(cur<=endM){
+                const eom=new Date(cur.getFullYear(),cur.getMonth()+1,0);
+                const diasT=Math.max(0,(eom-inicio)/86400000);
+                const t=Math.min(1,diasT/plazo);
+                const cumul=totalPres*(1-Math.cos(Math.PI*t))/2;
+                const mk=`${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}`;
+                const label=MNS[cur.getMonth()]+'-'+String(cur.getFullYear()).slice(2);
+                result.push({mk,label,cumul});
+                cur=new Date(cur.getFullYear(),cur.getMonth()+1,1);
+            }
+            return result;
+        };
+
+        let sMO='';
+        proyData.forEach((d,pi)=>{
+            const fcr=v=>{const a=Math.abs(v);if(a>=1e6)return(v/1e6).toFixed(2)+'M';if(a>=1e3)return(v/1e3).toFixed(0)+'k';return String(Math.round(v));};
+            const dCol=v=>v===null?'#94a3b8':v>=0?'#16a34a':'#dc2626';
+
+            // Datos del proyecto
+            const proyTotalPres=d.vivs.reduce((s,v)=>s+getBenefPresupuestoTotal(v),0);
+            const allPagosMO=d.vivs.flatMap(v=>getBenefPaidFiltered(v.ID_Benef));
+            const proyTimeline=buildMonthlyPayments(allPagosMO);
+            const proyPatron=buildPatronMO(d.pg,proyTotalPres);
+            const proyTotalPaid=allPagosMO.reduce((s,p)=>s+p.monto,0);
+            const pctPag=proyTotalPres>0?Math.round(proyTotalPaid/proyTotalPres*100):0;
+            const patronNow=proyPatron.length?proyPatron[proyPatron.length-1].cumul:null;
+            const pctPat=proyTotalPres>0&&patronNow!==null?Math.round(patronNow/proyTotalPres*100):null;
+            const desv=pctPat!==null?pctPag-pctPat:null;
+
+            // KPIs
+            const kpiPatron=patronNow!==null?`<div class="sc" style="border-left:3px solid #f59e0b;"><div class="scl">Patrón actual</div><div class="scv" style="color:#f59e0b;">${fcr(patronNow)}</div><div class="scd">${pctPat}% del presupuesto</div></div>`:'';
+            const kpiDesv=desv!==null?`<div class="sc" style="border-left:3px solid ${dCol(desv)};"><div class="scl">Desviación</div><div class="scv" style="color:${dCol(desv)};">${desv>=0?'+':''}${desv}%</div><div class="scd">Real vs Patrón</div></div>`:'';
+
+            // Tabla por beneficiario
+            let filas=d.vivs.map(v=>{
+                const tp=getBenefPresupuestoTotal(v);
+                const pgos=getBenefPaidFiltered(v.ID_Benef);
+                const paid=pgos.reduce((s,p)=>s+p.monto,0);
+                const ppag=tp>0?Math.round(paid/tp*100):0;
+                const pat=buildPatronMO(d.pg,tp);
+                const patV=pat.length?pat[pat.length-1].cumul:null;
+                const ppat=tp>0&&patV!==null?Math.round(patV/tp*100):null;
+                const dv=ppat!==null?ppag-ppat:null;
+                const nm=esc(`${v.NOMBRES||''} ${v.APELLIDOS||''}`);
+                const dvTxt=dv!==null?`${dv>=0?'+':''}${dv}%`:'—';
+                return `<tr style="border-bottom:1px solid #f1f5f9;">
+<td style="padding:4px 6px;font-size:10px;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${nm}">${nm}</td>
+<td style="padding:4px;text-align:right;font-size:10px;font-family:monospace;">${fcr(tp)}</td>
+<td style="padding:4px;text-align:right;font-size:10px;font-family:monospace;color:#7c3aed;font-weight:600;">${fcr(paid)}</td>
+<td style="padding:4px;text-align:center;font-size:10px;font-weight:700;color:#7c3aed;">${ppag}%</td>
+<td style="padding:4px;text-align:center;font-size:10px;color:#f59e0b;">${ppat!==null?ppat+'%':'—'}</td>
+<td style="padding:4px;text-align:center;font-size:10px;font-weight:700;color:${dCol(dv)};">${dvTxt}</td>
+</tr>`;
+            }).join('');
+            filas+=`<tr style="background:#f1f5f9;border-top:2px solid #e2e8f0;font-weight:700;">
+<td style="padding:5px 6px;font-size:10px;color:#0f172a;">TOTAL</td>
+<td style="padding:4px;text-align:right;font-size:10px;font-family:monospace;">${fcr(proyTotalPres)}</td>
+<td style="padding:4px;text-align:right;font-size:10px;font-family:monospace;color:#7c3aed;">${fcr(proyTotalPaid)}</td>
+<td style="padding:4px;text-align:center;font-size:10px;color:#7c3aed;">${pctPag}%</td>
+<td style="padding:4px;text-align:center;font-size:10px;color:#f59e0b;">${pctPat!==null?pctPat+'%':'—'}</td>
+<td style="padding:4px;text-align:center;font-size:10px;color:${dCol(desv)};">${desv!==null?(desv>=0?'+':'')+desv+'%':'—'}</td>
+</tr>`;
+
+            sMO+=`<div class="obra-block blk" data-obra="${pi}" style="border-left:4px solid #0f172a;">${prjHdr(d.nombre)}
+<div class="sg" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr));margin-bottom:14px;">
+<div class="sc"><div class="scl">Presupuesto M.O.</div><div class="scv">${fcr(proyTotalPres)}</div></div>
+<div class="sc" style="border-left:3px solid #7c3aed;"><div class="scl">Total Pagado</div><div class="scv" style="color:#7c3aed;">${fcr(proyTotalPaid)}</div><div class="scd">${pctPag}% del presupuesto</div></div>
+${kpiPatron}${kpiDesv}
+</div>
+<h3 class="sh">📈 Curvas S — Mano de Obra</h3>
+${(()=>{const _avs=(AVANCE_MENSUAL_DATA[String(d.pr.ID_proy)]||{}).serie||[];const _g1=proyTimeline.length?svgMOCurvaS(proyTimeline,proyPatron,proyTotalPres):'<div style="color:#94a3b8;font-size:12px;padding:16px;text-align:center;border:1px dashed #e2e8f0;border-radius:8px;">Sin pagos M.O. registrados</div>';const _g2=svgMOComparePctS(proyTimeline,proyTotalPres,_avs);return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'+_g1+_g2+'</div>';})()}
+<h3 class="sh" style="margin-top:14px;">📋 Detalle por Beneficiario</h3>
+<div class="tc"><table style="width:100%;table-layout:fixed;">
+<colgroup><col style="width:30%"><col style="width:14%"><col style="width:14%"><col style="width:12%"><col style="width:12%"><col style="width:12%"></colgroup>
+<thead><tr><th style="text-align:left;">Beneficiario</th><th style="text-align:right;">Presupuesto</th><th style="text-align:right;">Pagado</th><th style="text-align:center;">% Pagado</th><th style="text-align:center;">% Patrón</th><th style="text-align:center;">Desviación</th></tr></thead>
+<tbody>${filas}</tbody></table></div></div>`;
+        });
+
+        // Emitir
+        const titulo = resNombre ? `Reporte Residente: ${resNombre}` : `Reporte Residente — ${proyectoSel}`;
+        const subtitulo = `${proysList.length>1?proysList.length+' obras':proysList[0]?.ID_proy||proyectoSel} · Semana ${sem} · ${fechaGen}`;
+        const html = _emitirInformeHTML(titulo, subtitulo, sem, fechaGen, [sR, sCk, sCurv, sRit, sViv, sDesp, sMO], proyData);
+        const _rNom=(resNombre||proyectoSel).replace(/[^a-zA-Z0-9À-ſ]/g,'_');
+        const _fn=`Reporte_Residente_${_rNom}_Sem${sem}.html`;
+        const _bl=new Blob([html],{type:'text/html;charset=utf-8'});const _ul=URL.createObjectURL(_bl);
+        const _a=document.createElement('a');_a.href=_ul;_a.download=_fn;
+        document.body.appendChild(_a);_a.click();_a.remove();
+        const _w=window.open(_ul,'_blank');if(!_w)alert('Archivo descargado: '+_fn+'. Permite ventanas emergentes para verlo.');
+        setTimeout(()=>URL.revokeObjectURL(_ul),60000);
+    };
+
+    // ── Reporte capataz HTML ──────────────────────────────────────────────────────────────────
+    const generarReporteCapataz = async (capatazFiltro) => {
+        const hoy = new Date();
+        const sem = Math.ceil(((hoy - new Date(hoy.getFullYear(),0,1))/86400000 + new Date(hoy.getFullYear(),0,1).getDay()+1)/7);
+        const fechaGen = hoy.toLocaleString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+        const proyNombre = proy ? `${proy.ID_proy} · ${proy.NOMBRE_PROYECTO}` : proyectoSel;
+        let ganttRaw={}, despachosData=null;
+        try {
+            const [rG,rD]=await Promise.all([
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/gantt_programa.json'),
+                fetch(`https://scraices-dashboard-default-rtdb.firebaseio.com/despachos_data/${proyectoSel}.json`)
+            ]);
+            ganttRaw=(await rG.json())||{}; despachosData=await rD.json();
+        } catch(_e){}
+        const gruposData = agruparViviendas(datos, grupos);
+        const gruposCapataz = gruposData.filter(g => g.capataz === capatazFiltro && g.viviendas.length > 0);
+        const vivCapataz = gruposCapataz.flatMap(g => g.viviendas);
+        if (vivCapataz.length === 0) { alert(`Sin viviendas para: ${capatazFiltro}`); return; }
+        const grupoNums = new Set(gruposCapataz.map(g => { const mm=(g.nombre||'').match(/[Gg]rupo\s+(?:N[°o]?\s*)?(\d+)/); return mm?parseInt(mm[1]):null; }).filter(n=>n!==null));
+        const curvasAll = CURVAS_S_CONFIG[proyectoSel] || [];
+        const curvasCapataz = curvasAll.filter(c => { const mm=c.label.match(/[Gg]rupo\s+(\d+)/); return mm ? grupoNums.has(parseInt(mm[1])) : false; });
+        const secs = _buildSecciones(vivCapataz, gruposCapataz, curvasCapataz, capatazFiltro, ganttRaw, despachosData);
+        const html = _emitirInformeHTML(`Reporte Capataz: ${capatazFiltro} — ${proyNombre}`, `Semana ${sem} · ${fechaGen}`, sem, fechaGen, [secs.sR,secs.sCk,secs.sCurv,secs.sRit,secs.sViv,secs.sDesp]);
+        const _capSafe = capatazFiltro.replace(/[^a-zA-Z0-9À-ſ]/g,'_');
+        const _fn=`Reporte_Capataz_${_capSafe}_${proyectoSel}_Sem${sem}.html`;
+        const _bl=new Blob([html],{type:'text/html;charset=utf-8'}); const _ul=URL.createObjectURL(_bl);
+        const _a=document.createElement('a'); _a.href=_ul; _a.download=_fn;
+        document.body.appendChild(_a); _a.click(); _a.remove();
+        const _w=window.open(_ul,'_blank'); if(!_w)alert('Archivo descargado: '+_fn+'. Permite ventanas emergentes para verlo.');
+        setTimeout(()=>URL.revokeObjectURL(_ul),60000);
+    };
+
+    const generarInformeAdquisicionesHTML = async () => {
+        const obrasConCurva = PROYECTOS_DATA.filter(p => (CURVAS_S_CONFIG[p.ID_proy] || []).length > 0);
+        if (obrasConCurva.length === 0) { alert('No hay obras activas con curvas S configuradas.'); return; }
+
+        let ganttRaw = {}, gruposRaw = {}, obsRaw = {}, avanceGanttRaw = {}, despachosHtmlRaw = {}, despachosDataRaw = {};
+        try {
+            const [rGantt, rGrupos, rObs, rAvGantt, rDesp, rDespData] = await Promise.all([
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/gantt_programa.json'),
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/grupos.json'),
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/observaciones.json'),
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/avance_gantt.json'),
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/despachos_html.json'),
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/despachos_data.json')
+            ]);
+            ganttRaw        = (await rGantt.json())    || {};
+            gruposRaw       = (await rGrupos.json())   || {};
+            obsRaw          = (await rObs.json())      || {};
+            avanceGanttRaw  = (await rAvGantt.json())  || {};
+            despachosHtmlRaw= (await rDesp.json())     || {};
+            despachosDataRaw= (await rDespData.json()) || {};
+        } catch(e) { ganttRaw = {}; gruposRaw = {}; obsRaw = {}; avanceGanttRaw = {}; despachosHtmlRaw = {}; despachosDataRaw = {}; }
+
+        const getCapataz = (idProy, curvaLabel) => {
+            const gList = gruposRaw[idProy] || [];
+            const grupoNombre = curvaLabel.split(' · ')[0].trim().toLowerCase();
+            const found = gList.find(g => (g.nombre || '').toLowerCase() === grupoNombre);
+            return found && found.capataz ? found.capataz : null;
+        };
+        const fmtFecha = (iso) => { if (!iso) return '—'; const p = String(iso).substring(0,10).split('-'); return p.length===3 ? `${p[2]}/${p[1]}/${p[0]}` : String(iso); };
+        const getFlags = (v) => {
+            const seg = SEGUIMIENTO_DATA[String(v.ID_Benef)] || { _has: {} };
+            return { hpc:!!v.habil, te1:!!v.has_te1, visita_as:!!seg._has.visita_as, resol_as:!!seg._has.resol_as, visita_f1:!!seg._has.visita_f1, fecha_f1:!!seg._has.fecha_f1, artefactado:!!seg._has.artefactado, empalme:!!seg._has.empalme, visita_dom:!!seg._has.visita_dom, recepcion_dom:!!seg._has.recepcion_dom, fecha_recep:!!(v.fecha_recepcion||seg._has.fecha_recep) };
+        };
+
+        const obrasData = obrasConCurva.map(proy => {
+            const vivs = BENEFICIARIOS_DATA.filter(b => String(b.ID_Proy) === String(proy.ID_proy));
+            return { ID_proy: proy.ID_proy, nombre: `${proy.ID_proy} · ${proy.NOMBRE_PROYECTO}`, viviendas: vivs, grupos: gruposRaw[proy.ID_proy] || [] };
+        });
+        obrasData.sort((a, b) => ((avanceGanttRaw[b.ID_proy] || {}).pct || 0) - ((avanceGanttRaw[a.ID_proy] || {}).pct || 0));
+
+        // Checkpoints para adquisiciones (excluir los 4 de inspección in-situ)
+        const CP_KEYS_EXCL = new Set(['visita_as','visita_f1','visita_dom','recepcion_dom']);
+        const CPS_ADQ = [
+            {key:'hpc',label:'HPC'}, {key:'te1',label:'TE1'},
+            {key:'resol_as',label:'R.AS'}, {key:'fecha_f1',label:'F1'},
+            {key:'artefactado',label:'Artef.'}, {key:'empalme',label:'Empalme'}
+        ];
+
+        const renderTabAdq = (idx, tab) => {
+            const obra = obrasData[idx];
+            let h = `<div class="breadcrumb">Obra <strong>${obra.nombre}</strong> · `;
+
+            if (tab === 'resumen') {
+                const tot = obra.viviendas.length;
+                const av = tot ? Math.round(obra.viviendas.reduce((s,v) => { const insp = getInspeccion(v.ID_Benef); return s + (insp ? insp.pct_total : 0); }, 0) / tot) : 0;
+                const conInsp = obra.viviendas.filter(v => getInspeccion(v.ID_Benef) !== null).length;
+                const term = obra.viviendas.filter(v => v.fecha_recepcion).length;
+                const _ag = avanceGanttRaw[obra.ID_proy];
+                const agPct = _ag ? _ag.pct : null;
+                const agCol = agPct == null ? '#94a3b8' : agPct >= 80 ? '#16a34a' : agPct >= 50 ? '#2563eb' : '#dc2626';
+                h += `Estado General</div>
+<div class="summary-grid">
+  <div class="summary-card" style="border-left:3px solid ${agCol};"><div class="summary-card-label">Avance Real</div><div class="summary-card-value" style="color:${agCol};">${agPct != null ? Number(agPct).toFixed(2) + '%' : '—'}</div><div class="summary-card-detail">${_ag ? _ag.n + '/' + _ag.total + ' con avance' : 'Sin datos Gantt'}</div></div>
+  <div class="summary-card"><div class="summary-card-label">Viviendas</div><div class="summary-card-value">${tot}</div><div class="summary-card-detail">Beneficiarios</div></div>
+  <div class="summary-card"><div class="summary-card-label">Terminadas</div><div class="summary-card-value" style="color:#16a34a;">${term}</div><div class="summary-card-detail">Con recepción</div></div>
+</div>`;
+                // Programa de Obra (gantt_programa)
+                const pg = ganttRaw[obra.ID_proy] || null;
+                if (pg && pg.inicio && pg.finProg) {
+                    const diasR = Math.floor((new Date(pg.finProg) - new Date()) / 86400000);
+                    const estadoTxt = diasR < 0 ? `Vencido (${Math.abs(diasR)}d)` : `${diasR}d restantes`;
+                    const estadoCol = diasR < 0 ? '#dc2626' : diasR < 30 ? '#b45309' : '#16a34a';
+                    const pctProg = _ag != null ? Math.min(100, _ag.pct_prog ?? _ag.pct ?? 0) : null;
+                    const barVal  = pctProg !== null ? pctProg : (pg.plazo > 0 ? Math.min(100, Math.round((pg.plazo - Math.max(0, diasR)) / pg.plazo * 100)) : 0);
+                    const barCol  = barVal>=100?'#ef4444':barVal>=80?'#f59e0b':barVal>=50?'#3b82f6':'#22c55e';
+                    h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📋 Programa de Obra</h3>
+<div class="summary-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));">
+  <div class="summary-card"><div class="summary-card-label">Inicio</div><div style="font-size:11px;font-weight:700;">${fmtFecha(pg.inicio)}</div></div>
+  <div class="summary-card"><div class="summary-card-label">Término</div><div style="font-size:11px;font-weight:700;">${fmtFecha(pg.finProg)}</div></div>
+  <div class="summary-card"><div class="summary-card-label">Plazo</div><div style="font-size:11px;font-weight:700;">${pg.plazo} días</div></div>
+  <div class="summary-card"><div class="summary-card-label">Estado</div><div style="font-size:11px;font-weight:700;color:${estadoCol};">${estadoTxt}</div></div>
+</div>
+<div style="margin:10px 0 4px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;"><span>${fmtFecha(pg.inicio)}</span><span style="font-weight:600;">${pctProg !== null ? Number(pctProg).toFixed(2) + '% programado' : '—'}</span><span>${fmtFecha(pg.finProg)}</span></div>
+<div style="height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden;"><div style="height:100%;width:${barVal}%;background:${barCol};border-radius:6px;"></div></div>`;
+                } else {
+                    h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📋 Programa de Obra</h3><p style="color:#94a3b8;font-size:12px;">Sin datos de programa disponibles.</p>`;
+                }
+                const agBarCol = (agPct??0)>=80?'#16a34a':(agPct??0)>=50?'#3b82f6':(agPct??0)>=25?'#f59e0b':'#ef4444';
+                h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📊 Avance real a la fecha</h3>
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;"><span style="font-size:14px;font-weight:800;color:${agBarCol};font-family:monospace;">${agPct != null ? Number(agPct).toFixed(2) : '—'}%</span><span style="font-size:11px;color:#94a3b8;">${_ag ? _ag.n+'/'+_ag.total+' con avance' : 'Sin datos Curvas S'}</span></div>
+<div style="height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden;"><div style="height:100%;width:${agPct??0}%;background:${agBarCol};border-radius:6px;"></div></div>`;
+            } else if (tab === 'checkpoints') {
+                const tot = obra.viviendas.length;
+                h += `Checkpoints (${CPS_ADQ.length} indicadores)</div><div class="summary-grid" style="grid-template-columns:repeat(${CPS_ADQ.length},1fr);">`;
+                CPS_ADQ.forEach(cp => {
+                    const n = obra.viviendas.filter(v => getFlags(v)[cp.key]).length;
+                    const pct = tot ? Math.round(n/tot*100) : 0;
+                    const col = n===tot?'#16a34a':n>0?'#2563eb':'#6b7280';
+                    h += `<div class="summary-card" style="text-align:center;padding:3px 4px;"><div class="summary-card-label" style="margin-bottom:1px;">${cp.label}</div><div style="font-size:10px;font-weight:700;color:${col};">${n}<span style="font-size:8px;font-weight:400;color:#94a3b8;"> / ${tot} · ${pct}%</span></div></div>`;
+                });
+                h += `</div>`;
+            } else if (tab === 'curvas') {
+                const curvas = CURVAS_S_CONFIG[obra.ID_proy] || [];
+                h += `Curvas S de Control</div><div class="curvas-grid">`;
+                curvas.forEach(c => {
+                    const cap = getCapataz(obra.ID_proy, c.label);
+                    const capHtml = cap ? `<div style="font-size:10px;color:#64748b;margin-top:2px;">👷 ${cap}</div>` : '';
+                    h += `<div class="curva-card"><div class="curva-header">${c.label}${capHtml}</div><img src="https://drive.google.com/thumbnail?id=${c.id}&sz=w800&t=${Math.floor(Date.now()/3600000)}" style="width:100%;display:block;" alt="${c.label}" loading="lazy"/></div>`;
+                });
+                h += `</div>`;
+            } else if (tab === 'viviendas') {
+                h += `Detalle de Viviendas</div>`;
+                const gruposObra = agruparViviendas(obra.viviendas, obra.grupos);
+                const ck = (ok) => ok ? `<span style="color:#16a34a;font-weight:700;">✓</span>` : `<span style="color:#e5e7eb;">—</span>`;
+                gruposObra.forEach(grupo => {
+                    const tituloGrupo = grupo.nombre || 'Sin asignar';
+                    const capLabel = grupo.capataz ? ` &nbsp;·&nbsp; <span style="font-weight:400;color:#64748b;">Capataz: ${grupo.capataz}</span>` : '';
+                    h += `<div style="margin-bottom:24px;">
+<div style="font-size:12px;font-weight:700;color:#1a1a2e;background:#f1f5f9;border:1px solid #e2e8f0;padding:7px 12px;border-radius:7px;margin-bottom:8px;">
+  ${tituloGrupo}${capLabel} &nbsp;<span style="font-weight:400;color:#94a3b8;">(${grupo.viviendas.length} viv.)</span>
+</div>
+<div class="table-container"><table style="min-width:520px;white-space:nowrap;">
+<thead><tr><th style="overflow:hidden;text-overflow:ellipsis;">Beneficiario</th><th style="text-align:center;">Avance</th><th style="width:65px;padding:9px 4px;text-align:center;">HPC</th><th style="width:65px;padding:9px 4px;text-align:center;">TE1</th><th style="width:65px;padding:9px 4px;text-align:center;">V.AS</th><th style="width:65px;padding:9px 4px;text-align:center;">R.AS</th><th style="width:65px;padding:9px 4px;text-align:center;">F1</th><th style="width:65px;padding:9px 4px;text-align:center;">Empalme</th><th style="width:65px;padding:9px 4px;text-align:center;">Recep.</th></tr></thead><tbody>`;
+                    grupo.viviendas.forEach(v => {
+                        const insp = getInspeccion(v.ID_Benef);
+                        const pct = insp ? insp.pct_total : null;
+                        const fl = getFlags(v);
+                        const pctTxt = pct !== null ? `${pct}%` : '—';
+                        const pctCol = pct === null ? '#94a3b8' : pct >= 80 ? '#16a34a' : pct >= 50 ? '#2563eb' : '#dc2626';
+                        h += `<tr><td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${v.NOMBRES||''} ${v.APELLIDOS||''}">${v.NOMBRES||''} ${v.APELLIDOS||''}</td><td style="font-weight:700;color:${pctCol};">${pctTxt}</td><td style="text-align:center;">${ck(fl.hpc)}</td><td style="text-align:center;">${ck(fl.te1)}</td><td style="text-align:center;">${ck(fl.visita_as)}</td><td style="text-align:center;">${ck(fl.resol_as)}</td><td style="text-align:center;">${ck(fl.fecha_f1)}</td><td style="text-align:center;">${ck(fl.empalme)}</td><td style="text-align:center;">${ck(fl.fecha_recep)}</td></tr>`;
+                    });
+                    h += `</tbody></table></div></div>`;
+                });
+            }
+            return h;
+        };
+
+        const allSectionsAdq = {};
+        obrasData.forEach((o, idx) => {
+            allSectionsAdq[idx] = {
+                resumen:     renderTabAdq(idx, 'resumen'),
+                checkpoints: renderTabAdq(idx, 'checkpoints'),
+                curvas:      renderTabAdq(idx, 'curvas'),
+                viviendas:   renderTabAdq(idx, 'viviendas'),
+                despachos: (() => {
+                    const dSem = despachosDataRaw[o.ID_proy] || null;
+                    const tituloDesp = `${o.nombre.replace(' · ', ' - ')} - Despachos planificados`;
+                    const secSem = (dSem && dSem.beneficiarios && dSem.beneficiarios.length)
+                        ? (_generarSeccionDespachos(dSem, null, false, tituloDesp) || '')
+                        : '';
+                    const secHtml = despachosHtmlRaw[o.ID_proy] || '';
+                    return secSem + (secHtml ? `<div style="margin-top:20px;">${secHtml}</div>` : '')
+                        || '<p style="padding:32px;text-align:center;color:#94a3b8;font-size:14px;">Sin datos de despachos disponibles</p>';
+                })()
+            };
+        });
+
+        const cssAdq = `<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f4f8;color:#1a1a2e;font-size:14px;}
+.multi-container{max-width:980px;margin:0 auto;padding:0 0 40px;}
+.header{background:#0f172a;color:#fff;padding:14px 24px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:100;}
+.header h1{font-size:16px;font-weight:700;}
+.header-sub{font-size:11px;color:#94a3b8;margin-left:auto;}
+.tabs{background:#1e293b;display:flex;padding:0 24px;gap:2px;position:sticky;top:49px;z-index:99;}
+.tab-btn{background:none;border:none;color:#94a3b8;font-size:12px;font-weight:600;padding:11px 18px;cursor:pointer;border-bottom:3px solid transparent;}
+.tab-btn.active{color:#fff;border-bottom-color:#3b82f6;}
+.tab-btn:hover:not(.active){color:#e2e8f0;}
+.obra-jumper-wrap{position:relative;margin-left:auto;align-self:center;max-width:240px;}
+.obra-jumper-input{width:100%;background:#0f172a;color:#cbd5e1;border:1px solid #334155;border-radius:6px;padding:5px 28px 5px 10px;font-size:11px;font-weight:600;outline:none;box-sizing:border-box;cursor:pointer;}
+.obra-jumper-input::placeholder{color:#64748b;font-weight:400;}
+.obra-jumper-input:focus{border-color:#3b82f6;}
+.obra-jumper-arrow{position:absolute;right:8px;top:50%;transform:translateY(-50%);pointer-events:none;color:#64748b;font-size:9px;}
+.obra-jumper-list{display:none;position:absolute;top:calc(100% + 2px);right:0;min-width:100%;max-width:340px;background:#1e293b;border:1px solid #334155;border-radius:6px;max-height:280px;overflow-y:auto;z-index:999;box-shadow:0 4px 16px rgba(0,0,0,.4);list-style:none;margin:0;padding:0;}
+.obra-jumper-list.open{display:block;}
+.obra-jumper-item{padding:7px 10px;font-size:11px;color:#e2e8f0;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.obra-jumper-item:hover,.obra-jumper-item.oj-active{background:#334155;color:#fff;}
+.obra-jumper-item.oj-hidden{display:none;}
+.content{background:#f0f4f8;min-height:380px;}
+.section{display:none;}
+.section.active{display:block;}
+.obra-block{background:#fff;margin:12px;border-radius:10px;padding:24px;border:1px solid #e2e8f0;}
+.footer{background:#f8fafc;border-top:1px solid #e2e8f0;padding:12px 24px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;}
+.btn{padding:8px 14px;border:1px solid #d1d5db;border-radius:6px;background:#fff;cursor:pointer;font-size:12px;font-weight:600;color:#374151;}
+.btn:hover{background:#f3f4f6;}
+.btn-pdf{background:#0f172a;color:#fff;border-color:#0f172a;}
+.btn-pdf:hover{background:#1e293b;}
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:5px;margin-bottom:8px;}
+.summary-card{padding:3px 7px;border-radius:5px;border:1px solid #e2e8f0;background:#f8fafc;display:flex;align-items:baseline;gap:5px;overflow:hidden;}
+.summary-card-label{font-size:9px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;flex-shrink:0;}
+.summary-card-value{font-size:11px;font-weight:700;color:#0f172a;font-family:monospace;}
+.summary-card-detail{font-size:9px;color:#94a3b8;}
+.breadcrumb{font-size:12px;color:#94a3b8;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid #e2e8f0;}
+.breadcrumb strong{color:#0f172a;}
+.curvas-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-top:12px;}
+.curva-card{border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;}
+.curva-header{background:#f8fafc;padding:10px 12px;font-size:11px;font-weight:600;color:#475569;border-bottom:1px solid #e2e8f0;}
+.table-container{overflow:auto;max-height:520px;margin-top:12px;border:1px solid #e2e8f0;border-radius:6px;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+table thead{background:#f8fafc;}
+table th{padding:9px 11px;text-align:left;font-weight:700;color:#475569;border-bottom:2px solid #e2e8f0;position:sticky;top:0;background:#f8fafc;z-index:2;font-size:10px;text-transform:uppercase;}
+table td{padding:8px 11px;border-bottom:1px solid #f1f5f9;color:#334155;}
+table tr:hover td{background:#f8fafc;}
+table th:first-child,table td:first-child{position:sticky;left:0;background:white;z-index:1;border-right:1px solid #e2e8f0;min-width:180px;}
+table th:first-child{background:#f8fafc;z-index:3;}
+table tr:hover td:first-child{background:#f8fafc;}
+.no-data{color:#94a3b8;font-size:13px;text-align:center;padding:48px;font-style:italic;line-height:1.8;}
+@media (max-width:768px){.tabs{flex-wrap:wrap;padding:0 8px 0;gap:0;}.tab-btn{font-size:11px;padding:9px 10px;flex:1 1 auto;text-align:center;min-width:0;}.obra-jumper-wrap{margin-left:0;width:calc(100% - 16px);max-width:100%;margin:4px 8px 6px;}.obra-block{margin:8px;padding:14px 12px;}.summary-grid{grid-template-columns:1fr 1fr;}}
+@media print{.footer{display:none;}.tabs{display:none;}.section{display:block!important;}.obra-block{page-break-after:always;border:none;border-bottom:2px solid #e2e8f0;border-radius:0;margin:0;}}
+.seg-dot{cursor:help;display:inline-block;}
+</style>`;
+
+        const jsOpen2 = '<scr' + 'ipt>';
+        const jsClose2 = '</scr' + 'ipt>';
+        const js2 = jsOpen2 + `
+function mostrar(t,btn){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.tabs .tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('sec-'+t).classList.add('active');
+  btn.classList.add('active');
+}
+function jumpToObra(idx){
+  if(idx==='')return;
+  const sec=document.querySelector('.section.active');
+  const block=sec&&sec.querySelector('.obra-block[data-obra="'+idx+'"]');
+  if(block)block.scrollIntoView({behavior:'smooth',block:'start'});
+}
+;(function(){
+  var w=document.getElementById('ojWrap'),inp=document.getElementById('ojInput'),lst=document.getElementById('ojList');
+  if(!w)return;
+  function openL(){lst.classList.add('open');}
+  function closeL(){lst.classList.remove('open');inp.value='';}
+  inp.addEventListener('focus',openL);inp.addEventListener('click',openL);
+  inp.addEventListener('input',function(){
+    var q=this.value.toLowerCase();
+    lst.querySelectorAll('.obra-jumper-item').forEach(function(li){li.classList.toggle('oj-hidden',q&&!li.textContent.toLowerCase().includes(q));});
+    openL();
+  });
+  lst.addEventListener('click',function(e){
+    var li=e.target.closest('.obra-jumper-item');if(!li)return;
+    jumpToObra(li.dataset.idx);closeL();
+  });
+  document.addEventListener('click',function(e){if(!w.contains(e.target))closeL();});
+})();
+` + jsClose2;
+
+        const tabKeys2 = ['resumen','curvas','viviendas','despachos'];
+        const tabLabels2 = {resumen:'Resumen',curvas:'Curvas S',viviendas:'Viviendas',despachos:'Despachos'};
+
+        const tabsAdq = `<div class="tabs">
+${tabKeys2.map((t,i)=>`<button class="tab-btn${i===0?' active':''}" onclick="mostrar('${t}',this)">${tabLabels2[t]}</button>`).join('\n')}
+<div class="obra-jumper-wrap" id="ojWrap">
+  <input class="obra-jumper-input" id="ojInput" type="text" placeholder="&#128269; Ir a obra..." autocomplete="off">
+  <span class="obra-jumper-arrow">&#9660;</span>
+  <ul class="obra-jumper-list" id="ojList">
+    ${obrasData.map((o,i)=>`<li class="obra-jumper-item" data-idx="${i}">${o.nombre}</li>`).join('')}
+  </ul>
+</div>
+</div>`;
+
+        const secsAdq = tabKeys2.map(t =>
+            `<div class="section${t==='resumen'?' active':''}" id="sec-${t}">${obrasData.map((o,i)=>`<div class="obra-block" data-obra="${i}">${allSectionsAdq[i][t]}</div>`).join('')}</div>`
+        ).join('');
+
+        const htmlAdq = `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Reporte Adquisiciones — Multi Obras</title>
+${cssAdq}</head><body>
+<div class="multi-container">
+  <div class="header">
+    <h1>&#128230; Reporte Adquisiciones — Multi Obras</h1>
+    <span class="header-sub">${obrasData.length} obras en ejecución · ${new Date().toLocaleDateString('es-CL')}</span>
+  </div>
+  ${tabsAdq}
+  <div class="content">${secsAdq}</div>
+  <div class="footer">
+    <button class="btn btn-pdf" onclick="window.print();">&#128196; Imprimir/PDF</button>
+  </div>
+</div>
+${js2}
+</body></html>`;
+
+        const fname = `Reporte_Adquisiciones_${new Date().toISOString().substring(0,10)}.html`;
+        const blob = new Blob([htmlAdq], {type:'text/html;charset=utf-8'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href=url; a.download=fname;
+        document.body.appendChild(a); a.click(); a.remove();
+        const w = window.open(url, '_blank');
+        if (!w) alert('Archivo descargado: ' + fname);
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+    };
+
+    const generarTodosReportesCapataz = async () => {
+        if (!capataces || capataces.length === 0) {
+            alert('No hay capataces registrados en este proyecto.');
+            return;
+        }
+        for (const cap of capataces) {
+            await generarReporteCapataz(cap);
+        }
+    };
+
+    // HTML Navegable Multi-Obras: selector de obra + tabs (Resumen, Checkpoints, Curvas S, Ritmos, Viviendas)
+    const generarInformeMultiObras = async () => {
+        const obrasConCurva = PROYECTOS_DATA.filter(p => (CURVAS_S_CONFIG[p.ID_proy] || []).length > 0);
+        if (obrasConCurva.length === 0) { alert('No hay obras activas con curvas S configuradas.'); return; }
+
+        // Obtener datos de programa, grupos, observaciones y comentarios destacados desde Firebase
+        let ganttRaw = {}, gruposRaw = {}, obsRaw = {}, resumenComRaw = {}, avanceGanttRaw = {};
+        try {
+            const [rGantt, rGrupos, rObs, rResCom, rAvGantt] = await Promise.all([
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/gantt_programa.json'),
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/grupos.json'),
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/observaciones.json'),
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/resumen_comentarios.json'),
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/avance_gantt.json')
+            ]);
+            ganttRaw      = (await rGantt.json())   || {};
+            gruposRaw     = (await rGrupos.json())  || {};
+            obsRaw        = (await rObs.json())     || {};
+            resumenComRaw = (await rResCom.json())  || {};
+            avanceGanttRaw = (await rAvGantt.json()) || {};
+        } catch(e) { ganttRaw = {}; gruposRaw = {}; obsRaw = {}; resumenComRaw = {}; avanceGanttRaw = {}; }
+
+        // Devuelve el capataz para un label de curva (ej "Grupo 1 · El Maitén") y un proyecto
+        const getCapataz = (idProy, curvaLabel) => {
+            const gList = gruposRaw[idProy] || [];
+            // Extraer la parte "Grupo X" o "Grupo Rezagados" del label
+            const grupoNombre = curvaLabel.split(' · ')[0].trim().toLowerCase();
+            const found = gList.find(g => (g.nombre || '').toLowerCase() === grupoNombre);
+            return found && found.capataz ? found.capataz : null;
+        };
+
+        const fmtFecha = (iso) => {
+            if (!iso) return '—';
+            const p = String(iso).substring(0, 10).split('-');
+            return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : String(iso);
+        };
+
+        // Helper: calcular flags de checkpoints usando globals (SEGUIMIENTO_DATA, BENEFICIARIOS_DATA)
+        const getFlags = (v) => {
+            const seg = SEGUIMIENTO_DATA[String(v.ID_Benef)] || { _has: {} };
+            return {
+                hpc:           !!v.habil,
+                te1:           !!v.has_te1,
+                visita_as:     !!seg._has.visita_as,
+                resol_as:      !!seg._has.resol_as,
+                visita_f1:     !!seg._has.visita_f1,
+                fecha_f1:      !!seg._has.fecha_f1,
+                artefactado:   !!seg._has.artefactado,
+                empalme:       !!seg._has.empalme,
+                visita_dom:    !!seg._has.visita_dom,
+                fecha_v_dom:   !!seg._has.fecha_v_dom,
+                recepcion_dom: !!seg._has.recepcion_dom,
+                fecha_recep:   !!(v.fecha_recepcion || seg._has.fecha_recep)
+            };
+        };
+
+        const obrasData = obrasConCurva.map(proy => {
+            const vivs = BENEFICIARIOS_DATA.filter(b => String(b.ID_Proy) === String(proy.ID_proy));
+            return { ID_proy: proy.ID_proy, nombre: `${proy.ID_proy} · ${proy.NOMBRE_PROYECTO}`, viviendas: vivs, grupos: gruposRaw[proy.ID_proy] || [] };
+        });
+
+        obrasData.sort((a, b) => ((avanceGanttRaw[b.ID_proy] || {}).pct || 0) - ((avanceGanttRaw[a.ID_proy] || {}).pct || 0));
+
+        const CPS = [
+            {key:'hpc',label:'HPC'}, {key:'te1',label:'TE1'},
+            {key:'visita_as',label:'V.AS'}, {key:'resol_as',label:'R.AS'},
+            {key:'visita_f1',label:'V.F1'}, {key:'fecha_f1',label:'F1'},
+            {key:'artefactado',label:'Artef.'}, {key:'empalme',label:'Empalme'},
+            {key:'visita_dom',label:'V.DOM'}, {key:'recepcion_dom',label:'Recep.'}
+        ];
+
+        const renderTab = (idx, tab) => {
+            const obra = obrasData[idx];
+            let h = `<div class="breadcrumb">Obra <strong>${obra.nombre}</strong> · `;
+
+            if (tab === 'resumen') {
+                const tot = obra.viviendas.length;
+                const av = tot ? Math.round(obra.viviendas.reduce((s,v) => {
+                    const insp = getInspeccion(v.ID_Benef);
+                    return s + (insp ? insp.pct_total : 0);
+                }, 0) / tot) : 0;
+                const conInsp = obra.viviendas.filter(v => getInspeccion(v.ID_Benef) !== null).length;
+                const term = obra.viviendas.filter(v => v.fecha_recepcion).length;
+                const crit = obra.viviendas.filter(v => getFlags(v).fecha_f1 && !v.fecha_recepcion && av < 50).length;
+                const _ag = avanceGanttRaw[obra.ID_proy];
+                const agPct = _ag ? _ag.pct : null;
+                const agCol = agPct == null ? '#94a3b8' : agPct >= 80 ? '#16a34a' : agPct >= 50 ? '#2563eb' : '#dc2626';
+                h += `Estado General</div>
+<div class="summary-grid">
+  <div class="summary-card" style="border-left:3px solid ${agCol};"><div class="summary-card-label">Avance Real</div><div class="summary-card-value" style="color:${agCol};">${agPct != null ? Number(agPct).toFixed(2) + '%' : '—'}</div><div class="summary-card-detail">${_ag ? _ag.n + '/' + _ag.total + ' con avance' : 'Sin datos Gantt'}</div></div>
+  <div class="summary-card"><div class="summary-card-label">Viviendas</div><div class="summary-card-value">${tot}</div><div class="summary-card-detail">Beneficiarios</div></div>
+  <div class="summary-card"><div class="summary-card-label">Terminadas</div><div class="summary-card-value" style="color:#16a34a;">${term}</div><div class="summary-card-detail">Con recepción</div></div>
+</div>`;
+                // Contrato (PROYECTOS_DATA: fecha_inicio + duracion)
+                const proyRec = PROYECTOS_DATA.find(p => p.ID_proy === obra.ID_proy);
+                if (proyRec && proyRec.fecha_inicio) {
+                    const cIni = proyRec.fecha_inicio;
+                    const cDur = proyRec.duracion || 0;
+                    const cFin = cDur > 0 ? (() => { const d = new Date(cIni); d.setDate(d.getDate() + cDur); return d.toISOString().substring(0,10); })() : null;
+                    const cDiasR = cFin ? Math.floor((new Date(cFin) - new Date()) / 86400000) : null;
+                    const cEstado = cDiasR === null ? '—' : cDiasR < 0 ? `Vencido (${Math.abs(cDiasR)}d)` : `${cDiasR}d restantes`;
+                    const cCol = cDiasR === null ? '#6b7280' : cDiasR < 0 ? '#dc2626' : cDiasR < 30 ? '#b45309' : '#16a34a';
+                    const cPctTr = cDur > 0 && cFin ? Math.min(100, Math.round((cDur - Math.max(0, cDiasR)) / cDur * 100)) : 0;
+                    const cBarCol = cPctTr >= 100 ? '#ef4444' : cPctTr >= 80 ? '#f59e0b' : cPctTr >= 50 ? '#3b82f6' : '#22c55e';
+                    h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📄 Contrato</h3>
+<div class="summary-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));">
+  <div class="summary-card"><div class="summary-card-label">Inicio</div><div style="font-size:11px;font-weight:700;">${fmtFecha(cIni)}</div></div>
+  <div class="summary-card"><div class="summary-card-label">Término</div><div style="font-size:11px;font-weight:700;">${fmtFecha(cFin)}</div></div>
+  <div class="summary-card"><div class="summary-card-label">Plazo</div><div style="font-size:11px;font-weight:700;">${cDur} días</div></div>
+  <div class="summary-card"><div class="summary-card-label">Estado</div><div style="font-size:11px;font-weight:700;color:${cCol};">${cEstado}</div></div>
+</div>
+<div style="margin:8px 0 4px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;"><span>${fmtFecha(cIni)}</span><span style="font-weight:600;">${cPctTr}% transcurrido</span><span>${fmtFecha(cFin)}</span></div>
+<div style="height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden;margin-bottom:4px;"><div style="height:100%;width:${cPctTr}%;background:${cBarCol};border-radius:6px;"></div></div>`;
+                }
+                // Programa de Obra desde Firebase (gantt_programa)
+                const pg = ganttRaw[obra.ID_proy] || null;
+                if (pg && pg.inicio && pg.finProg) {
+                    const diasR = Math.floor((new Date(pg.finProg) - new Date()) / 86400000);
+                    const estadoTxt = diasR < 0 ? `Vencido (${Math.abs(diasR)}d)` : `${diasR}d restantes`;
+                    const estadoCol = diasR < 0 ? '#dc2626' : diasR < 30 ? '#b45309' : '#16a34a';
+                    // pctProg: % programado según curva S Gantt (coincide con la columna % Prog. del cuadro)
+                    const pctProg = _ag != null ? Math.min(100, _ag.pct_prog ?? _ag.pct ?? 0) : null;
+                    const barVal  = pctProg !== null ? pctProg : (pg.plazo > 0 ? Math.min(100, Math.round((pg.plazo - Math.max(0, diasR)) / pg.plazo * 100)) : 0);
+                    const barCol  = barVal >= 100 ? '#ef4444' : barVal >= 80 ? '#f59e0b' : barVal >= 50 ? '#3b82f6' : '#22c55e';
+                    h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📋 Programa de Obra</h3>
+<div class="summary-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));">
+  <div class="summary-card"><div class="summary-card-label">Inicio</div><div style="font-size:11px;font-weight:700;">${fmtFecha(pg.inicio)}</div></div>
+  <div class="summary-card"><div class="summary-card-label">Término</div><div style="font-size:11px;font-weight:700;">${fmtFecha(pg.finProg)}</div></div>
+  <div class="summary-card"><div class="summary-card-label">Plazo</div><div style="font-size:11px;font-weight:700;">${pg.plazo} días</div></div>
+  <div class="summary-card"><div class="summary-card-label">Estado</div><div style="font-size:11px;font-weight:700;color:${estadoCol};">${estadoTxt}</div></div>
+</div>
+<div style="margin:10px 0 4px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;"><span>${fmtFecha(pg.inicio)}</span><span style="font-weight:600;">${pctProg !== null ? Number(pctProg).toFixed(2) + '% programado' : '—'}</span><span>${fmtFecha(pg.finProg)}</span></div>
+<div style="height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden;"><div style="height:100%;width:${barVal}%;background:${barCol};border-radius:6px;"></div></div>`;
+                } else {
+                    h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📋 Programa de Obra</h3><p style="color:#94a3b8;font-size:12px;">Sin datos de programa disponibles.</p>`;
+                }
+                // Avance real a la fecha
+                
+                h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📊 Avance real a la fecha</h3>
+<div class="summary-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));">
+  <div class="summary-card"><div class="summary-card-label">Avance Real</div><div style="font-size:14px;font-weight:800;color:${agCol};">${agPct != null ? Number(agPct).toFixed(2) : '—'}%</div></div>
+  <div class="summary-card"><div class="summary-card-label">Inspeccionadas</div><div style="font-size:11px;font-weight:700;">${conInsp} / ${tot}</div><div style="font-size:11px;color:#94a3b8;">viviendas</div></div>
+  <div class="summary-card"><div class="summary-card-label">Terminadas</div><div style="font-size:11px;font-weight:700;color:#16a34a;">${term}</div><div style="font-size:11px;color:#94a3b8;">con recepción</div></div>
+</div>
+<div style="margin:8px 0 4px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;"><span>0%</span><span style="font-weight:600;color:${agCol};">${agPct != null ? Number(agPct).toFixed(2) : '0.00'}% completado</span><span>100%</span></div>
+<div style="height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden;margin-bottom:4px;"><div style="height:100%;width:${agPct ?? 0}%;background:${agCol};border-radius:6px;transition:width 0.5s;"></div></div>`;
+            } else if (tab === 'checkpoints') {
+                h += `Checkpoints del Proyecto</div><div class="summary-grid" style="grid-template-columns:repeat(auto-fill,minmax(55px,1fr));">`;
+                const tot = obra.viviendas.length;
+                CPS.forEach(cp => {
+                    const n = obra.viviendas.filter(v => getFlags(v)[cp.key]).length;
+                    const pct = tot ? Math.round(n/tot*100) : 0;
+                    const col = n===tot?'#16a34a':n>0?'#2563eb':'#6b7280';
+                    h += `<div class="summary-card" style="text-align:center;padding:3px 4px;"><div class="summary-card-label" style="margin-bottom:1px;">${cp.label}</div><div style="font-size:10px;font-weight:700;color:${col};">${n}<span style="font-size:8px;font-weight:400;color:#94a3b8;"> / ${tot} · ${pct}%</span></div></div>`;
+                });
+                h += `</div>`;
+            } else if (tab === 'curvas') {
+                const curvas = CURVAS_S_CONFIG[obra.ID_proy] || [];
+                h += `Curvas S de Control</div><div class="curvas-grid">`;
+                curvas.forEach(c => {
+                    const cap = getCapataz(obra.ID_proy, c.label);
+                    const capHtml = cap ? `<div style="font-size:10px;color:#64748b;margin-top:2px;">👷 ${cap}</div>` : '';
+                    h += `<div class="curva-card"><div class="curva-header">${c.label}${capHtml}</div><img src="https://drive.google.com/thumbnail?id=${c.id}&sz=w800&t=${Math.floor(Date.now()/3600000)}" style="width:100%;display:block;" alt="${c.label}" loading="lazy"/></div>`;
+                });
+                h += `</div>`;
+            } else if (tab === 'ritmos') {
+                h += `Ritmos M.O. y Despachos</div>`;
+                const fmtCortoR = (n) => n >= 1e6 ? (n/1e6).toFixed(1)+'M' : n >= 1e3 ? (n/1e3).toFixed(0)+'k' : String(n);
+                const fmtMesR = (ym) => { if (!ym || ym.length < 7) return ym; const [y,m] = ym.split('-'); const ms=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']; return `${ms[parseInt(m,10)-1]}'${y.slice(2)}`; };
+                // Ritmo M.O. (pagos ciclo 25-25)
+                const bMO = {};
+                obra.viviendas.forEach(v => {
+                    getSolpago(v.ID_Benef).forEach(p => {
+                        if (!p.fecha) return;
+                        const m2 = p.fecha.match(/^(\d{4})-(\d{2})-(\d{2})/);
+                        if (!m2) return;
+                        let yr = parseInt(m2[1]), mo = parseInt(m2[2]), dy = parseInt(m2[3]);
+                        if (dy >= 25) { mo += 1; if (mo > 12) { mo = 1; yr += 1; } }
+                        const ym = `${yr}-${String(mo).padStart(2,'0')}`;
+                        bMO[ym] = (bMO[ym] || 0) + p.monto;
+                    });
+                });
+                const oMO = Object.keys(bMO).sort().slice(-12);
+                const chartMO = svgLineChartString({ meses: oMO, valores: oMO.map(k => bMO[k]), color: '#7c3aed', fillColor: 'rgba(124,58,237,0.10)', fmtMes: fmtMesR, fmtV: fmtCortoR });
+                // Ritmo Despachos
+                const bD = {};
+                obra.viviendas.forEach(v => {
+                    DESPACHOS_DATA.filter(x => String(x.ID_Benef) === String(v.ID_Benef)).forEach(x => {
+                        if (!x.Fecha) return;
+                        const ym = x.Fecha.substring(0, 7);
+                        bD[ym] = (bD[ym] || 0) + 1;
+                    });
+                });
+                const oD = Object.keys(bD).sort().slice(-12);
+                const chartD = svgLineChartString({ meses: oD, valores: oD.map(k => bD[k]), color: '#10b981', fillColor: 'rgba(16,185,129,0.10)', fmtMes: fmtMesR, fmtV: (v) => String(v) });
+                h += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px;">
+<div><div style="font-size:12px;font-weight:600;color:#333;margin-bottom:8px;">Ritmo Mano de Obra (ciclo 25-25)</div>${chartMO}</div>
+<div><div style="font-size:12px;font-weight:600;color:#333;margin-bottom:8px;">Ritmo Despachos (por mes)</div>${chartD}</div>
+</div>`;
+                // Comentarios destacados (con estrella) por beneficiario
+                const starredIds = new Set(Object.keys(resumenComRaw[obra.ID_proy] || {}));
+                let comHtml = '';
+                obra.viviendas.forEach(v => {
+                    const obsAll = obsRaw[v.ID_Benef] || [];
+                    const starred = obsAll.filter(o => starredIds.has(String(o.id)));
+                    if (starred.length === 0) return;
+                    const nombre = `${v.NOMBRES || ''} ${v.APELLIDOS || ''}`.trim();
+                    const items = starred.map(o => {
+                        const fch = (o.fecha || '').toString().substring(0, 10);
+                        return `<div style="padding:6px 12px;margin-bottom:5px;font-size:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;">
+<span style="font-size:10px;color:#94a3b8;">${fch}</span>
+<div style="color:#374151;margin-top:2px;">${o.texto || ''}</div></div>`;
+                    }).join('');
+                    comHtml += `<div style="margin-bottom:14px;"><div style="font-size:13px;font-weight:700;color:#1a1a2e;margin-bottom:6px;">${nombre}</div>${items}</div>`;
+                });
+                if (!comHtml) {
+                    comHtml = `<div style="color:#94a3b8;font-size:12px;padding:16px;text-align:center;border:1px dashed #e2e8f0;border-radius:8px;">Sin comentarios destacados (marcados con ★) en esta obra.</div>`;
+                }
+                h += `<h3 style="font-size:13px;color:#333;margin:20px 0 10px;display:flex;align-items:center;gap:6px;"><span style="color:#f59e0b;">★</span> Comentarios Destacados por Beneficiario</h3>${comHtml}`;
+            } else if (tab === 'viviendas') {
+                h += `Detalle de Viviendas</div>`;
+                const gruposObra = agruparViviendas(obra.viviendas, obra.grupos);
+                const ck = (ok) => ok ? `<span style="color:#16a34a;font-weight:700;">✓</span>` : `<span style="color:#e5e7eb;">—</span>`;
+                gruposObra.forEach(grupo => {
+                    const tituloGrupo = grupo.nombre || 'Sin asignar';
+                    const capLabel = grupo.capataz ? ` &nbsp;·&nbsp; <span style="font-weight:400;color:#64748b;">Capataz: ${grupo.capataz}</span>` : '';
+                    h += `<div style="margin-bottom:24px;">
+<div style="font-size:12px;font-weight:700;color:#1a1a2e;background:#f1f5f9;border:1px solid #e2e8f0;padding:7px 12px;border-radius:7px;margin-bottom:8px;">
+  ${tituloGrupo}${capLabel} &nbsp;<span style="font-weight:400;color:#94a3b8;">(${grupo.viviendas.length} viv.)</span>
+</div>
+<div class="table-container"><table style="min-width:520px;white-space:nowrap;">
+<thead><tr><th style="overflow:hidden;text-overflow:ellipsis;">Beneficiario</th><th style="text-align:center;">Avance</th><th style="width:65px;padding:9px 4px;text-align:center;">HPC</th><th style="width:65px;padding:9px 4px;text-align:center;">TE1</th><th style="width:65px;padding:9px 4px;text-align:center;">V.AS</th><th style="width:65px;padding:9px 4px;text-align:center;">R.AS</th><th style="width:65px;padding:9px 4px;text-align:center;">F1</th><th style="width:65px;padding:9px 4px;text-align:center;">Empalme</th><th style="width:65px;padding:9px 4px;text-align:center;">Recep.</th></tr></thead><tbody>`;
+                    grupo.viviendas.forEach(v => {
+                        const insp = getInspeccion(v.ID_Benef);
+                        const pct = insp ? insp.pct_total : null;
+                        const fl = getFlags(v);
+                        const pctTxt = pct !== null ? `${pct}%` : '—';
+                        const pctCol = pct === null ? '#94a3b8' : pct >= 80 ? '#16a34a' : pct >= 50 ? '#2563eb' : '#dc2626';
+                        h += `<tr><td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${v.NOMBRES||''} ${v.APELLIDOS||''}">${v.NOMBRES||''} ${v.APELLIDOS||''}</td><td style="font-weight:700;color:${pctCol};">${pctTxt}</td><td style="text-align:center;">${ck(fl.hpc)}</td><td style="text-align:center;">${ck(fl.te1)}</td><td style="text-align:center;">${ck(fl.visita_as)}</td><td style="text-align:center;">${ck(fl.resol_as)}</td><td style="text-align:center;">${ck(fl.fecha_f1)}</td><td style="text-align:center;">${ck(fl.empalme)}</td><td style="text-align:center;">${ck(fl.fecha_recep)}</td></tr>`;
+                    });
+                    h += `</tbody></table></div></div>`;
+                });
+            } else if (tab === 'pagos') {
+                const fmtUF = (v) => v != null ? v.toLocaleString('es-CL',{minimumFractionDigits:2,maximumFractionDigits:2})+' UF' : '—';
+                const fmtFch = (iso) => { if(!iso) return '—'; const p=String(iso).substring(0,10).split('-'); return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:iso; };
+                const pct = (n,d) => d>0 ? (n/d*100).toFixed(1) : '0.0';
+                const idsObra = new Set(obra.viviendas.map(v => String(v.ID_Benef)));
+                const eps = (EEPP_DATA||[]).filter(e => idsObra.has(String(e.ID_Benef)));
+                const mPag  = eps.filter(e => (e.Estado||'').includes('Pagado')).reduce((s,e) => s+e.Monto,0);
+                const mIng  = eps.filter(e => (e.Estado||'').includes('Ingresado')).reduce((s,e) => s+e.Monto,0);
+                const mPrep = eps.filter(e => !(e.Estado||'').includes('Pagado') && !(e.Estado||'').includes('Ingresado')).reduce((s,e) => s+e.Monto,0);
+                const mTot  = mPag + mIng + mPrep;
+                const montoProyInfo = (MONTOS_PROY_DATA||{})[obra.ID_proy] || null;
+                const mProy  = montoProyInfo ? montoProyInfo.total : 0;
+                const vivProy = montoProyInfo ? montoProyInfo.viviendas : obra.viviendas.length;
+                const porFact = mProy > 0 ? Math.max(0, mProy - mPag) : 0;
+                const _agPagos = avanceGanttRaw[obra.ID_proy];
+                const avInsp = _agPagos ? _agPagos.pct : null;
+
+                // Cards resumen — siempre visibles
+                h += `Estados de Pago</div>`;
+                if (mProy > 0) {
+                    h += `<div class="summary-grid" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px;margin-bottom:10px;">
+<div class="summary-card" style="border-color:#8b5cf6;padding:7px 10px;"><div class="summary-card-label">Total por cobrar</div><div style="font-size:12px;font-weight:500;color:#7c3aed;">${fmtUF(mProy)}</div><div class="summary-card-detail">${vivProy} viviendas</div></div>
+<div class="summary-card" style="border-color:#16a34a;padding:7px 10px;"><div class="summary-card-label">Pagado (cobrado)</div><div style="font-size:12px;font-weight:500;color:#16a34a;">${fmtUF(mPag)}</div><div class="summary-card-detail">${pct(mPag,mProy)}% del proyecto</div></div>
+<div class="summary-card" style="border-color:#ca8a04;padding:7px 10px;"><div class="summary-card-label">Ingresado (en trámite)</div><div style="font-size:12px;font-weight:500;color:#b45309;">${fmtUF(mIng)}</div><div class="summary-card-detail">${pct(mIng,mProy)}% · en tramitación</div></div>
+<div class="summary-card" style="padding:7px 10px;"><div class="summary-card-label">Por facturar</div><div style="font-size:12px;font-weight:500;color:#374151;">${fmtUF(porFact)}</div><div class="summary-card-detail">${pct(porFact,mProy)}% del proyecto</div></div>
+</div>`;
+                } else {
+                    h += `<div class="summary-grid" style="grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px;">
+<div class="summary-card" style="border-color:#16a34a;padding:7px 10px;"><div class="summary-card-label">Pagado</div><div style="font-size:12px;font-weight:500;color:#16a34a;">${fmtUF(mPag)}</div></div>
+<div class="summary-card" style="border-color:#ca8a04;padding:7px 10px;"><div class="summary-card-label">Ingresado</div><div style="font-size:12px;font-weight:500;color:#b45309;">${fmtUF(mIng)}</div></div>
+<div class="summary-card" style="padding:7px 10px;"><div class="summary-card-label">En Preparación</div><div style="font-size:12px;font-weight:500;color:#374151;">${fmtUF(mPrep)}</div></div>
+</div>`;
+                }
+
+                // Barra de progreso — siempre visible
+                const base = mProy > 0 ? mProy : (mTot > 0 ? mTot : 1);
+                const pP = pct(mPag,base), pI = pct(mIng,base), pR = pct(mPrep,base);
+                const pS = mProy > 0 ? pct(Math.max(0,mProy-mTot),base) : '0.0';
+                h += `<div style="margin-bottom:16px;">
+<div style="font-size:10px;font-weight:500;color:#64748b;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px;">Progreso de cobro ${mProy>0?'(sobre total proyecto)':'(sobre EP cargados)'}</div>
+<div style="position:relative;margin-bottom:4px;${avInsp>0?'padding-top:16px;':''}">
+${avInsp!=null?`<div style="position:absolute;top:0;bottom:0;left:${Math.min(avInsp,100)}%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;pointer-events:none;"><span style="font-size:9px;font-weight:700;color:#dc2626;white-space:nowrap;line-height:1;">${Number(avInsp).toFixed(2)}%</span><div style="width:2px;flex:1;background:#dc2626;"></div></div>`:''}
+<div style="display:flex;height:14px;border-radius:9999px;overflow:hidden;background:#f3f4f6;">
+${parseFloat(pP)>0?`<div style="width:${pP}%;background:#22c55e;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;color:#fff;">${parseFloat(pP)>8?pP+'%':''}</div>`:''}
+${parseFloat(pI)>0?`<div style="width:${pI}%;background:#facc15;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;color:#713f12;">${parseFloat(pI)>8?pI+'%':''}</div>`:''}
+${parseFloat(pR)>0?`<div style="width:${pR}%;background:#d1d5db;display:flex;align-items:center;justify-content:center;font-size:9px;color:#374151;">${parseFloat(pR)>8?pR+'%':''}</div>`:''}
+${mProy>0&&parseFloat(pS)>0?`<div style="width:${pS}%;background:#ede9fe;display:flex;align-items:center;justify-content:center;font-size:9px;color:#7c3aed;">${parseFloat(pS)>8?pS+'%':''}</div>`:''}
+${mTot===0&&mProy===0?`<div style="flex:1;display:flex;align-items:center;justify-content:center;font-size:10px;color:#9ca3af;">Sin EP registrados</div>`:''}
+</div></div>
+<div style="display:flex;flex-wrap:wrap;gap:10px;font-size:10px;color:#6b7280;">
+<span><span style="display:inline-block;width:10px;height:10px;background:#22c55e;border-radius:2px;margin-right:3px;vertical-align:middle;"></span>Pagado (${pP}%)</span>
+<span><span style="display:inline-block;width:10px;height:10px;background:#facc15;border-radius:2px;margin-right:3px;vertical-align:middle;"></span>Ingresado (${pI}%)</span>
+<span><span style="display:inline-block;width:10px;height:10px;background:#d1d5db;border-radius:2px;margin-right:3px;vertical-align:middle;"></span>En Prep. (${pR}%)</span>
+${avInsp!=null?`<span><span style="display:inline-block;width:2px;height:10px;background:#dc2626;margin-right:3px;vertical-align:middle;"></span>Avance físico (${Number(avInsp).toFixed(2)}%)</span>`:''}
+</div></div>`;
+
+                // Tabla de EP
+                const epsPorNum = {};
+                eps.forEach(e => {
+                    const n = e.Num_EP||'?';
+                    if (!epsPorNum[n]) epsPorNum[n]={num:n,fecha:'',monto:0,benef:0,pag:0,ing:0,prep:0,estado:''};
+                    epsPorNum[n].monto += e.Monto; epsPorNum[n].benef++;
+                    if (!epsPorNum[n].fecha && e.Fecha) epsPorNum[n].fecha=e.Fecha;
+                    if ((e.Estado||'').includes('Pagado')) epsPorNum[n].pag++;
+                    else if ((e.Estado||'').includes('Ingresado')) epsPorNum[n].ing++;
+                    else epsPorNum[n].prep++;
+                });
+                const epsArr = Object.values(epsPorNum).filter(e=>e.num&&String(e.num).trim()).sort((a,b)=>parseInt(a.num)-parseInt(b.num));
+                epsArr.forEach(e => {
+                    if (e.pag===e.benef) e.estado='Pagado';
+                    else if (e.ing>0&&e.pag===0&&e.prep===0) e.estado='Ingresado';
+                    else if (e.prep===e.benef) e.estado='En Preparación';
+                    else e.estado='Mixto';
+                });
+                const estadoCol = (s) => s==='Pagado'?'#16a34a':s==='Ingresado'?'#b45309':s==='Mixto'?'#2563eb':'#6b7280';
+                const estadoBg  = (s) => s==='Pagado'?'#f0fdf4':s==='Ingresado'?'#fffbeb':'#f8fafc';
+                h += `<div class="table-container"><table>
+<thead><tr><th>EP #</th><th>Fecha</th><th style="text-align:center;">Beneficiarios</th><th style="text-align:right;">Monto (UF)</th><th style="text-align:center;">Estado</th></tr></thead><tbody>`;
+                if (epsArr.length === 0) {
+                    h += `<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:16px;font-style:italic;">Sin estados de pago registrados</td></tr>`;
+                } else {
+                    epsArr.forEach(e => {
+                        h += `<tr style="background:${estadoBg(e.estado)};"><td style="font-weight:700;">EP ${e.num}</td><td>${fmtFch(e.fecha)}</td><td style="text-align:center;">${e.benef}</td><td style="text-align:right;font-family:monospace;font-weight:700;">${fmtUF(e.monto)}</td><td style="text-align:center;"><span style="padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:600;background:${estadoBg(e.estado)};color:${estadoCol(e.estado)};border:1px solid ${estadoCol(e.estado)}33;">${e.estado}</span></td></tr>`;
+                    });
+                }
+                h += `</tbody><tfoot>
+<tr style="border-top:2px solid #d1d5db;background:#f9fafb;font-weight:600;"><td colspan="3">Total EP cargados</td><td style="text-align:right;font-family:monospace;">${fmtUF(mTot)}</td><td></td></tr>
+<tr style="background:#f0fdf4;font-weight:700;color:#16a34a;"><td colspan="3">Pagado (cobrado)</td><td style="text-align:right;font-family:monospace;">${fmtUF(mPag)}</td><td style="text-align:center;font-size:11px;">${mProy>0?pct(mPag,mProy)+'%':''}</td></tr>
+${mProy>0?`<tr style="font-weight:700;color:#7c3aed;background:#f5f3ff;"><td colspan="2">TOTAL PROYECTO (por cobrar)</td><td style="text-align:center;font-size:11px;">${vivProy} viv.</td><td style="text-align:right;font-family:monospace;">${fmtUF(mProy)}</td><td style="text-align:center;font-size:11px;">100%</td></tr>`:''}
+</tfoot></table></div>`;
+            }
+            return h;
+        };
+
+        // Pre-generar todas las secciones de todas las obras
+        const allSections = {};
+        obrasData.forEach((o, idx) => {
+            allSections[idx] = {
+                resumen: renderTab(idx, 'resumen'),
+                checkpoints: renderTab(idx, 'checkpoints'),
+                curvas: renderTab(idx, 'curvas'),
+                ritmos: renderTab(idx, 'ritmos'),
+                viviendas: renderTab(idx, 'viviendas'),
+                pagos: renderTab(idx, 'pagos')
+            };
+        });
+
+        // Cuadro resumen ejecutivo (tabla global al inicio de la pestaña Resumen)
+        const vivConDespacho = new Set(DESPACHOS_DATA.map(d => String(d.ID_Benef)));
+        const fmtD2 = (iso) => { if (!iso) return '—'; const p = String(iso).substring(0,10).split('-'); return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:iso; };
+        const resumenFilas = obrasData.map(obra => {
+            const tot = obra.viviendas.length;
+            const av = tot ? Math.round(obra.viviendas.reduce((s,v)=>{ const i=getInspeccion(v.ID_Benef); return s+(i?i.pct_total:0); },0)/tot) : 0;
+            const _ag = avanceGanttRaw[obra.ID_proy];
+            const agPct = _ag ? (_ag.pct_prog ?? _ag.pct) : null;
+            const avReal = _ag ? _ag.pct : null;
+            const proyRec = PROYECTOS_DATA.find(p => p.ID_proy === obra.ID_proy);
+            const cIni = proyRec ? proyRec.fecha_inicio : null;
+            const cDur = proyRec ? (proyRec.duracion || 0) : 0;
+            const cFin = cDur>0&&cIni ? (()=>{ const d=new Date(cIni); d.setDate(d.getDate()+cDur); return d.toISOString().substring(0,10); })() : null;
+            const cDiasR = cFin ? Math.floor((new Date(cFin)-new Date())/86400000) : null;
+            const cPctTr = cDur>0&&cFin ? Math.min(100,Math.round((cDur-Math.max(0,cDiasR||0))/cDur*100)) : null;
+            const pg = ganttRaw[obra.ID_proy] || null;
+            const progDiasR = pg&&pg.finProg ? Math.floor((new Date(pg.finProg)-new Date())/86400000) : null;
+            const habilitadas = obra.viviendas.filter(v=>v.habil).length;
+            const enEjecucion = obra.viviendas.filter(v=>vivConDespacho.has(String(v.ID_Benef))).length;
+            const diff = (avReal!==null&&agPct!==null) ? Math.round((avReal-agPct)*100)/100 : null;
+            const recepDom=obra.viviendas.filter(v=>{const seg=SEGUIMIENTO_DATA[String(v.ID_Benef)];return seg&&seg._has&&seg._has.recepcion_dom;}).length;
+            const todasRecep=tot>0&&recepDom===tot;
+            const _ufr=todasRecep?obra.viviendas.map(v=>{const seg=SEGUIMIENTO_DATA[String(v.ID_Benef)];const fd=(seg&&seg.fecha_recep)||v.fecha_recepcion||null;return fd?new Date(fd):null;}).filter(f=>f&&!isNaN(f.getTime())):[]; 
+            const ultimaFR=_ufr.length?new Date(Math.max(..._ufr.map(f=>f.getTime()))):null;
+            let pgDiasRFrozen=progDiasR,pgDiasRColor=null,pgDiasRText=null;
+            if(todasRecep&&pg&&pg.finProg&&ultimaFR){const df=Math.floor((new Date(pg.finProg)-ultimaFR)/86400000);pgDiasRFrozen=df;pgDiasRColor=df>=0?'#16a34a':'#dc2626';pgDiasRText=(df>=0?'+':'')+df+'d';}
+            const _pctPend=tot>0?(tot-recepDom)/tot*100:0;
+            const circleHtml=(todasRecep&&pgDiasRFrozen>=0)?'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#16a34a;vertical-align:middle;" class="seg-dot" title="Todas con Recep. DOM completadas dentro del plazo" data-tip="Todas con Recep. DOM completadas dentro del plazo"></span>':(progDiasR!==null&&progDiasR<=90)?'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#dc2626;vertical-align:middle;" class="seg-dot" title="90 días o menos al término del programa" data-tip="90 días o menos al término del programa"></span>':(recepDom>0&&pg&&pg.plazo>0?(()=>{const pctEl=Math.max(0,pg.plazo-Math.max(0,progDiasR??0))/pg.plazo*100;return pctEl>=80?'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#eab308;vertical-align:middle;" class="seg-dot" title="Más del 80% del plazo transcurrido, más de 90d al término" data-tip="Más del 80% del plazo transcurrido, más de 90d al término"></span>':'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#9ca3af;vertical-align:middle;" class="seg-dot" title="Con Recep. DOM, menos del 80% del plazo transcurrido" data-tip="Con Recep. DOM, menos del 80% del plazo transcurrido"></span>';})():'')
+            return { obra, tot, av, avReal, agPct, cPctTr, cDiasR, cDur, pg, progDiasR, habilitadas, enEjecucion, diff, recepDom, todasRecep, pgDiasRFrozen, pgDiasRColor, pgDiasRText, circleHtml };
+        });
+
+        const resumenTablaHtml = (() => {
+            let t = `<div style="background:#fff;margin:12px 12px 0;border-radius:10px;padding:14px 16px;border:1px solid #e2e8f0;overflow-x:auto;overflow-y:auto;max-height:420px;-webkit-overflow-scrolling:touch;">
+<div style="font-size:12px;font-weight:700;color:#1e293b;margin-bottom:10px;">📋 Resumen ejecutivo de proyectos</div>
+<table style="min-width:900px;border-collapse:collapse;font-size:10px;white-space:nowrap;">
+<thead style="position:sticky;top:0;z-index:1;">
+<tr style="background:#f1f5f9;">
+  <th rowspan="2" style="padding:5px 6px;border:1px solid #e2e8f0;text-align:left;font-size:9px;text-transform:uppercase;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Proyecto</th>
+  <th colspan="3" style="padding:4px 6px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Avance (%)</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;background:#fef9c3;" title="% Avance Real − % Avance Programa">% Real<br>- % Prog</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Inicio<br>Prog.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Término<br>Prog.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Pzo.<br>Cont.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Pzo.<br>Prog.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Rest.<br>Cont.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Rest.<br>Prog.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Tot.<br>Viv.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Hab.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;text-transform:uppercase;color:#475569;cursor:help;" title="Considera en ejecución aquellas con al menos 1 despacho realizado.">Viv. en<br>Ejec.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;background:#f0fdf4;cursor:help;" title="Cantidad de beneficiarios con Recepción Definitiva DOM">Recep.<br>DOM</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;cursor:help;" title="Indicador de estado RECEP DOM vs plazo de programa">Est.<br>RECEP</th>
+</tr>
+<tr style="background:#f8fafc;">
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;width:72px;min-width:72px;" title="% Avance de contrato">% Cont.</th>
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;width:72px;min-width:72px;" title="% Avance según programa de obra (por fechas Gantt)">% Prog.</th>
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;width:72px;min-width:72px;" title="% Avance real (Curvas S)">% Real</th>
+</tr>
+</thead><tbody>`;
+            const sortedResumenFilas=[...resumenFilas].sort((a,b)=>{
+                if(a.progDiasR===null&&b.progDiasR===null)return 0;
+                if(a.progDiasR===null)return 1; if(b.progDiasR===null)return -1;
+                return b.progDiasR-a.progDiasR;
+            });
+            let _fc90e=true;
+            sortedResumenFilas.forEach(r => {
+                const isCrit90=r.progDiasR!==null&&r.progDiasR<=90;
+                if(isCrit90&&_fc90e){_fc90e=false;t+=`<tr style="height:0;"><td colspan="16" style="padding:0;border:none;border-top:3px solid #dc2626;"></td></tr>`;}
+                const rowBg=isCrit90?'background:#fff1f2;':'';
+                const dCol = r.diff===null?'#94a3b8':r.diff>=0?'#16a34a':'#dc2626';
+                const dBg  = r.diff===null?'':r.diff>=0?'#f0fdf4':'#fef2f2';
+                const dTxt = r.diff===null?'—':(r.diff>=0?'+':'')+Number(r.diff).toFixed(2)+'%';
+                const cRCol = r.cDiasR===null?'#94a3b8':r.cDiasR<0?'#dc2626':r.cDiasR<30?'#b45309':'#374151';
+                const pRCol = r.progDiasR===null?'#94a3b8':r.progDiasR<=90?'#dc2626':'#374151';
+                t += `<tr style="border-bottom:1px solid #f1f5f9;${rowBg}">
+  <td style="padding:5px 6px;border-right:1px solid #f1f5f9;font-size:10px;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.obra.nombre}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${r.cPctTr!==null?Number(r.cPctTr).toFixed(2)+'%':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${r.agPct!==null?Number(r.agPct).toFixed(2)+'%':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:${r.diff!==null?(r.diff>=5?'#16a34a':r.diff>=0?'#2563eb':'#dc2626'):'#94a3b8'};">${r.avReal!==null?Number(r.avReal).toFixed(2)+'%':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;font-weight:700;color:${dCol};background:${dBg};">${dTxt}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${fmtD2(r.pg&&r.pg.inicio)}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${fmtD2(r.pg&&r.pg.finProg)}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${r.cDur?r.cDur+'d':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${r.pg&&r.pg.plazo?r.pg.plazo+'d':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:${cRCol};">${r.cDiasR!==null?r.cDiasR+'d':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:${r.pgDiasRColor||pRCol};font-weight:${(r.todasRecep||isCrit90)?'700':'400'};">${r.pgDiasRText||(r.pgDiasRFrozen!==null?r.pgDiasRFrozen+'d':'—')}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${r.tot}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${r.habilitadas}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;font-weight:700;color:#2563eb;">${r.enEjecucion}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;font-weight:700;color:${r.todasRecep?'#16a34a':'#374151'};">${r.recepDom}/${r.tot}</td>
+  <td style="padding:4px 4px;text-align:center;">${r.circleHtml}</td>
+</tr>`;
+            });
+            t += `</tbody></table></div>`;
+            return t;
+        })();
+
+        const css = `<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f4f8;color:#1a1a2e;font-size:14px;}
+.multi-container{max-width:980px;margin:0 auto;padding:0 0 40px;}
+.header{background:#0f172a;color:#fff;padding:14px 24px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:100;}
+.header h1{font-size:16px;font-weight:700;}
+.header-sub{font-size:11px;color:#94a3b8;margin-left:auto;}
+.tabs{background:#1e293b;display:flex;padding:0 24px;gap:2px;position:sticky;top:49px;z-index:99;}
+.tab-btn{background:none;border:none;color:#94a3b8;font-size:12px;font-weight:600;padding:11px 18px;cursor:pointer;border-bottom:3px solid transparent;}
+.tab-btn.active{color:#fff;border-bottom-color:#3b82f6;}
+.tab-btn:hover:not(.active){color:#e2e8f0;}
+.obra-jumper-wrap{position:relative;margin-left:auto;align-self:center;max-width:240px;}
+.obra-jumper-input{width:100%;background:#0f172a;color:#cbd5e1;border:1px solid #334155;border-radius:6px;padding:5px 28px 5px 10px;font-size:11px;font-weight:600;outline:none;box-sizing:border-box;cursor:pointer;}
+.obra-jumper-input::placeholder{color:#64748b;font-weight:400;}
+.obra-jumper-input:focus{border-color:#3b82f6;}
+.obra-jumper-arrow{position:absolute;right:8px;top:50%;transform:translateY(-50%);pointer-events:none;color:#64748b;font-size:9px;}
+.obra-jumper-list{display:none;position:absolute;top:calc(100% + 2px);right:0;min-width:100%;max-width:340px;background:#1e293b;border:1px solid #334155;border-radius:6px;max-height:280px;overflow-y:auto;z-index:999;box-shadow:0 4px 16px rgba(0,0,0,.4);list-style:none;margin:0;padding:0;}
+.obra-jumper-list.open{display:block;}
+.obra-jumper-item{padding:7px 10px;font-size:11px;color:#e2e8f0;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.obra-jumper-item:hover,.obra-jumper-item.oj-active{background:#334155;color:#fff;}
+.obra-jumper-item.oj-hidden{display:none;}
+.content{background:#f0f4f8;min-height:380px;}
+.section{display:none;}
+.section.active{display:block;}
+.obra-block{background:#fff;margin:12px;border-radius:10px;padding:24px;border:1px solid #e2e8f0;}
+.footer{background:#f8fafc;border-top:1px solid #e2e8f0;padding:12px 24px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;}
+.btn{padding:8px 14px;border:1px solid #d1d5db;border-radius:6px;background:#fff;cursor:pointer;font-size:12px;font-weight:600;color:#374151;}
+.btn:hover{background:#f3f4f6;}
+.btn-pdf{background:#0f172a;color:#fff;border-color:#0f172a;}
+.btn-pdf:hover{background:#1e293b;}
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:5px;margin-bottom:8px;}
+.summary-card{padding:3px 7px;border-radius:5px;border:1px solid #e2e8f0;background:#f8fafc;display:flex;align-items:baseline;gap:5px;overflow:hidden;}
+.sc-blue{background:#eff6ff;border-color:#bfdbfe;}
+.sc-green{background:#f0fdf4;border-color:#bbf7d0;}
+.sc-yellow{background:#fefce8;border-color:#fde68a;}
+.sc-red{background:#fff1f2;border-color:#fecdd3;}
+.summary-card-label{font-size:9px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;flex-shrink:0;}
+.summary-card-value{font-size:11px;font-weight:700;color:#0f172a;font-family:monospace;}
+.summary-card-detail{font-size:9px;color:#94a3b8;}
+.breadcrumb{font-size:12px;color:#94a3b8;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid #e2e8f0;}
+.breadcrumb strong{color:#0f172a;}
+.sec-h3{font-size:13px;font-weight:700;color:#1e293b;margin:20px 0 10px;padding-bottom:6px;border-bottom:1px solid #e2e8f0;}
+.sec-h3:first-child{margin-top:0;}
+.curvas-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-top:12px;}
+.curva-card{border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;}
+.curva-header{background:#f8fafc;padding:10px 12px;font-size:11px;font-weight:600;color:#475569;border-bottom:1px solid #e2e8f0;}
+.table-container{overflow:auto;max-height:520px;margin-top:12px;border:1px solid #e2e8f0;border-radius:6px;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+table thead{background:#f8fafc;}
+table th{padding:9px 11px;text-align:left;font-weight:700;color:#475569;border-bottom:2px solid #e2e8f0;position:sticky;top:0;background:#f8fafc;z-index:2;font-size:10px;text-transform:uppercase;}
+table td{padding:8px 11px;border-bottom:1px solid #f1f5f9;color:#334155;}
+table tr:hover td{background:#f8fafc;}
+table th:first-child,table td:first-child{position:sticky;left:0;background:white;z-index:1;border-right:1px solid #e2e8f0;min-width:180px;}
+table th:first-child{background:#f8fafc;z-index:3;}
+table tr:hover td:first-child{background:#f8fafc;}
+.no-data{color:#94a3b8;font-size:13px;text-align:center;padding:48px;font-style:italic;line-height:1.8;}
+@media (max-width:768px){
+  .tabs{flex-wrap:wrap;padding:0 8px 0;gap:0;}
+  .tab-btn{font-size:11px;padding:9px 10px;flex:1 1 auto;text-align:center;min-width:0;}
+  .obra-jumper-wrap{margin-left:0;width:calc(100% - 16px);max-width:100%;margin:4px 8px 6px;}
+  .obra-block{margin:8px;padding:14px 12px;border-radius:8px;}
+  .summary-grid{grid-template-columns:1fr 1fr;}
+  .summary-card-value{font-size:11px;}
+}
+@media print{.footer{display:none;}.tabs{display:none;}.section{display:block!important;}.obra-block{page-break-after:always;border:none;border-bottom:2px solid #e2e8f0;border-radius:0;margin:0;}}
+.seg-dot{cursor:help;display:inline-block;}
+</style>`;
+
+        const jsOpen = '<scr' + 'ipt>';
+        const jsClose = '</scr' + 'ipt>';
+        const js = jsOpen + `
+function mostrar(t,btn){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.tabs .tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('sec-'+t).classList.add('active');
+  btn.classList.add('active');
+}
+function jumpToObra(idx){
+  if(idx==='')return;
+  const sec=document.querySelector('.section.active');
+  const block=sec&&sec.querySelector('.obra-block[data-obra="'+idx+'"]');
+  if(block)block.scrollIntoView({behavior:'smooth',block:'start'});
+}
+;(function(){
+  var w=document.getElementById('ojWrap'),inp=document.getElementById('ojInput'),lst=document.getElementById('ojList');
+  if(!w)return;
+  function openL(){lst.classList.add('open');}
+  function closeL(){lst.classList.remove('open');inp.value='';}
+  inp.addEventListener('focus',openL);inp.addEventListener('click',openL);
+  inp.addEventListener('input',function(){
+    var q=this.value.toLowerCase();
+    lst.querySelectorAll('.obra-jumper-item').forEach(function(li){li.classList.toggle('oj-hidden',q&&!li.textContent.toLowerCase().includes(q));});
+    openL();
+  });
+  lst.addEventListener('click',function(e){
+    var li=e.target.closest('.obra-jumper-item');if(!li)return;
+    jumpToObra(li.dataset.idx);closeL();
+  });
+  document.addEventListener('click',function(e){if(!w.contains(e.target))closeL();});
+})();
+;(function(){
+  var tip=null;
+  function getEl(e){return e.target?e.target.closest('.seg-dot'):null;}
+  document.addEventListener('mouseover',function(e){
+    var el=getEl(e);if(!el)return;
+    if(!tip){tip=document.createElement('div');tip.style.cssText='position:fixed;background:#0f172a;color:#f1f5f9;font-size:11px;font-weight:500;padding:5px 9px;border-radius:6px;pointer-events:none;z-index:9999;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.3);display:none;';document.body.appendChild(tip);}
+    tip.textContent=el.dataset.tip||el.title||'';
+    tip.style.display='block';
+  });
+  document.addEventListener('mousemove',function(e){
+    if(tip&&tip.style.display==='block'){tip.style.left=(e.clientX+14)+'px';tip.style.top=(e.clientY-36)+'px';}
+  });
+  document.addEventListener('mouseout',function(e){
+    if(tip&&!(e.relatedTarget&&e.relatedTarget.closest&&e.relatedTarget.closest('.seg-dot')))tip.style.display='none';
+  });
+})();
+` + jsClose;
+
+        // ── Programa Mensual: tabla global filas=obras, columnas=meses ──────────
+        const progMensualHtml = (() => {
+            const MESES_ES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+            const allMonths = new Set();
+            obrasData.forEach(obra => {
+                const m = avanceGanttRaw[obra.ID_proy];
+                if (m && m.mensual) Object.keys(m.mensual).forEach(ym => allMonths.add(ym));
+            });
+            if (allMonths.size === 0) {
+                return `<div class="obra-block"><p class="no-data">Sin datos de programa mensual.<br>Ejecute las curvas S para generar la serie histórica.</p></div>`;
+            }
+            const months = Array.from(allMonths).sort();
+            const hoyYM  = new Date().toISOString().substring(0, 7);
+            const fmtYM  = ym => { const [y,m] = ym.split('-'); return `${MESES_ES[+m-1]}<br><span style="font-size:8px;">${y}</span>`; };
+
+            let th = months.map(ym => {
+                const isCur = ym === hoyYM;
+                const isPast = ym < hoyYM;
+                const bg = isCur ? '#1d4ed8' : isPast ? '#334155' : '#4b5563';
+                const border = isCur ? 'border-bottom:3px solid #60a5fa;' : '';
+                return `<th style="padding:6px 5px;text-align:center;color:${isCur?'#fff':'#cbd5e1'};font-size:9px;font-weight:600;border:1px solid #1e293b;min-width:56px;background:${bg};${border}line-height:1.3;">${fmtYM(ym)}</th>`;
+            }).join('');
+
+            let rows2 = obrasData.map((obra, idx) => {
+                const ag = avanceGanttRaw[obra.ID_proy];
+                const mensual = (ag && ag.mensual) ? ag.mensual : {};
+                const bg = idx % 2 === 0 ? '#fff' : '#f8fafc';
+                let tds = months.map(ym => {
+                    const val = mensual[ym];
+                    if (val === undefined || val === null) {
+                        return `<td style="padding:5px 6px;text-align:center;font-size:9px;color:#e2e8f0;border:1px solid #f1f5f9;">—</td>`;
+                    }
+                    const pct = Number(val).toFixed(2);
+                    const isCur = ym === hoyYM;
+                    const isFut = ym > hoyYM;
+                    const col = val >= 100 ? '#16a34a' : val >= 75 ? '#2563eb' : val >= 50 ? '#7c3aed' : val >= 25 ? '#b45309' : '#64748b';
+                    const bdr = isCur ? 'border-left:2px solid #1d4ed8;border-right:2px solid #1d4ed8;' : '';
+                    const op  = isFut ? 'opacity:0.55;' : '';
+                    return `<td style="padding:5px 6px;text-align:center;font-size:9px;font-weight:${isCur?'700':'500'};color:${col};border:1px solid #f1f5f9;font-family:monospace;${bdr}${op}">${pct}%</td>`;
+                }).join('');
+                return `<tr style="background:${bg};">
+  <td style="padding:6px 10px;font-size:10px;font-weight:600;color:#1e293b;border:1px solid #e2e8f0;position:sticky;left:0;background:${bg};z-index:1;white-space:nowrap;">${obra.nombre}</td>
+  ${tds}
+</tr>`;
+            }).join('');
+
+            return `<div class="obra-block" style="padding:16px 0 8px;">
+<div style="padding:0 16px 10px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+  <div style="font-size:13px;font-weight:700;color:#1e293b;">📅 Programa Mensual Acumulado — todas las obras</div>
+  <div style="font-size:9px;color:#94a3b8;">Columna azul = mes actual · Fuente: Gantt de control</div>
+</div>
+<div style="overflow-x:auto;overflow-y:auto;max-height:580px;-webkit-overflow-scrolling:touch;border-top:1px solid #e2e8f0;">
+<table style="border-collapse:collapse;font-size:10px;white-space:nowrap;min-width:${180 + months.length * 58}px;">
+<thead style="position:sticky;top:0;z-index:3;">
+<tr style="background:#0f172a;">
+  <th style="padding:8px 12px;text-align:left;color:#f1f5f9;font-size:10px;font-weight:700;border:1px solid #1e293b;position:sticky;left:0;z-index:4;background:#0f172a;min-width:180px;">Proyecto</th>
+  ${th}
+</tr>
+</thead>
+<tbody>${rows2}</tbody>
+</table>
+</div>
+<div style="padding:8px 16px 4px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+  <span style="font-size:9px;color:#94a3b8;">% Acumulado programado según Gantt de control:</span>
+  <span style="font-size:9px;color:#16a34a;">● ≥100%</span>
+  <span style="font-size:9px;color:#2563eb;">● ≥75%</span>
+  <span style="font-size:9px;color:#7c3aed;">● ≥50%</span>
+  <span style="font-size:9px;color:#b45309;">● ≥25%</span>
+  <span style="font-size:9px;color:#64748b;">● &lt;25%</span>
+</div>
+</div>`;
+        })();
+
+        const tabKeys = ['resumen','checkpoints','curvas','ritmos','viviendas','pagos','progmensual'];
+        const tabLabels = {resumen:'Resumen',checkpoints:'Checkpoints',curvas:'Curvas S',ritmos:'Ritmos y comentarios',viviendas:'Viviendas',pagos:'Estado de Pago',progmensual:'Prog. Mensual'};
+
+        const tabs = `<div class="tabs">
+${tabKeys.map((t,i)=>`<button class="tab-btn${i===0?' active':''}" onclick="mostrar('${t}',this)">${tabLabels[t]}</button>`).join('\n')}
+<div class="obra-jumper-wrap" id="ojWrap">
+  <input class="obra-jumper-input" id="ojInput" type="text" placeholder="&#128269; Ir a obra..." autocomplete="off">
+  <span class="obra-jumper-arrow">&#9660;</span>
+  <ul class="obra-jumper-list" id="ojList">
+    ${obrasData.map((o,i)=>`<li class="obra-jumper-item" data-idx="${i}">${o.nombre}</li>`).join('')}
+  </ul>
+</div>
+</div>`;
+
+        const secs = tabKeys.map(t => {
+            if (t === 'progmensual') {
+                return `<div class="section" id="sec-progmensual">${progMensualHtml}</div>`;
+            }
+            const pre  = t === 'resumen' ? resumenTablaHtml : '';
+            const body = obrasData.map((o,i) => `<div class="obra-block" data-obra="${i}">${allSections[i][t]}</div>`).join('');
+            return `<div class="section${t==='resumen'?' active':''}" id="sec-${t}">${pre}${body}</div>`;
+        }).join('');
+
+        const html = `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Informes Ejecutivos — Multi Obras</title>
+${css}</head><body>
+<div class="multi-container">
+  <div class="header">
+    <h1>&#128202; Informes Ejecutivos — Multi Obras</h1>
+    <span class="header-sub">${obrasData.length} obras en ejecución · ${new Date().toLocaleDateString('es-CL')}</span>
+  </div>
+  ${tabs}
+  <div class="content">${secs}</div>
+  <div class="footer">
+    <button class="btn btn-pdf" onclick="window.print();">&#128196; Imprimir/PDF</button>
+  </div>
+</div>
+${js}</body></html>`;
+
+        const fname = `Informes_MultiObras_${new Date().toISOString().substring(0,10)}.html`;
+        const blob = new Blob([html], {type:'text/html;charset=utf-8'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = fname;
+        document.body.appendChild(a); a.click(); a.remove();
+        const w = window.open(url, '_blank');
+        if (!w) alert('Archivo descargado: ' + fname);
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+    };
+
+    // ================================================================
+    // RECEPCIONES HTML — informe de recepciones multi-obra
+    // ================================================================
+    const generarInformeRecepciones = async () => {
+        const obrasConCurva = PROYECTOS_DATA.filter(p => (CURVAS_S_CONFIG[p.ID_proy] || []).length > 0);
+        if (obrasConCurva.length === 0) { alert('No hay obras activas con curvas S configuradas.'); return; }
+
+        let ganttRaw = {}, gruposRaw = {}, obsRaw = {}, resumenComRaw = {}, avanceGanttRaw = {};
+        try {
+            const [rGantt, rGrupos, rObs, rResCom, rAvGantt] = await Promise.all([
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/gantt_programa.json'),
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/grupos.json'),
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/observaciones.json'),
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/resumen_comentarios.json'),
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/avance_gantt.json')
+            ]);
+            ganttRaw      = (await rGantt.json())   || {};
+            gruposRaw     = (await rGrupos.json())  || {};
+            obsRaw        = (await rObs.json())     || {};
+            resumenComRaw = (await rResCom.json())  || {};
+            avanceGanttRaw = (await rAvGantt.json()) || {};
+        } catch(e) { ganttRaw = {}; gruposRaw = {}; obsRaw = {}; resumenComRaw = {}; avanceGanttRaw = {}; }
+
+        const getCapataz = (idProy, curvaLabel) => {
+            const gList = gruposRaw[idProy] || [];
+            const grupoNombre = curvaLabel.split(' · ')[0].trim().toLowerCase();
+            const found = gList.find(g => (g.nombre || '').toLowerCase() === grupoNombre);
+            return found && found.capataz ? found.capataz : null;
+        };
+
+        const fmtFecha = (iso) => {
+            if (!iso) return '—';
+            const p = String(iso).substring(0, 10).split('-');
+            return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : String(iso);
+        };
+
+        const getFlags = (v) => {
+            const seg = SEGUIMIENTO_DATA[String(v.ID_Benef)] || { _has: {} };
+            return {
+                hpc:           !!v.habil,
+                te1:           !!v.has_te1,
+                visita_as:     !!seg._has.visita_as,
+                resol_as:      !!seg._has.resol_as,
+                visita_f1:     !!seg._has.visita_f1,
+                fecha_f1:      !!seg._has.fecha_f1,
+                artefactado:   !!seg._has.artefactado,
+                empalme:       !!seg._has.empalme,
+                visita_dom:    !!seg._has.visita_dom,
+                fecha_v_dom:   !!seg._has.fecha_v_dom,
+                recepcion_dom: !!seg._has.recepcion_dom,
+                fecha_recep:   !!(v.fecha_recepcion || seg._has.fecha_recep)
+            };
+        };
+
+        const obrasData = obrasConCurva.map(proy => {
+            const vivs = BENEFICIARIOS_DATA.filter(b => String(b.ID_Proy) === String(proy.ID_proy));
+            return { ID_proy: proy.ID_proy, nombre: `${proy.ID_proy} · ${proy.NOMBRE_PROYECTO}`, viviendas: vivs, grupos: gruposRaw[proy.ID_proy] || [] };
+        });
+
+        obrasData.sort((a, b) => ((avanceGanttRaw[b.ID_proy] || {}).pct || 0) - ((avanceGanttRaw[a.ID_proy] || {}).pct || 0));
+
+        const CPS = [
+            {key:'hpc',label:'HPC'}, {key:'te1',label:'TE1'},
+            {key:'visita_as',label:'V.AS'}, {key:'resol_as',label:'R.AS'},
+            {key:'visita_f1',label:'V.F1'}, {key:'fecha_f1',label:'F1'},
+            {key:'artefactado',label:'Artef.'}, {key:'empalme',label:'Empalme'},
+            {key:'visita_dom',label:'V.DOM'}, {key:'recepcion_dom',label:'Recep.'}
+        ];
+
+        const renderTab = (idx, tab) => {
+            const obra = obrasData[idx];
+            let h = `<div class="breadcrumb">Obra <strong>${obra.nombre}</strong> · `;
+
+            if (tab === 'resumen') {
+                const tot = obra.viviendas.length;
+                const av = tot ? Math.round(obra.viviendas.reduce((s,v) => {
+                    const insp = getInspeccion(v.ID_Benef);
+                    return s + (insp ? insp.pct_total : 0);
+                }, 0) / tot) : 0;
+                const conInsp = obra.viviendas.filter(v => getInspeccion(v.ID_Benef) !== null).length;
+                const term = obra.viviendas.filter(v => v.fecha_recepcion).length;
+                const crit = obra.viviendas.filter(v => getFlags(v).fecha_f1 && !v.fecha_recepcion && av < 50).length;
+                const _ag = avanceGanttRaw[obra.ID_proy];
+                const agPct = _ag ? _ag.pct : null;
+                const agCol = agPct == null ? '#94a3b8' : agPct >= 80 ? '#16a34a' : agPct >= 50 ? '#2563eb' : '#dc2626';
+                h += `Estado General</div>
+<div class="summary-grid">
+  <div class="summary-card" style="border-left:3px solid ${agCol};"><div class="summary-card-label">Avance Real</div><div class="summary-card-value" style="color:${agCol};">${agPct != null ? Number(agPct).toFixed(2) + '%' : '—'}</div><div class="summary-card-detail">${_ag ? _ag.n + '/' + _ag.total + ' con avance' : 'Sin datos Gantt'}</div></div>
+  <div class="summary-card"><div class="summary-card-label">Viviendas</div><div class="summary-card-value">${tot}</div><div class="summary-card-detail">Beneficiarios</div></div>
+  <div class="summary-card"><div class="summary-card-label">Terminadas</div><div class="summary-card-value" style="color:#16a34a;">${term}</div><div class="summary-card-detail">Con recepción</div></div>
+</div>`;
+                const proyRec = PROYECTOS_DATA.find(p => p.ID_proy === obra.ID_proy);
+                if (proyRec && proyRec.fecha_inicio) {
+                    const cIni = proyRec.fecha_inicio;
+                    const cDur = proyRec.duracion || 0;
+                    const cFin = cDur > 0 ? (() => { const d = new Date(cIni); d.setDate(d.getDate() + cDur); return d.toISOString().substring(0,10); })() : null;
+                    const cDiasR = cFin ? Math.floor((new Date(cFin) - new Date()) / 86400000) : null;
+                    const cEstado = cDiasR === null ? '—' : cDiasR < 0 ? `Vencido (${Math.abs(cDiasR)}d)` : `${cDiasR}d restantes`;
+                    const cCol = cDiasR === null ? '#6b7280' : cDiasR < 0 ? '#dc2626' : cDiasR < 30 ? '#b45309' : '#16a34a';
+                    const cPctTr = cDur > 0 && cFin ? Math.min(100, Math.round((cDur - Math.max(0, cDiasR)) / cDur * 100)) : 0;
+                    const cBarCol = cPctTr >= 100 ? '#ef4444' : cPctTr >= 80 ? '#f59e0b' : cPctTr >= 50 ? '#3b82f6' : '#22c55e';
+                    h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📄 Contrato</h3>
+<div class="summary-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));">
+  <div class="summary-card"><div class="summary-card-label">Inicio</div><div style="font-size:11px;font-weight:700;">${fmtFecha(cIni)}</div></div>
+  <div class="summary-card"><div class="summary-card-label">Término</div><div style="font-size:11px;font-weight:700;">${fmtFecha(cFin)}</div></div>
+  <div class="summary-card"><div class="summary-card-label">Plazo</div><div style="font-size:11px;font-weight:700;">${cDur} días</div></div>
+  <div class="summary-card"><div class="summary-card-label">Estado</div><div style="font-size:11px;font-weight:700;color:${cCol};">${cEstado}</div></div>
+</div>
+<div style="margin:8px 0 4px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;"><span>${fmtFecha(cIni)}</span><span style="font-weight:600;">${cPctTr}% transcurrido</span><span>${fmtFecha(cFin)}</span></div>
+<div style="height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden;margin-bottom:4px;"><div style="height:100%;width:${cPctTr}%;background:${cBarCol};border-radius:6px;"></div></div>`;
+                }
+                const pg = ganttRaw[obra.ID_proy] || null;
+                if (pg && pg.inicio && pg.finProg) {
+                    const diasR = Math.floor((new Date(pg.finProg) - new Date()) / 86400000);
+                    const estadoTxt = diasR < 0 ? `Vencido (${Math.abs(diasR)}d)` : `${diasR}d restantes`;
+                    const estadoCol = diasR < 0 ? '#dc2626' : diasR < 30 ? '#b45309' : '#16a34a';
+                    const pctProg = _ag != null ? Math.min(100, _ag.pct_prog ?? _ag.pct ?? 0) : null;
+                    const barVal  = pctProg !== null ? pctProg : (pg.plazo > 0 ? Math.min(100, Math.round((pg.plazo - Math.max(0, diasR)) / pg.plazo * 100)) : 0);
+                    const barCol  = barVal >= 100 ? '#ef4444' : barVal >= 80 ? '#f59e0b' : barVal >= 50 ? '#3b82f6' : '#22c55e';
+                    h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📋 Programa de Obra</h3>
+<div class="summary-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));">
+  <div class="summary-card"><div class="summary-card-label">Inicio</div><div style="font-size:11px;font-weight:700;">${fmtFecha(pg.inicio)}</div></div>
+  <div class="summary-card"><div class="summary-card-label">Término</div><div style="font-size:11px;font-weight:700;">${fmtFecha(pg.finProg)}</div></div>
+  <div class="summary-card"><div class="summary-card-label">Plazo</div><div style="font-size:11px;font-weight:700;">${pg.plazo} días</div></div>
+  <div class="summary-card"><div class="summary-card-label">Estado</div><div style="font-size:11px;font-weight:700;color:${estadoCol};">${estadoTxt}</div></div>
+</div>
+<div style="margin:10px 0 4px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;"><span>${fmtFecha(pg.inicio)}</span><span style="font-weight:600;">${pctProg !== null ? Number(pctProg).toFixed(2) + '% programado' : '—'}</span><span>${fmtFecha(pg.finProg)}</span></div>
+<div style="height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden;"><div style="height:100%;width:${barVal}%;background:${barCol};border-radius:6px;"></div></div>`;
+                } else {
+                    h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📋 Programa de Obra</h3><p style="color:#94a3b8;font-size:12px;">Sin datos de programa disponibles.</p>`;
+                }
+                
+                h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📊 Avance real a la fecha</h3>
+<div class="summary-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));">
+  <div class="summary-card"><div class="summary-card-label">Avance Real</div><div style="font-size:14px;font-weight:800;color:${agCol};">${agPct != null ? Number(agPct).toFixed(2) : '—'}%</div></div>
+  <div class="summary-card"><div class="summary-card-label">Inspeccionadas</div><div style="font-size:11px;font-weight:700;">${conInsp} / ${tot}</div><div style="font-size:11px;color:#94a3b8;">viviendas</div></div>
+  <div class="summary-card"><div class="summary-card-label">Terminadas</div><div style="font-size:11px;font-weight:700;color:#16a34a;">${term}</div><div style="font-size:11px;color:#94a3b8;">con recepción</div></div>
+</div>
+<div style="margin:8px 0 4px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;"><span>0%</span><span style="font-weight:600;color:${agCol};">${agPct != null ? Number(agPct).toFixed(2) : '0.00'}% completado</span><span>100%</span></div>
+<div style="height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden;margin-bottom:4px;"><div style="height:100%;width:${agPct ?? 0}%;background:${agCol};border-radius:6px;transition:width 0.5s;"></div></div>`;
+            } else if (tab === 'checkpoints') {
+                h += `Checkpoints del Proyecto</div><div class="summary-grid" style="grid-template-columns:repeat(auto-fill,minmax(55px,1fr));">`;
+                const tot = obra.viviendas.length;
+                CPS.forEach(cp => {
+                    const n = obra.viviendas.filter(v => getFlags(v)[cp.key]).length;
+                    const pct = tot ? Math.round(n/tot*100) : 0;
+                    const col = n===tot?'#16a34a':n>0?'#2563eb':'#6b7280';
+                    h += `<div class="summary-card" style="text-align:center;padding:3px 4px;"><div class="summary-card-label" style="margin-bottom:1px;">${cp.label}</div><div style="font-size:10px;font-weight:700;color:${col};">${n}<span style="font-size:8px;font-weight:400;color:#94a3b8;"> / ${tot} · ${pct}%</span></div></div>`;
+                });
+                h += `</div>`;
+            } else if (tab === 'curvas') {
+                const curvas = CURVAS_S_CONFIG[obra.ID_proy] || [];
+                h += `Curvas S de Control</div><div class="curvas-grid">`;
+                curvas.forEach(c => {
+                    const cap = getCapataz(obra.ID_proy, c.label);
+                    const capHtml = cap ? `<div style="font-size:10px;color:#64748b;margin-top:2px;">👷 ${cap}</div>` : '';
+                    h += `<div class="curva-card"><div class="curva-header">${c.label}${capHtml}</div><img src="https://drive.google.com/thumbnail?id=${c.id}&sz=w800&t=${Math.floor(Date.now()/3600000)}" style="width:100%;display:block;" alt="${c.label}" loading="lazy"/></div>`;
+                });
+                h += `</div>`;
+            } else if (tab === 'comentarios') {
+                h += `Comentarios Destacados</div>`;
+                const starredIds = new Set(Object.keys(resumenComRaw[obra.ID_proy] || {}));
+                let comHtml = '';
+                obra.viviendas.forEach(v => {
+                    const obsAll = obsRaw[v.ID_Benef] || [];
+                    const starred = obsAll.filter(o => starredIds.has(String(o.id)));
+                    if (starred.length === 0) return;
+                    const nombre = `${v.NOMBRES || ''} ${v.APELLIDOS || ''}`.trim();
+                    const items = starred.map(o => {
+                        const fch = (o.fecha || '').toString().substring(0, 10);
+                        return `<div style="padding:6px 12px;margin-bottom:5px;font-size:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;">
+<span style="font-size:10px;color:#94a3b8;">${fch}</span>
+<div style="color:#374151;margin-top:2px;">${o.texto || ''}</div></div>`;
+                    }).join('');
+                    comHtml += `<div style="margin-bottom:14px;"><div style="font-size:13px;font-weight:700;color:#1a1a2e;margin-bottom:6px;">${nombre}</div>${items}</div>`;
+                });
+                if (!comHtml) {
+                    comHtml = `<div style="color:#94a3b8;font-size:12px;padding:16px;text-align:center;border:1px dashed #e2e8f0;border-radius:8px;">Sin comentarios destacados (marcados con ★) en esta obra.</div>`;
+                }
+                h += `<h3 style="font-size:13px;color:#333;margin:20px 0 10px;display:flex;align-items:center;gap:6px;"><span style="color:#f59e0b;">★</span> Comentarios Destacados por Beneficiario</h3>${comHtml}`;
+            } else if (tab === 'viviendas') {
+                h += `Detalle de Viviendas</div>`;
+                const gruposObra = agruparViviendas(obra.viviendas, obra.grupos);
+                const ck = (ok) => ok ? `<span style="color:#16a34a;font-weight:700;">✓</span>` : `<span style="color:#e5e7eb;">—</span>`;
+                gruposObra.forEach(grupo => {
+                    const tituloGrupo = grupo.nombre || 'Sin asignar';
+                    const capLabel = grupo.capataz ? ` &nbsp;·&nbsp; <span style="font-weight:400;color:#64748b;">Capataz: ${grupo.capataz}</span>` : '';
+                    h += `<div style="margin-bottom:24px;">
+<div style="font-size:12px;font-weight:700;color:#1a1a2e;background:#f1f5f9;border:1px solid #e2e8f0;padding:7px 12px;border-radius:7px;margin-bottom:8px;">
+  ${tituloGrupo}${capLabel} &nbsp;<span style="font-weight:400;color:#94a3b8;">(${grupo.viviendas.length} viv.)</span>
+</div>
+<div class="table-container"><table style="min-width:520px;white-space:nowrap;">
+<thead><tr><th style="overflow:hidden;text-overflow:ellipsis;">Beneficiario</th><th style="text-align:center;">Avance</th><th style="width:65px;padding:9px 4px;text-align:center;">HPC</th><th style="width:65px;padding:9px 4px;text-align:center;">TE1</th><th style="width:65px;padding:9px 4px;text-align:center;">V.AS</th><th style="width:65px;padding:9px 4px;text-align:center;">R.AS</th><th style="width:65px;padding:9px 4px;text-align:center;">F1</th><th style="width:65px;padding:9px 4px;text-align:center;">Empalme</th><th style="width:65px;padding:9px 4px;text-align:center;">Recep.</th></tr></thead><tbody>`;
+                    grupo.viviendas.forEach(v => {
+                        const insp = getInspeccion(v.ID_Benef);
+                        const pct = insp ? insp.pct_total : null;
+                        const fl = getFlags(v);
+                        const pctTxt = pct !== null ? `${pct}%` : '—';
+                        const pctCol = pct === null ? '#94a3b8' : pct >= 80 ? '#16a34a' : pct >= 50 ? '#2563eb' : '#dc2626';
+                        h += `<tr><td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${v.NOMBRES||''} ${v.APELLIDOS||''}">${v.NOMBRES||''} ${v.APELLIDOS||''}</td><td style="font-weight:700;color:${pctCol};">${pctTxt}</td><td style="text-align:center;">${ck(fl.hpc)}</td><td style="text-align:center;">${ck(fl.te1)}</td><td style="text-align:center;">${ck(fl.visita_as)}</td><td style="text-align:center;">${ck(fl.resol_as)}</td><td style="text-align:center;">${ck(fl.fecha_f1)}</td><td style="text-align:center;">${ck(fl.empalme)}</td><td style="text-align:center;">${ck(fl.fecha_recep)}</td></tr>`;
+                    });
+                    h += `</tbody></table></div></div>`;
+                });
+            }
+            return h;
+        };
+
+        const allSections = {};
+        obrasData.forEach((o, idx) => {
+            allSections[idx] = {
+                resumen:     renderTab(idx, 'resumen'),
+                checkpoints: renderTab(idx, 'checkpoints'),
+                curvas:      renderTab(idx, 'curvas'),
+                comentarios: renderTab(idx, 'comentarios'),
+                viviendas:   renderTab(idx, 'viviendas'),
+            };
+        });
+
+        const css = `<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f4f8;color:#1a1a2e;font-size:14px;}
+.multi-container{max-width:980px;margin:0 auto;padding:0 0 40px;}
+.header{background:#0f172a;color:#fff;padding:14px 24px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:100;}
+.header h1{font-size:16px;font-weight:700;}
+.header-sub{font-size:11px;color:#94a3b8;margin-left:auto;}
+.tabs{background:#1e293b;display:flex;padding:0 24px;gap:2px;position:sticky;top:49px;z-index:99;}
+.tab-btn{background:none;border:none;color:#94a3b8;font-size:12px;font-weight:600;padding:11px 18px;cursor:pointer;border-bottom:3px solid transparent;}
+.tab-btn.active{color:#fff;border-bottom-color:#3b82f6;}
+.tab-btn:hover:not(.active){color:#e2e8f0;}
+.obra-jumper-wrap{position:relative;margin-left:auto;align-self:center;max-width:240px;}
+.obra-jumper-input{width:100%;background:#0f172a;color:#cbd5e1;border:1px solid #334155;border-radius:6px;padding:5px 28px 5px 10px;font-size:11px;font-weight:600;outline:none;box-sizing:border-box;cursor:pointer;}
+.obra-jumper-input::placeholder{color:#64748b;font-weight:400;}
+.obra-jumper-input:focus{border-color:#3b82f6;}
+.obra-jumper-arrow{position:absolute;right:8px;top:50%;transform:translateY(-50%);pointer-events:none;color:#64748b;font-size:9px;}
+.obra-jumper-list{display:none;position:absolute;top:calc(100% + 2px);right:0;min-width:100%;max-width:340px;background:#1e293b;border:1px solid #334155;border-radius:6px;max-height:280px;overflow-y:auto;z-index:999;box-shadow:0 4px 16px rgba(0,0,0,.4);list-style:none;margin:0;padding:0;}
+.obra-jumper-list.open{display:block;}
+.obra-jumper-item{padding:7px 10px;font-size:11px;color:#e2e8f0;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.obra-jumper-item:hover,.obra-jumper-item.oj-active{background:#334155;color:#fff;}
+.obra-jumper-item.oj-hidden{display:none;}
+.content{background:#f0f4f8;min-height:380px;}
+.section{display:none;}
+.section.active{display:block;}
+.obra-block{background:#fff;margin:12px;border-radius:10px;padding:24px;border:1px solid #e2e8f0;}
+.footer{background:#f8fafc;border-top:1px solid #e2e8f0;padding:12px 24px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;}
+.btn{padding:8px 14px;border:1px solid #d1d5db;border-radius:6px;background:#fff;cursor:pointer;font-size:12px;font-weight:600;color:#374151;}
+.btn:hover{background:#f3f4f6;}
+.btn-pdf{background:#0f172a;color:#fff;border-color:#0f172a;}
+.btn-pdf:hover{background:#1e293b;}
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:5px;margin-bottom:8px;}
+.summary-card{padding:3px 7px;border-radius:5px;border:1px solid #e2e8f0;background:#f8fafc;display:flex;align-items:baseline;gap:5px;overflow:hidden;}
+.summary-card-label{font-size:9px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;flex-shrink:0;}
+.summary-card-value{font-size:11px;font-weight:700;color:#0f172a;font-family:monospace;}
+.summary-card-detail{font-size:9px;color:#94a3b8;}
+.breadcrumb{font-size:12px;color:#94a3b8;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid #e2e8f0;}
+.breadcrumb strong{color:#0f172a;}
+.curvas-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-top:12px;}
+.curva-card{border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;}
+.curva-header{background:#f8fafc;padding:10px 12px;font-size:11px;font-weight:600;color:#475569;border-bottom:1px solid #e2e8f0;}
+.table-container{overflow:auto;max-height:520px;margin-top:12px;border:1px solid #e2e8f0;border-radius:6px;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+table thead{background:#f8fafc;}
+table th{padding:9px 11px;text-align:left;font-weight:700;color:#475569;border-bottom:2px solid #e2e8f0;position:sticky;top:0;background:#f8fafc;z-index:2;font-size:10px;text-transform:uppercase;}
+table td{padding:8px 11px;border-bottom:1px solid #f1f5f9;color:#334155;}
+table tr:hover td{background:#f8fafc;}
+table th:first-child,table td:first-child{position:sticky;left:0;background:white;z-index:1;border-right:1px solid #e2e8f0;min-width:180px;}
+table th:first-child{background:#f8fafc;z-index:3;}
+table tr:hover td:first-child{background:#f8fafc;}
+.no-data{color:#94a3b8;font-size:13px;text-align:center;padding:48px;font-style:italic;line-height:1.8;}
+@media (max-width:768px){
+  .tabs{flex-wrap:wrap;padding:0 8px 0;gap:0;}
+  .tab-btn{font-size:11px;padding:9px 10px;flex:1 1 auto;text-align:center;min-width:0;}
+  .obra-jumper-wrap{margin-left:0;width:calc(100% - 16px);max-width:100%;margin:4px 8px 6px;}
+  .obra-block{margin:8px;padding:14px 12px;border-radius:8px;}
+  .summary-grid{grid-template-columns:1fr 1fr;}
+  .summary-card-value{font-size:11px;}
+}
+@media print{.footer{display:none;}.tabs{display:none;}.section{display:block!important;}.obra-block{page-break-after:always;border:none;border-bottom:2px solid #e2e8f0;border-radius:0;margin:0;}}
+.seg-dot{cursor:help;display:inline-block;}
+</style>`;
+
+        const jsOpen = '<scr' + 'ipt>';
+        const jsClose = '</scr' + 'ipt>';
+        const js = jsOpen + `
+function mostrar(t,btn){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.tabs .tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('sec-'+t).classList.add('active');
+  btn.classList.add('active');
+}
+function jumpToObra(idx){
+  if(idx==='')return;
+  const sec=document.querySelector('.section.active');
+  const block=sec&&sec.querySelector('.obra-block[data-obra="'+idx+'"]');
+  if(block)block.scrollIntoView({behavior:'smooth',block:'start'});
+}
+;(function(){
+  var w=document.getElementById('ojWrap'),inp=document.getElementById('ojInput'),lst=document.getElementById('ojList');
+  if(!w)return;
+  function openL(){lst.classList.add('open');}
+  function closeL(){lst.classList.remove('open');inp.value='';}
+  inp.addEventListener('focus',openL);inp.addEventListener('click',openL);
+  inp.addEventListener('input',function(){
+    var q=this.value.toLowerCase();
+    lst.querySelectorAll('.obra-jumper-item').forEach(function(li){li.classList.toggle('oj-hidden',q&&!li.textContent.toLowerCase().includes(q));});
+    openL();
+  });
+  lst.addEventListener('click',function(e){
+    var li=e.target.closest('.obra-jumper-item');if(!li)return;
+    jumpToObra(li.dataset.idx);closeL();
+  });
+  document.addEventListener('click',function(e){if(!w.contains(e.target))closeL();});
+})();
+;(function(){
+  var tip=null;
+  function getEl(e){return e.target?e.target.closest('.seg-dot'):null;}
+  document.addEventListener('mouseover',function(e){
+    var el=getEl(e);if(!el)return;
+    if(!tip){tip=document.createElement('div');tip.style.cssText='position:fixed;background:#0f172a;color:#f1f5f9;font-size:11px;font-weight:500;padding:5px 9px;border-radius:6px;pointer-events:none;z-index:9999;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.3);display:none;';document.body.appendChild(tip);}
+    tip.textContent=el.dataset.tip||el.title||'';
+    tip.style.display='block';
+  });
+  document.addEventListener('mousemove',function(e){
+    if(tip&&tip.style.display==='block'){tip.style.left=(e.clientX+14)+'px';tip.style.top=(e.clientY-36)+'px';}
+  });
+  document.addEventListener('mouseout',function(e){
+    if(tip&&!(e.relatedTarget&&e.relatedTarget.closest&&e.relatedTarget.closest('.seg-dot')))tip.style.display='none';
+  });
+})();
+` + jsClose;
+
+        const vivConDespacho = new Set(DESPACHOS_DATA.map(d => String(d.ID_Benef)));
+        const fmtD2 = (iso) => { if (!iso) return '—'; const p = String(iso).substring(0,10).split('-'); return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:iso; };
+        const resumenFilas = obrasData.map(obra => {
+            const tot = obra.viviendas.length;
+            const av = tot ? Math.round(obra.viviendas.reduce((s,v)=>{ const i=getInspeccion(v.ID_Benef); return s+(i?i.pct_total:0); },0)/tot) : 0;
+            const _ag = avanceGanttRaw[obra.ID_proy];
+            const agPct = _ag ? (_ag.pct_prog ?? _ag.pct) : null;
+            const avReal = _ag ? _ag.pct : null;
+            const proyRec = PROYECTOS_DATA.find(p => p.ID_proy === obra.ID_proy);
+            const cIni = proyRec ? proyRec.fecha_inicio : null;
+            const cDur = proyRec ? (proyRec.duracion || 0) : 0;
+            const cFin = cDur>0&&cIni ? (()=>{ const d=new Date(cIni); d.setDate(d.getDate()+cDur); return d.toISOString().substring(0,10); })() : null;
+            const cDiasR = cFin ? Math.floor((new Date(cFin)-new Date())/86400000) : null;
+            const cPctTr = cDur>0&&cFin ? Math.min(100,Math.round((cDur-Math.max(0,cDiasR||0))/cDur*100)) : null;
+            const pg = ganttRaw[obra.ID_proy] || null;
+            const progDiasR = pg&&pg.finProg ? Math.floor((new Date(pg.finProg)-new Date())/86400000) : null;
+            const habilitadas = obra.viviendas.filter(v=>v.habil).length;
+            const enEjecucion = obra.viviendas.filter(v=>vivConDespacho.has(String(v.ID_Benef))).length;
+            const diff = (avReal!==null&&agPct!==null) ? Math.round((avReal-agPct)*100)/100 : null;
+            const recepDom=obra.viviendas.filter(v=>{const seg=SEGUIMIENTO_DATA[String(v.ID_Benef)];return seg&&seg._has&&seg._has.recepcion_dom;}).length;
+            const todasRecep=tot>0&&recepDom===tot;
+            const _ufr=todasRecep?obra.viviendas.map(v=>{const seg=SEGUIMIENTO_DATA[String(v.ID_Benef)];const fd=(seg&&seg.fecha_recep)||v.fecha_recepcion||null;return fd?new Date(fd):null;}).filter(f=>f&&!isNaN(f.getTime())):[]; 
+            const ultimaFR=_ufr.length?new Date(Math.max(..._ufr.map(f=>f.getTime()))):null;
+            let pgDiasRFrozen=progDiasR,pgDiasRColor=null,pgDiasRText=null;
+            if(todasRecep&&pg&&pg.finProg&&ultimaFR){const df=Math.floor((new Date(pg.finProg)-ultimaFR)/86400000);pgDiasRFrozen=df;pgDiasRColor=df>=0?'#16a34a':'#dc2626';pgDiasRText=(df>=0?'+':'')+df+'d';}
+            const _pctPend=tot>0?(tot-recepDom)/tot*100:0;
+            const circleHtml=(todasRecep&&pgDiasRFrozen>=0)?'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#16a34a;vertical-align:middle;" class="seg-dot" title="Todas con Recep. DOM completadas dentro del plazo" data-tip="Todas con Recep. DOM completadas dentro del plazo"></span>':(progDiasR!==null&&progDiasR<=90)?'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#dc2626;vertical-align:middle;" class="seg-dot" title="90 días o menos al término del programa" data-tip="90 días o menos al término del programa"></span>':(recepDom>0&&pg&&pg.plazo>0?(()=>{const pctEl=Math.max(0,pg.plazo-Math.max(0,progDiasR??0))/pg.plazo*100;return pctEl>=80?'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#eab308;vertical-align:middle;" class="seg-dot" title="Más del 80% del plazo transcurrido, más de 90d al término" data-tip="Más del 80% del plazo transcurrido, más de 90d al término"></span>':'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#9ca3af;vertical-align:middle;" class="seg-dot" title="Con Recep. DOM, menos del 80% del plazo transcurrido" data-tip="Con Recep. DOM, menos del 80% del plazo transcurrido"></span>';})():'')
+            return { obra, tot, av, avReal, agPct, cPctTr, cDiasR, cDur, pg, progDiasR, habilitadas, enEjecucion, diff, recepDom, todasRecep, pgDiasRFrozen, pgDiasRColor, pgDiasRText, circleHtml };
+        });
+        const resumenTablaHtml = (() => {
+            let t = `<div style="background:#fff;margin:12px 12px 0;border-radius:10px;padding:14px 16px;border:1px solid #e2e8f0;overflow-x:auto;overflow-y:auto;max-height:420px;-webkit-overflow-scrolling:touch;">
+<div style="font-size:12px;font-weight:700;color:#1e293b;margin-bottom:10px;">📋 Resumen ejecutivo de proyectos</div>
+<table style="min-width:900px;border-collapse:collapse;font-size:10px;white-space:nowrap;">
+<thead style="position:sticky;top:0;z-index:1;">
+<tr style="background:#f1f5f9;">
+  <th rowspan="2" style="padding:5px 6px;border:1px solid #e2e8f0;text-align:left;font-size:9px;text-transform:uppercase;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Proyecto</th>
+  <th colspan="3" style="padding:4px 6px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Avance (%)</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;background:#fef9c3;" title="% Avance Real − % Avance Programa">% Real<br>- % Prog</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Inicio<br>Prog.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Término<br>Prog.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Pzo.<br>Cont.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Pzo.<br>Prog.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Rest.<br>Cont.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Rest.<br>Prog.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Tot.<br>Viv.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Hab.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;text-transform:uppercase;color:#475569;cursor:help;" title="Considera en ejecución aquellas con al menos 1 despacho realizado.">Viv. en<br>Ejec.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;background:#f0fdf4;cursor:help;" title="Cantidad de beneficiarios con Recepción Definitiva DOM">Recep.<br>DOM</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;cursor:help;" title="Indicador de estado RECEP DOM vs plazo de programa">Est.<br>RECEP</th>
+</tr>
+<tr style="background:#f8fafc;">
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;width:72px;min-width:72px;" title="% Avance de contrato">% Cont.</th>
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;width:72px;min-width:72px;" title="% Avance según programa de obra (por fechas Gantt)">% Prog.</th>
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;width:72px;min-width:72px;" title="% Avance real (Curvas S)">% Real</th>
+</tr>
+</thead><tbody>`;
+            const sortedResumenFilas2=[...resumenFilas].sort((a,b)=>{
+                if(a.progDiasR===null&&b.progDiasR===null)return 0;
+                if(a.progDiasR===null)return 1; if(b.progDiasR===null)return -1;
+                return b.progDiasR-a.progDiasR;
+            });
+            let _fc90r2=true;
+            sortedResumenFilas2.forEach(r => {
+                const isCrit90=r.progDiasR!==null&&r.progDiasR<=90;
+                if(isCrit90&&_fc90r2){_fc90r2=false;t+=`<tr style="height:0;"><td colspan="16" style="padding:0;border:none;border-top:3px solid #dc2626;"></td></tr>`;}
+                const rowBg=isCrit90?'background:#fff1f2;':'';
+                const dCol = r.diff===null?'#94a3b8':r.diff>=0?'#16a34a':'#dc2626';
+                const dBg  = r.diff===null?'':r.diff>=0?'#f0fdf4':'#fef2f2';
+                const dTxt = r.diff===null?'—':(r.diff>=0?'+':'')+Number(r.diff).toFixed(2)+'%';
+                const cRCol = r.cDiasR===null?'#94a3b8':r.cDiasR<0?'#dc2626':r.cDiasR<30?'#b45309':'#374151';
+                const pRCol = r.progDiasR===null?'#94a3b8':r.progDiasR<=90?'#dc2626':'#374151';
+                t += `<tr style="border-bottom:1px solid #f1f5f9;${rowBg}">
+  <td style="padding:5px 6px;border-right:1px solid #f1f5f9;font-size:10px;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.obra.nombre}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${r.cPctTr!==null?Number(r.cPctTr).toFixed(2)+'%':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${r.agPct!==null?Number(r.agPct).toFixed(2)+'%':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:${r.diff!==null?(r.diff>=5?'#16a34a':r.diff>=0?'#2563eb':'#dc2626'):'#94a3b8'};">${r.avReal!==null?Number(r.avReal).toFixed(2)+'%':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;font-weight:700;color:${dCol};background:${dBg};">${dTxt}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${fmtD2(r.pg&&r.pg.inicio)}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${fmtD2(r.pg&&r.pg.finProg)}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${r.cDur?r.cDur+'d':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${r.pg&&r.pg.plazo?r.pg.plazo+'d':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:${cRCol};">${r.cDiasR!==null?r.cDiasR+'d':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:${r.pgDiasRColor||pRCol};font-weight:${(r.todasRecep||isCrit90)?'700':'400'};">${r.pgDiasRText||(r.pgDiasRFrozen!==null?r.pgDiasRFrozen+'d':'—')}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${r.tot}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${r.habilitadas}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;font-weight:700;color:#2563eb;">${r.enEjecucion}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;font-weight:700;color:${r.todasRecep?'#16a34a':'#374151'};">${r.recepDom}/${r.tot}</td>
+  <td style="padding:4px 4px;text-align:center;">${r.circleHtml}</td>
+</tr>`;
+            });
+            t += `</tbody></table></div>`;
+            return t;
+        })();
+
+        const tabKeys = ['resumen','checkpoints','curvas','comentarios','viviendas'];
+        const tabLabels = {resumen:'Resumen',checkpoints:'Checkpoints',curvas:'Curvas S',comentarios:'Comentarios',viviendas:'Viviendas'};
+
+        const tabs = `<div class="tabs">
+${tabKeys.map((t,i)=>`<button class="tab-btn${i===0?' active':''}" onclick="mostrar('${t}',this)">${tabLabels[t]}</button>`).join('\n')}
+<div class="obra-jumper-wrap" id="ojWrap">
+  <input class="obra-jumper-input" id="ojInput" type="text" placeholder="&#128269; Ir a obra..." autocomplete="off">
+  <span class="obra-jumper-arrow">&#9660;</span>
+  <ul class="obra-jumper-list" id="ojList">
+    ${obrasData.map((o,i)=>`<li class="obra-jumper-item" data-idx="${i}">${o.nombre}</li>`).join('')}
+  </ul>
+</div>
+</div>`;
+
+        const secs = tabKeys.map(t =>
+            `<div class="section${t==='resumen'?' active':''}" id="sec-${t}">${t==='resumen'?resumenTablaHtml:''}${obrasData.map((o,i)=>`<div class="obra-block" data-obra="${i}">${allSections[i][t]}</div>`).join('')}</div>`
+        ).join('');
+
+        const html = `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Informe de Recepciones — Multi Obras</title>
+${css}</head><body>
+<div class="multi-container">
+  <div class="header">
+    <h1>&#127968; Informe de Recepciones — Multi Obras</h1>
+    <span class="header-sub">${obrasData.length} obras en ejecución · ${new Date().toLocaleDateString('es-CL')}</span>
+  </div>
+  ${tabs}
+  <div class="content">${secs}</div>
+  <div class="footer">
+    <button class="btn btn-pdf" onclick="window.print();">&#128196; Imprimir/PDF</button>
+  </div>
+</div>
+${js}</body></html>`;
+
+        const fname = `Informe_Recepciones_${new Date().toISOString().substring(0,10)}.html`;
+        const blob = new Blob([html], {type:'text/html;charset=utf-8'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = fname;
+        document.body.appendChild(a); a.click(); a.remove();
+        const w = window.open(url, '_blank');
+        if (!w) alert('Archivo descargado: ' + fname);
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+    };
+
+    // ================================================================
+    // ESTADOS DE PAGO HTML — informe financiero multi-obra
+    // ================================================================
+    const generarEstadosPagoHTML = async () => {
+        let obras = PROYECTOS_DATA.filter(p => p.estado === 'ejecucion');
+        if (!obras.length) { alert('Sin obras en ejecución.'); return; }
+
+        // Fetch avance de programa y carta gantt desde Firebase
+        let avanceGanttRaw = {}, ganttRaw = {};
+        try {
+            const [rAG, rG] = await Promise.all([
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/avance_gantt.json'),
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/gantt_programa.json')
+            ]);
+            avanceGanttRaw = (await rAG.json()) || {};
+            ganttRaw       = (await rG.json())  || {};
+        } catch (_) {}
+        obras = obras.slice().sort((a, b) => ((avanceGanttRaw[b.ID_proy] || {}).pct || 0) - ((avanceGanttRaw[a.ID_proy] || {}).pct || 0));
+
+        const fmtUF = (v) => (Math.round((v||0) * 100) / 100).toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' UF';
+        const fmtFecha = (d) => {
+            if (!d) return '—';
+            const s = String(d).substring(0, 10);
+            const parts = s.split('-');
+            return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : s;
+        };
+
+        // Generador de gráfico SVG sin librerías externas
+        const svgChart = (labels, series, yHint) => {
+            if (!labels.length) return '<p style="color:#94a3b8;font-size:12px;text-align:center;padding:40px 0;">Sin datos históricos suficientes para graficar.</p>';
+            const W=900,H=260,pL=88,pR=16,pT=16,pB=52,cW=W-pL-pR,cH=H-pT-pB;
+            const allV=series.flatMap(s=>s.data.filter(v=>v!=null&&v>0));
+            const yMax=allV.length?Math.max(...allV)*1.08:(yHint||1);
+            const xp=i=>pL+(labels.length>1?i/(labels.length-1)*cW:cW/2);
+            const yp=v=>pT+cH-Math.min(1,v/yMax)*cH;
+            const yBaseline=pT+cH; // SVG y del eje X (valor=0)
+            let out=`<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;"><defs><clipPath id="cgc"><rect x="${pL}" y="${pT}" width="${cW+2}" height="${cH}"/></clipPath></defs>`;
+            for(let i=0;i<=5;i++){const v=yMax*i/5,y=yp(v).toFixed(1);out+=`<line x1="${pL}" y1="${y}" x2="${W-pR}" y2="${y}" stroke="#e5e7eb" stroke-width="1"/><text x="${pL-5}" y="${(+y+3.5).toFixed(1)}" text-anchor="end" font-size="9" fill="#94a3b8">${Math.round(v).toLocaleString('es-CL')}</text>`;}
+            const step=Math.max(1,Math.floor(labels.length/9));
+            labels.forEach((l,i)=>{if(i%step===0||i===labels.length-1){const x=xp(i).toFixed(1);out+=`<text x="${x}" y="${H-pB+13}" text-anchor="end" font-size="9" fill="#94a3b8" transform="rotate(-35,${x},${H-pB+13})">${l}</text>`;}});
+            series.forEach(s=>{
+                if(!s.data.some(v=>v!=null))return;
+                // Agrupar puntos no-nulos en segmentos contiguos
+                let pts=[],segs=[];
+                s.data.forEach((v,i)=>{if(v==null){if(pts.length)segs.push(pts);pts=[];return;}pts.push([xp(i),yp(v)]);});
+                if(pts.length)segs.push(pts);
+                // Interpolación cúbica monotónica Fritsch-Carlson: no genera picos/valles falsos entre puntos
+                segs.forEach(pts=>{
+                    if(pts.length<2)return;
+                    const n=pts.length;
+                    const del=[];
+                    for(let i=0;i<n-1;i++) del.push((pts[i+1][1]-pts[i][1])/(pts[i+1][0]-pts[i][0]));
+                    const m=new Array(n);
+                    m[0]=del[0]; m[n-1]=del[n-2];
+                    for(let i=1;i<n-1;i++) m[i]=(del[i-1]*del[i]<=0)?0:(del[i-1]+del[i])/2;
+                    for(let i=0;i<n-1;i++){
+                        if(Math.abs(del[i])<1e-10){m[i]=0;m[i+1]=0;}
+                        else{const a=m[i]/del[i],b=m[i+1]/del[i],r=a*a+b*b;if(r>9){const t=3/Math.sqrt(r);m[i]=t*a*del[i];m[i+1]=t*b*del[i];}}
+                    }
+                    let d=`M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
+                    for(let i=0;i<n-1;i++){
+                        const dx=pts[i+1][0]-pts[i][0];
+                        d+=` C${(pts[i][0]+dx/3).toFixed(1)},${(pts[i][1]+m[i]*dx/3).toFixed(1)} ${(pts[i+1][0]-dx/3).toFixed(1)},${(pts[i+1][1]-m[i+1]*dx/3).toFixed(1)} ${pts[i+1][0].toFixed(1)},${pts[i+1][1].toFixed(1)}`;
+                    }
+                    out+=`<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2.5" clip-path="url(#cgc)" ${s.dash?`stroke-dasharray="${s.dash}"`:''}  stroke-linecap="round" stroke-linejoin="round"/>`;
+                });
+                s.data.forEach((v,i)=>{if(v!=null)out+=`<circle cx="${xp(i).toFixed(1)}" cy="${yp(v).toFixed(1)}" r="3.5" fill="${s.color}" stroke="#fff" stroke-width="1.5"/>`;});
+            });
+            out+=`<line x1="${pL}" y1="${pT}" x2="${pL}" y2="${pT+cH}" stroke="#94a3b8" stroke-width="1"/><line x1="${pL}" y1="${pT+cH}" x2="${W-pR}" y2="${pT+cH}" stroke="#94a3b8" stroke-width="1"/>`;
+            out+='</svg>';
+            return out;
+        };
+
+        // Pre-generar todo el contenido de tabs por obra (sin DOM queries en tiempo de render)
+        const allSections = obras.map(proy => {
+            const pid = proy.ID_proy;
+            const nombre = `${pid} · ${proy.NOMBRE_PROYECTO || pid}`;
+            const comuna = proy.COMUNA || '';
+
+            const montos    = MONTOS_PROY_DATA[pid] || { total: 0, viviendas: 0 };
+            const eps       = EEPP_DATA.filter(ep => ep.ID_Proy === pid);
+            const gars      = GARANTIAS_DATA.filter(g => g.ID_Proy === pid);
+
+            const sumByEstado = (...kw) => eps.filter(e => kw.some(k => e.Estado.toLowerCase().includes(k))).reduce((a,e) => a + e.Monto, 0);
+            const totalPagado    = sumByEstado('pagado');
+            const totalIngresado = sumByEstado('ingresado');
+            const totalAprobado  = sumByEstado('aprobado');
+            const totalEP        = eps.reduce((a,e) => a + e.Monto, 0);
+            const totalContrato  = montos.total;
+            const pctCobrado     = totalContrato > 0 ? Math.min(100, Math.round(totalPagado / totalContrato * 1000) / 10) : 0;
+            const pctEmitido     = totalContrato > 0 ? Math.min(100, Math.round(totalEP / totalContrato * 1000) / 10) : 0;
+            const totalGarUF     = gars.reduce((a,g) => a + g.monto_uf, 0);
+            const epNums         = [...new Set(eps.map(e => e.Num_EP))];
+            const epNumsEmitidos = epNums.length;
+            const epPendientes   = epNums.filter(n => eps.filter(e => e.Num_EP === n).some(e => !e.Estado.toLowerCase().includes('pagado'))).length;
+            const agNode         = avanceGanttRaw[pid];
+            const pctPrograma    = (agNode != null) ? Math.min(100, Math.round(((agNode.pct_prog ?? agNode.pct) || 0) * 10) / 10) : null;
+            const pctReal        = agNode?.pct != null ? Math.round(agNode.pct * 100) / 100 : null;
+
+            // ── TAB RESUMEN ──────────────────────────────────────────────────
+            // Siempre muestra datos del contrato aunque no haya EP ejecutado
+            const barCol = pctCobrado >= 80 ? '#16a34a' : pctCobrado >= 40 ? '#2563eb' : pctCobrado > 0 ? '#f59e0b' : '#94a3b8';
+            const resumen = `
+<div class="breadcrumb">Obra <strong>${nombre}</strong>${comuna ? ' · ' + comuna : ''} · Estado General</div>
+<h3 class="sec-h3">&#128209; Datos del Contrato</h3>
+<div class="summary-grid">
+  <div class="summary-card sc-blue"><div class="summary-card-label">Total Contrato</div><div class="summary-card-value">${fmtUF(totalContrato)}</div><div class="summary-card-detail">${montos.viviendas} viviendas</div></div>
+  <div class="summary-card sc-green"><div class="summary-card-label">Cobrado (Pagado)</div><div class="summary-card-value" style="color:${barCol};">${fmtUF(totalPagado)}</div><div class="summary-card-detail">${pctCobrado}% del contrato</div></div>
+  <div class="summary-card sc-yellow"><div class="summary-card-label">En tramitación</div><div class="summary-card-value">${fmtUF(totalIngresado + totalAprobado)}</div><div class="summary-card-detail">${epPendientes} EP pendientes</div></div>
+  <div class="summary-card sc-red"><div class="summary-card-label">Por facturar</div><div class="summary-card-value">${fmtUF(Math.max(0, totalContrato - totalEP))}</div><div class="summary-card-detail">${epNumsEmitidos} EP emitidos · ${pctEmitido}% del total</div></div>
+</div>
+<div style="margin:18px 0 4px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;"><span style="font-size:10px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.5px;">% Cobrado</span><span style="font-size:11px;font-weight:700;color:${barCol};">${pctCobrado}%</span></div>
+  <div style="background:#e5e7eb;border-radius:6px;height:9px;overflow:hidden;margin-bottom:9px;">
+    <div style="height:100%;width:${pctEmitido}%;background:#bfdbfe;border-radius:6px;position:relative;"><div style="height:100%;width:${totalEP>0?Math.round(totalPagado/totalEP*100):0}%;background:${barCol};border-radius:6px;"></div></div>
+  </div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;"><span style="font-size:10px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.5px;">% Avance de contrato</span><span style="font-size:11px;font-weight:700;color:#2563eb;">${pctEmitido}%</span></div>
+  <div style="background:#e5e7eb;border-radius:6px;height:9px;overflow:hidden;margin-bottom:9px;">
+    <div style="height:100%;width:${pctEmitido}%;background:#2563eb;border-radius:6px;"></div>
+  </div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;"><span style="font-size:10px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.5px;">% Avance de programa</span><span style="font-size:11px;font-weight:700;color:#7c3aed;">${pctPrograma != null ? pctPrograma + '%' : '—'}</span></div>
+  <div style="background:#e5e7eb;border-radius:6px;height:9px;overflow:hidden;margin-bottom:9px;">
+    <div style="height:100%;width:${pctPrograma != null ? pctPrograma : 0}%;background:#7c3aed;border-radius:6px;"></div>
+  </div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;"><span style="font-size:10px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.5px;">% Avance real</span><span style="font-size:11px;font-weight:700;color:#ea580c;">${pctReal != null ? Number(pctReal).toFixed(2) + '%' : '—'}</span></div>
+  <div style="background:#e5e7eb;border-radius:6px;height:9px;overflow:hidden;margin-bottom:16px;">
+    <div style="height:100%;width:${pctReal != null ? pctReal : 0}%;background:#ea580c;border-radius:6px;"></div>
+  </div>
+</div>
+<h3 class="sec-h3">&#128274; Garantías del Proyecto</h3>
+${gars.length ? `<div class="summary-grid">${gars.map(g => {
+  const venc = g.fecha_vcmto ? new Date(g.fecha_vcmto) : null;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const diasRestantes = venc ? Math.round((venc - today) / 86400000) : null;
+  const vencida = diasRestantes != null && diasRestantes < 0;
+  const badgeCls = vencida || diasRestantes <= 59 ? 'gar-badge-red' : diasRestantes <= 89 ? 'gar-badge-yellow' : 'gar-badge-green';
+  const badgeTxt = vencida ? 'VENCIDA' : diasRestantes != null ? diasRestantes + 'd' : '—';
+  return `<div class="summary-card${vencida ? ' sc-vencida' : ''}"><div style="display:flex;justify-content:space-between;align-items:flex-start;"><div class="summary-card-label">${g.tipoCorto||g.tipo} · ${g.entidad}</div>${diasRestantes != null ? `<span class="${badgeCls}">${badgeTxt}</span>` : ''}</div><div class="summary-card-value" style="font-size:14px;">${fmtUF(g.monto_uf)}</div><div class="summary-card-detail">${g.banco||'—'} · Vcto: ${fmtFecha(g.fecha_vcmto)}</div></div>`;
+}).join('')}</div>
+<div style="font-size:11px;color:#475569;margin-top:6px;">Total garantías: <strong>${fmtUF(totalGarUF)}</strong> · ${gars.length} boleta${gars.length!==1?'s':''}</div>` : '<p style="color:#94a3b8;font-size:12px;font-style:italic;padding:10px 0;">Sin garantías vigentes registradas.</p>'}`;
+
+            // ── TAB ESTADOS DE PAGO ──────────────────────────────────────────
+            const epByNum = {};
+            eps.forEach(ep => {
+                const k = String(ep.Num_EP || '—');
+                if (!epByNum[k]) epByNum[k] = { num: k, items: [] };
+                epByNum[k].items.push(ep);
+            });
+            let cumPagado = 0;
+            const epRows = Object.values(epByNum)
+                .sort((a,b) => (parseFloat(a.num)||0) - (parseFloat(b.num)||0))
+                .map(g => {
+                    const tot = g.items.reduce((a,e) => a + e.Monto, 0);
+                    const est = g.items[0].Estado;
+                    const fecha = g.items.map(e => e.Fecha).filter(Boolean).sort().slice(-1)[0] || '';
+                    const estL = est.toLowerCase();
+                    const ecls = estL.includes('pagado') ? 'est-pagado' : estL.includes('ingresado') ? 'est-ingresado' : 'est-otro';
+                    let saldoCell = '<td></td>';
+                    if (estL.includes('pagado')) {
+                        cumPagado += tot;
+                        const saldo = Math.max(0, totalContrato - cumPagado);
+                        saldoCell = `<td class="td-monto td-saldo">Saldo: ${fmtUF(saldo)}</td>`;
+                    }
+                    return `<tr><td class="td-ep">EP ${g.num}</td><td class="tc">${g.items.length}</td><td class="td-monto">${fmtUF(tot)}</td><td class="${ecls} tc">${est}</td><td class="tc">${fmtFecha(fecha)}</td>${saldoCell}</tr>`;
+                }).join('');
+            const ep = eps.length
+                ? `<div class="breadcrumb">Obra <strong>${nombre}</strong> · Estados de Pago · ${epNumsEmitidos} EP emitidos · <span style="color:#0f172a;font-weight:700;">Contrato: ${fmtUF(totalContrato)}</span></div>
+<div class="table-wrap"><table class="dt"><thead><tr><th>EP</th><th class="tc">Benef.</th><th>Monto UF</th><th class="tc">Estado</th><th class="tc">Fecha</th><th>Saldo contrato</th></tr></thead>
+<tbody>${epRows}</tbody>
+<tfoot><tr><td colspan="2"><strong>Total emitido</strong></td><td class="td-monto"><strong>${fmtUF(totalEP)}</strong></td><td class="tc est-pagado"><strong>${fmtUF(totalPagado)}</strong></td><td class="tc" style="font-size:10px;color:#94a3b8;">pagado</td><td class="td-monto td-saldo"><strong>Saldo: ${fmtUF(Math.max(0,totalContrato-totalPagado))}</strong></td></tr></tfoot></table></div>`
+                : `<div class="breadcrumb">Obra <strong>${nombre}</strong> · Estados de Pago · <span style="color:#0f172a;font-weight:700;">Contrato: ${fmtUF(totalContrato)}</span></div><p class="no-data">Sin estados de pago emitidos.<br><small>${montos.viviendas} viviendas</small></p>`;
+
+            // ── TAB GARANTÍAS ────────────────────────────────────────────────
+            const garRows = gars.map(g => {
+                const venc = g.fecha_vcmto ? new Date(g.fecha_vcmto) : null;
+                const today2 = new Date(); today2.setHours(0,0,0,0);
+                const dias = venc ? Math.round((venc - today2) / 86400000) : null;
+                const vencida = dias != null && dias < 0;
+                const badgeCls = vencida || dias <= 59 ? 'gar-badge-red' : dias <= 89 ? 'gar-badge-yellow' : 'gar-badge-green';
+                const badgeTxt = vencida ? 'VENCIDA' : dias != null ? dias + ' días' : '—';
+                return `<tr class="${vencida?'gar-vencida':''}"><td>${g.tipoCorto||g.tipo}</td><td>${g.num_bol||'—'}</td><td>${g.banco||'—'}</td><td class="td-monto">${fmtUF(g.monto_uf)}</td><td class="tc">${g.entidad||'—'}</td><td class="tc">${fmtFecha(g.fecha_vcmto)}</td><td class="tc">${dias != null ? `<span class="${badgeCls}">${badgeTxt}</span>` : '—'}</td></tr>`;
+            }).join('');
+            const gar = gars.length
+                ? `<div class="breadcrumb">Obra <strong>${nombre}</strong> · Garantías vigentes (${gars.length} boletas · ${fmtUF(totalGarUF)})</div>
+<div class="table-wrap"><table class="dt"><thead><tr><th>Tipo</th><th>Nº Boleta</th><th>Banco</th><th>Monto UF</th><th class="tc">Entidad</th><th class="tc">Vencimiento</th><th class="tc">Plazo</th></tr></thead>
+<tbody>${garRows}</tbody>
+<tfoot><tr><td colspan="3"><strong>Total garantías</strong></td><td class="td-monto"><strong>${fmtUF(totalGarUF)}</strong></td><td colspan="3"></td></tr></tfoot></table></div>`
+                : `<div class="breadcrumb">Obra <strong>${nombre}</strong> · Garantías</div><p class="no-data">Sin garantías vigentes.</p>`;
+
+            // ── TAB CURVA DE COBROS/PAGOS ─────────────────────────────────────
+            const pagadoByMes = {}, emitidoByMes = {};
+            eps.forEach(e => {
+                if (!e.Fecha) return;
+                const m = String(e.Fecha).substring(0,7);
+                const est = (e.Estado||'').toLowerCase();
+                if (est.includes('pagado')) pagadoByMes[m] = (pagadoByMes[m]||0) + e.Monto;
+                if (est.includes('pagado') || est.includes('ingresado') || est.includes('tramitaci')) emitidoByMes[m] = (emitidoByMes[m]||0) + e.Monto;
+            });
+            const serieAvReal = (AVANCE_MENSUAL_DATA[pid]?.serie) || [];
+            const mesSet = new Set([...Object.keys(pagadoByMes), ...Object.keys(emitidoByMes), ...serieAvReal.map(s=>s.mes)]);
+            const chartMeses = [...mesSet].filter(Boolean).sort();
+            let cPag = 0, cEmi = 0;
+            const dCobrado = [], dEmitido = [], dAvReal = [];
+            chartMeses.forEach(mes => {
+                cPag += pagadoByMes[mes]||0;
+                cEmi += emitidoByMes[mes]||0;
+                dCobrado.push(Math.round(cPag*100)/100);
+                dEmitido.push(Math.round(cEmi*100)/100);
+                const rp = serieAvReal.find(s=>s.mes===mes);
+                dAvReal.push(rp != null ? Math.round(rp.avance/100*totalContrato*100)/100 : null);
+            });
+            // Interpolar linealmente los meses sin dato en dAvReal
+            for (let i = 0; i < dAvReal.length; i++) {
+                if (dAvReal[i] !== null) continue;
+                const prev = i > 0 ? i - 1 : null;
+                let next = null;
+                for (let j = i + 1; j < dAvReal.length; j++) { if (dAvReal[j] !== null) { next = j; break; } }
+                if (prev !== null && next !== null) {
+                    // interpolación lineal entre los dos extremos conocidos
+                    const span = next - prev;
+                    for (let k = prev + 1; k < next; k++) {
+                        dAvReal[k] = Math.round((dAvReal[prev] + (dAvReal[next] - dAvReal[prev]) * (k - prev) / span) * 100) / 100;
+                    }
+                    i = next - 1; // saltar los meses ya rellenados
+                }
+            }
+            const chartSeries = [
+                { color:'#16a34a', data:dCobrado,  dash:null    },   // verde sólido  — Cobrado real
+                { color:'#2563eb', data:dEmitido,  dash:'4,3'   },   // azul — EP emitidos (cobrado + en tramitación)
+                { color:'#ca8a04', data:dAvReal,   dash:'6,2'   },   // amarillo — Por avance real
+            ];
+            const curvaHtml = `<div class="obra-block">
+<div class="breadcrumb">Obra <strong>${nombre}</strong>${comuna?' · '+comuna:''} · Curva Cobros/Pagos · Contrato: ${fmtUF(totalContrato)}</div>
+<div class="ch-legend">
+  <span class="ch-dot" style="background:#16a34a;"></span><span>Cobrado real</span>
+  <span class="ch-dot ch-dashed" style="border-color:#2563eb;"></span><span>EP emitidos (cobrado + en tramitación)</span>
+  <span class="ch-dot ch-dashed" style="border-color:#ca8a04;"></span><span>Por avance real</span>
+</div>
+${svgChart(chartMeses, chartSeries, totalContrato)}
+</div>`;
+
+            return { resumen, ep, gar, curvaHtml };
+        });
+
+        // Totales globales para barra resumen pestaña EP
+        const grandContrato = obras.reduce((s,p) => s + (MONTOS_PROY_DATA[p.ID_proy]?.total||0), 0);
+        const grandCobrado  = obras.reduce((s,p) => s + EEPP_DATA.filter(e => e.ID_Proy === p.ID_proy && e.Estado.toLowerCase().includes('pagado')).reduce((a,e) => a + e.Monto, 0), 0);
+        const grandSaldo    = Math.max(0, grandContrato - grandCobrado);
+        const epSummaryBar  = `<div class="ep-sumbar">
+  <div class="ep-sumbar-item"><span class="ep-sumbar-label">Total contratos</span><span class="ep-sumbar-val">${fmtUF(grandContrato)}</span></div>
+  <div class="ep-sumbar-sep"></div>
+  <div class="ep-sumbar-item"><span class="ep-sumbar-label">Total cobrado</span><span class="ep-sumbar-val" style="color:#16a34a;">${fmtUF(grandCobrado)}</span></div>
+  <div class="ep-sumbar-sep"></div>
+  <div class="ep-sumbar-item"><span class="ep-sumbar-label">Saldo por cobrar</span><span class="ep-sumbar-val" style="color:#dc2626;">${fmtUF(grandSaldo)}</span></div>
+</div>`;
+
+        const cssEP = `<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f4f8;color:#1a1a2e;font-size:14px;}
+.multi-container{max-width:980px;margin:0 auto;padding:0 0 40px;}
+.header{background:#0f172a;color:#fff;padding:14px 24px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:100;}
+.header h1{font-size:16px;font-weight:700;}
+.header-sub{font-size:11px;color:#94a3b8;margin-left:auto;}
+.tabs{background:#1e293b;display:flex;padding:0 24px;gap:2px;position:sticky;top:49px;z-index:99;}
+.tab-btn{background:none;border:none;color:#94a3b8;font-size:12px;font-weight:600;padding:11px 18px;cursor:pointer;border-bottom:3px solid transparent;}
+.tab-btn.active{color:#fff;border-bottom-color:#3b82f6;}
+.tab-btn:hover:not(.active){color:#e2e8f0;}
+.content{background:#f0f4f8;min-height:380px;}
+.section{display:none;}
+.section.active{display:block;}
+.obra-block{background:#fff;margin:12px;border-radius:10px;padding:24px;border:1px solid #e2e8f0;}
+.footer{background:#f8fafc;border-top:1px solid #e2e8f0;padding:12px 24px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;}
+.btn{padding:8px 14px;border:1px solid #d1d5db;border-radius:6px;background:#fff;cursor:pointer;font-size:12px;font-weight:600;color:#374151;}
+.btn:hover{background:#f3f4f6;}
+.btn-pdf{background:#0f172a;color:#fff;border-color:#0f172a;}
+.btn-pdf:hover{background:#1e293b;}
+.breadcrumb{font-size:12px;color:#94a3b8;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid #e8e8e8;}
+.breadcrumb strong{color:#0f172a;}
+.sec-h3{font-size:13px;font-weight:700;color:#1e293b;margin:20px 0 10px;padding-bottom:6px;border-bottom:1px solid #e2e8f0;}
+.sec-h3:first-child{margin-top:0;}
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:5px;margin-bottom:8px;}
+.summary-card{padding:3px 7px;border-radius:5px;border:1px solid #e2e8f0;background:#f8fafc;display:flex;align-items:baseline;gap:5px;overflow:hidden;}
+.sc-blue{background:#eff6ff;border-color:#bfdbfe;}
+.sc-green{background:#f0fdf4;border-color:#bbf7d0;}
+.sc-yellow{background:#fefce8;border-color:#fde68a;}
+.sc-red{background:#fff1f2;border-color:#fecdd3;}
+.sc-vencida{background:#fff1f2;border-color:#fca5a5;}
+.summary-card-label{font-size:9px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;flex-shrink:0;}
+.summary-card-value{font-size:11px;font-weight:700;color:#0f172a;font-family:monospace;}
+.summary-card-detail{font-size:9px;color:#94a3b8;}
+.dt{width:100%;border-collapse:collapse;font-size:12px;}
+.dt th{background:#f8fafc;color:#475569;font-weight:700;padding:9px 11px;text-align:left;border-bottom:2px solid #e2e8f0;font-size:10px;text-transform:uppercase;}
+.dt td{padding:8px 11px;border-bottom:1px solid #f1f5f9;color:#334155;}
+.dt tr:hover td{background:#f8fafc;}
+.dt tfoot td{background:#f1f5f9;border-top:2px solid #e2e8f0;font-weight:600;}
+.td-monto{text-align:right;font-family:monospace;font-size:11px;}
+.td-ep{font-weight:700;color:#1e40af;}
+.tc{text-align:center;}
+.est-pagado{color:#15803d;font-weight:700;}
+.est-ingresado{color:#b45309;font-weight:600;}
+.est-otro{color:#4f46e5;font-weight:600;}
+.est-vencida{color:#dc2626;font-weight:700;}
+.gar-vencida td{background:#fff1f2!important;}
+.no-data{color:#94a3b8;font-size:13px;text-align:center;padding:48px;font-style:italic;line-height:1.8;}
+.gar-badge-green{display:inline-block;padding:2px 7px;border-radius:12px;font-size:10px;font-weight:700;background:#dcfce7;color:#15803d;border:1px solid #86efac;white-space:nowrap;}
+.gar-badge-yellow{display:inline-block;padding:2px 7px;border-radius:12px;font-size:10px;font-weight:700;background:#fef9c3;color:#a16207;border:1px solid #fde047;white-space:nowrap;}
+.gar-badge-red{display:inline-block;padding:2px 7px;border-radius:12px;font-size:10px;font-weight:700;background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;white-space:nowrap;}
+.td-saldo{font-size:10px;color:#64748b;}
+.ep-sumbar{position:sticky;top:89px;z-index:98;background:#0f172a;display:flex;align-items:center;gap:0;padding:10px 24px;border-bottom:1px solid #1e293b;}
+.ep-sumbar-item{display:flex;flex-direction:column;gap:2px;padding:0 20px;}
+.ep-sumbar-label{font-size:9px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;}
+.ep-sumbar-val{font-size:13px;font-weight:700;color:#fff;font-family:monospace;}
+.ep-sumbar-sep{width:1px;height:32px;background:#334155;}
+.ch-legend{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px;font-size:11px;color:#475569;}
+.ch-dot{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:4px;vertical-align:middle;}
+.ch-dashed{width:18px;height:0;border-radius:0;border-top:3px dashed;background:transparent;vertical-align:middle;}
+.ch-wrap{position:relative;height:260px;margin-top:8px;}
+.obra-jumper-wrap{position:relative;margin-left:auto;align-self:center;max-width:240px;}
+.obra-jumper-input{width:100%;background:#0f172a;color:#cbd5e1;border:1px solid #334155;border-radius:6px;padding:5px 28px 5px 10px;font-size:11px;font-weight:600;outline:none;box-sizing:border-box;cursor:pointer;}
+.obra-jumper-input::placeholder{color:#64748b;font-weight:400;}
+.obra-jumper-input:focus{border-color:#3b82f6;}
+.obra-jumper-arrow{position:absolute;right:8px;top:50%;transform:translateY(-50%);pointer-events:none;color:#64748b;font-size:9px;}
+.obra-jumper-list{display:none;position:absolute;top:calc(100% + 2px);right:0;min-width:100%;max-width:340px;background:#1e293b;border:1px solid #334155;border-radius:6px;max-height:280px;overflow-y:auto;z-index:999;box-shadow:0 4px 16px rgba(0,0,0,.4);list-style:none;margin:0;padding:0;}
+.obra-jumper-list.open{display:block;}
+.obra-jumper-item{padding:7px 10px;font-size:11px;color:#e2e8f0;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.obra-jumper-item:hover,.obra-jumper-item.oj-active{background:#334155;color:#fff;}
+.obra-jumper-item.oj-hidden{display:none;}
+.table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;width:100%;}
+@media (max-width:768px){
+  .header{position:fixed!important;top:0!important;left:0!important;right:0!important;width:100%!important;padding:10px 14px;flex-wrap:wrap;gap:6px;z-index:1000!important;}
+  .header h1{font-size:13px;line-height:1.3;}
+  .header-sub{margin-left:0;font-size:10px;width:100%;}
+  .tabs{flex-wrap:wrap;padding:0 8px 0;gap:0;position:relative!important;top:auto!important;}
+  .tab-btn{font-size:11px;padding:9px 10px;flex:1 1 auto;text-align:center;min-width:0;}
+  .obra-jumper-wrap{margin-left:0;width:calc(100% - 16px);max-width:100%;margin:4px 8px 6px;}
+  .ep-sumbar{flex-wrap:wrap;position:relative!important;top:auto!important;padding:8px 12px;gap:4px 0;}
+  .ep-sumbar-item{padding:4px 12px;}
+  .ep-sumbar-sep{display:none;}
+  .obra-block{margin:8px;padding:14px 12px;border-radius:8px;}
+  .summary-grid{grid-template-columns:1fr 1fr;}
+  .summary-card-value{font-size:11px;}
+  .dt{font-size:11px;}
+  .dt th,.dt td{padding:6px 7px;}
+  .no-data{padding:28px 12px;}
+  .footer{padding:10px 14px;}
+  .ch-legend{font-size:10px;gap:6px;}
+}
+@media print{.footer{display:none;}.tabs{display:none;}.ep-sumbar{display:none;}.section{display:block!important;}.obra-block{page-break-after:always;border:none;border-bottom:2px solid #e2e8f0;border-radius:0;margin:0;}}
+</style>`;
+
+        const jsOpen = '<scr'+'ipt>';
+        const jsClose = '<\/scr'+'ipt>';
+        const jsEP = jsOpen + `
+function updateStickyTops(){
+  const h=document.querySelector('.header');
+  const t=document.querySelector('.tabs');
+  const s=document.querySelector('.ep-sumbar');
+  const c=document.querySelector('.multi-container');
+  if(!h||!t||!c)return;
+  const mobile=window.innerWidth<=768;
+  if(mobile){
+    // Aplicar fixed via JS inline (más robusto que CSS en content:// Android)
+    h.style.cssText='position:fixed!important;top:0!important;left:0!important;right:0!important;width:100%!important;z-index:1000!important;';
+    const hH=h.offsetHeight;
+    c.style.paddingTop=hH+'px';
+    t.style.position='relative';
+    t.style.top='auto';
+    if(s){s.style.position='relative';s.style.top='auto';}
+  } else {
+    h.style.cssText='';
+    c.style.paddingTop='0';
+    const hH=h.offsetHeight;
+    const tH=t.offsetHeight;
+    t.style.position='sticky';
+    t.style.top=hH+'px';
+    if(s){s.style.position='sticky';s.style.top=(hH+tH)+'px';}
+  }
+}
+function mostrar(t,btn){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.tabs .tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('sec-'+t).classList.add('active');
+  btn.classList.add('active');
+  setTimeout(updateStickyTops,50);
+}
+function jumpToObra(idx){
+  if(idx==='')return;
+  const sec=document.querySelector('.section.active');
+  const block=sec&&sec.querySelector('.obra-block[data-obra="'+idx+'"]');
+  if(block)block.scrollIntoView({behavior:'smooth',block:'start'});
+}
+document.addEventListener('DOMContentLoaded',updateStickyTops);
+window.addEventListener('load',updateStickyTops);
+window.addEventListener('resize',updateStickyTops);
+;(function(){
+  var w=document.getElementById('ojWrap'),inp=document.getElementById('ojInput'),lst=document.getElementById('ojList');
+  if(!w)return;
+  function openL(){lst.classList.add('open');}
+  function closeL(){lst.classList.remove('open');inp.value='';}
+  inp.addEventListener('focus',openL);inp.addEventListener('click',openL);
+  inp.addEventListener('input',function(){
+    var q=this.value.toLowerCase();
+    lst.querySelectorAll('.obra-jumper-item').forEach(function(li){li.classList.toggle('oj-hidden',q&&!li.textContent.toLowerCase().includes(q));});
+    openL();
+  });
+  lst.addEventListener('click',function(e){
+    var li=e.target.closest('.obra-jumper-item');if(!li)return;
+    jumpToObra(li.dataset.idx);closeL();
+  });
+  document.addEventListener('click',function(e){if(!w.contains(e.target))closeL();});
+})();
+;(function(){
+  var tip=null;
+  function getEl(e){return e.target?e.target.closest('.seg-dot'):null;}
+  document.addEventListener('mouseover',function(e){
+    var el=getEl(e);if(!el)return;
+    if(!tip){tip=document.createElement('div');tip.style.cssText='position:fixed;background:#0f172a;color:#f1f5f9;font-size:11px;font-weight:500;padding:5px 9px;border-radius:6px;pointer-events:none;z-index:9999;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.3);display:none;';document.body.appendChild(tip);}
+    tip.textContent=el.dataset.tip||el.title||'';
+    tip.style.display='block';
+  });
+  document.addEventListener('mousemove',function(e){
+    if(tip&&tip.style.display==='block'){tip.style.left=(e.clientX+14)+'px';tip.style.top=(e.clientY-36)+'px';}
+  });
+  document.addEventListener('mouseout',function(e){
+    if(tip&&!(e.relatedTarget&&e.relatedTarget.closest&&e.relatedTarget.closest('.seg-dot')))tip.style.display='none';
+  });
+})();
+` + jsClose;
+
+        // ── Tabla resumen consolidada (parte superior pestaña Resumen) ──────────
+        const vivConDespachoEP = new Set(DESPACHOS_DATA.map(d => String(d.ID_Benef)));
+        const fmtD2EP = (iso) => { if (!iso) return '—'; const p = String(iso).substring(0,10).split('-'); return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:iso; };
+        const fmtUF2d = (v) => (Math.round((v||0)*100)/100).toLocaleString('es-CL',{minimumFractionDigits:2,maximumFractionDigits:2});
+
+        const resumenPagoFilas = obras.map(proy => {
+            const pid = proy.ID_proy;
+            const montos = MONTOS_PROY_DATA[pid] || { total: 0, viviendas: 0 };
+            const eps = EEPP_DATA.filter(ep => ep.ID_Proy === pid);
+            const sumByEst = (...kw) => eps.filter(e => kw.some(k => e.Estado.toLowerCase().includes(k))).reduce((a,e) => a + e.Monto, 0);
+            const totPagado   = sumByEst('pagado');
+            const totTramite  = sumByEst('ingresado') + sumByEst('aprobado');
+            const totEP       = eps.reduce((a,e) => a + e.Monto, 0);
+            const totContrato = montos.total;
+            const pctCob  = totContrato > 0 ? Math.round(totPagado/totContrato*10000)/100 : 0;
+            const pctEmit = totContrato > 0 ? Math.round(totEP/totContrato*10000)/100 : 0;
+            const agPct   = (ag => ag?.pct_prog ?? ag?.pct ?? null)(avanceGanttRaw[pid]);
+            const pctReal = avanceGanttRaw[pid]?.pct != null ? Math.round(avanceGanttRaw[pid].pct * 100) / 100 : null;
+            const pg      = ganttRaw[pid] || null;
+            const progDiasR = pg?.finProg ? Math.floor((new Date(pg.finProg)-new Date())/86400000) : null;
+            const cDur    = proy.duracion || 0;
+            const cIni    = proy.fecha_inicio || null;
+            const cFin    = cDur>0&&cIni ? (()=>{ const d=new Date(cIni); d.setDate(d.getDate()+cDur); return d.toISOString().substring(0,10); })() : null;
+            const cDiasR  = cFin ? Math.floor((new Date(cFin)-new Date())/86400000) : null;
+            const habBens = BENEFICIARIOS_DATA.filter(b => String(b.ID_Proy) === String(pid));
+            const habilitadas = habBens.filter(b => b.habil).length;
+            const enEjecucion = habBens.filter(b => vivConDespachoEP.has(String(b.ID_Benef))).length;
+            return { proy, pid, pctCob, pctEmit, agPct, pctReal, pg, cDur, cDiasR, progDiasR, montos, habilitadas, enEjecucion, totContrato, totPagado, totTramite, totFacturar: Math.max(0, totContrato-totEP) };
+        });
+
+        const resumenPagoTablaHtml = (() => {
+            let t = `<div style="background:#fff;margin:12px 12px 0;border-radius:10px;padding:14px 16px;border:1px solid #e2e8f0;">
+<div style="font-size:12px;font-weight:700;color:#1e293b;margin-bottom:10px;">📋 Resumen ejecutivo — Estados de Pago</div>
+<div id="ep-resumen-wrap" style="overflow:auto;max-height:70vh;position:relative;border:1px solid #e2e8f0;border-radius:6px;">
+<table id="ep-resumen-table" style="border-collapse:collapse;font-size:10px;table-layout:fixed;min-width:780px;width:100%;">
+<colgroup>
+  <col style="width:160px">
+  <col style="width:62px"><col style="width:62px">
+  <col style="width:36px"><col style="width:36px"><col style="width:40px">
+  <col style="width:95px"><col style="width:95px"><col style="width:85px"><col style="width:85px">
+</colgroup>
+<thead>
+<tr style="background:#f1f5f9;">
+  <th rowspan="2" style="padding:5px 6px;border:1px solid #e2e8f0;text-align:left;font-size:9px;text-transform:uppercase;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;position:sticky;top:0;left:0;z-index:4;background:#f1f5f9;box-shadow:2px 0 4px rgba(0,0,0,.08);">Proyecto</th>
+  <th colspan="2" style="padding:4px 6px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;position:sticky;top:0;z-index:2;background:#f1f5f9;">Avance (%)</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;position:sticky;top:0;z-index:2;background:#f1f5f9;">Tot.<br>Viv.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;position:sticky;top:0;z-index:2;background:#f1f5f9;">Hab.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;text-transform:uppercase;color:#475569;cursor:help;position:sticky;top:0;z-index:2;background:#f1f5f9;" title="Con al menos 1 despacho realizado">Viv. en<br>Ejec.</th>
+  <th colspan="4" style="padding:4px 6px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;background:#f0fdf4;position:sticky;top:0;z-index:2;">Montos (UF)</th>
+</tr>
+<tr style="background:#f8fafc;">
+  <th class="ep-r2" style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;position:sticky;z-index:2;background:#f8fafc;" title="% Cobrado del total del contrato">% Cobrado</th>
+  <th class="ep-r2" style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;position:sticky;z-index:2;background:#f8fafc;" title="% Avance real (Curvas S)">% Avan. Real</th>
+  <th class="ep-r2" style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;background:#f0fdf4;position:sticky;z-index:2;">Total Contrato</th>
+  <th class="ep-r2" style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;background:#f0fdf4;position:sticky;z-index:2;">Cobrado (Pagado)</th>
+  <th class="ep-r2" style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;background:#f0fdf4;position:sticky;z-index:2;">En Tramitación</th>
+  <th class="ep-r2" style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;background:#f0fdf4;position:sticky;z-index:2;">Por Facturar</th>
+</tr>
+</thead><tbody>`;
+            resumenPagoFilas.forEach(r => {
+                const cRCol = r.cDiasR===null?'#94a3b8':r.cDiasR<0?'#dc2626':r.cDiasR<30?'#b45309':'#374151';
+                const pRCol = r.progDiasR===null?'#94a3b8':r.progDiasR<90?'#dc2626':'#374151';
+                const nombre = `${r.pid} · ${r.proy.NOMBRE_PROYECTO || r.pid}`;
+                t += `<tr style="border-bottom:1px solid #f1f5f9;">
+  <td style="padding:5px 6px;border-right:1px solid #e2e8f0;font-size:10px;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;position:sticky;left:0;z-index:1;background:#fff;box-shadow:2px 0 4px rgba(0,0,0,.06);" title="${nombre}">${nombre}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${r.pctCob.toFixed(2)}%</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${r.pctReal!==null?Number(r.pctReal).toFixed(2)+'%':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${r.montos.viviendas||'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${r.habilitadas||'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;font-weight:700;color:#2563eb;">${r.enEjecucion}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:right;font-size:10px;font-family:monospace;">${fmtUF2d(r.totContrato)}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:right;font-size:10px;font-family:monospace;color:#16a34a;font-weight:700;">${fmtUF2d(r.totPagado)}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:right;font-size:10px;font-family:monospace;color:#b45309;">${fmtUF2d(r.totTramite)}</td>
+  <td style="padding:4px 4px;text-align:right;font-size:10px;font-family:monospace;color:#7c3aed;">${fmtUF2d(r.totFacturar)}</td>
+</tr>`;
+            });
+            const gCont = resumenPagoFilas.reduce((s,r)=>s+r.totContrato,0);
+            const gPag  = resumenPagoFilas.reduce((s,r)=>s+r.totPagado,0);
+            const gTram = resumenPagoFilas.reduce((s,r)=>s+r.totTramite,0);
+            const gFact = resumenPagoFilas.reduce((s,r)=>s+r.totFacturar,0);
+            t += `<tr style="background:#f1f5f9;border-top:2px solid #cbd5e1;font-weight:700;">
+  <td style="padding:5px 6px;font-size:10px;color:#475569;border-right:1px solid #e2e8f0;position:sticky;left:0;z-index:1;background:#f1f5f9;box-shadow:2px 0 4px rgba(0,0,0,.06);">TOTAL (${resumenPagoFilas.length} obras)</td>
+  <td colspan="5" style="padding:4px 4px;border-right:1px solid #e2e8f0;"></td>
+  <td style="padding:4px 4px;text-align:right;font-size:10px;font-family:monospace;border-right:1px solid #e2e8f0;">${fmtUF2d(gCont)}</td>
+  <td style="padding:4px 4px;text-align:right;font-size:10px;font-family:monospace;color:#16a34a;border-right:1px solid #e2e8f0;">${fmtUF2d(gPag)}</td>
+  <td style="padding:4px 4px;text-align:right;font-size:10px;font-family:monospace;color:#b45309;border-right:1px solid #e2e8f0;">${fmtUF2d(gTram)}</td>
+  <td style="padding:4px 4px;text-align:right;font-size:10px;font-family:monospace;color:#7c3aed;">${fmtUF2d(gFact)}</td>
+</tr>`;
+            t += `</tbody></table></div>
+<scr`+`ipt>(function(){
+  var w=document.getElementById('ep-resumen-wrap');
+  if(!w)return;
+  var r1=w.querySelector('thead tr:first-child');
+  if(!r1)return;
+  var h=r1.offsetHeight||32;
+  w.querySelectorAll('.ep-r2').forEach(function(th){th.style.top=h+'px';});
+})()</scr`+`ipt></div>`;
+            return t;
+        })();
+
+        const tabResumen = resumenPagoTablaHtml + allSections.map((s,i) => `<div class="obra-block" data-obra="${i}">${s.resumen}</div>`).join('');
+        const tabEP      = epSummaryBar + allSections.map((s,i) => `<div class="obra-block" data-obra="${i}">${s.ep}</div>`).join('');
+        const tabGar     = allSections.map((s,i) => `<div class="obra-block" data-obra="${i}">${s.gar}</div>`).join('');
+        const tabCurva   = allSections.map((s,i) => s.curvaHtml.replace('class="obra-block"',`class="obra-block" data-obra="${i}"`)).join('');
+
+        // ── TAB PROG. MENSUAL ────────────────────────────────────────────────
+        const MESES_ES_EP = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+        const hoyYM_EP = new Date().toISOString().substring(0,7);
+        const allYMs_EP = new Set();
+        obras.forEach(p => { const m=(avanceGanttRaw[p.ID_proy]||{}).mensual; if(m)Object.keys(m).forEach(ym=>allYMs_EP.add(ym)); });
+        const sortedYMs_EP = [...allYMs_EP].sort();
+        const tabProgMensual = (() => {
+            if (!sortedYMs_EP.length) return '<p style="color:#94a3b8;font-size:12px;font-style:italic;padding:20px 16px;">Sin datos de programa mensual disponibles. Ejecute las curvas S para poblar este campo.</p>';
+            const cellBg=(v,ym)=>{if(ym>hoyYM_EP)return v>0?'rgba(148,163,184,0.12)':'transparent';if(v>=100)return'#dcfce7';if(v>=75)return'#dbeafe';if(v>=50)return'#ede9fe';if(v>=25)return'#fef3c7';return'#f1f5f9';};
+            const cellFg=(v,ym)=>{if(ym>hoyYM_EP)return'#94a3b8';if(v>=100)return'#16a34a';if(v>=75)return'#1d4ed8';if(v>=50)return'#6d28d9';if(v>=25)return'#b45309';return'#64748b';};
+            let h=`<div style="overflow:auto;max-height:70vh;padding:12px 16px;border:1px solid #e2e8f0;border-radius:6px;margin:12px 12px 0;"><table style="border-collapse:collapse;font-size:10px;white-space:nowrap;"><thead><tr><th style="padding:6px 10px;background:#f1f5f9;border:1px solid #e2e8f0;text-align:left;font-size:9px;color:#475569;position:sticky;left:0;z-index:2;min-width:160px;max-width:200px;">Proyecto</th>`;
+            sortedYMs_EP.forEach(ym=>{
+                const [yr,mo]=ym.split('-');
+                const isCur=ym===hoyYM_EP;
+                h+=`<th style="padding:5px 8px;border:1px solid #e2e8f0;text-align:center;font-size:9px;color:${isCur?'#1d4ed8':'#475569'};background:${isCur?'#eff6ff':'#f1f5f9'};min-width:54px;">${MESES_ES_EP[+mo-1]}<br><span style="font-size:8px;">${yr}</span></th>`;
+            });
+            h+=`</tr></thead><tbody>`;
+            obras.forEach((proy,ri)=>{
+                const pid=proy.ID_proy;
+                const nombre=`${pid} · ${proy.NOMBRE_PROYECTO||pid}`;
+                const mensual=(avanceGanttRaw[pid]||{}).mensual||{};
+                const bg=ri%2?'#f8fafc':'#fff';
+                h+=`<tr><td style="padding:5px 10px;border:1px solid #e2e8f0;font-size:10px;font-weight:600;color:#1e293b;position:sticky;left:0;z-index:1;background:${bg};max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${nombre}">${nombre}</td>`;
+                sortedYMs_EP.forEach(ym=>{
+                    const v=mensual[ym]!=null?mensual[ym]:null;
+                    const isCur=ym===hoyYM_EP;
+                    const isFut=ym>hoyYM_EP;
+                    const cbg=v!==null?cellBg(v,ym):isFut?'transparent':'#f8fafc';
+                    const cfg=v!==null?cellFg(v,ym):'#cbd5e1';
+                    h+=`<td style="padding:5px 8px;border:1px solid #e2e8f0;text-align:center;font-size:10px;font-weight:700;color:${cfg};background:${cbg};opacity:${isFut?'0.6':'1'};${isCur?'outline:2px solid #3b82f6;outline-offset:-2px;':''}">${v!==null?Number(v).toFixed(1)+'%':'—'}</td>`;
+                });
+                h+=`</tr>`;
+            });
+            h+=`</tbody></table></div>`;
+            return h;
+        })();
+
+        const htmlEP = `<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Estados de Pago — Multi Obras</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+${cssEP}</head><body>
+<div class="multi-container">
+  <div class="header">
+    <h1>&#128200; Estados de Pago — Multi Obras</h1>
+    <span class="header-sub">${obras.length} obras en ejecución · ${new Date().toLocaleDateString('es-CL')}</span>
+  </div>
+  <div class="tabs">
+    <button class="tab-btn active" onclick="mostrar('resumen',this)">Resumen</button>
+    <button class="tab-btn" onclick="mostrar('ep',this)">Estados de Pago</button>
+    <button class="tab-btn" onclick="mostrar('gar',this)">Garantías</button>
+    <button class="tab-btn" onclick="mostrar('curva',this)">Curva Cobros/Pagos</button>
+    <button class="tab-btn" onclick="mostrar('progmensual',this)">Prog. Mensual</button>
+    <div class="obra-jumper-wrap" id="ojWrap">
+      <input class="obra-jumper-input" id="ojInput" type="text" placeholder="&#128269; Ir a obra..." autocomplete="off">
+      <span class="obra-jumper-arrow">&#9660;</span>
+      <ul class="obra-jumper-list" id="ojList">
+        ${obras.map((p,i)=>`<li class="obra-jumper-item" data-idx="${i}">${p.ID_proy} · ${p.NOMBRE_PROYECTO}</li>`).join('')}
+      </ul>
+    </div>
+  </div>
+  <div class="content">
+    <div class="section active" id="sec-resumen">${tabResumen}</div>
+    <div class="section" id="sec-ep">${tabEP}</div>
+    <div class="section" id="sec-gar">${tabGar}</div>
+    <div class="section" id="sec-curva">${tabCurva}</div>
+    <div class="section" id="sec-progmensual">${tabProgMensual}</div>
+  </div>
+  <div class="footer">
+    <button class="btn btn-pdf" onclick="window.print()">&#128196; Imprimir / PDF</button>
+  </div>
+</div>
+${jsEP}</body></html>`;
+
+        const fname = `EstadosPago_MultiObras_${new Date().toISOString().substring(0,10)}.html`;
+        const blob = new Blob([htmlEP], { type: 'text/html;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = fname;
+        document.body.appendChild(a); a.click(); a.remove();
+        const w = window.open(url, '_blank');
+        if (!w) alert('Archivo descargado: ' + fname);
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+    };
+
+    // Version HTML autocontenida con menu inferior para navegar entre paginas (portada + 1 por grupo)
+    const generarInformeNavegable = () => {
+        const inf = construirInforme();
+        const titulos = ['Resumen'].concat(inf.gruposPaginas.map(g => g.nombre));
+        const pagesHtml = `<section class="vpage active">${inf.headerHtml}${inf.portadaHtml}${inf.footerHtml}</section>`
+            + inf.gruposPaginas.map(g => `<section class="vpage"><div class="grupo-page">${g.contenidoHtml}</div></section>`).join('');
+        const viewerCss = `
+body.viewer{background:#e2e8f0;padding:0;max-width:100%;}
+.vpage{display:none;background:#fff;max-width:940px;margin:18px auto;padding:36px;box-shadow:0 4px 18px rgba(0,0,0,.08);border-radius:6px;}
+.vpage.active{display:block;}
+.vpage .grupo-page{margin-top:0;}
+.vbar{position:fixed;left:0;right:0;bottom:0;background:#1a1a2e;color:#fff;display:flex;align-items:center;gap:8px;padding:8px 12px;z-index:1000;box-shadow:0 -3px 14px rgba(0,0,0,.2);}
+.vbar button{background:#2a2a45;color:#fff;border:none;border-radius:7px;padding:8px 12px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;}
+.vbar button:hover:not(:disabled){background:#8B2332;}
+.vbar button:disabled{opacity:.35;cursor:default;}
+.vbar .vlabel{font-size:12px;font-weight:600;min-width:64px;text-align:center;}
+.vdots{display:flex;gap:6px;overflow-x:auto;flex:1;padding:2px 4px;}
+.vdots button{background:#2a2a45;font-size:11px;padding:6px 10px;}
+.vdots button.on{background:#8B2332;}
+body.viewer{padding-bottom:64px;}
+@media print{ .vbar{display:none!important;} .vpage{display:block!important;box-shadow:none;margin:0;border-radius:0;page-break-after:always;} body.viewer{background:#fff;padding-bottom:0;} }`;
+        const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Informe Navegable — ${inf.meta.proyNombre}</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>${inf.css}
+${viewerCss}</style>
+</head>
+<body class="viewer">
+<div id="pages">${pagesHtml}</div>
+<div class="vbar no-print">
+  <button id="vprev">&lsaquo; Anterior</button>
+  <div class="vdots" id="vdots"></div>
+  <span class="vlabel" id="vlabel"></span>
+  <button id="vnext">Siguiente &rsaquo;</button>
+  <button id="vprint" title="Imprimir o guardar como PDF">PDF</button>
+</div>
+<script>
+(function(){
+  var titulos = ${JSON.stringify(titulos)};
+  var pages = Array.prototype.slice.call(document.querySelectorAll('.vpage'));
+  var idx = 0;
+  var elPrev = document.getElementById('vprev');
+  var elNext = document.getElementById('vnext');
+  var elLabel = document.getElementById('vlabel');
+  var elDots = document.getElementById('vdots');
+  titulos.forEach(function(t, i){
+    var b = document.createElement('button');
+    b.textContent = (i === 0 ? t : (i + '. ' + t));
+    b.addEventListener('click', function(){ show(i); });
+    elDots.appendChild(b);
+  });
+  function show(i){
+    idx = Math.max(0, Math.min(pages.length - 1, i));
+    pages.forEach(function(p, j){ p.classList.toggle('active', j === idx); });
+    Array.prototype.forEach.call(elDots.children, function(b, j){ b.classList.toggle('on', j === idx); });
+    elLabel.textContent = (idx + 1) + ' / ' + pages.length;
+    elPrev.disabled = (idx === 0);
+    elNext.disabled = (idx === pages.length - 1);
+    window.scrollTo(0, 0);
+  }
+  elPrev.addEventListener('click', function(){ show(idx - 1); });
+  elNext.addEventListener('click', function(){ show(idx + 1); });
+  document.getElementById('vprint').addEventListener('click', function(){ window.print(); });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'ArrowLeft') show(idx - 1);
+    else if (e.key === 'ArrowRight') show(idx + 1);
+  });
+  show(0);
+})();
+<\/script>
+</body>
+</html>`;
+        const fname = `Informe_Navegable_${String(inf.meta.proyectoSel).replace(/[^A-Za-z0-9_-]/g, '')}_S${inf.meta.semana}.html`;
+        const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+        const urlB = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = urlB; a.download = fname;
+        document.body.appendChild(a); a.click(); a.remove();
+        const w = window.open(urlB, '_blank');
+        if (!w) alert('Archivo descargado: ' + fname + '. Permite ventanas emergentes para verlo en una pestaña.');
+        setTimeout(function(){ URL.revokeObjectURL(urlB); }, 60000);
+    };
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // Definición de checkpoints en orden visual (T1 eliminado por solicitud del usuario)
+    const CHECKPOINTS = [
+        { key: 'hpc',          label: 'HPC',         tipo: 'beneficiario' },
+        { key: 'te1',          label: 'TE1',         tipo: 'te1' },
+        { key: 'visita_as',    label: 'V.AS',        tipo: 'seguimiento' },
+        { key: 'resol_as',     label: 'R.AS',        tipo: 'seguimiento' },
+        { key: 'visita_f1',    label: 'V.F1',        tipo: 'seguimiento' },
+        { key: 'fecha_f1',     label: 'F1',          tipo: 'seguimiento' },
+        { key: 'artefactado',  label: 'Artef.',      tipo: 'seguimiento' },
+        { key: 'empalme',      label: 'Empalme',     tipo: 'seguimiento' },
+        { key: 'visita_dom',   label: 'V.DOM',       tipo: 'seguimiento' },
+        { key: 'fecha_v_dom',  label: 'F.V.DOM',     tipo: 'seguimiento' },
+        { key: 'recepcion_dom',label: 'Recep.',      tipo: 'seguimiento' },
+        { key: 'fecha_recep',  label: 'F.Recep',     tipo: 'recepcion' }
+    ];
+
+    // Para cada vivienda, calcular el set de flags de checkpoint + filtrar comentarios con estrella
+    const datos = React.useMemo(() => {
+        // Set de IDs de observaciones marcadas con estrella en este proyecto
+        const starredIds = new Set(
+            resumenComentarios && proyectoSel && resumenComentarios[String(proyectoSel)]
+                ? Object.keys(resumenComentarios[String(proyectoSel)])
+                : []
+        );
+        return viviendas.map(v => {
+            const seg = SEGUIMIENTO_DATA[String(v.ID_Benef)] || { _has: {}, obs: '' };
+            const flags = {
+                hpc: !!v.habil,
+                te1: !!v.has_te1,
+                visita_as:     !!seg._has.visita_as,
+                resol_as:      !!seg._has.resol_as,
+                visita_f1:     !!seg._has.visita_f1,
+                fecha_f1:      !!seg._has.fecha_f1,
+                artefactado:   !!seg._has.artefactado,
+                empalme:       !!seg._has.empalme,
+                visita_dom:    !!seg._has.visita_dom,
+                fecha_v_dom:   !!seg._has.fecha_v_dom,
+                recepcion_dom: !!seg._has.recepcion_dom,
+                fecha_recep:   !!(v.fecha_recepcion || seg._has.fecha_recep)
+            };
+            const completados = Object.values(flags).filter(Boolean).length;
+            const insp = getInspeccion(v.ID_Benef);
+            const pctTotal = insp ? insp.pct_total : null;
+            const pctBenef = getAvanceBenef(proyectoSel, v.NOMBRES, v.APELLIDOS);
+            const pagosBenef = getSolpago(v.ID_Benef);
+            const totalPagadoMO = pagosBenef.reduce((s, p) => s + p.monto, 0);
+            const obsAll = (observaciones && observaciones[v.ID_Benef]) || [];
+            // Solo observaciones marcadas con estrella → publicas en el informe
+            const obsPublicas = obsAll.filter(o => starredIds.has(String(o.id)));
+            return {
+                ...v, seg, flags, completados, pctTotal, pctBenef, pagosBenef, totalPagadoMO,
+                obsPublicas,
+                numComentarios: obsPublicas.length
+            };
+        });
+    }, [viviendas, observaciones, resumenComentarios, proyectoSel]);
+
+    // Listado único de capataces del proyecto (declarado después de datos para evitar TDZ)
+    const capataces = React.useMemo(() => {
+        const gd = agruparViviendas(datos, grupos);
+        return [...new Set(gd.filter(g => g.capataz).map(g => g.capataz))].sort();
+    }, [datos, grupos]);
+
+    // Filtros + búsqueda
+    const datosFiltrados = React.useMemo(() => {
+        const q = busqueda.trim().toLowerCase();
+        return datos.filter(d => {
+            if (filtro === 'pendientes' && d.flags.fecha_recep) return false;
+            if (filtro === 'recepcionadas' && !d.flags.fecha_recep) return false;
+            if (!q) return true;
+            return (`${d.NOMBRES} ${d.APELLIDOS}`.toLowerCase().includes(q) || String(d.ID_Benef).toLowerCase().includes(q));
+        });
+    }, [datos, busqueda, filtro]);
+
+    // Agrupar por grupo (capataz) - reusa la misma logica que tab Viviendas
+    const gruposDatos = React.useMemo(() => agruparViviendas(datosFiltrados, grupos), [datosFiltrados, grupos]);
+
+    // KPIs por checkpoint
+    const kpisCheckpoints = React.useMemo(() => {
+        return CHECKPOINTS.map(cp => {
+            const n = datos.filter(d => d.flags[cp.key]).length;
+            return { ...cp, n, total: datos.length };
+        });
+    }, [datos]);
+
+    // Ritmo M.O. por CICLO de pago (dia 25 a dia 24 del mes siguiente)
+    // Razon: los pagos de mano de obra se cierran el dia 25, no calendario natural.
+    // Un pago con fecha >= 25 cuenta para el periodo del mes SIGUIENTE.
+    const ritmoMOProy = React.useMemo(() => {
+        const buckets = {};
+        datos.forEach(d => d.pagosBenef.forEach(p => {
+            if (!p.fecha) return;
+            // p.fecha viene en formato YYYY-MM-DD
+            const m = p.fecha.match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (!m) return;
+            let year = parseInt(m[1], 10);
+            let month = parseInt(m[2], 10); // 1-12
+            const day = parseInt(m[3], 10);
+            // Si dia >= 25, el ciclo es del mes siguiente
+            if (day >= 25) {
+                month += 1;
+                if (month > 12) { month = 1; year += 1; }
+            }
+            const ym = `${year}-${String(month).padStart(2,'0')}`;
+            buckets[ym] = (buckets[ym] || 0) + p.monto;
+        }));
+        const ordenado = Object.keys(buckets).sort().slice(-12);
+        const valores = ordenado.map(k => buckets[k]);
+        return {
+            meses: ordenado,
+            valores,
+            max: valores.length ? Math.max(...valores) : 0,
+            min: valores.length ? Math.min(...valores) : 0
+        };
+    }, [datos]);
+
+    // Ritmo despachos por MES CALENDARIO (no 25-25, porque despacho fisico no tiene ciclo de pago)
+    const ritmoAvanceProy = React.useMemo(() => {
+        const buckets = {};
+        datos.forEach(d => {
+            const desps = DESPACHOS_DATA.filter(x => String(x.ID_Benef) === String(d.ID_Benef));
+            desps.forEach(x => {
+                if (!x.Fecha) return;
+                const ym = x.Fecha.substring(0, 7);
+                buckets[ym] = (buckets[ym] || 0) + 1;
+            });
+        });
+        const ordenado = Object.keys(buckets).sort().slice(-12);
+        const valores = ordenado.map(k => buckets[k]);
+        return {
+            meses: ordenado,
+            valores,
+            max: valores.length ? Math.max(...valores) : 0,
+            min: valores.length ? Math.min(...valores) : 0
+        };
+    }, [datos]);
+
+    const fmtCorto = (n) => n >= 1e9 ? (n/1e9).toFixed(1)+'B' : n >= 1e6 ? (n/1e6).toFixed(1)+'M' : n >= 1e3 ? (n/1e3).toFixed(0)+'k' : String(n);
+    const fmtMes = (ym) => {
+        if (!ym || ym.length < 7) return ym;
+        const [y, m] = ym.split('-');
+        const meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+        return `${meses[parseInt(m,10)-1]}'${y.slice(2)}`;
+    };
+
+    // Estado del panel debug
+    const [showDebug, setShowDebug] = React.useState(false);
+    const [manifestData, setManifestData] = React.useState(null);
+    const [manifestLoading, setManifestLoading] = React.useState(false);
+    const [manifestError, setManifestError] = React.useState(null);
+    const segRawCount = Object.keys(SEGUIMIENTO_DATA).length;
+    const segColMap = (typeof window !== 'undefined' && window._SEG_COL_MAP) || {};
+    const segRawCols = (typeof window !== 'undefined' && window._SEG_RAW_COLS) || [];
+    const segTableUsed = (typeof window !== 'undefined' && window._SEG_TABLE_USED) || null;
+    const segSampleRow = (typeof window !== 'undefined' && window._SEG_SAMPLE_ROWS && window._SEG_SAMPLE_ROWS[0]) || null;
+    const segDiag = (typeof window !== 'undefined' && window._SEG_DIAG) || {};
+    const checkpointsSinMatch = CHECKPOINTS.filter(cp => cp.tipo === 'seguimiento' && !segColMap[cp.key]);
+    const idMatchProblem = segDiag.segRawLen > 0 && segDiag.segMatchedCount === 0;
+
+    const cargarManifest = async () => {
+        if (manifestLoading) return;
+        setManifestLoading(true);
+        setManifestError(null);
+        try {
+            const url = APPS_SCRIPT_URL + '?action=manifest';
+            const resp = await fetch(url, { redirect: 'follow' });
+            const text = await resp.text();
+            let data;
+            try { data = JSON.parse(text); } catch (e) { throw new Error('Respuesta no es JSON: ' + text.substring(0, 200)); }
+            if (data.error) throw new Error(data.error);
+            setManifestData(data.tables || {});
+        } catch (e) {
+            setManifestError(e.message);
+        } finally {
+            setManifestLoading(false);
+        }
+    };
+
+    // Filtrar el manifest a hojas que parezcan ser de "seguimiento" o "cierre"
+    const manifestSeguimientoHojas = React.useMemo(() => {
+        if (!manifestData) return [];
+        const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+        return Object.entries(manifestData)
+            .filter(([name]) => {
+                const n = norm(name);
+                return n.includes('seguim') || n.includes('cierre');
+            })
+            .sort((a, b) => b[1] - a[1]); // ordenar por filas desc
+    }, [manifestData]);
+
+    const copiarDebug = () => {
+        const benefCierreCols = (typeof window !== 'undefined' && window._BENEF_CIERRE_COLS) || [];
+        const benefCierreColMap = (segDiag.benefCierreColMap || {});
+        const lines = [
+            '=== Diagnostico Seguimiento ===',
+            `Hoja primaria: ${segTableUsed || '(NINGUNA)'} (${segDiag.segRawLen || 0} filas)`,
+            `Beneficiarios activos en el dashboard: ${segDiag.benefDataLen || 0}`,
+            `Filas linkeadas (ID encontrado en BENEFICIARIOS_DATA): ${segDiag.segMatchedCount || 0}`,
+            `Filas sin link (proyectos viejos/cerrados): ${segDiag.segUnmatchedCount || 0}`,
+            `Filas sin ID: ${segDiag.segSkippedNoId || 0}`,
+            '',
+            'Hojas probadas:',
+            ...((segDiag.candidatesReport || []).map(c =>
+                `  ${c.name === segTableUsed ? '*' : ' '} ${c.name}: ${c.rows} filas${c.error ? ' (no encontrada)' : ''}`
+            )),
+            '',
+            'Match efectivo por checkpoint:',
+            '  (Beneficiario.BT+ es el dato real. Si BT+ no tiene la columna,',
+            '   documentacion sirve de fallback usando la existencia del PDF.)',
+            '',
+            ...CHECKPOINTS.filter(cp => cp.tipo === 'seguimiento').map(cp => {
+                const btCol = benefCierreColMap[cp.key];
+                const docCol = segColMap[cp.key];
+                let primary, fallback = '';
+                if (btCol) {
+                    primary = `Beneficiario.${btCol}`;
+                    if (docCol) fallback = `  (+ fallback documentacion.${docCol})`;
+                } else if (docCol) {
+                    primary = `documentacion.${docCol}  (solo fallback)`;
+                } else {
+                    primary = 'SIN MATCH';
+                }
+                return `  ${cp.label.padEnd(12)} -> ${primary}${fallback}`;
+            }),
+            '',
+            `Columnas Beneficiario BT+ disponibles (${benefCierreCols.length}):`,
+            ...benefCierreCols.map(c => `  - ${c}`),
+            '',
+            `Columnas en hoja "${segTableUsed || ''}" (${segRawCols.length}):`,
+            ...segRawCols.map(c => `  - ${c}`),
+            ''
+        ];
+        if (segSampleRow) {
+            lines.push('Valores de la primera fila:');
+            for (const k of segRawCols) {
+                const v = segSampleRow[k];
+                if (v !== null && v !== undefined && String(v).trim() !== '' && String(v).toLowerCase() !== 'nan') {
+                    lines.push(`  ${k}: ${String(v).substring(0, 80)}`);
+                }
+            }
+        }
+        try {
+            navigator.clipboard.writeText(lines.join('\n'));
+            alert('Diagnostico copiado al portapapeles. Pegalo en el chat.');
+        } catch (e) {
+            console.log(lines.join('\n'));
+            alert('No se pudo copiar. Mira la consola (F12) y copia desde ahi.');
+        }
+    };
+
+    // Exponer funciones al botón "Informes" del header (siempre actualizado con el proyecto activo)
+    React.useEffect(() => {
+        window._raicesInformeFns = {
+            residente:    generarInformeResidenteHTML,
+            capataz:      generarTodosReportesCapataz,
+            adquisiciones:generarInformeAdquisicionesHTML,
+            ejecutivo:    generarInformeMultiObras,
+            recepciones:  generarInformeRecepciones,
+            estadosPago:  generarEstadosPagoHTML,
+        };
+        return () => { /* no limpiar: dejar la última versión disponible */ };
+    }, [proyectoSel, proy]);
+
+    return (
+        <div className="space-y-4">
+            {/* ── HEADER: Título + Exportar PDF ── */}
+            <div className="flex flex-wrap items-center justify-between gap-2 bg-white border border-gray-200 rounded-xl px-4 py-3 shadow-sm">
+                <div className="flex items-center gap-2">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8B2332" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 1 1 0 10h-2"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                    <h2 className="text-sm font-bold text-gray-800">Estado General del Proyecto</h2>
+                    {proy && <span className="text-xs text-gray-400 font-normal">— {proy.ID_proy} · {proy.NOMBRE_PROYECTO}</span>}
+                </div>
+            </div>
+            {/* PANEL DE DEBUG / DIAGNOSTICO Seguimiento */}
+            <div className={`border rounded-xl shadow-sm overflow-hidden ${checkpointsSinMatch.length > 0 || segRawCount === 0 ? 'bg-red-50 border-red-300' : 'bg-blue-50 border-blue-200'}`}>
+                <div onClick={() => setShowDebug(!showDebug)} className="px-3 py-2 cursor-pointer flex items-center justify-between hover:opacity-80">
+                    <div className="flex items-center gap-2">
+                        <span className={`text-xs ${checkpointsSinMatch.length > 0 || segRawCount === 0 ? 'text-red-700' : 'text-blue-700'} font-semibold`}>
+                            {showDebug ? '▼' : '▶'} Diagnostico fuente "Seguimiento" ({segRawCount} registros · {segRawCols.length} columnas · {checkpointsSinMatch.length} checkpoints sin match)
+                        </span>
+                    </div>
+                    {checkpointsSinMatch.length > 0 && segRawCount > 0 && (
+                        <span className="text-[10px] text-red-700 font-medium">⚠ Faltan: {checkpointsSinMatch.map(c => c.label).join(', ')}</span>
+                    )}
+                </div>
+                {showDebug && (
+                    <div className="px-3 pb-3 pt-1 border-t border-current/20 space-y-2">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <div className="text-[10px] text-gray-600">
+                                Tabla AppSheet leida: <strong className="font-mono">{segTableUsed || '(NINGUNA)'}</strong>
+                                {segTableUsed && segTableUsed !== 'Seguimiento' && (
+                                    <span className="ml-1.5 text-amber-700">⚠ fallback (no se llama "Seguimiento" exacto)</span>
+                                )}
+                            </div>
+                            <button onClick={copiarDebug} className="text-[10px] px-2 py-1 bg-violet-600 text-white rounded font-medium hover:bg-violet-700">
+                                📋 Copiar diagnostico
+                            </button>
+                        </div>
+                        {/* Reporte de candidatas de tabla */}
+                        {segDiag.candidatesReport && segDiag.candidatesReport.length > 0 && (
+                            <div className="text-[11px] bg-white border border-gray-200 rounded px-2 py-1.5">
+                                <div className="font-semibold text-gray-700 mb-1">Hojas probadas (se usa la de mayor cantidad de filas)</div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-0.5 font-mono">
+                                    {segDiag.candidatesReport.map(c => (
+                                        <div key={c.name} className={`flex items-center gap-2 ${c.name === segTableUsed ? 'bg-green-50 border-green-300 border rounded px-1' : ''}`}>
+                                            <span className={`w-2 h-2 rounded-full ${c.rows > 0 ? 'bg-green-500' : 'bg-gray-300'}`}></span>
+                                            <span className="font-semibold flex-1">{c.name}</span>
+                                            <span className={c.rows > 0 ? 'text-blue-700' : 'text-gray-400'}>{c.rows} filas {c.error ? '(error: '+c.error+')' : ''}</span>
+                                            {c.name === segTableUsed && <span className="text-[9px] text-green-700 font-bold">← usada</span>}
+                                        </div>
+                                    ))}
+                                </div>
+                                {/* Boton para listar TODAS las hojas del Sheet */}
+                                <div className="mt-2 pt-2 border-t border-gray-200">
+                                    <button onClick={cargarManifest} disabled={manifestLoading}
+                                            className="text-[10px] px-2 py-1 bg-amber-600 text-white rounded font-medium hover:bg-amber-700 disabled:opacity-50">
+                                        {manifestLoading ? 'Cargando...' : '🔍 Listar TODAS las hojas del Google Sheet (manifest)'}
+                                    </button>
+                                    {manifestError && (
+                                        <p className="text-[10px] text-red-700 mt-1">Error: {manifestError}</p>
+                                    )}
+                                    {manifestData && (
+                                        <div className="mt-2 space-y-1">
+                                            {manifestSeguimientoHojas.length > 0 ? (
+                                                <div className="bg-amber-50 border border-amber-300 rounded p-1.5">
+                                                    <div className="text-[10px] font-semibold text-amber-800 mb-0.5">
+                                                        Hojas con "seguim"/"cierre" en el nombre ({manifestSeguimientoHojas.length}):
+                                                    </div>
+                                                    {manifestSeguimientoHojas.map(([name, rows]) => (
+                                                        <div key={name} className="text-[10px] font-mono flex items-center gap-2">
+                                                            <span className="font-bold text-amber-900">{name}</span>
+                                                            <span className="text-amber-700">→ {rows} filas</span>
+                                                            {rows > 1 && <span className="text-[9px] text-green-700 font-bold">← deberia ser esta!</span>}
+                                                        </div>
+                                                    ))}
+                                                    <div className="text-[9px] text-amber-700 mt-1 italic">
+                                                        Pegame el nombre de la hoja correcta y la agrego al matcher.
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <p className="text-[10px] text-red-700">No se encontraron hojas con "seguim"/"cierre" en su nombre. La data quizas este en otro Google Sheet (otro spreadsheet ID).</p>
+                                            )}
+                                            <details className="text-[10px]">
+                                                <summary className="cursor-pointer text-gray-600">Ver TODAS las hojas del Sheet ({Object.keys(manifestData).length})</summary>
+                                                <div className="font-mono text-gray-600 bg-white border border-gray-200 rounded p-1.5 mt-1 max-h-40 overflow-y-auto">
+                                                    {Object.entries(manifestData).sort((a,b) => b[1]-a[1]).map(([name, rows]) => (
+                                                        <div key={name}><strong>{name}</strong>: {rows} filas</div>
+                                                    ))}
+                                                </div>
+                                            </details>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                        {/* Diagnostico de match de IDs */}
+                        {segDiag.segRawLen > 0 && (
+                            <div className={`text-[11px] rounded px-2 py-1.5 ${idMatchProblem ? 'bg-red-100 border border-red-300' : 'bg-white border border-gray-200'}`}>
+                                <div className="font-semibold text-gray-700 mb-1">Match de IDs (Seguimiento ↔ BENEFICIARIOS_DATA)</div>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-1 font-mono">
+                                    <div>Filas seguimiento: <strong>{segDiag.segRawLen}</strong></div>
+                                    <div className={segDiag.segMatchedCount === 0 ? 'text-red-700 font-bold' : 'text-green-700'}>Matcheadas: <strong>{segDiag.segMatchedCount}</strong></div>
+                                    <div className={segDiag.segUnmatchedCount > 0 ? 'text-amber-700' : ''}>Sin match: <strong>{segDiag.segUnmatchedCount}</strong></div>
+                                    <div>Benef activos: <strong>{segDiag.benefDataLen}</strong></div>
+                                </div>
+                                <div className="text-[10px] text-gray-600 mt-1">
+                                    Col ID detectada en Seguimiento: <code className="bg-gray-100 px-1 rounded">{segDiag.idCol || '(NINGUNA)'}</code>
+                                </div>
+                                {idMatchProblem && (
+                                    <div className="mt-1 text-[10px] text-red-700">
+                                        <strong>0 filas linkeadas.</strong> Ejemplos IDs de Seguimiento que no estan en BENEFICIARIOS_DATA:
+                                        <code className="block bg-white border border-red-200 rounded px-1 mt-0.5">{(segDiag.sampleUnmatched || []).join(', ')}</code>
+                                        Ejemplos IDs en BENEFICIARIOS_DATA:
+                                        <code className="block bg-white border border-red-200 rounded px-1 mt-0.5">{(segDiag.sampleBenefIds || []).join(', ')}</code>
+                                        <p className="mt-1 italic">Si los IDs son visualmente distintos (uuids vs numeros, o formato distinto), el problema esta en como se referencia el beneficiario entre las hojas.</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Resumen fuente secundaria (sin repetir match - eso ya esta arriba) */}
+                        {segDiag.benefCierreColsCount > 0 && (
+                            <div className="text-[10px] text-gray-500 bg-gray-50 border border-gray-200 rounded px-2 py-1">
+                                <strong>Beneficiario.BT+:</strong> {segDiag.benefCierreColsCount} columnas disponibles, {segDiag.benefCierreEnriched || 0} beneficiarios enriquecidos.
+                                {window._BENEF_CIERRE_COLS && (
+                                    <details className="mt-1">
+                                        <summary className="cursor-pointer text-gray-600">Ver columnas BT+</summary>
+                                        <div className="font-mono text-gray-600 bg-white border border-gray-200 rounded p-1.5 mt-1 max-h-32 overflow-y-auto">
+                                            {window._BENEF_CIERRE_COLS.join(' · ')}
+                                        </div>
+                                    </details>
+                                )}
+                            </div>
+                        )}
+                        {segRawCount === 0 ? (
+                            <div className="text-[11px] text-red-700">
+                                <strong>No se cargaron registros de Seguimiento.</strong> Probadas: Seguimiento, Seguimiento Cierre de Obras, Seguimiento_Cierre, SeguimientoCierre.
+                                Decime el nombre EXACTO de la hoja en el Sheet (con espacios, guiones bajos, etc.) y lo agrego.
+                            </div>
+                        ) : (
+                            <>
+                                <div>
+                                    <div className="text-[10px] font-semibold text-gray-600 uppercase mb-1">Match efectivo por checkpoint (fuente real usada)</div>
+                                    <div className="text-[10px] text-gray-500 mb-1 italic">Para cada checkpoint se prefiere <code>documentacion</code> si tiene la columna; si no, se usa <code>Beneficiario.BT+</code>.</div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-1 text-[11px] font-mono">
+                                        {CHECKPOINTS.filter(cp => cp.tipo === 'seguimiento').map(cp => {
+                                            const colDoc = segColMap[cp.key];
+                                            const colBT = (segDiag.benefCierreColMap || {})[cp.key];
+                                            const sourceCol = colDoc || colBT;
+                                            const sourceLabel = colDoc ? 'documentacion' : (colBT ? 'Beneficiario.BT+' : null);
+                                            return (
+                                                <div key={cp.key} className={`flex items-center gap-2 px-2 py-0.5 rounded ${sourceCol ? 'bg-white' : 'bg-red-100'}`}>
+                                                    <span className={`w-2 h-2 rounded-full ${sourceCol ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                                                    <span className="font-semibold text-gray-700 w-20">{cp.label}</span>
+                                                    <span className="text-gray-400">→</span>
+                                                    <span className={sourceCol ? 'text-blue-700' : 'text-red-600 italic'} title={sourceCol || ''}>{sourceCol || 'SIN MATCH'}</span>
+                                                    {sourceLabel && <span className="text-[9px] text-gray-400">({sourceLabel})</span>}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                                <div>
+                                    <div className="text-[10px] font-semibold text-gray-600 uppercase mb-1">Columnas reales en la hoja ({segRawCols.length})</div>
+                                    <div className="text-[10px] font-mono text-gray-600 bg-white border border-gray-200 rounded p-1.5 max-h-24 overflow-y-auto leading-snug">
+                                        {segRawCols.join(' · ')}
+                                    </div>
+                                </div>
+                                {segSampleRow && (
+                                    <details className="text-[10px]">
+                                        <summary className="cursor-pointer text-gray-600 font-semibold">Ver primera fila completa (con valores)</summary>
+                                        <div className="font-mono text-gray-600 bg-white border border-gray-200 rounded p-1.5 mt-1 max-h-40 overflow-y-auto">
+                                            {Object.entries(segSampleRow)
+                                                .filter(([k, v]) => v !== null && v !== undefined && String(v).trim() !== '' && String(v).toLowerCase() !== 'nan')
+                                                .map(([k, v]) => (
+                                                    <div key={k}><strong>{k}:</strong> {String(v).substring(0, 100)}</div>
+                                                ))}
+                                        </div>
+                                    </details>
+                                )}
+                                <div className="text-[10px] text-gray-500 italic">
+                                    Click <strong>📋 Copiar diagnostico</strong> y pegalo en el chat para que yo ajuste las reglas si hay "SIN MATCH" o si el match esta resolviendo a una columna incorrecta.
+                                </div>
+                            </>
+                        )}
+                    </div>
+                )}
+            </div>
+
+            {/* STRIP DE KPIS POR CHECKPOINT */}
+            <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-3">
+                <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Checkpoints del Proyecto</h3>
+                    <span className="text-[10px] text-gray-400">{datos.length} viviendas · datos AppSheet "Seguimiento"</span>
+                </div>
+                <div className="grid grid-cols-7 md:grid-cols-13 gap-1.5" style={{gridTemplateColumns: `repeat(${CHECKPOINTS.length}, minmax(0, 1fr))`}}>
+                    {kpisCheckpoints.map(cp => {
+                        const pct = cp.total > 0 ? Math.round((cp.n / cp.total) * 100) : 0;
+                        const color = pct >= 80 ? 'bg-green-50 border-green-200 text-green-700'
+                                    : pct >= 40 ? 'bg-amber-50 border-amber-200 text-amber-700'
+                                    : 'bg-gray-50 border-gray-200 text-gray-500';
+                        return (
+                            <div key={cp.key} className={`border rounded-lg px-1.5 py-1.5 text-center ${color}`}>
+                                <div className="text-[9px] font-medium opacity-75 truncate">{cp.label}</div>
+                                <div className="text-base font-bold leading-tight">{cp.n}</div>
+                                <div className="text-[9px] opacity-60">/ {cp.total}</div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+
+            {/* RITMOS MENSUALES — line charts con autoescala */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <LineChartCard
+                    titulo="Ritmo Pagos M.O. (por ciclo 25-25)"
+                    badge="Solo Aprobados"
+                    badgeColor="text-violet-600"
+                    color="#8b5cf6"
+                    fillColor="rgba(139, 92, 246, 0.12)"
+                    info="Cada punto es un ciclo de pago de 25 a 25 (un pago con fecha >= dia 25 se contabiliza al mes siguiente). Solo se incluyen pagos con ESTADO SOLICITUD = Aprobado. Eje Y autoescalado (no parte de 0) para visualizar mejor la variacion."
+                    meses={ritmoMOProy.meses}
+                    valores={ritmoMOProy.valores}
+                    fmtVal={(v) => formatPeso(v)}
+                    fmtVCorto={fmtCorto}
+                    fmtMes={fmtMes}
+                    emptyMsg="Sin pagos aprobados con fecha"
+                />
+                <LineChartCard
+                    titulo="Ritmo Despachos (mensual)"
+                    badge="proxy de actividad"
+                    badgeColor="text-amber-600"
+                    color="#10b981"
+                    fillColor="rgba(16, 185, 129, 0.12)"
+                    info="Cantidad de despachos por mes calendario (cualquier Tipo_despacho registrado en la tabla Despacho del proyecto). Eje Y autoescalado."
+                    meses={ritmoAvanceProy.meses}
+                    valores={ritmoAvanceProy.valores}
+                    fmtVal={(v) => `${v} despacho${v === 1 ? '' : 's'}`}
+                    fmtVCorto={(v) => String(v)}
+                    fmtMes={fmtMes}
+                    emptyMsg="Sin despachos con fecha"
+                />
+            </div>
+
+            {/* CURVAS S DE CONTROL */}
+            {(CURVAS_S_CONFIG[proyectoSel] || []).length > 0 && (
+                <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+                    <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Curvas S de Control</h3>
+                        <span className="text-[10px] text-gray-400">{(CURVAS_S_CONFIG[proyectoSel] || []).length} gráficos</span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {(CURVAS_S_CONFIG[proyectoSel] || []).map(c => (
+                            <div key={c.id} className="border border-gray-100 rounded-lg overflow-hidden">
+                                <div className="bg-gray-50 px-3 py-1.5 text-[11px] font-semibold text-gray-600 border-b border-gray-100">{c.label}</div>
+                                <img
+                                    src={`https://drive.google.com/thumbnail?id=${c.id}&sz=w800&t=${Math.floor(Date.now()/3600000)}`}
+                                    alt={c.label}
+                                    className="w-full block"
+                                    loading="lazy"
+                                />
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* FILTROS */}
+            <div className="flex items-center gap-2 flex-wrap">
+                <input type="text" value={busqueda} onChange={e => setBusqueda(e.target.value)}
+                       placeholder="Buscar por nombre o ID..."
+                       className="flex-1 min-w-[200px] px-3 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500" />
+                {[["todas","Todas"],["pendientes","Pendientes"],["recepcionadas","Recepcionadas"]].map(([k,l]) => (
+                    <button key={k} onClick={() => setFiltro(k)}
+                            className={`px-2.5 py-1.5 text-[11px] rounded-lg border transition-colors ${filtro===k?'bg-violet-600 text-white border-violet-600':'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'}`}>
+                        {l}
+                    </button>
+                ))}
+                <button onClick={() => exportarInformeCompartible({ proy, gruposDatos, kpisCheckpoints, CHECKPOINTS, ritmoMOProy, ritmoAvanceProy, fmtMes })}
+                        className="px-2.5 py-1.5 text-[11px] rounded-lg border bg-green-600 text-white border-green-600 hover:bg-green-700 transition-colors flex items-center gap-1"
+                        title="Descarga un HTML autocontenido para compartir externamente: navegable por grupo (mobile) + PDF. Sin diagnostico interno.">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v12m0 0l-4-4m4 4l4-4M4 20h16"/></svg>
+                    Informe por grupo (compartible)
+                </button>
+                <span className="text-[10px] text-gray-400 ml-auto">{datosFiltrados.length} de {datos.length}</span>
+            </div>
+
+            {/* TABLA COLAPSABLE AGRUPADA POR CAPATAZ */}
+            {gruposDatos.map(grupo => {
+                const gc = grupo.colorIdx >= 0 ? GRUPO_COLORS[grupo.colorIdx] : null;
+                const colapsado = !!grupoColapsado[grupo.id];
+                const totalGrupo = grupo.viviendas.length;
+                const recepcGrupo = grupo.viviendas.filter(v => v.flags.fecha_recep).length;
+                const hpcGrupo = grupo.viviendas.filter(v => v.flags.hpc).length;
+                const pctGrupo = totalGrupo > 0 ? Math.round((recepcGrupo / totalGrupo) * 100) : 0;
+                const isAll = grupo.id === '_all';
+                return (
+                    <div key={grupo.id} className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                        {/* Header del grupo */}
+                        <div onClick={() => setGrupoColapsado(prev => ({...prev, [grupo.id]: !prev[grupo.id]}))}
+                             className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors ${gc ? gc.headerBg : 'bg-gray-50'} hover:opacity-90 border-b ${gc ? gc.border : 'border-gray-200'}`}>
+                            <span className={`text-gray-400 text-xs transition-transform ${colapsado ? '' : 'rotate-90'}`}>▶</span>
+                            {gc && <span className={`w-2.5 h-2.5 rounded-full ${gc.accent}`}></span>}
+                            <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                    <h3 className={`text-sm font-bold ${gc ? gc.text : 'text-gray-700'}`}>
+                                        {isAll ? `Todas las viviendas (${proy ? proy.ID_proy + ' · ' + proy.NOMBRE_PROYECTO : ''})` : (grupo.nombre || 'Sin Nombre')}
+                                    </h3>
+                                    {grupo.capataz && (
+                                        <span className={`text-[11px] px-2 py-0.5 rounded-full ${gc ? gc.light + ' ' + gc.text : 'bg-gray-100 text-gray-600'} font-medium`}>
+                                            Capataz: {grupo.capataz}
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="text-[10px] text-gray-500 mt-0.5">
+                                    {totalGrupo} viv. · HPC: <strong className={hpcGrupo === totalGrupo && totalGrupo > 0 ? 'text-green-600' : 'text-orange-600'}>{hpcGrupo}/{totalGrupo}</strong> · RF: <strong className={recepcGrupo === totalGrupo && totalGrupo > 0 ? 'text-green-600' : recepcGrupo > 0 ? 'text-blue-600' : 'text-gray-400'}>{recepcGrupo}/{totalGrupo}</strong> ({pctGrupo}%)
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-1">
+                                {/* Mini-resumen de checkpoints del grupo */}
+                                {CHECKPOINTS.map(cp => {
+                                    const n = grupo.viviendas.filter(v => v.flags[cp.key]).length;
+                                    const pct = totalGrupo > 0 ? n / totalGrupo : 0;
+                                    return (
+                                        <span key={cp.key} className="w-2 h-6 rounded-sm flex items-end overflow-hidden bg-gray-100" title={`${cp.label}: ${n}/${totalGrupo}`}>
+                                            <span className="w-full bg-green-500" style={{height: Math.round(pct*100) + '%'}}></span>
+                                        </span>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Nota del coordinador (visible siempre, aun colapsado) */}
+                        {grupo.comentario && (
+                            <div className="px-4 py-2 bg-amber-50 border-b border-amber-200 flex items-start gap-2">
+                                <svg className="w-3.5 h-3.5 text-amber-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/>
+                                    <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd"/>
+                                </svg>
+                                <div className="flex-1 min-w-0">
+                                    <div className="text-[9px] uppercase tracking-wide text-amber-700 font-semibold mb-0.5">Nota del Coordinador</div>
+                                    <p className="text-[11px] text-gray-800 italic break-words">{grupo.comentario}</p>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Header de columnas + filas (solo si no colapsado) */}
+                        {!colapsado && (
+                            <>
+                                <div className="hidden md:flex items-center gap-1 px-3 py-2 bg-gray-50/50 border-b border-gray-100 text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
+                                    <span className="w-6 text-center">#</span>
+                                    <span className="flex-1 min-w-[140px]">Beneficiario</span>
+                                    {CHECKPOINTS.map(cp => (
+                                        <span key={cp.key} className="w-10 text-center" title={cp.label}>{cp.label}</span>
+                                    ))}
+                                    <span className="w-14 text-right" title="% Avance físico real (AppSheet)">% Av</span>
+                                    <span className="w-10 text-center" title="Comentarios publicos">💬</span>
+                                </div>
+                                <div className="divide-y divide-gray-100">
+                                    {grupo.viviendas.map((d, idx) => {
+                                        const exp = expandida === d.ID_Benef;
+                                        return (
+                                            <div key={d.ID_Benef}>
+                                                <div
+                                                    onClick={() => setExpandida(exp ? null : d.ID_Benef)}
+                                                    style={d.flags.fecha_recep ? RF_HATCH_STYLE : undefined}
+                                                    className={`flex items-center gap-1 px-3 py-2 cursor-pointer hover:bg-gray-50 transition-colors ${exp ? 'bg-violet-50' : ''}`}
+                                                >
+                                                    <span className="w-6 text-center text-[10px] text-gray-400 font-mono">{idx + 1}</span>
+                                                    <div className="flex-1 min-w-[140px]">
+                                                        <div className="text-xs font-semibold text-gray-800 leading-tight" style={d.flags.fecha_recep ? RF_TEXT_SHADOW : undefined}>{d.NOMBRES} {d.APELLIDOS}</div>
+                                                        <div className="text-[10px] text-gray-400 font-mono">{d.ID_Benef} · {d.tipologia}</div>
+                                                    </div>
+                                                    {CHECKPOINTS.map(cp => {
+                                                        const on = d.flags[cp.key];
+                                                        return (
+                                                            <span key={cp.key} className="w-10 flex justify-center">
+                                                                <span className={`w-3 h-3 rounded-full ${on ? 'bg-green-500' : 'bg-gray-200'}`} title={`${cp.label}: ${on ? 'OK' : '—'}`}></span>
+                                                            </span>
+                                                        );
+                                                    })}
+                                                    <span className="w-14 text-right">
+                                                        {d.pctBenef !== null && d.pctBenef !== undefined ? (
+                                                            <span className={`text-xs font-bold font-mono ${d.pctBenef >= 90 ? 'text-green-600' : d.pctBenef >= 50 ? 'text-amber-600' : 'text-gray-500'}`}>{Number(d.pctBenef).toFixed(2)}%</span>
+                                                        ) : <span className="text-[10px] text-gray-300">—</span>}
+                                                    </span>
+                                                    <span className="w-10 text-center text-[11px] text-gray-500">
+                                                        {d.numComentarios > 0 ? <span className="bg-amber-100 text-amber-700 px-1.5 rounded text-[10px] font-semibold">{d.numComentarios}</span> : <span className="text-gray-300">—</span>}
+                                                    </span>
+                                                </div>
+
+                                                {/* Fila expandida */}
+                                                {exp && (
+                                                    <div className="bg-violet-50/30 border-t border-violet-100 px-4 py-3 space-y-3">
+                                                        {/* Hitos */}
+                                                        <div>
+                                                            <h4 className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Hitos de Cierre</h4>
+                                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5 text-[11px]">
+                                                                {CHECKPOINTS.filter(cp => cp.tipo === 'seguimiento').map(cp => {
+                                                                    const val = d.seg[cp.key];
+                                                                    const on = d.flags[cp.key];
+                                                                    // Si el valor es una ruta de PDF (fallback documentacion), mostrar "Doc cargado"
+                                                                    const isPdfPath = val && (String(val).includes('Files_/') || /\.pdf$/i.test(String(val)));
+                                                                    const display = !val ? '—' : (isPdfPath ? '✓ Doc cargado' : val);
+                                                                    return (
+                                                                        <div key={cp.key} className={`flex items-center gap-1.5 px-2 py-1 rounded border ${on ? 'bg-white border-green-200' : 'bg-gray-50 border-gray-200 opacity-60'}`} title={isPdfPath ? 'Solo confirmado por documento subido en tabla documentacion' : ''}>
+                                                                            <span className={`w-2 h-2 rounded-full ${on ? 'bg-green-500' : 'bg-gray-300'}`}></span>
+                                                                            <span className="font-medium text-gray-600 w-16 truncate">{cp.label}</span>
+                                                                            <span className="text-gray-700 truncate flex-1">{display}</span>
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                                <div className={`flex items-center gap-1.5 px-2 py-1 rounded border ${d.flags.fecha_recep ? 'bg-white border-green-200' : 'bg-gray-50 border-gray-200 opacity-60'}`}>
+                                                                    <span className={`w-2 h-2 rounded-full ${d.flags.fecha_recep ? 'bg-green-500' : 'bg-gray-300'}`}></span>
+                                                                    <span className="font-medium text-gray-600 w-16 truncate">Recep.Def</span>
+                                                                    <span className="text-gray-700 truncate flex-1">{d.fecha_recepcion || d.seg.fecha_recep || '—'}</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Comentarios publicos (con estrella) */}
+                                                        <div>
+                                                            <h4 className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5 flex items-center gap-1">
+                                                                <span className="text-amber-500">&#9733;</span> Comentarios destacados (publicos)
+                                                            </h4>
+                                                            <div className="space-y-1">
+                                                                {d.obsPublicas.length > 0 ? d.obsPublicas.map((o) => (
+                                                                    <div key={o.id} className="text-[11px] text-gray-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                                                                        <span className="font-semibold text-amber-700 text-[9px] uppercase mr-1.5">{(o.fecha || '').substring(0,10) || 'Obs'}</span>
+                                                                        {o.texto || ''}
+                                                                    </div>
+                                                                )) : (
+                                                                    <p className="text-[11px] text-gray-400 italic">
+                                                                        Sin comentarios destacados. Para incluir un comentario aqui,
+                                                                        marca la estrella <span className="text-amber-500">&#9733;</span> en el tab "Viviendas".
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Resumen */}
+                                                        <div className="grid grid-cols-2 gap-3">
+                                                            <div className="bg-white border border-gray-200 rounded px-3 py-2">
+                                                                <div className="text-[10px] text-gray-500 uppercase">M.O. Pagado (acum, Aprob.)</div>
+                                                                <div className="text-sm font-bold text-violet-700 font-mono">{formatPeso(d.totalPagadoMO)}</div>
+                                                                <div className="text-[10px] text-gray-400">{d.pagosBenef.length} pago{d.pagosBenef.length === 1 ? '' : 's'}</div>
+                                                            </div>
+                                                            <div className="bg-white border border-gray-200 rounded px-3 py-2">
+                                                                <div className="text-[10px] text-gray-500 uppercase">Estado General</div>
+                                                                <div className="text-sm font-bold text-gray-700">{d.estadoGeneral || '—'}</div>
+                                                                <div className="text-[10px] text-gray-400">Avance despacho: {d.avance?.porcentaje || 0}%</div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                    {grupo.viviendas.length === 0 && (
+                                        <div className="px-4 py-6 text-center text-xs text-gray-400">Sin viviendas en este grupo</div>
+                                    )}
+                                </div>
+                            </>
+                        )}
+                    </div>
+                );
+            })}
+            {datosFiltrados.length === 0 && (
+                <div className="bg-white border border-gray-200 rounded-xl px-4 py-8 text-center text-xs text-gray-400">
+                    {busqueda ? `Sin resultados para "${busqueda}"` : 'Sin viviendas para mostrar'}
+                </div>
+            )}
+
+            {/* Nota footer */}
+            <div className="text-[10px] text-gray-400 px-2 space-y-0.5">
+                <p>* Hitos de cierre (V.AS, R.AS, V.F1, F1, T1, Artefactado, Empalme, V.DOM, F.V.DOM, Recep.) provienen de la tabla "Seguimiento" de AppSheet.</p>
+                <p>* Solo se muestran comentarios marcados con estrella <span className="text-amber-500">&#9733;</span> (publicos). Los demas son internos.</p>
+                <p>* Configurar grupos y capataces en el tab "Configuracion".</p>
+            </div>
+        </div>
+    );
+};
+
+// ===== CONSTANTES GLOBALES DE PERSONAL E INFORMES =====
+const ROLES_PERSONAL = [
+    { key: 'capataz',            label: 'Capataz' },
+    { key: 'residente',          label: 'Residente' },
+    { key: 'gerente',            label: 'Gerente' },
+    { key: 'coordinador',        label: 'Coordinador' },
+    { key: 'coordinador_pagos',  label: 'Coordinador de pagos' },
+    { key: 'logistica',          label: 'Logística' },
+    { key: 'rrhh',               label: 'Recursos Humanos' },
+    { key: 'prevencion',         label: 'Prevencionista de Riesgos' },
+    { key: 'oficina_tecnica',    label: 'Oficina Técnica' },
+    { key: 'coord_recepciones',  label: 'Coordinador de recepciones' },
+];
+
+const INFORME_TIPOS = [
+    { key: 'residente',          label: 'Reporte residente HTML',        esHtml: true  },
+    { key: 'por_capataz',        label: 'Reporte Capataz HTML',          esHtml: true  },
+    { key: 'adquisiciones_html',  label: 'Reporte adquisiciones HTML',    esHtml: true  },
+    { key: 'html_navegable',      label: 'Reporte Ejecutivo HTML',        esHtml: true  },
+    { key: 'recepciones_html',    label: 'Reporte recepciones HTML',      esHtml: true  },
+    { key: 'estados_pago_html',   label: 'Estados de Pago HTML',          esHtml: true  },
+];
+
+// ===== CONFIGURACIÓN (Grupos + Diagrama + Editor) =====
+const ModalPersonalGlobal = ({ personalGlobal, fbDB, onClose }) => {
+    const [form, setForm] = React.useState({ nombre: '', telefono: '', correo: '', rol: 'capataz', informes: [], alerta_climatica: false });
+    const [editKey, setEditKey] = React.useState(null);
+    const [informesOpenKey, setInformesOpenKey] = React.useState(null);
+    const lista = Object.entries(personalGlobal || {});
+
+    const guardar = () => {
+        if (!form.nombre.trim()) return;
+        const entry = { ...form, nombre: form.nombre.trim() };
+        if (editKey) {
+            fbDB.ref(`personal_global/${editKey}`).set(entry);
+            setEditKey(null);
+        } else {
+            fbDB.ref(`personal_global/${Date.now()}`).set(entry);
+        }
+        setForm({ nombre: '', telefono: '', correo: '', rol: 'capataz', informes: [], alerta_climatica: false });
+    };
+
+    const eliminar = (key) => {
+        if (!window.confirm('¿Eliminar este registro?')) return;
+        fbDB.ref(`personal_global/${key}`).remove();
+    };
+
+    const iniciarEdicion = (key, p) => {
+        setEditKey(key);
+        setForm({ nombre: p.nombre || '', telefono: p.telefono || '', correo: p.correo || '', rol: p.rol || 'capataz', informes: p.informes || [], alerta_climatica: !!p.alerta_climatica });
+        setInformesOpenKey(null);
+    };
+
+    const cancelarEdicion = () => {
+        setEditKey(null);
+        setForm({ nombre: '', telefono: '', correo: '', rol: 'capataz', informes: [], alerta_climatica: false });
+    };
+
+    const toggleInforme = (key, informeKey, current, checked) => {
+        const nuevos = checked ? [...current, informeKey] : current.filter(k => k !== informeKey);
+        fbDB.ref(`personal_global/${key}/informes`).set(nuevos.length > 0 ? nuevos : null);
+    };
+
+    const toggleAlertaClimatica = (key, current) => {
+        fbDB.ref(`personal_global/${key}/alerta_climatica`).set(current ? null : true);
+    };
+
+    const ROLES_MAP = { capataz:'Capataz', residente:'Residente', gerente:'Gerente', coordinador:'Coordinador', coordinador_pagos:'Coordinador de pagos', logistica:'Logística', rrhh:'Recursos Humanos' };
+    const rolesPresentes = [...new Set(lista.map(([,p]) => p.rol))].sort();
+
+    return (
+        <div className="fixed inset-0 z-[70] bg-black/50 flex items-start justify-center pt-6 px-4 overflow-y-auto" onClick={e => e.target === e.currentTarget && onClose()}>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl mb-6">
+                {/* Header */}
+                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-violet-50 rounded-t-2xl">
+                    <div>
+                        <h2 className="text-base font-bold text-violet-800">Registro de Personal — Organización</h2>
+                        <p className="text-xs text-violet-600 mt-0.5">Agrega personas de la organización para asignarlas a proyectos y definir qué informes reciben.</p>
+                    </div>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl font-light leading-none p-1">×</button>
+                </div>
+
+                {/* Formulario */}
+                <div className="px-6 py-4 border-b border-gray-100">
+                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">{editKey ? '✎ Editando registro' : '+ Agregar persona'}</h3>
+                    <div className="flex flex-wrap gap-2">
+                        <div className="flex-1 min-w-[160px]">
+                            <label className="text-[10px] text-gray-500 font-medium">Nombre</label>
+                            <input type="text" value={form.nombre} onChange={e => setForm(f => ({...f, nombre: e.target.value}))} placeholder="Nombre completo" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 mt-0.5" />
+                        </div>
+                        <div className="w-36">
+                            <label className="text-[10px] text-gray-500 font-medium">Teléfono</label>
+                            <input type="text" value={form.telefono} onChange={e => setForm(f => ({...f, telefono: e.target.value}))} placeholder="+56 9..." className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 mt-0.5" />
+                        </div>
+                        <div className="flex-1 min-w-[160px]">
+                            <label className="text-[10px] text-gray-500 font-medium">Correo</label>
+                            <input type="email" value={form.correo} onChange={e => setForm(f => ({...f, correo: e.target.value}))} placeholder="correo@ejemplo.cl" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 mt-0.5" />
+                        </div>
+                        <div className="w-40">
+                            <label className="text-[10px] text-gray-500 font-medium">Rol</label>
+                            <select value={form.rol} onChange={e => setForm(f => ({...f, rol: e.target.value}))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 mt-0.5">
+                                {ROLES_PERSONAL.map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
+                            </select>
+                        </div>
+                    </div>
+                    <div className="mt-3">
+                        <label className="text-[10px] text-gray-500 font-medium">Informes a recibir por correo</label>
+                        <div className="flex flex-wrap gap-x-5 gap-y-1.5 mt-1.5">
+                            {INFORME_TIPOS.map(t => (
+                                <label key={t.key} className="flex items-center gap-1.5 text-xs cursor-pointer text-gray-600 hover:text-violet-700 select-none">
+                                    <input type="checkbox" checked={(form.informes||[]).includes(t.key)} onChange={e => setForm(f => ({ ...f, informes: e.target.checked ? [...(f.informes||[]), t.key] : (f.informes||[]).filter(k => k !== t.key) }))} className="rounded border-gray-300 text-violet-500 focus:ring-violet-400" />
+                                    {t.label}
+                                    {t.esHtml && <span className="text-[9px] text-violet-500 font-semibold uppercase tracking-wide ml-0.5" title="Este informe incluye todas las obras y se envía en un solo correo">· multi-obra</span>}
+                                </label>
+                            ))}
+                        </div>
+                        {(form.informes||[]).some(k => ['adquisiciones_html','html_navegable','recepciones_html'].includes(k)) && (
+                            <div className="mt-1.5 text-[10px] text-violet-600 bg-violet-50 border border-violet-200 rounded px-2 py-1">
+                                ℹ️ Los reportes HTML incluyen todas las obras y se envían en un <strong>único correo</strong>, independiente de cuántos proyectos tenga asignados.
+                            </div>
+                        )}
+                        <label className="flex items-center gap-1.5 text-xs cursor-pointer text-gray-600 hover:text-sky-700 select-none mt-2.5">
+                            <input type="checkbox" checked={!!form.alerta_climatica} onChange={e => setForm(f => ({ ...f, alerta_climatica: e.target.checked }))} className="rounded border-gray-300 text-sky-500 focus:ring-sky-400" />
+                            🌦️ Recibir Alerta Climática (condiciones adversas por sector)
+                        </label>
+                    </div>
+                    <div className="flex gap-2 mt-3">
+                        <button onClick={guardar} disabled={!form.nombre.trim()} className="px-4 py-2 bg-violet-600 text-white rounded-lg text-sm font-medium hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                            {editKey ? 'Guardar cambios' : '+ Agregar'}
+                        </button>
+                        {editKey && <button onClick={cancelarEdicion} className="px-4 py-2 bg-gray-200 text-gray-600 rounded-lg text-sm hover:bg-gray-300 transition-colors">Cancelar</button>}
+                    </div>
+                </div>
+
+                {/* Lista */}
+                <div className="px-6 py-4 max-h-[420px] overflow-y-auto">
+                    {lista.length === 0 ? (
+                        <p className="text-sm text-gray-400 italic text-center py-6">Sin personal registrado. Agrega personas usando el formulario de arriba.</p>
+                    ) : (
+                        rolesPresentes.map(rol => {
+                            const grupo = lista.filter(([,p]) => p.rol === rol);
+                            if (grupo.length === 0) return null;
+                            const rolLabel = ROLES_MAP[rol] || rol;
+                            return (
+                                <div key={rol} className="mb-5">
+                                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2 border-b border-gray-100 pb-1">{rolLabel}s</div>
+                                    <div className="space-y-1">
+                                        {grupo.map(([key, p]) => (
+                                            <div key={key} className={`rounded-xl border px-3 py-2 transition-colors ${editKey === key ? 'border-violet-300 bg-violet-50' : 'border-gray-100 bg-gray-50 hover:bg-gray-100'}`}>
+                                                <div className="flex items-start justify-between">
+                                                    <div>
+                                                        <div className="text-sm font-semibold text-gray-700">{p.nombre}</div>
+                                                        <div className="flex gap-3 mt-0.5">
+                                                            {p.telefono && <span className="text-[10px] text-gray-400">📞 {p.telefono}</span>}
+                                                            {p.correo && <span className="text-[10px] text-gray-400">✉ {p.correo}</span>}
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-1 shrink-0 ml-2">
+                                                        <button
+                                                            onClick={() => setInformesOpenKey(informesOpenKey === key ? null : key)}
+                                                            className={`flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded border transition-colors ${(p.informes||[]).length > 0 ? 'bg-violet-100 text-violet-700 border-violet-300' : 'bg-gray-100 text-gray-400 border-gray-200 hover:bg-violet-50 hover:text-violet-500'}`}
+                                                            title="Gestionar informes"
+                                                        >
+                                                            📧 {(p.informes||[]).length > 0 ? (p.informes||[]).length : '—'}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => toggleAlertaClimatica(key, p.alerta_climatica)}
+                                                            className={`flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded border transition-colors ${p.alerta_climatica ? 'bg-sky-100 text-sky-700 border-sky-300' : 'bg-gray-100 text-gray-400 border-gray-200 hover:bg-sky-50 hover:text-sky-500'}`}
+                                                            title="Recibir Alerta Climática"
+                                                        >
+                                                            🌦️
+                                                        </button>
+                                                        <button onClick={() => iniciarEdicion(key, p)} className="text-violet-500 hover:text-violet-700 text-xs px-1.5" title="Editar">✎</button>
+                                                        <button onClick={() => eliminar(key)} className="text-red-400 hover:text-red-600 text-xs px-1" title="Eliminar">×</button>
+                                                    </div>
+                                                </div>
+                                                {informesOpenKey === key && (
+                                                    <div className="mt-2 p-2.5 bg-violet-50 rounded-lg border border-violet-200">
+                                                        <div className="text-[10px] text-violet-700 font-semibold mb-2 uppercase tracking-wide">Informes a recibir por correo</div>
+                                                        <div className="grid grid-cols-2 gap-1">
+                                                            {INFORME_TIPOS.map(t => (
+                                                                <label key={t.key} className="flex items-center gap-2 text-xs cursor-pointer text-gray-600 hover:text-violet-700 select-none">
+                                                                    <input type="checkbox" checked={(p.informes||[]).includes(t.key)} onChange={e => toggleInforme(key, t.key, p.informes||[], e.target.checked)} className="rounded border-gray-300 text-violet-500" />
+                                                                    {t.label}
+                                                                    {t.esHtml && <span className="text-[9px] text-violet-400 font-semibold" title="Multi-obra — se envía en un solo correo">· multi-obra</span>}
+                                                                </label>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            );
+                        })
+                    )}
+                </div>
+
+                <div className="px-6 py-3 border-t border-gray-100 flex justify-between items-center bg-gray-50 rounded-b-2xl">
+                    <span className="text-xs text-gray-400">{lista.length} persona{lista.length !== 1 ? 's' : ''} registrada{lista.length !== 1 ? 's' : ''}</span>
+                    <button onClick={onClose} className="px-4 py-1.5 bg-gray-200 text-gray-600 rounded-lg text-sm hover:bg-gray-300 transition-colors">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+
+// ===== LINAJE DE DATOS — SVG EMBEBIDO =====
+const SVG_LINAJE_CONTENT = `<svg viewBox="0 0 1140 430"
+     xmlns="http://www.w3.org/2000/svg"
+     role="img"
+     aria-label="Diagrama de linaje de datos SG Raíces: 4 capas — Fuentes (Google Sheets, 8 vistas AppSheet, DMC API), Procesamiento (scripts Python vía GitHub Actions + fetch directo browser), Almacenamiento (Firebase RTDB + Google Drive), Salidas (Dashboard React SPA)">
+
+<defs>
+  <marker id="a" markerWidth="7" markerHeight="5" refX="6.5" refY="2.5" orient="auto">
+    <polygon points="0 0,7 2.5,0 5" fill="var(--arr)"/>
+  </marker>
+  <marker id="ae" markerWidth="7" markerHeight="5" refX="6.5" refY="2.5" orient="auto">
+    <polygon points="0 0,7 2.5,0 5" fill="var(--etl-s)"/>
+  </marker>
+  <marker id="ar" markerWidth="7" markerHeight="5" refX="6.5" refY="2.5" orient="auto">
+    <polygon points="0 0,7 2.5,0 5" fill="var(--rpt-s)"/>
+  </marker>
+</defs>
+
+<!-- ═══ COLUMN HEADERS ═══ -->
+<rect x="8"   y="4" width="192" height="20" rx="4" fill="var(--src-s)" opacity=".12"/>
+<text x="104" y="18" text-anchor="middle" font-size="10" font-weight="700" letter-spacing=".8" fill="var(--src-s)">FUENTES</text>
+
+<rect x="258" y="4" width="205" height="20" rx="4" fill="var(--etl-s)" opacity=".12"/>
+<text x="360" y="18" text-anchor="middle" font-size="10" font-weight="700" letter-spacing=".8" fill="var(--etl-s)">PROCESAMIENTO</text>
+
+<rect x="520" y="4" width="205" height="20" rx="4" fill="var(--sto-s)" opacity=".12"/>
+<text x="622" y="18" text-anchor="middle" font-size="10" font-weight="700" letter-spacing=".8" fill="var(--sto-s)">ALMACENAMIENTO</text>
+
+<rect x="782" y="4" width="345" height="20" rx="4" fill="var(--dsh-s)" opacity=".12"/>
+<text x="954" y="18" text-anchor="middle" font-size="10" font-weight="700" letter-spacing=".8" fill="var(--dsh-s)">SALIDAS — Dashboard</text>
+
+<!-- ═══ S1: GOOGLE SHEETS ═══ -->
+<rect x="8" y="32" width="192" height="108" rx="6" fill="var(--src-fill)" stroke="var(--src-s)" stroke-width="1.5"/>
+<text x="104" y="51"  text-anchor="middle" font-size="12"  font-weight="700" fill="var(--src-t)">Google Sheets</text>
+<text x="104" y="64"  text-anchor="middle" font-size="10.5" fill="var(--src-t)">Gantt de Control</text>
+<line x1="18" y1="70" x2="190" y2="70" stroke="var(--src-s)" stroke-width=".5" opacity=".35"/>
+<text x="104" y="82"  text-anchor="middle" font-size="9.5" fill="var(--src-t)" opacity=".85">11 hojas — una por proyecto</text>
+<text x="104" y="95"  text-anchor="middle" font-size="9.5" fill="var(--src-t)" opacity=".85">tab «Programa de obra»</text>
+<text x="104" y="108" text-anchor="middle" font-size="9.5" fill="var(--src-t)" opacity=".85">tab «% Avance» (Aliwen)</text>
+<text x="104" y="120" text-anchor="middle" font-size="9"   fill="var(--src-t)" opacity=".6">tab «Ñuke Mapu» · «Datos Control»</text>
+<!-- S1: y=32-140, center y=86 -->
+
+<!-- ═══ APPSHEET GROUP ═══ -->
+<rect x="6" y="148" width="196" height="380" rx="6"
+      fill="var(--src-s)" opacity=".05"
+      stroke="var(--src-s)" stroke-width="1" stroke-dasharray="4,3"/>
+<text x="104" y="163" text-anchor="middle" font-size="9.5" font-weight="700" fill="var(--src-s)" letter-spacing=".4">AppSheet «Seguimiento»</text>
+
+<!-- S2: Total Avances -->
+<rect x="16" y="170" width="176" height="38" rx="5" fill="var(--src-fill)" stroke="var(--src-s)" stroke-width="1.2"/>
+<text x="104" y="185" text-anchor="middle" font-size="9.5" font-weight="700" fill="var(--src-t)">Total Avances [En Ejecución]</text>
+<text x="104" y="199" text-anchor="middle" font-size="8.5" fill="var(--src-t)" opacity=".8">Obras > Total Avances</text>
+
+<!-- S3: Seguimiento cierre -->
+<rect x="16" y="214" width="176" height="38" rx="5" fill="var(--src-fill)" stroke="var(--src-s)" stroke-width="1.2"/>
+<text x="104" y="229" text-anchor="middle" font-size="9.5" font-weight="700" fill="var(--src-t)">Seguimiento cierre de obras</text>
+<text x="104" y="243" text-anchor="middle" font-size="8.5" fill="var(--src-t)" opacity=".8">HPC · VAS · RAS · VF1 · F1 · Artef. · Recep.</text>
+
+<!-- S4: Eléctrico -->
+<rect x="16" y="258" width="176" height="38" rx="5" fill="var(--src-fill)" stroke="var(--src-s)" stroke-width="1.2"/>
+<text x="104" y="273" text-anchor="middle" font-size="9.5" font-weight="700" fill="var(--src-t)">Eléctrico</text>
+<text x="104" y="287" text-anchor="middle" font-size="8.5" fill="var(--src-t)" opacity=".8">TE1 · Solicitud de empalme</text>
+
+<!-- S5: Pagos MO Histórico -->
+<rect x="16" y="302" width="176" height="38" rx="5" fill="var(--src-fill)" stroke="var(--src-s)" stroke-width="1.2"/>
+<text x="104" y="317" text-anchor="middle" font-size="9.5" font-weight="700" fill="var(--src-t)">Pagos M.O. Histórico</text>
+<text x="104" y="331" text-anchor="middle" font-size="8.5" fill="var(--src-t)" opacity=".8">Obras > Pagos M.O. Histórico</text>
+
+<!-- S6: Pagos MO en curso -->
+<rect x="16" y="346" width="176" height="38" rx="5" fill="var(--src-fill)" stroke="var(--src-s)" stroke-width="1.2"/>
+<text x="104" y="361" text-anchor="middle" font-size="9.5" font-weight="700" fill="var(--src-t)">Pagos M.O. en curso</text>
+<text x="104" y="375" text-anchor="middle" font-size="8.5" fill="var(--src-t)" opacity=".8">Obras > Pagos M.O. en curso</text>
+
+<!-- S7: Solicitudes de Despacho -->
+<rect x="16" y="390" width="176" height="38" rx="5" fill="var(--src-fill)" stroke="var(--src-s)" stroke-width="1.2"/>
+<text x="104" y="405" text-anchor="middle" font-size="9.5" font-weight="700" fill="var(--src-t)">Solicitudes de Despacho ★</text>
+<text x="104" y="419" text-anchor="middle" font-size="8.5" fill="var(--src-t)" opacity=".8">Operaciones > Solicitudes (principal)</text>
+
+<!-- S8: Ver Despachos -->
+<rect x="16" y="434" width="176" height="38" rx="5" fill="var(--src-fill)" stroke="var(--src-s)" stroke-width="1.2"/>
+<text x="104" y="449" text-anchor="middle" font-size="9.5" font-weight="700" fill="var(--src-t)">Ver Despachos</text>
+<text x="104" y="463" text-anchor="middle" font-size="8.5" fill="var(--src-t)" opacity=".8">Operaciones > Ver Despachos</text>
+
+<!-- S9: Pendientes -->
+<rect x="16" y="478" width="176" height="45" rx="5" fill="var(--src-fill)" stroke="var(--src-s)" stroke-width="1.2"/>
+<text x="104" y="495" text-anchor="middle" font-size="9.5" font-weight="700" fill="var(--src-t)">Pendientes</text>
+<text x="104" y="508" text-anchor="middle" font-size="8.5" fill="var(--src-t)" opacity=".8">Operaciones > Pendientes</text>
+<text x="104" y="519" text-anchor="middle" font-size="8"   fill="var(--src-t)" opacity=".55">→ vía Firebase</text>
+<!-- AppSheet group: y=148-528, S9 ends y=523 -->
+
+<!-- ═══ S10: DMC / Clima API ═══ -->
+<rect x="8" y="540" width="192" height="52" rx="6" fill="var(--src-fill)" stroke="var(--src-s)" stroke-width="1.5"/>
+<text x="104" y="559" text-anchor="middle" font-size="12"  font-weight="700" fill="var(--src-t)">DMC / Clima API</text>
+<line x1="18" y1="565" x2="190" y2="565" stroke="var(--src-s)" stroke-width=".5" opacity=".35"/>
+<text x="104" y="578" text-anchor="middle" font-size="9.5" fill="var(--src-t)" opacity=".85">12 sectores · IX Región</text>
+<!-- S10: y=540-592, center y=566 -->
+
+<!-- ═══ PROCESAMIENTO ═══ -->
+
+<!-- GitHub Actions badge -->
+<rect x="262" y="32" width="162" height="14" rx="3" fill="var(--etl-s)" opacity=".15"/>
+<text x="343" y="43" text-anchor="middle" font-size="8.5" fill="var(--etl-t)">⚡ GitHub Actions · lun–vie 09:00</text>
+
+<!-- E1: calcular_avance_gantt.py -->
+<rect x="258" y="50" width="205" height="60" rx="6" fill="var(--etl-fill)" stroke="var(--etl-s)" stroke-width="1.5"/>
+<text x="360" y="68"  text-anchor="middle" font-size="11"  font-weight="700" fill="var(--etl-t)">calcular_avance_gantt.py</text>
+<line x1="268" y1="74" x2="453" y2="74" stroke="var(--etl-s)" stroke-width=".5" opacity=".35"/>
+<text x="360" y="86"  text-anchor="middle" font-size="9"   fill="var(--etl-t)" opacity=".85">lee fila «Programa» del Gantt</text>
+<text x="360" y="99"  text-anchor="middle" font-size="9"   fill="var(--etl-t)" opacity=".85">calcula pct_real por beneficiario</text>
+<!-- E1: y=50-110, center y=80 -->
+
+<!-- E2: curvas_automatico_*.py -->
+<rect x="258" y="118" width="205" height="78" rx="6" fill="var(--etl-fill)" stroke="var(--etl-s)" stroke-width="1.5"/>
+<text x="360" y="136" text-anchor="middle" font-size="11"  font-weight="700" fill="var(--etl-t)">curvas_automatico_*.py</text>
+<text x="360" y="149" text-anchor="middle" font-size="9"   fill="var(--etl-t)">× 11 scripts — uno por proyecto</text>
+<line x1="268" y1="155" x2="453" y2="155" stroke="var(--etl-s)" stroke-width=".5" opacity=".35"/>
+<text x="360" y="167" text-anchor="middle" font-size="9"   fill="var(--etl-t)" opacity=".85">genera PNG Curva S por grupo</text>
+<text x="360" y="180" text-anchor="middle" font-size="9"   fill="var(--etl-t)" opacity=".85">tooltip: Prog desde «Programa de obra»</text>
+<text x="360" y="191" text-anchor="middle" font-size="8.5" fill="var(--etl-t)" opacity=".6">leer_pct_programa_gantt()</text>
+<!-- E2: y=118-196, center y=157 -->
+
+<!-- E3: Apps Script fetch directo browser -->
+<rect x="258" y="268" width="205" height="78" rx="6" fill="var(--etl-fill)" stroke="var(--etl-s)" stroke-width="1.5"/>
+<text x="360" y="286" text-anchor="middle" font-size="11"  font-weight="700" fill="var(--etl-t)">Apps Script → Browser</text>
+<line x1="268" y1="292" x2="453" y2="292" stroke="var(--etl-s)" stroke-width=".5" opacity=".35"/>
+<text x="360" y="304" text-anchor="middle" font-size="9"   fill="var(--etl-t)" opacity=".85">fetch directo al cargar el dashboard</text>
+<text x="360" y="316" text-anchor="middle" font-size="9"   fill="var(--etl-t)" opacity=".85">Seguimiento · Despacho · Pagos · Benef.</text>
+<text x="360" y="328" text-anchor="middle" font-size="8.5" fill="var(--etl-t)" opacity=".65">generar_snapshot.py (cache 15 min)</text>
+<text x="360" y="339" text-anchor="middle" font-size="8.5" fill="var(--etl-t)" opacity=".65">→ rama data-snapshot · GitHub</text>
+<!-- E3: y=268-346, center y=307 -->
+
+<!-- E4: alerta_climatica.py -->
+<rect x="258" y="522" width="205" height="55" rx="6" fill="var(--etl-fill)" stroke="var(--etl-s)" stroke-width="1.5"/>
+<text x="360" y="542" text-anchor="middle" font-size="11"  font-weight="700" fill="var(--etl-t)">alerta_climatica.py</text>
+<line x1="268" y1="548" x2="453" y2="548" stroke="var(--etl-s)" stroke-width=".5" opacity=".35"/>
+<text x="360" y="560" text-anchor="middle" font-size="9"   fill="var(--etl-t)" opacity=".85">evalúa umbrales por sector</text>
+<text x="360" y="571" text-anchor="middle" font-size="9"   fill="var(--etl-t)" opacity=".85">escribe flag booleano</text>
+<!-- E4: y=522-577, center y=549 -->
+
+<!-- ═══ ALMACENAMIENTO ═══ -->
+
+<!-- ST1 -->
+<rect x="520" y="50" width="205" height="52" rx="6" fill="var(--sto-fill)" stroke="var(--sto-s)" stroke-width="1.5"/>
+<text x="622" y="69"  text-anchor="middle" font-size="11"  font-weight="700" fill="var(--sto-t)">Firebase RTDB</text>
+<text x="622" y="83"  text-anchor="middle" font-size="10"  fill="var(--sto-t)">/avance_gantt/{pid}</text>
+<text x="622" y="95"  text-anchor="middle" font-size="8.5" fill="var(--sto-t)" opacity=".75">pct_real · pct_prog · desglose mensual</text>
+<!-- ST1: y=50-102, center y=76 -->
+
+<!-- ST2 -->
+<rect x="520" y="115" width="205" height="52" rx="6" fill="var(--sto-fill)" stroke="var(--sto-s)" stroke-width="1.5"/>
+<text x="622" y="134" text-anchor="middle" font-size="11"  font-weight="700" fill="var(--sto-t)">Firebase RTDB</text>
+<text x="622" y="148" text-anchor="middle" font-size="10"  fill="var(--sto-t)">/curvas_drive_ids</text>
+<text x="622" y="160" text-anchor="middle" font-size="8.5" fill="var(--sto-t)" opacity=".75">Drive file IDs por proyecto/grupo</text>
+<!-- ST2: y=115-167, center y=141 -->
+
+<!-- ST3 -->
+<rect x="520" y="180" width="205" height="52" rx="6" fill="var(--sto-fill)" stroke="var(--sto-s)" stroke-width="1.5"/>
+<text x="622" y="199" text-anchor="middle" font-size="11"  font-weight="700" fill="var(--sto-t)">Google Drive</text>
+<text x="622" y="213" text-anchor="middle" font-size="10"  fill="var(--sto-t)">PNG Curva S</text>
+<text x="622" y="225" text-anchor="middle" font-size="8.5" fill="var(--sto-t)" opacity=".75">~70 imágenes (grupos + total)</text>
+<!-- ST3: y=180-232, center y=206 -->
+
+<!-- separator: Sheets vs AppSheet origin -->
+<line x1="520" y1="244" x2="725" y2="244" stroke="var(--sto-s)" stroke-width=".5" stroke-dasharray="3,4" opacity=".3"/>
+
+<!-- ST4 -->
+<rect x="520" y="254" width="205" height="52" rx="6" fill="var(--sto-fill)" stroke="var(--sto-s)" stroke-width="1.5"/>
+<text x="622" y="273" text-anchor="middle" font-size="11"  font-weight="700" fill="var(--sto-t)">Firebase RTDB</text>
+<text x="622" y="287" text-anchor="middle" font-size="10"  fill="var(--sto-t)">/avance_benef</text>
+<text x="622" y="299" text-anchor="middle" font-size="8.5" fill="var(--sto-t)" opacity=".75">% avance por beneficiario</text>
+<!-- ST4: y=254-306, center y=280 -->
+
+<!-- ST5 -->
+<rect x="520" y="318" width="205" height="52" rx="6" fill="var(--sto-fill)" stroke="var(--sto-s)" stroke-width="1.5"/>
+<text x="622" y="337" text-anchor="middle" font-size="11"  font-weight="700" fill="var(--sto-t)">Firebase RTDB</text>
+<text x="622" y="351" text-anchor="middle" font-size="10"  fill="var(--sto-t)">/checkpoints</text>
+<text x="622" y="363" text-anchor="middle" font-size="8.5" fill="var(--sto-t)" opacity=".75">HPC · VAS · RAS · TE1 · Empalme · …</text>
+<!-- ST5: y=318-370, center y=344 -->
+
+<!-- ST6 -->
+<rect x="520" y="382" width="205" height="52" rx="6" fill="var(--sto-fill)" stroke="var(--sto-s)" stroke-width="1.5"/>
+<text x="622" y="401" text-anchor="middle" font-size="11"  font-weight="700" fill="var(--sto-t)">Firebase RTDB</text>
+<text x="622" y="415" text-anchor="middle" font-size="10"  fill="var(--sto-t)">/pagos_despachos</text>
+<text x="622" y="427" text-anchor="middle" font-size="8.5" fill="var(--sto-t)" opacity=".75">montos pagos MO · registros despacho</text>
+<!-- ST6: y=382-434, center y=408 -->
+
+<!-- separator: AppSheet vs Clima -->
+<line x1="520" y1="448" x2="725" y2="448" stroke="var(--sto-s)" stroke-width=".5" stroke-dasharray="3,4" opacity=".3"/>
+
+<!-- ST7 -->
+<rect x="520" y="520" width="205" height="52" rx="6" fill="var(--sto-fill)" stroke="var(--sto-s)" stroke-width="1.5"/>
+<text x="622" y="539" text-anchor="middle" font-size="11"  font-weight="700" fill="var(--sto-t)">Firebase RTDB</text>
+<text x="622" y="553" text-anchor="middle" font-size="10"  fill="var(--sto-t)">/alerta_climatica</text>
+<text x="622" y="565" text-anchor="middle" font-size="8.5" fill="var(--sto-t)" opacity=".75">flag 🌦️ booleano por sector</text>
+<!-- ST7: y=520-572, center y=546 -->
+
+<!-- ═══ SALIDAS: DASHBOARD ═══ -->
+
+<!-- D1: Programa de Obra -->
+<rect x="782" y="32" width="345" height="42" rx="6" fill="var(--dsh-fill)" stroke="var(--dsh-s)" stroke-width="1.5"/>
+<text x="954" y="51"  text-anchor="middle" font-size="11.5" font-weight="700" fill="var(--dsh-t)">Programa de Obra</text>
+<text x="954" y="65"  text-anchor="middle" font-size="9.5"  fill="var(--dsh-t)">% Real · % Prog · Desviación · card por proyecto</text>
+
+<!-- D2: Curvas S -->
+<rect x="782" y="82" width="345" height="42" rx="6" fill="var(--dsh-fill)" stroke="var(--dsh-s)" stroke-width="1.5"/>
+<text x="954" y="101" text-anchor="middle" font-size="11.5" font-weight="700" fill="var(--dsh-t)">Curvas S de Control</text>
+<text x="954" y="115" text-anchor="middle" font-size="9.5"  fill="var(--dsh-t)">PNG por grupo · tooltip Prog / Real / Desv.</text>
+
+<!-- D3: % AV Beneficiarios -->
+<rect x="782" y="132" width="345" height="42" rx="6" fill="var(--dsh-fill)" stroke="var(--dsh-s)" stroke-width="1.5"/>
+<text x="954" y="151" text-anchor="middle" font-size="11.5" font-weight="700" fill="var(--dsh-t)">% AV Beneficiarios</text>
+<text x="954" y="165" text-anchor="middle" font-size="9.5"  fill="var(--dsh-t)">Total Avances [En Ejecución] · % por vivienda</text>
+
+<!-- D4: Checkpoints -->
+<rect x="782" y="182" width="345" height="55" rx="6" fill="var(--dsh-fill)" stroke="var(--dsh-s)" stroke-width="1.5"/>
+<text x="954" y="201" text-anchor="middle" font-size="11.5" font-weight="700" fill="var(--dsh-t)">Checkpoints del Proyecto</text>
+<text x="954" y="216" text-anchor="middle" font-size="9"    fill="var(--dsh-t)">Sgt. Cierre → HPC · VAS · RAS · VF1 · F1 · Artef. · Recep.</text>
+<text x="954" y="229" text-anchor="middle" font-size="9"    fill="var(--dsh-t)">Eléctrico → TE1 · Empalme (solicitud conexión)</text>
+
+<!-- D5: Ritmo Pagos MO -->
+<rect x="782" y="245" width="345" height="42" rx="6" fill="var(--dsh-fill)" stroke="var(--dsh-s)" stroke-width="1.5"/>
+<text x="954" y="264" text-anchor="middle" font-size="11.5" font-weight="700" fill="var(--dsh-t)">Ritmo Pagos M.O.</text>
+<text x="954" y="278" text-anchor="middle" font-size="9.5"  fill="var(--dsh-t)">Pagos MO Histórico · Pagos MO en curso</text>
+
+<!-- D6: Ritmo Despachos -->
+<rect x="782" y="295" width="345" height="42" rx="6" fill="var(--dsh-fill)" stroke="var(--dsh-s)" stroke-width="1.5"/>
+<text x="954" y="314" text-anchor="middle" font-size="11.5" font-weight="700" fill="var(--dsh-t)">Ritmo Despachos</text>
+<text x="954" y="328" text-anchor="middle" font-size="9.5"  fill="var(--dsh-t)">Solicitudes Despacho ★ · Ver Despachos</text>
+
+<!-- D7: Alerta Climática -->
+<rect x="782" y="345" width="345" height="42" rx="6" fill="var(--dsh-fill)" stroke="var(--dsh-s)" stroke-width="1.5"/>
+<text x="954" y="364" text-anchor="middle" font-size="11.5" font-weight="700" fill="var(--dsh-t)">Alerta Climática 🌦️</text>
+<text x="954" y="378" text-anchor="middle" font-size="9.5"  fill="var(--dsh-t)">flag por sector · IX Región · actualiz. diaria</text>
+
+<!-- Dashboard ends y=387 -->
+
+<!-- ═══ ARROWS: FUENTES → PROCESAMIENTO ═══ -->
+
+<!-- S1 → E1 (Sheets API → calcular_avance) -->
+<path d="M 200,75 C 230,75 230,80 258,80"
+      fill="none" stroke="var(--arr)" stroke-width="1.2" marker-end="url(#a)"/>
+<text x="228" y="72" text-anchor="middle" font-size="8.5" fill="var(--arr-lbl)">Sheets API</text>
+
+<!-- S1 → E2 (Sheets API → curvas) -->
+<path d="M 200,122 C 230,122 230,157 258,157"
+      fill="none" stroke="var(--arr)" stroke-width="1.2" marker-end="url(#a)"/>
+<text x="228" y="142" text-anchor="middle" font-size="8.5" fill="var(--arr-lbl)">Sheets API</text>
+
+<!-- AppSheet vertical collecting bar -->
+<line x1="200" y1="189" x2="200" y2="522"
+      stroke="var(--src-s)" stroke-width=".9" opacity=".3"/>
+<!-- AppSheet group → E3 (midpoint of bar ≈ y=355) -->
+<path d="M 200,355 C 230,355 230,307 258,307"
+      fill="none" stroke="var(--arr)" stroke-width="1.2" marker-end="url(#a)"/>
+<text x="228" y="328" text-anchor="middle" font-size="8.5" fill="var(--arr-lbl)">Sheets API</text>
+
+<!-- S10 → E4 (DMC → alerta) -->
+<path d="M 200,566 C 230,566 230,549 258,549"
+      fill="none" stroke="var(--arr)" stroke-width="1.2" marker-end="url(#a)"/>
+<text x="228" y="551" text-anchor="middle" font-size="8.5" fill="var(--arr-lbl)">API</text>
+
+<!-- ═══ ARROWS: PROCESAMIENTO → ALMACENAMIENTO ═══ -->
+
+<!-- E1 → ST1 -->
+<line x1="463" y1="80" x2="520" y2="76"
+      stroke="var(--arr)" stroke-width="1.2" marker-end="url(#a)"/>
+<text x="491" y="70" text-anchor="middle" font-size="8.5" fill="var(--arr-lbl)">pct_prog · pct_real</text>
+
+<!-- E2 → ST2 -->
+<path d="M 463,141 C 492,141 492,141 520,141"
+      fill="none" stroke="var(--arr)" stroke-width="1.2" marker-end="url(#a)"/>
+<text x="491" y="134" text-anchor="middle" font-size="8.5" fill="var(--arr-lbl)">Drive IDs</text>
+
+<!-- E2 → ST3 -->
+<path d="M 463,173 C 492,173 492,206 520,206"
+      fill="none" stroke="var(--arr)" stroke-width="1.2" marker-end="url(#a)"/>
+<text x="491" y="196" text-anchor="middle" font-size="8.5" fill="var(--arr-lbl)">sube PNG</text>
+
+<!-- E3 → ST4 -->
+<path d="M 463,296 C 492,296 492,280 520,280"
+      fill="none" stroke="var(--arr)" stroke-width="1.2" marker-end="url(#a)"/>
+<text x="491" y="281" text-anchor="middle" font-size="8.5" fill="var(--arr-lbl)">escribe</text>
+
+<!-- E3 → ST5 -->
+<path d="M 463,307 C 492,307 492,344 520,344"
+      fill="none" stroke="var(--arr)" stroke-width="1.2" marker-end="url(#a)"/>
+<text x="491" y="332" text-anchor="middle" font-size="8.5" fill="var(--arr-lbl)">escribe</text>
+
+<!-- E3 → ST6 -->
+<path d="M 463,322 C 492,322 492,408 520,408"
+      fill="none" stroke="var(--arr)" stroke-width="1.2" marker-end="url(#a)"/>
+<text x="491" y="368" text-anchor="middle" font-size="8.5" fill="var(--arr-lbl)">escribe</text>
+
+<!-- E4 → ST7 -->
+<path d="M 463,549 C 492,549 492,546 520,546"
+      fill="none" stroke="var(--arr)" stroke-width="1.2" marker-end="url(#a)"/>
+<text x="491" y="540" text-anchor="middle" font-size="8.5" fill="var(--arr-lbl)">flag</text>
+
+<!-- ═══ ARROWS: ALMACENAMIENTO → DASHBOARD ═══ -->
+
+<!-- ST1 → D1 -->
+<path d="M 725,76 C 754,76 754,53 782,53"
+      fill="none" stroke="var(--arr)" stroke-width="1.2" marker-end="url(#a)"/>
+<text x="752" y="59" text-anchor="middle" font-size="8.5" fill="var(--arr-lbl)">pct_real · prog</text>
+
+<!-- ST2 → D2 (Drive IDs en HTML) -->
+<path d="M 725,141 C 754,141 754,103 782,103"
+      fill="none" stroke="var(--arr)" stroke-width="1.2" marker-end="url(#a)"/>
+<text x="752" y="113" text-anchor="middle" font-size="8.5" fill="var(--arr-lbl)">IDs en HTML</text>
+
+<!-- ST3 → D2 (thumbnail, dashed = browser fetch) -->
+<path d="M 725,206 C 754,206 754,115 782,115"
+      fill="none" stroke="var(--arr)" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#a)"/>
+<text x="751" y="165" text-anchor="middle" font-size="8.5" fill="var(--arr-lbl)" font-style="italic">thumbnail</text>
+
+<!-- ST4 → D3 -->
+<path d="M 725,280 C 754,280 754,153 782,153"
+      fill="none" stroke="var(--arr)" stroke-width="1.2" marker-end="url(#a)"/>
+<text x="752" y="208" text-anchor="middle" font-size="8.5" fill="var(--arr-lbl)">% avance</text>
+
+<!-- ST5 → D4 -->
+<path d="M 725,344 C 754,344 754,209 782,209"
+      fill="none" stroke="var(--arr)" stroke-width="1.2" marker-end="url(#a)"/>
+<text x="752" y="272" text-anchor="middle" font-size="8.5" fill="var(--arr-lbl)">checkpoints</text>
+
+<!-- ST6 → D5 (pagos MO) -->
+<path d="M 725,400 C 754,400 754,266 782,266"
+      fill="none" stroke="var(--arr)" stroke-width="1.2" marker-end="url(#a)"/>
+<text x="752" y="329" text-anchor="middle" font-size="8.5" fill="var(--arr-lbl)">pagos MO</text>
+
+<!-- ST6 → D6 (despachos) -->
+<path d="M 725,418 C 754,418 754,316 782,316"
+      fill="none" stroke="var(--arr)" stroke-width="1.2" marker-end="url(#a)"/>
+<text x="752" y="363" text-anchor="middle" font-size="8.5" fill="var(--arr-lbl)">despachos</text>
+
+<!-- ST7 → D7 -->
+<path d="M 725,546 C 754,546 754,366 782,366"
+      fill="none" stroke="var(--arr)" stroke-width="1.2" marker-end="url(#a)"/>
+<text x="752" y="454" text-anchor="middle" font-size="8.5" fill="var(--arr-lbl)">flag 🌦️</text>
+
+<!-- ═══ LEGEND ═══ -->
+<line x1="10"  y1="412" x2="35"  y2="412" stroke="var(--arr)" stroke-width="1.2" marker-end="url(#a)"/>
+<text x="42"   y="416" font-size="8.5" fill="var(--muted)">flujo de datos</text>
+<line x1="150" y1="412" x2="175" y2="412" stroke="var(--arr)" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#a)"/>
+<text x="182"  y="416" font-size="8.5" fill="var(--muted)">fetch directo browser (thumbnail)</text>
+<text x="380"  y="416" font-size="8.5" fill="var(--muted)">★ = fuente principal Ritmo Despachos</text>
+
+</svg>`;
+const FIG_LINAJE_CONTENT = `<figcaption>
+  <strong>Fuentes primarias:</strong> Google Sheets (Gantt de Control, 11 proyectos) y 8 vistas de AppSheet «Seguimiento» — cada vista alimenta un módulo distinto del dashboard. Los datos de AppSheet se escriben en Google Sheets; el dashboard los lee vía Apps Script.
+  <br>
+  <strong>Carga en vivo (E3):</strong> al abrir el dashboard el browser hace un fetch directo a Apps Script, que devuelve las tablas (Seguimiento, Despacho, Pagos, Beneficiarios, etc.) sin sync intermedio AppSheet→Firebase. <code>generar_snapshot.py</code> captura el estado procesado cada 15 min y lo publica en la rama <code>data-snapshot</code> para carga instantánea.
+  <br>
+  <strong>Checkpoints:</strong> HPC · VAS · RAS · VF1 · F1 · Artef. · Recep. vienen de <em>Seguimiento cierre de obras</em>; TE1 y Empalme (solicitud de conexión) vienen del módulo <em>Eléctrico</em>. Se computan en el browser a partir de los datos descargados vía Apps Script.
+  <br>
+  <strong>Curvas S → Dashboard:</strong> los scripts (<code>curvas_automatico_*.py</code>, lun–vie 09:00) generan PNG, los suben a Drive y guardan Drive IDs en <code>/curvas_drive_ids</code>. <code>sincronizar_dashboard.py</code> actualiza <code>CURVAS_S_CONFIG</code> en el HTML. El browser carga las imágenes desde Drive vía URL de thumbnail (línea punteada).
+  <br>
+  <strong>Nota:</strong> la generación de reportes PDF/HTML vía Playwright fue eliminada el 2026-08-06.
+</figcaption>`;
+
+// ===== CONFIGURACION GENERAL MODAL (transversal a todas las obras) =====
+const ConfigGeneralModal = ({ show, onClose, viviendas, proyectoSel }) => {
+    if (!show) return null;
+    const originalConfig = ETAPAS_CONFIG_FULL;
+    const [config, setConfig] = React.useState(() => JSON.parse(JSON.stringify(originalConfig)));
+    const [subTab, setSubTab] = React.useState('diagrama');
+    const [dirty, setDirty] = React.useState(false);
+
+    const etapas = config.etapas || {};
+    const secuencia = config.secuencia_principal || [];
+    const allKeys = Object.keys(etapas);
+
+    const updateEtapa = (key, field, value) => {
+        setConfig(prev => { const next = JSON.parse(JSON.stringify(prev)); next.etapas[key][field] = value; return next; });
+        setDirty(true);
+    };
+    const toggleSecuencia = (key) => {
+        setConfig(prev => { const next = JSON.parse(JSON.stringify(prev)); const idx = next.secuencia_principal.indexOf(key); if (idx >= 0) next.secuencia_principal.splice(idx, 1); else next.secuencia_principal.push(key); return next; });
+        setDirty(true);
+    };
+    const toggleCritico = (key) => { updateEtapa(key, 'critico', !etapas[key].critico); };
+    const restaurar = () => { setConfig(JSON.parse(JSON.stringify(originalConfig))); setDirty(false); };
+    const exportarJSON = () => {
+        const exportData = JSON.parse(JSON.stringify(config));
+        exportData._ultima_modificacion = new Date().toISOString().split('T')[0];
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = 'etapas_config.json';
+        document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+    };
+    const calcNiveles = () => {
+        const niveles = {}; const visited = new Set(); const queue = [];
+        allKeys.forEach(k => { if (!etapas[k].dependencia) { niveles[k] = 0; visited.add(k); queue.push(k); } });
+        while (queue.length > 0) { const current = queue.shift(); allKeys.forEach(k => { if (!visited.has(k) && etapas[k].dependencia === current) { niveles[k] = (niveles[current] || 0) + 1; visited.add(k); queue.push(k); } }); }
+        const porNivel = {}; Object.entries(niveles).forEach(([k, n]) => { if (!porNivel[n]) porNivel[n] = []; porNivel[n].push(k); }); return porNivel;
+    };
+    const niveles = calcNiveles();
+    const maxNivel = Math.max(...Object.keys(niveles).map(Number), 0);
+
+    // ===== DIAGRAMA SUB-TAB =====
+    const DiagramaTab = () => {
+        const NODE_W = 150, NODE_H = 80, LEVEL_GAP = 60, NODE_GAP = 16;
+        const maxNodesInLevel = Math.max(...Object.values(niveles).map(arr => arr.length), 1);
+        const svgHeight = Math.max(maxNodesInLevel * (NODE_H + NODE_GAP) + 40, 300);
+        const svgWidth = (maxNivel + 1) * (NODE_W + LEVEL_GAP) + 60;
+        const positions = {};
+        Object.entries(niveles).forEach(([nivel, keys]) => {
+            const n = Number(nivel);
+            const totalH = keys.length * NODE_H + (keys.length - 1) * NODE_GAP;
+            const startY = (svgHeight - totalH) / 2;
+            keys.forEach((k, i) => { positions[k] = { x: 30 + n * (NODE_W + LEVEL_GAP), y: startY + i * (NODE_H + NODE_GAP) }; });
+        });
+        const esCritica = (k) => secuencia.includes(k);
+        const esFlexible = (k) => etapas[k].flexible || etapas[k].ventana_flexible;
+        return (
+            <div className="overflow-auto bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <svg width={svgWidth} height={svgHeight} className="block">
+                    {allKeys.map(k => {
+                        const dep = etapas[k].dependencia;
+                        if (!dep || !positions[dep] || !positions[k]) return null;
+                        const from = positions[dep]; const to = positions[k];
+                        const x1 = from.x + NODE_W, y1 = from.y + NODE_H / 2;
+                        const x2 = to.x, y2 = to.y + NODE_H / 2;
+                        const midX = (x1 + x2) / 2;
+                        const isCrit = esCritica(k) && esCritica(dep);
+                        return (
+                            <g key={`conn-${k}`}>
+                                <path d={`M${x1},${y1} C${midX},${y1} ${midX},${y2} ${x2},${y2}`} fill="none" stroke={isCrit ? "#8b5cf6" : "#d1d5db"} strokeWidth={isCrit ? 2.5 : 1.5} strokeDasharray={esFlexible(k) ? "6,3" : "none"} />
+                                <polygon points={`${x2},${y2} ${x2-8},${y2-4} ${x2-8},${y2+4}`} fill={isCrit ? "#8b5cf6" : "#d1d5db"} />
+                            </g>
+                        );
+                    })}
+                    {allKeys.map(k => {
+                        const pos = positions[k]; if (!pos) return null;
+                        const e = etapas[k]; const crit = esCritica(k); const flex = esFlexible(k);
+                        return (
+                            <g key={k} transform={`translate(${pos.x},${pos.y})`}>
+                                <rect width={NODE_W} height={NODE_H} rx={8} ry={8} fill={crit ? "#faf5ff" : flex ? "#f9fafb" : "white"} stroke={crit ? "#8b5cf6" : flex ? "#9ca3af" : "#e5e7eb"} strokeWidth={crit ? 2.5 : 1.5} strokeDasharray={flex ? "6,3" : "none"} />
+                                <text x={NODE_W/2} y={20} textAnchor="middle" fontSize="11" fontWeight="600" fill={crit ? "#6d28d9" : "#374151"}>{e.nombre}</text>
+                                <text x={NODE_W/2} y={35} textAnchor="middle" fontSize="10" fill="#9ca3af" fontFamily="IBM Plex Mono">{e.codigo} {crit ? "| CRITICO" : flex ? "| flexible" : ""}</text>
+                                <text x={NODE_W/2} y={52} textAnchor="middle" fontSize="10" fill="#6b7280">Duración: {e.duracion}d</text>
+                                {e.tiempo_optimo !== null && (
+                                    <g>
+                                        <rect x={10} y={60} width={(NODE_W-20)*0.5} height={6} rx={3} fill="#22c55e" opacity={0.6} />
+                                        <rect x={10 + (NODE_W-20)*0.5} y={60} width={(NODE_W-20)*0.5} height={6} rx={3} fill="#eab308" opacity={0.6} />
+                                        <text x={18} y={69} fontSize="8" fill="#166534">{e.tiempo_optimo}d</text>
+                                        <text x={NODE_W-30} y={69} fontSize="8" fill="#854d0e">{e.tiempo_alerta}d</text>
+                                    </g>
+                                )}
+                            </g>
+                        );
+                    })}
+                </svg>
+                <div className="mt-4 flex flex-wrap gap-4 text-xs text-gray-500 border-t border-gray-200 pt-3">
+                    <div className="flex items-center gap-2"><div className="w-8 h-4 rounded border-2 border-violet-500 bg-violet-50" /><span>Ruta crítica</span></div>
+                    <div className="flex items-center gap-2"><div className="w-8 h-4 rounded border-2 border-gray-300 border-dashed bg-gray-50" /><span>Etapa flexible</span></div>
+                    <div className="flex items-center gap-2"><div className="w-8 h-4 rounded border-2 border-gray-200 bg-white" /><span>Etapa estándar</span></div>
+                    <div className="flex items-center gap-2"><div className="w-8 h-0.5 bg-violet-500" /><span>Dependencia crítica</span></div>
+                    <div className="flex items-center gap-2"><div className="flex gap-0.5"><div className="w-4 h-2 rounded bg-green-500 opacity-60" /><div className="w-4 h-2 rounded bg-yellow-500 opacity-60" /></div><span>Tiempos: óptimo | alerta</span></div>
+                </div>
+            </div>
+        );
+    };
+
+    // ===== EDITOR SUB-TAB =====
+    const EditorTab = () => (
+        <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+                <thead>
+                    <tr className="text-left text-gray-500 border-b border-gray-200 bg-gray-50">
+                        <th className="py-2 px-3">Cód</th><th className="py-2 px-3">Etapa</th>
+                        <th className="py-2 px-3 text-center">Duración</th><th className="py-2 px-3 text-center">T. Óptimo</th>
+                        <th className="py-2 px-3 text-center">T. Alerta</th><th className="py-2 px-3">Depende de</th>
+                        <th className="py-2 px-3 text-center">Crítica</th><th className="py-2 px-3 text-center">En Secuencia</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {allKeys.map((key) => {
+                        const e = etapas[key]; const enSeq = secuencia.includes(key);
+                        return (
+                            <tr key={key} className={`border-b border-gray-100 ${enSeq ? "bg-violet-50/50" : ""}`}>
+                                <td className="py-2 px-3 font-mono text-gray-600">{e.codigo}</td>
+                                <td className="py-2 px-3 text-gray-800 font-medium">{e.nombre}</td>
+                                <td className="py-2 px-3 text-center"><input type="number" min="1" max="60" value={e.duracion || 0} onChange={(ev) => updateEtapa(key, 'duracion', parseInt(ev.target.value) || 0)} className="w-14 text-center border border-gray-300 rounded px-1 py-0.5 text-sm focus:ring-1 focus:ring-violet-400 focus:border-violet-400" /></td>
+                                <td className="py-2 px-3 text-center"><input type="number" min="0" max="60" value={e.tiempo_optimo ?? ''} placeholder="-" onChange={(ev) => { const v = ev.target.value === '' ? null : parseInt(ev.target.value); updateEtapa(key, 'tiempo_optimo', v); }} className="w-14 text-center border border-gray-300 rounded px-1 py-0.5 text-sm focus:ring-1 focus:ring-green-400 focus:border-green-400" /></td>
+                                <td className="py-2 px-3 text-center"><input type="number" min="0" max="60" value={e.tiempo_alerta ?? ''} placeholder="-" onChange={(ev) => { const v = ev.target.value === '' ? null : parseInt(ev.target.value); updateEtapa(key, 'tiempo_alerta', v); }} className="w-14 text-center border border-gray-300 rounded px-1 py-0.5 text-sm focus:ring-1 focus:ring-red-400 focus:border-red-400" /></td>
+                                <td className="py-2 px-3"><select value={e.dependencia || ''} onChange={(ev) => updateEtapa(key, 'dependencia', ev.target.value || null)} className="w-full border border-gray-300 rounded px-1 py-0.5 text-sm text-gray-700 focus:ring-1 focus:ring-violet-400 bg-white"><option value="">— Ninguna —</option>{allKeys.filter(k => k !== key).map(k => (<option key={k} value={k}>{etapas[k].nombre} ({etapas[k].codigo})</option>))}</select></td>
+                                <td className="py-2 px-3 text-center"><input type="checkbox" checked={!!e.critico} onChange={() => toggleCritico(key)} className="w-4 h-4 rounded border-gray-300 text-violet-600 focus:ring-violet-400" /></td>
+                                <td className="py-2 px-3 text-center"><input type="checkbox" checked={enSeq} onChange={() => toggleSecuencia(key)} className="w-4 h-4 rounded border-gray-300 text-violet-600 focus:ring-violet-400" /></td>
+                            </tr>
+                        );
+                    })}
+                </tbody>
+            </table>
+        </div>
+    );
+
+    // ===== FUNCIONAMIENTO SUB-TAB =====
+    const FuncionamientoTab = () => {
+        const seg = (typeof window !== 'undefined' && window._SEG_DIAG) || {};
+        const nProy = (typeof PROYECTOS_DATA !== 'undefined' ? PROYECTOS_DATA.length : 0);
+        const nViv = viviendas.length;
+        const nInsp = (typeof INSPECCIONES_DATA !== 'undefined' ? INSPECCIONES_DATA.length : 0);
+        const te1Count = (typeof BENEF_CON_TE1 !== 'undefined' && BENEF_CON_TE1 && BENEF_CON_TE1.size) ? BENEF_CON_TE1.size : 0;
+        const curvasCfg = (typeof CURVAS_S_CONFIG !== 'undefined' ? CURVAS_S_CONFIG : {});
+        const curvasKeys = Object.keys(curvasCfg);
+        const curvasProyActual = (curvasCfg[proyectoSel] || []).length;
+        const tablas = (typeof TABLES_TO_FETCH !== 'undefined' ? TABLES_TO_FETCH.split(',') : []);
+        const familias = (typeof FAMILIAS_CRITICAS !== 'undefined' ? FAMILIAS_CRITICAS : []);
+        const segCheckpoints = (typeof window !== 'undefined' && window._SEG_COL_MAP) ? Object.keys(window._SEG_COL_MAP) : ['te1','visita_as','resol_as','visita_f1','fecha_f1','artefactado','empalme','visita_dom','fecha_v_dom','recepcion_dom','fecha_recep','obs'];
+        const endpoint = (typeof APPS_SCRIPT_URL !== 'undefined' ? APPS_SCRIPT_URL : '');
+        const [solReg, setSolReg] = React.useState(null);
+        const [solTxt, setSolTxt] = React.useState('');
+        const enviarSolicitud = (regla) => {
+            const t = solTxt.trim(); if (!t) return;
+            const id = Date.now();
+            const fecha = (typeof fechaChile === 'function') ? fechaChile() : new Date().toISOString();
+            fbDB.ref('sugerencias/' + id).set({ id, texto: '[Funcionamiento · ' + regla + '] ' + t, imagen: null, fecha, resuelta: false });
+            setSolReg(null); setSolTxt(''); alert('Solicitud registrada en Sugerencias. El equipo la revisara desde ese panel.');
+        };
+        const REGLAS = [
+            { id: 'avance',    nombre: 'Formula % Avance (70/25/5)',        estado: 'ok',   detalle: '% Total = 0.70 x %Viv + 0.25 x %RC + 0.05 x %Hab. Coincide con la definicion de negocio. Cada fila de Ejecucion es un delta que se suma por beneficiario.' },
+            { id: 'solpago',   nombre: 'Pagos M.O. — solo "Aprobado"',      estado: 'ok',   detalle: 'Suma montos de Solpago cuyo ESTADO incluye "aprobad". Los no aprobados no cuentan.' },
+            { id: 'ciclo',     nombre: 'Ciclo de pago 25 a 25',             estado: 'ok',   detalle: 'Un pago con fecha dia >= 25 se contabiliza en el mes siguiente (no calendario natural).' },
+            { id: 'te1',       nombre: 'TE1 — triple fuente (OR logico)',   estado: 'ok',   detalle: 'Prendido si CUALQUIERA: set embebido (' + te1Count + ' IDs) OR columna en perfil Beneficiario OR columna en tabla de cierre.' },
+            { id: 'estrella',  nombre: 'Comentarios publicos (estrella)',   estado: 'ok',   detalle: 'Solo las observaciones marcadas con estrella se muestran en el informe Estado General. El resto son internas.' },
+            { id: 'seg',       nombre: 'Matching de columnas de Cierre',    estado: 'warn', detalle: 'SEG_RULES normaliza nombres (must/not) y tolera variantes de AppSheet, pero un renombre de columna lo puede romper en silencio. Tabla en uso: ' + (seg.tableUsed || '—') + '.' },
+            { id: 'semaforo',  nombre: 'Semaforo de plazos por etapa',      estado: 'warn', detalle: 'El codigo usa tiempo_optimo/alerta por etapa (desde despacho de la dependencia). CLAUDE.md describe otro modelo (dias desde ultima solicitud 7/14). Conviene definir UNO solo.' },
+            { id: 'config',    nombre: 'Tiempos de etapa — fuente unica',   estado: 'warn', detalle: 'Hoy existen 3 copias: ETAPAS_CONFIG embebido en este HTML, config/etapas_config.json y Etapas.md. Pueden divergir; el dashboard usa el embebido.' },
+            { id: 'despachos', nombre: 'Ritmo Despachos (proxy temporal)',  estado: 'warn', detalle: 'Es un proxy de actividad (conteo de despachos por mes). Pendiente reemplazar por % avance real desde los deltas de Ejecucion.' },
+            { id: 'curvas',    nombre: 'Curvas S — imagenes estaticas',     estado: 'bad',  detalle: 'Son imagenes PNG de Drive hardcodeadas por proyecto (CURVAS_S_CONFIG), generadas afuera. Estan desconectadas del % real vivo que el dashboard YA calcula. El "% Real" mostrado puede estar desactualizado.' },
+            { id: 'firebase',  nombre: 'Reglas de Firebase abiertas',       estado: 'bad',  detalle: 'El RTDB no tiene autenticacion: cualquiera con la URL puede leer y escribir observaciones, grupos, etc. Riesgo de integridad de lo supervisado.' },
+        ];
+        const estiloEstado = { ok: { c: '#16a34a', bg: '#f0fdf4', b: '#bbf7d0', t: 'OK' }, warn: { c: '#d97706', bg: '#fffbeb', b: '#fde68a', t: 'REVISAR' }, bad: { c: '#dc2626', bg: '#fef2f2', b: '#fecaca', t: 'CORREGIR' } };
+        const Stat = ({ label, value, sub }) => (<div className="bg-white rounded-lg border border-gray-200 px-3 py-2"><div className="text-[18px] font-bold text-gray-800 leading-none">{value}</div><div className="text-[10px] text-gray-500 mt-1">{label}</div>{sub && <div className="text-[9px] text-gray-400">{sub}</div>}</div>);
+        const Pill = ({ children, tone }) => (<span className="inline-block text-[10px] font-medium px-2 py-0.5 rounded-full mr-1 mb-1" style={{ background: tone === 'warn' ? '#fffbeb' : tone === 'bad' ? '#fef2f2' : '#eff6ff', color: tone === 'warn' ? '#b45309' : tone === 'bad' ? '#b91c1c' : '#1d4ed8', border: '1px solid ' + (tone === 'warn' ? '#fde68a' : tone === 'bad' ? '#fecaca' : '#bfdbfe') }}>{children}</span>);
+        return (
+            <div className="space-y-5">
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                    <h3 className="text-sm font-semibold text-blue-800 mb-1">Funcionamiento del Dashboard (ficha tecnica viva)</h3>
+                    <p className="text-xs text-blue-600 leading-relaxed">Esta seccion documenta — con los valores reales cargados en este momento — de donde sale la informacion, que reglas de negocio aplica el panel y como se calcula cada cosa. Sirve para <strong>supervisar las reglas, juzgarlas y solicitar cambios</strong> sin salir del dashboard. En cada regla puedes pulsar <em>"Solicitar cambio"</em> y queda registrado en el panel de Sugerencias.</p>
+                </div>
+                <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+                    <h4 className="text-sm font-semibold text-gray-700 mb-3">1. Fuentes de informacion <span className="text-[10px] font-normal text-green-600">● en vivo</span></h4>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
+                        <Stat label="Proyectos cargados" value={nProy} />
+                        <Stat label="Viviendas (proy. actual)" value={nViv} sub={proyectoSel} />
+                        <Stat label="Con inspeccion/avance" value={nInsp} />
+                        <Stat label="Beneficiarios con TE1" value={te1Count} sub="set embebido" />
+                    </div>
+                    <div className="text-xs text-gray-600 space-y-1.5">
+                        <div><span className="font-semibold text-gray-700">Google Sheets</span> via Apps Script <code className="bg-gray-100 px-1 rounded text-[10px]">{endpoint ? (endpoint.slice(0, 52) + '…') : '—'}</code></div>
+                        <div className="flex flex-wrap items-center"><span className="font-semibold text-gray-700 mr-1">Tablas descargadas:</span>{tablas.map(t => <Pill key={t}>{t.trim()}</Pill>)}</div>
+                        <div><span className="font-semibold text-gray-700">Firebase RTDB</span> (lectura+escritura): <span className="text-gray-500">grupos · observaciones · actividades · consultas · muestras_hormigon · sugerencias · proyectos_terminados · ocultados · resumen_comentarios</span></div>
+                        <div><span className="font-semibold text-gray-700">Tabla de cierre en uso:</span> <code className="bg-gray-100 px-1 rounded text-[10px]">{seg.tableUsed || '—'}</code> <span className="text-gray-400">({seg.segMatchedCount != null ? seg.segMatchedCount : '?'} matches de {seg.benefDataLen != null ? seg.benefDataLen : '?'} benef.)</span></div>
+                        <div><span className="font-semibold text-gray-700">Google Drive:</span> imagenes de Curvas S (estaticas, cargadas como thumbnail)</div>
+                    </div>
+                </div>
+                <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+                    <h4 className="text-sm font-semibold text-gray-700 mb-1">2. Reglas de plazos por etapa <span className="text-[10px] font-normal text-green-600">● refleja el Editor de Tiempos</span></h4>
+                    <p className="text-[11px] text-gray-500 mb-2">Verde si dias &lt; optimo · Amarillo entre optimo y alerta · Rojo si &gt;= alerta. Si editas en "Editor de Tiempos", esta tabla cambia.</p>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                            <thead><tr className="text-gray-400 border-b border-gray-200"><th className="text-left py-1.5 px-2">Etapa</th><th className="text-center px-2">Optimo</th><th className="text-center px-2">Alerta</th><th className="text-left px-2">Depende de</th><th className="text-center px-2">Critica</th></tr></thead>
+                            <tbody>{Object.keys(etapas).map(k => { const e = etapas[k]; return (<tr key={k} className="border-b border-gray-50"><td className="py-1.5 px-2 text-gray-700 font-medium">{e.nombre} <span className="text-gray-400">({e.codigo})</span></td><td className="text-center px-2 text-gray-600">{e.tiempo_optimo ?? '—'}</td><td className="text-center px-2 text-gray-600">{e.tiempo_alerta ?? '—'}</td><td className="px-2 text-gray-500">{e.dependencia ? (etapas[e.dependencia]?.nombre || e.dependencia) : '—'}</td><td className="text-center px-2">{e.critico ? <span className="text-red-500 font-bold">si</span> : <span className="text-gray-300">no</span>}</td></tr>); })}</tbody>
+                        </table>
+                    </div>
+                    <div className="mt-2 text-[11px] text-gray-600"><span className="font-semibold">Pagos M.O.:</span> ciclo 25 a 25 · solo "Aprobado" · familias criticas: {familias.map(f => <Pill key={f} tone="warn">{f}</Pill>)}</div>
+                </div>
+                <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+                    <h4 className="text-sm font-semibold text-gray-700 mb-1">3. Curvas S — cobertura actual</h4>
+                    <div className="flex items-center gap-3 text-xs mb-2">
+                        <Stat label="Proyectos con curvas" value={curvasKeys.length + ' / ' + nProy} />
+                        <div className={"px-3 py-2 rounded-lg border " + (curvasProyActual > 0 ? "bg-green-50 border-green-200 text-green-700" : "bg-red-50 border-red-200 text-red-600")}>Proyecto actual ({proyectoSel}): {curvasProyActual > 0 ? (curvasProyActual + ' curva(s) configurada(s)') : 'SIN curvas configuradas'}</div>
+                    </div>
+                    <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2"><strong>Limitacion conocida:</strong> las Curvas S son imagenes estaticas de Drive agregadas a mano por proyecto (en codigo). El "% Real" que muestran es una foto, no el % vivo que este mismo panel ya calcula. Optimizacion sugerida: graficarlas desde la data viva.</div>
+                </div>
+                <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+                    <h4 className="text-sm font-semibold text-gray-700 mb-1">4. Supervision de reglas — juzgar y solicitar cambios</h4>
+                    <p className="text-[11px] text-gray-500 mb-3">Estado de cada regla frente al modelo de negocio. Pulsa "Solicitar cambio" para registrar una observacion en Sugerencias.</p>
+                    <div className="space-y-2">
+                        {REGLAS.map(r => { const s = estiloEstado[r.estado]; return (
+                            <div key={r.id} className="rounded-lg border p-3" style={{ background: s.bg, borderColor: s.b }}>
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: s.c, color: '#fff' }}>{s.t}</span>
+                                            <span className="text-sm font-semibold text-gray-800">{r.nombre}</span>
+                                        </div>
+                                        <p className="text-[11px] text-gray-600 mt-1 leading-relaxed">{r.detalle}</p>
+                                    </div>
+                                    <button onClick={() => { setSolReg(solReg === r.id ? null : r.id); setSolTxt(''); }} className="text-[11px] whitespace-nowrap px-2.5 py-1 rounded-md border border-gray-300 bg-white text-gray-600 hover:bg-gray-50">Solicitar cambio</button>
+                                </div>
+                                {solReg === r.id && (
+                                    <div className="mt-2 flex items-end gap-2">
+                                        <textarea value={solTxt} onChange={e => setSolTxt(e.target.value)} rows={2} placeholder={'Que cambio propones para "' + r.nombre + '"? (por que, y como deberia comportarse)'} className="flex-1 text-xs border border-gray-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-400" />
+                                        <button onClick={() => enviarSolicitud(r.nombre)} className="px-3 py-1.5 text-xs bg-violet-600 text-white rounded-lg hover:bg-violet-700 font-medium whitespace-nowrap">Enviar</button>
+                                    </div>
+                                )}
+                            </div>
+                        ); })}
+                    </div>
+                </div>
+                <p className="text-[10px] text-gray-400">Checkpoints de cierre rastreados ({segCheckpoints.length}): {segCheckpoints.join(' · ')}</p>
+            </div>
+        );
+    };
+
+    // ===== LINAJE DE DATOS TAB =====
+    const LinajeDatosTab = () => (
+        <div id="cfg-linaje-wrapper" style={{fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif'}}>
+            <style dangerouslySetInnerHTML={{__html:`#cfg-linaje-wrapper{--bg:#f1f5f9;--fg:#0f172a;--muted:#64748b;--src-fill:#eff6ff;--src-s:#2563eb;--src-t:#1e40af;--etl-fill:#fffbeb;--etl-s:#d97706;--etl-t:#78350f;--sto-fill:#f5f3ff;--sto-s:#7c3aed;--sto-t:#4c1d95;--dsh-fill:#f0fdf4;--dsh-s:#16a34a;--dsh-t:#14532d;--rpt-fill:#f0fdfa;--rpt-s:#0d9488;--rpt-t:#134e4a;--arr:#94a3b8;--arr-lbl:#64748b;}#cfg-linaje-wrapper figcaption{margin-top:14px;font-size:12px;color:var(--muted);line-height:1.7;border-top:1px solid var(--arr);padding-top:12px;}#cfg-linaje-wrapper figcaption strong{color:var(--fg);}#cfg-linaje-wrapper figcaption code{font-size:11px;background:var(--sto-fill);color:var(--sto-t);padding:1px 4px;border-radius:3px;}`}} />
+            <header style={{marginBottom:'16px'}}>
+                <h2 style={{fontSize:'15px',fontWeight:'700',color:'#0f172a',margin:0}}>Linaje de Datos — SG Raíces Dashboard</h2>
+                <p style={{fontSize:'12px',color:'#64748b',marginTop:'3px',margin:'3px 0 0'}}>Trazabilidad del origen de cada dato por módulo, desde la fuente primaria hasta el panel de control y los reportes semanales</p>
+            </header>
+            <figure style={{margin:0,overflowX:'auto'}}>
+                <div dangerouslySetInnerHTML={{__html: SVG_LINAJE_CONTENT}} />
+                <figcaption dangerouslySetInnerHTML={{__html: FIG_LINAJE_CONTENT}} />
+            </figure>
+        </div>
+    );
+
+    return (
+        <div className="fixed inset-0 z-[500] bg-white flex flex-col">
+            <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-gray-50 shrink-0">
+                <div className="flex items-center gap-4 flex-wrap">
+                    <span className="text-sm font-bold text-gray-700">⚙ Configuración General</span>
+                    <div className="flex gap-1 bg-white border border-gray-200 rounded-lg p-1 shadow-sm">
+                        {[["diagrama","Diagrama de Dependencias"],["editor","Editor de Tiempos"],["funcionamiento","Funcionamiento"],["linaje","Linaje de Datos"]].map(([k,l]) => (
+                            <button key={k} onClick={() => setSubTab(k)} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${subTab===k ? "bg-raices-red text-white" : "text-gray-600 hover:bg-gray-100"}`}>{l}</button>
+                        ))}
+                    </div>
+                    {(subTab === 'diagrama' || subTab === 'editor') && (
+                        <div className="flex items-center gap-2">
+                            {dirty && <span className="text-xs text-orange-500 font-medium mr-2">Cambios sin guardar</span>}
+                            <button onClick={restaurar} className="px-3 py-1.5 text-sm border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors">Restaurar Original</button>
+                            <button onClick={exportarJSON} className="px-3 py-1.5 text-sm bg-raices-red text-white rounded-lg hover:bg-opacity-90 transition-colors flex items-center gap-1"><IconDownload /> Exportar JSON</button>
+                        </div>
+                    )}
+                </div>
+                <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors ml-4 shrink-0" title="Cerrar Configuración General">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div className="flex-1 overflow-auto px-6 py-4">
+                {subTab === 'diagrama' && <DiagramaTab />}
+                {subTab === 'editor' && <EditorTab />}
+                {subTab === 'funcionamiento' && <FuncionamientoTab />}
+                {subTab === 'linaje' && <LinajeDatosTab />}
+                {(subTab === 'diagrama' || subTab === 'editor') && (
+                    <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-xs text-yellow-700">
+                        <strong>Nota:</strong> Para aplicar cambios al dashboard, exporta el JSON y reemplaza <code className="bg-yellow-100 px-1 rounded">config/etapas_config.json</code>, luego regenera el dashboard.
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel, personalObra, personalObraRef, personalGlobal }) => {
+    const [subTab, setSubTab] = React.useState('grupos');
+
+    // ===== Grupos editor state =====
+    const [editingGrupos, setEditingGrupos] = React.useState(JSON.parse(JSON.stringify(grupos)));
+    const [dirtyGrupos, setDirtyGrupos] = React.useState(false);
+    const [nuevoGrupoNombre, setNuevoGrupoNombre] = React.useState("");
+    const [nuevoGrupoCapataz, setNuevoGrupoCapataz] = React.useState("");
+    const [nuevoGrupoResidente, setNuevoGrupoResidente] = React.useState("");
+    const [nuevoPersonal, setNuevoPersonal] = React.useState({ nombre: '', telefono: '', correo: '', rol: 'capataz', informes: [] });
+    const [editandoPersonal, setEditandoPersonal] = React.useState(null); // { key, datos }
+    const [informesOpenKey, setInformesOpenKey] = React.useState(null);
+    const [selectedPersonalGlobal, setSelectedPersonalGlobal] = React.useState('');
+
+    React.useEffect(() => {
+        // Solo resetear si no hay cambios pendientes del usuario
+        if (!dirtyGrupos) {
+            setEditingGrupos(JSON.parse(JSON.stringify(grupos)));
+        }
+    }, [grupos]);
+
+    const asignados = new Set();
+    editingGrupos.forEach(g => g.beneficiarios.forEach(b => asignados.add(b)));
+    const sinAsignar = viviendas.filter(v => !asignados.has(String(v.ID_Benef)));
+
+    const agregarGrupo = () => {
+        if (!nuevoGrupoNombre.trim()) return;
+        const newId = "G" + (editingGrupos.length + 1);
+        setDirtyGrupos(true);
+        setEditingGrupos([...editingGrupos, { id: newId, nombre: nuevoGrupoNombre.trim(), capataz: nuevoGrupoCapataz.trim(), residente: nuevoGrupoResidente.trim(), beneficiarios: [] }]);
+        setNuevoGrupoNombre(""); setNuevoGrupoCapataz(""); setNuevoGrupoResidente("");
+    };
+
+    const moverAGrupo = (benefId, grupoId) => {
+        setDirtyGrupos(true);
+        setEditingGrupos(prev => prev.map(g => ({
+            ...g,
+            beneficiarios: g.id === grupoId
+                ? [...g.beneficiarios, benefId]
+                : g.beneficiarios.filter(b => b !== benefId)
+        })));
+    };
+
+    const quitarDeGrupo = (benefId, grupoId) => {
+        setDirtyGrupos(true);
+        setEditingGrupos(prev => prev.map(g =>
+            g.id === grupoId ? {...g, beneficiarios: g.beneficiarios.filter(b => b !== benefId)} : g
+        ));
+    };
+
+    const eliminarGrupo = (grupoId) => {
+        setDirtyGrupos(true);
+        setEditingGrupos(prev => prev.filter(g => g.id !== grupoId));
+    };
+
+    const editarCapataz = (grupoId, nuevoCapataz) => {
+        setDirtyGrupos(true);
+        setEditingGrupos(prev => prev.map(g =>
+            g.id === grupoId ? {...g, capataz: nuevoCapataz} : g
+        ));
+    };
+
+    const editarResidente = (grupoId, nuevoResidente) => {
+        setDirtyGrupos(true);
+        setEditingGrupos(prev => prev.map(g =>
+            g.id === grupoId ? {...g, residente: nuevoResidente} : g
+        ));
+    };
+
+    const agregarPersonal = () => {
+        if (!nuevoPersonal.nombre.trim()) return;
+        const key = Date.now().toString();
+        const entry = { ...nuevoPersonal, nombre: nuevoPersonal.nombre.trim() };
+        const path = `personal_obra/${proyectoSel}/${key}`;
+        fbDB.ref(path).set(entry);
+        setNuevoPersonal({ nombre: '', telefono: '', correo: '', rol: 'capataz', informes: [] });
+    };
+
+    const agregarDesdeGlobal = () => {
+        if (!selectedPersonalGlobal || !(personalGlobal||{})[selectedPersonalGlobal]) return;
+        const persona = (personalGlobal||{})[selectedPersonalGlobal];
+        const key = Date.now().toString();
+        fbDB.ref(`personal_obra/${proyectoSel}/${key}`).set({ ...persona, global_key: selectedPersonalGlobal });
+        setSelectedPersonalGlobal('');
+    };
+
+    const eliminarPersonal = (key) => {
+        if (!window.confirm('¿Eliminar este registro de personal?')) return;
+        fbDB.ref(`personal_obra/${proyectoSel}/${key}`).remove();
+    };
+
+    const guardarEdicionPersonal = () => {
+        if (!editandoPersonal || !editandoPersonal.datos.nombre.trim()) return;
+        fbDB.ref(`personal_obra/${proyectoSel}/${editandoPersonal.key}`).set({
+            ...editandoPersonal.datos,
+            nombre: editandoPersonal.datos.nombre.trim()
+        });
+        setEditandoPersonal(null);
+    };
+
+    const toggleInformePersonal = (key, informeKey, currentInformes, checked) => {
+        const nuevos = checked
+            ? [...currentInformes, informeKey]
+            : currentInformes.filter(k => k !== informeKey);
+        fbDB.ref(`personal_obra/${proyectoSel}/${key}/informes`).set(nuevos.length > 0 ? nuevos : null);
+    };
+
+    const toggleAlertaClimaticaProy = (key, current) => {
+        fbDB.ref(`personal_obra/${proyectoSel}/${key}/alerta_climatica`).set(current ? null : true);
+    };
+
+    const personalProy = Object.entries((personalObra || {})[proyectoSel] || {});
+    const capatacesList = personalProy.filter(([,p]) => p.rol === 'capataz').map(([,p]) => p.nombre);
+    const residentesList = personalProy.filter(([,p]) => p.rol === 'residente').map(([,p]) => p.nombre);
+
+    const aplicarCambios = () => {
+        setDirtyGrupos(false);
+        setGrupos(editingGrupos);
+    };
+
+    return (
+        <div>
+            {/* Sub-tabs */}
+            <div className="flex items-center justify-between mb-4">
+                <div className="flex gap-1 bg-white border border-gray-200 rounded-lg p-1 shadow-sm">
+                    {[["grupos", "Grupos de Trabajo"]].map(([k, l]) => (
+                        <button key={k} onClick={() => setSubTab(k)} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${subTab === k ? "bg-raices-red text-white" : "text-gray-600 hover:bg-gray-100"}`}>
+                            {l}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {/* ========== GRUPOS ========== */}
+            {subTab === 'grupos' && (
+                <div className="space-y-4">
+                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                        <h3 className="text-sm font-semibold text-blue-800 mb-1">Grupos de Trabajo por Capataz</h3>
+                        <p className="text-xs text-blue-600 leading-relaxed">
+                            Agrupa beneficiarios bajo un capataz. Los grupos se reflejan en las pestañas Viviendas y Matriz.
+                            Los beneficiarios sin grupo se ordenan automáticamente por fecha de primer despacho.
+                            Los datos se guardan en Firebase (compartidos entre dispositivos).
+                        </p>
+                    </div>
+
+                    {/* === PERSONAL DE OBRA === */}
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                        <h3 className="text-sm font-semibold text-amber-800 mb-1">Personal de Obra</h3>
+                        <p className="text-xs text-amber-700">Registra capataces y residentes para asignarlos a los grupos.</p>
+                    </div>
+
+                    {/* === ROLES GLOBALES (sin requisito de asignación a obra) === */}
+                    {(() => {
+                        const ROLES_GLOB_KEYS = ['gerente','coordinador','coordinador_pagos','logistica','rrhh'];
+                        const globales = Object.entries(personalGlobal || {}).filter(([,p]) => ROLES_GLOB_KEYS.includes(p.rol));
+                        if (globales.length === 0) return null;
+                        return (
+                            <div className="bg-violet-50 border border-violet-200 rounded-xl p-4">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <span className="text-sm font-semibold text-violet-800">Roles Globales</span>
+                                    <span className="text-[10px] bg-violet-200 text-violet-700 px-2 py-0.5 rounded-full font-medium">Reciben informes de todas las obras</span>
+                                </div>
+                                <p className="text-[11px] text-violet-600 mb-3">Estas personas reciben sus informes configurados sin necesitar asignación a una obra específica.</p>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {globales.map(([gk, persona]) => {
+                                        const rolLabel = (ROLES_PERSONAL.find(r => r.key === persona.rol) || {}).label || persona.rol;
+                                        const infs = persona.informes || [];
+                                        return (
+                                            <div key={gk} className="bg-white border border-violet-100 rounded-lg p-2.5">
+                                                <div className="flex items-start justify-between gap-1">
+                                                    <div className="min-w-0">
+                                                        <div className="text-xs font-semibold text-gray-700 truncate">{persona.nombre}</div>
+                                                        <div className="text-[10px] text-violet-500 font-medium">{rolLabel}</div>
+                                                        {persona.correo && <div className="text-[10px] text-gray-400 truncate">✉ {persona.correo}</div>}
+                                                    </div>
+                                                    <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded border font-medium ${infs.length > 0 ? 'bg-violet-100 text-violet-700 border-violet-300' : 'bg-gray-100 text-gray-400 border-gray-200'}`}>
+                                                        📧 {infs.length > 0 ? infs.length : '—'}
+                                                    </span>
+                                                </div>
+                                                {infs.length > 0 && (
+                                                    <div className="flex flex-wrap gap-1 mt-1.5">
+                                                        {infs.map(k => {
+                                                            const t = INFORME_TIPOS.find(x => x.key === k);
+                                                            return t ? <span key={k} className="text-[9px] bg-violet-50 text-violet-600 border border-violet-200 rounded px-1 py-0.5">{t.label}</span> : null;
+                                                        })}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                                <p className="text-[10px] text-violet-400 mt-2">Gestiona sus informes desde el botón <strong>Personal</strong> en la barra superior.</p>
+                            </div>
+                        );
+                    })()}
+
+                    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+                        <h4 className="text-sm font-semibold text-gray-700 mb-3">Asignar Personal al Proyecto</h4>
+                        {Object.keys(personalGlobal || {}).length === 0 ? (
+                            <p className="text-xs text-gray-400 italic">No hay personal registrado. Usa el botón <strong>Personal</strong> en la barra superior para agregar personas a la organización.</p>
+                        ) : (
+                            <div className="flex items-end gap-3">
+                                <div className="flex-1">
+                                    <label className="text-[10px] text-gray-500 font-medium">Seleccionar persona (roles capataz / residente)</label>
+                                    <select value={selectedPersonalGlobal} onChange={e => setSelectedPersonalGlobal(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 mt-0.5">
+                                        <option value="">— Seleccionar —</option>
+                                        {Object.entries(personalGlobal || {})
+                                            .filter(([gk, persona]) => {
+                                                const ROLES_GLOB_KEYS = ['gerente','coordinador','coordinador_pagos','logistica','rrhh'];
+                                                if (ROLES_GLOB_KEYS.includes(persona.rol)) return false; // globales no necesitan asignación
+                                                return !personalProy.some(([,p]) => p.global_key === gk);
+                                            })
+                                            .map(([gk, persona]) => {
+                                                const rolLabel = (ROLES_PERSONAL.find(r => r.key === persona.rol) || {}).label || persona.rol;
+                                                return <option key={gk} value={gk}>{persona.nombre} ({rolLabel})</option>;
+                                            })
+                                        }
+                                    </select>
+                                </div>
+                                <button onClick={agregarDesdeGlobal} disabled={!selectedPersonalGlobal} className="px-4 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors whitespace-nowrap">+ Asignar</button>
+                            </div>
+                        )}
+
+                        <div className="mt-4 grid grid-cols-2 gap-4">
+                            {ROLES_PERSONAL.filter(r => personalProy.some(([,p]) => p.rol === r.key)).map(rolObj => (
+                                <div key={rolObj.key}>
+                                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">{rolObj.label}</div>
+                                    {personalProy.filter(([,p]) => p.rol === rolObj.key).map(([key, p]) => (
+                                        <div key={key} className="py-2 border-b border-gray-100 last:border-0">
+                                            {editandoPersonal && editandoPersonal.key === key ? (
+                                                <div className="space-y-1.5">
+                                                    <input type="text" value={editandoPersonal.datos.nombre} onChange={e => setEditandoPersonal(ep => ({...ep, datos: {...ep.datos, nombre: e.target.value}}))} className="w-full border border-amber-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-amber-400" placeholder="Nombre" />
+                                                    <input type="text" value={editandoPersonal.datos.telefono || ''} onChange={e => setEditandoPersonal(ep => ({...ep, datos: {...ep.datos, telefono: e.target.value}}))} className="w-full border border-amber-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-amber-400" placeholder="Teléfono" />
+                                                    <input type="email" value={editandoPersonal.datos.correo || ''} onChange={e => setEditandoPersonal(ep => ({...ep, datos: {...ep.datos, correo: e.target.value}}))} className="w-full border border-amber-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-amber-400" placeholder="Correo" />
+                                                    <select value={editandoPersonal.datos.rol} onChange={e => setEditandoPersonal(ep => ({...ep, datos: {...ep.datos, rol: e.target.value}}))} className="w-full border border-amber-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-amber-400">
+                                                        {ROLES_PERSONAL.map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
+                                                    </select>
+                                                    <div className="text-[10px] text-gray-500 font-medium mt-1">Informes a recibir:</div>
+                                                    <div className="flex flex-wrap gap-x-3 gap-y-1">
+                                                        {INFORME_TIPOS.map(t => (
+                                                            <label key={t.key} className="flex items-center gap-1 text-xs cursor-pointer text-gray-600">
+                                                                <input type="checkbox" checked={(editandoPersonal.datos.informes||[]).includes(t.key)} onChange={e => setEditandoPersonal(ep => ({ ...ep, datos: { ...ep.datos, informes: e.target.checked ? [...(ep.datos.informes||[]), t.key] : (ep.datos.informes||[]).filter(k => k !== t.key) } }))} className="rounded border-gray-300" />
+                                                                {t.label}
+                                                            </label>
+                                                        ))}
+                                                    </div>
+                                                    <div className="flex gap-1 pt-0.5">
+                                                        <button onClick={guardarEdicionPersonal} className="flex-1 px-2 py-1 bg-amber-500 text-white rounded text-xs font-medium hover:bg-amber-600">Guardar</button>
+                                                        <button onClick={() => setEditandoPersonal(null)} className="px-2 py-1 bg-gray-200 text-gray-600 rounded text-xs hover:bg-gray-300">Cancelar</button>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                (() => {
+                                                    const globalRec = p.global_key && (personalGlobal||{})[p.global_key];
+                                                    const informesLocked = globalRec && (globalRec.informes||[]).length > 0;
+                                                    const informesActivos = informesLocked ? (globalRec.informes||[]) : (p.informes||[]);
+                                                    return (
+                                                    <div>
+                                                        <div className="flex items-start justify-between">
+                                                            <div>
+                                                                <div className="text-sm font-medium text-gray-700">{p.nombre}</div>
+                                                                {p.telefono && <div className="text-[10px] text-gray-400">📞 {p.telefono}</div>}
+                                                                {p.correo && <div className="text-[10px] text-gray-400">✉ {p.correo}</div>}
+                                                            </div>
+                                                            <div className="flex items-center gap-1 ml-2 mt-0.5 shrink-0">
+                                                                {informesLocked ? (
+                                                                    <span title="Informes definidos en registro global" className={`flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded border ${informesActivos.length > 0 ? 'bg-amber-100 text-amber-700 border-amber-300' : 'bg-gray-100 text-gray-400 border-gray-200'}`}>
+                                                                        📧 {informesActivos.length > 0 ? informesActivos.length : '—'} 🔒
+                                                                    </span>
+                                                                ) : (
+                                                                    <button
+                                                                        onClick={() => setInformesOpenKey(informesOpenKey === key ? null : key)}
+                                                                        title="Gestionar informes"
+                                                                        className={`flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded border transition-colors ${informesActivos.length > 0 ? 'bg-amber-100 text-amber-700 border-amber-300 hover:bg-amber-200' : 'bg-gray-100 text-gray-400 border-gray-200 hover:bg-amber-50 hover:text-amber-500 hover:border-amber-200'}`}
+                                                                    >
+                                                                        📧 {informesActivos.length > 0 ? informesActivos.length : '—'}
+                                                                    </button>
+                                                                )}
+                                                                {p.global_key ? (
+                                                                    <span title="Alerta Climática definida en registro global" className={`text-[10px] px-1.5 py-0.5 rounded border ${globalRec && globalRec.alerta_climatica ? 'bg-sky-100 text-sky-700 border-sky-300' : 'bg-gray-100 text-gray-400 border-gray-200'}`}>
+                                                                        🌦️🔒
+                                                                    </span>
+                                                                ) : (
+                                                                    <button
+                                                                        onClick={() => toggleAlertaClimaticaProy(key, p.alerta_climatica)}
+                                                                        className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${p.alerta_climatica ? 'bg-sky-100 text-sky-700 border-sky-300' : 'bg-gray-100 text-gray-400 border-gray-200 hover:bg-sky-50 hover:text-sky-500'}`}
+                                                                        title="Recibir Alerta Climática"
+                                                                    >
+                                                                        🌦️
+                                                                    </button>
+                                                                )}
+                                                                {!p.global_key && <button onClick={() => setEditandoPersonal({ key, datos: { informes: [], ...p } })} className="text-amber-500 hover:text-amber-700 text-xs px-1" title="Editar">✎</button>}
+                                                                <button onClick={() => eliminarPersonal(key)} className="text-red-400 hover:text-red-600 text-xs px-1" title="Quitar de obra">×</button>
+                                                            </div>
+                                                        </div>
+                                                        {informesLocked && informesActivos.length > 0 && (
+                                                            <div className="mt-1.5 flex flex-wrap gap-1">
+                                                                {informesActivos.map(ik => {
+                                                                    const t = INFORME_TIPOS.find(x => x.key === ik);
+                                                                    return t ? <span key={ik} className="text-[10px] px-1.5 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-full">{t.label}</span> : null;
+                                                                })}
+                                                            </div>
+                                                        )}
+                                                        {!informesLocked && informesOpenKey === key && (
+                                                            <div className="mt-2 p-2.5 bg-amber-50 rounded-lg border border-amber-200">
+                                                                <div className="text-[10px] text-amber-700 font-semibold mb-2 uppercase tracking-wide">Informes a recibir por correo</div>
+                                                                <div className="space-y-1.5">
+                                                                    {INFORME_TIPOS.map(t => (
+                                                                        <label key={t.key} className="flex items-center gap-2 text-xs cursor-pointer text-gray-600 hover:text-amber-700 select-none">
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                checked={informesActivos.includes(t.key)}
+                                                                                onChange={e => toggleInformePersonal(key, t.key, informesActivos, e.target.checked)}
+                                                                                className="rounded border-gray-300 text-amber-500 focus:ring-amber-400"
+                                                                            />
+                                                                            {t.label}
+                                                                        </label>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    );
+                                                })()
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            ))}
+                            {personalProy.length === 0 && (
+                                <div className="col-span-2 text-xs text-gray-400 italic text-center py-2">Sin personal registrado</div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+                        <h4 className="text-sm font-semibold text-gray-700 mb-3">Crear Nuevo Grupo</h4>
+                        <div className="flex items-end gap-3 flex-wrap">
+                            <div className="flex-1 min-w-[150px]">
+                                <label className="text-[10px] text-gray-500 font-medium">Nombre del Grupo</label>
+                                <input type="text" value={nuevoGrupoNombre} onChange={e => setNuevoGrupoNombre(e.target.value)} placeholder="Ej: Grupo 4" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 mt-0.5" />
+                            </div>
+                            <div className="flex-1 min-w-[150px]">
+                                <label className="text-[10px] text-gray-500 font-medium">Capataz</label>
+                                <select value={nuevoGrupoCapataz} onChange={e => setNuevoGrupoCapataz(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 mt-0.5">
+                                    <option value="">— Sin capataz —</option>
+                                    {capatacesList.map(n => <option key={n} value={n}>{n}</option>)}
+                                </select>
+                            </div>
+                            <div className="flex-1 min-w-[150px]">
+                                <label className="text-[10px] text-gray-500 font-medium">Residente</label>
+                                <select value={nuevoGrupoResidente} onChange={e => setNuevoGrupoResidente(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 mt-0.5">
+                                    <option value="">— Sin residente —</option>
+                                    {residentesList.map(n => <option key={n} value={n}>{n}</option>)}
+                                </select>
+                            </div>
+                            <button onClick={agregarGrupo} className="px-4 py-2 bg-violet-600 text-white rounded-lg text-sm font-medium hover:bg-violet-700 transition-colors whitespace-nowrap">+ Crear Grupo</button>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        {editingGrupos.map((grupo, gIdx) => {
+                            const c = GRUPO_COLORS[gIdx % GRUPO_COLORS.length];
+                            const gVivs = grupo.beneficiarios.map(bid => viviendas.find(v => String(v.ID_Benef) === bid)).filter(Boolean);
+                            const res = grupoResumen(gVivs);
+                            return (
+                                <div key={grupo.id} className={`${c.bg} border ${c.border} rounded-xl overflow-hidden`}>
+                                    <div className="p-3 flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <div className={`w-7 h-7 ${c.accent} rounded-lg flex items-center justify-center`}>
+                                                <span className="text-white text-[10px] font-bold">{grupo.id}</span>
+                                            </div>
+                                            <div>
+                                                <h4 className={`text-sm font-bold ${c.text}`}>{grupo.nombre}</h4>
+                                                <div className="flex items-center gap-1 mt-0.5">
+                                                    <span className="text-[10px] text-gray-400">Capataz:</span>
+                                                    <select value={grupo.capataz || ""} onChange={e => editarCapataz(grupo.id, e.target.value)} className="text-[11px] text-gray-700 font-medium bg-transparent border-b border-dashed border-gray-300 focus:border-violet-500 focus:outline-none text-sm">
+                                                        <option value="">— Sin asignar —</option>
+                                                        {capatacesList.map(n => <option key={n} value={n}>{n}</option>)}
+                                                    </select>
+                                                </div>
+                                                <div className="flex items-center gap-1 mt-0.5">
+                                                    <span className="text-[10px] text-gray-400">Residente:</span>
+                                                    <select value={grupo.residente || ""} onChange={e => editarResidente(grupo.id, e.target.value)} className="text-[11px] text-gray-700 font-medium bg-transparent border-b border-dashed border-gray-300 focus:border-violet-500 focus:outline-none text-sm">
+                                                        <option value="">— Sin asignar —</option>
+                                                        {residentesList.map(n => <option key={n} value={n}>{n}</option>)}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[10px] text-gray-500">{res.n} viv. — Avance: {res.pctAvance}%</span>
+                                            <button onClick={() => eliminarGrupo(grupo.id)} className="text-red-400 hover:text-red-600 text-xs px-1.5 py-0.5 rounded hover:bg-red-50" title="Eliminar grupo">x</button>
+                                        </div>
+                                    </div>
+                                    <div className="bg-white/70 p-2 space-y-1 max-h-[200px] overflow-y-auto">
+                                        {gVivs.length === 0 && <p className="text-xs text-gray-400 text-center py-3">Sin beneficiarios asignados</p>}
+                                        {gVivs.map(v => (
+                                            <div key={v.ID_Benef} className="flex items-center justify-between px-2 py-1 rounded hover:bg-gray-50 text-xs group">
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`w-2 h-2 rounded-full ${
+                                                        v.estadoGeneral === "critico" ? "bg-red-500" :
+                                                        v.estadoGeneral === "atencion" ? "bg-yellow-500" :
+                                                        v.estadoGeneral === "en_tiempo" ? "bg-green-500" : "bg-gray-300"
+                                                    }`} />
+                                                    <span className="text-gray-700 font-medium">{v.NOMBRES} {v.APELLIDOS}</span>
+                                                    <span className="text-gray-400">{v.tipologia}</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-gray-400 font-mono text-[10px]">{v.avance.porcentaje}%</span>
+                                                    <button onClick={() => quitarDeGrupo(String(v.ID_Benef), grupo.id)} className="text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity text-[10px]">quitar</button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    {sinAsignar.length > 0 && (
+                                        <div className="p-2 border-t border-gray-100">
+                                            <select className="w-full text-xs border border-gray-200 rounded px-2 py-1.5 bg-white text-gray-500 focus:outline-none focus:ring-1 focus:ring-violet-400" defaultValue="" onChange={e => { if(e.target.value) { moverAGrupo(e.target.value, grupo.id); e.target.value=""; } }}>
+                                                <option value="">+ Agregar beneficiario...</option>
+                                                {sinAsignar.map(v => <option key={v.ID_Benef} value={String(v.ID_Benef)}>{v.NOMBRES} {v.APELLIDOS} ({v.tipologia}) — {v.avance.porcentaje}%</option>)}
+                                            </select>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    {sinAsignar.length > 0 && (
+                        <div className="bg-white rounded-xl border border-dashed border-gray-300 p-4">
+                            <div className="flex items-center justify-between mb-3">
+                                <h4 className="text-sm font-semibold text-gray-500">Sin Asignar a Grupo</h4>
+                                <span className="text-xs text-gray-400">{sinAsignar.length} beneficiarios — se ordenan por fecha de primer despacho</span>
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                                {sinAsignar.map(v => (
+                                    <div key={v.ID_Benef} className="flex items-center gap-2 px-2 py-1.5 rounded border border-gray-200 text-xs bg-gray-50 hover:bg-gray-100">
+                                        <span className={`w-2 h-2 rounded-full ${
+                                            v.estadoGeneral === "critico" ? "bg-red-500" :
+                                            v.estadoGeneral === "atencion" ? "bg-yellow-500" :
+                                            v.estadoGeneral === "en_tiempo" ? "bg-green-500" : "bg-gray-300"
+                                        }`} />
+                                        <span className="text-gray-700 font-medium truncate">{v.NOMBRES} {v.APELLIDOS}</span>
+                                        <span className="text-gray-400 font-mono text-[10px] ml-auto">{v.avance.porcentaje}%</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="flex items-center justify-between bg-gray-50 rounded-xl border border-gray-200 p-4">
+                        <p className="text-[10px] text-gray-400">Los cambios se reflejan en las pestañas Viviendas y Matriz al aplicar</p>
+                        <div className="flex gap-2">
+                            <button onClick={() => { setDirtyGrupos(false); setEditingGrupos(JSON.parse(JSON.stringify(grupos))); }} className="px-3 py-1.5 text-xs bg-gray-200 text-gray-600 rounded-lg hover:bg-gray-300">Descartar</button>
+                            <button onClick={aplicarCambios} className="px-4 py-1.5 text-xs bg-violet-600 text-white rounded-lg hover:bg-violet-700 font-medium">Aplicar Grupos</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+        </div>
+    );
+};
+
+// ===== APP PRINCIPAL =====
+// ===== EXPORTAR: Solicitudes de Pago M.O. APROBADAS pero NO PAGADAS (EN CURSO) =====
+// Hace su propia consulta fresca al Apps Script (independiente del pipeline del dashboard)
+// Criterio: Estado Solicitud = Aprobado  Y  sin Comprobante (Estado Operacion pendiente).
+async function exportarSolpagoEnCurso(btn) {
+    if (typeof XLSX === 'undefined') { alert('No se pudo cargar la libreria de Excel (XLSX). Revisa tu conexion y recarga.'); return; }
+    if (typeof APPS_SCRIPT_URL === 'undefined') { alert('No hay conexion a la base (APPS_SCRIPT_URL no definido).'); return; }
+    const old = btn ? btn.innerHTML : null;
+    try {
+        if (btn) { btn.disabled = true; btn.classList.add('animate-pulse'); }
+        const url = APPS_SCRIPT_URL + '?tables=' + encodeURIComponent('Solpago,Maestros,Proyectos');
+        const resp = await fetch(url, { redirect: 'follow' });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const data = await resp.json();
+        if (data.error) throw new Error(data.error);
+        const SP = (data.Solpago && data.Solpago.rows) || [];
+        const MA = (data.Maestros && data.Maestros.rows) || [];
+        const PR = (data.Proyectos && data.Proyectos.rows) || [];
+
+        const pname = {}; PR.forEach(p => { pname[String(p.ID_proy || '').trim()] = String(p.NOMBRE_PROYECTO || '').trim(); });
+        const mname = {}, mesp = {};
+        MA.forEach(m => {
+            const id = String(m.IDU_maestros || '').trim();
+            mname[id] = ((String(m.Nombres || '').trim()) + ' ' + (String(m.Apellidos || '').trim())).trim() || id;
+            mesp[id] = String(m.Especialidad || '').trim();
+        });
+        const num = x => { const n = parseFloat(String(x == null ? '' : x).replace(/[$\s.]/g, '').replace(',', '.')); return isNaN(n) ? 0 : n; };
+        const pdate = s => { s = String(s || '').trim(); if (!s) return null; if (s.includes('T')) s = s.split('T')[0]; const m = s.match(/(\d{4})-(\d{1,2})-(\d{1,2})/); if (m) return new Date(+m[1], +m[2] - 1, +m[3]); const d = new Date(s); return isNaN(d.getTime()) ? null : d; };
+
+        // FILTRO: Aprobado (Estado Solicitud) + sin Comprobante (no pagado / en curso)
+        const cand = SP.filter(s => String(s.Estado || '').toLowerCase().includes('aprobad') && !String(s.Comprobante || '').trim());
+        if (cand.length === 0) { alert('No se encontraron solicitudes APROBADAS sin pagar. (Revisa el criterio o que haya datos.)'); return; }
+        const N = cand.length;
+        const TOT = cand.reduce((a, r) => a + num(r.monto), 0);
+        const today = new Date();
+
+        const aggregate = keyFn => {
+            const m = {};
+            cand.forEach(r => { const k = keyFn(r) || '(sin dato)'; if (!m[k]) m[k] = [0, 0]; m[k][0]++; m[k][1] += num(r.monto); });
+            return Object.entries(m).sort((a, b) => b[1][1] - a[1][1]);
+        };
+        const byProy = aggregate(r => pname[String(r.ID_proy || '').trim()] || String(r.ID_proy || '').trim());
+        const byPart = aggregate(r => String(r.Familia_pago || '').trim());
+        // Maestro con especialidad
+        const mAgg = {};
+        cand.forEach(r => { const code = String(r.maestro || '').trim(); const nm = mname[code] || code || '(sin maestro)'; if (!mAgg[nm]) mAgg[nm] = [0, 0, mesp[code] || '']; mAgg[nm][0]++; mAgg[nm][1] += num(r.monto); });
+        const byMaestro = Object.entries(mAgg).sort((a, b) => b[1][1] - a[1][1]);
+
+        const ages = cand.map(r => { const d = pdate(r.fecha); return d ? Math.floor((today - d) / 86400000) : null; }).filter(x => x != null);
+        const fechaStr = today.getFullYear() + String(today.getMonth() + 1).padStart(2, '0') + String(today.getDate()).padStart(2, '0');
+
+        const wb = XLSX.utils.book_new();
+        const setMoney = (ws, colsZeroBased, fromRow) => {
+            const ref = XLSX.utils.decode_range(ws['!ref']);
+            for (let R = fromRow; R <= ref.e.r; R++) {
+                colsZeroBased.forEach(C => { const cell = ws[XLSX.utils.encode_cell({ r: R, c: C })]; if (cell && typeof cell.v === 'number') cell.z = '#,##0'; });
+            }
+        };
+
+        // Hoja Resumen
+        const resumen = [
+            ['Solicitudes de Pago M.O. APROBADAS pero NO PAGADAS (EN CURSO)'],
+            ['Criterio: Estado Solicitud = Aprobado  Y  sin Comprobante (Estado Operacion = pendiente)'],
+            ['Generado', today.toLocaleString('es-CL')],
+            [],
+            ['Total solicitudes en curso', N],
+            ['Monto total pendiente ($)', TOT],
+            ['Antiguedad promedio (dias)', ages.length ? Math.round(ages.reduce((a, b) => a + b, 0) / ages.length) : 0],
+            ['Antiguedad maxima (dias)', ages.length ? Math.max.apply(null, ages) : 0],
+            ['Proyectos involucrados', byProy.length],
+            ['Maestros involucrados', byMaestro.length],
+            ['Partidas involucradas', byPart.length],
+        ];
+        const wsR = XLSX.utils.aoa_to_sheet(resumen); wsR['!cols'] = [{ wch: 50 }, { wch: 28 }];
+        if (wsR['B6']) wsR['B6'].z = '#,##0';
+        XLSX.utils.book_append_sheet(wb, wsR, 'Resumen');
+
+        // Hojas de agregacion (Proyecto / Partida)
+        const aggSheet = (agg, col1) => {
+            const aoa = [[col1, 'N solicitudes', 'Monto pendiente ($)', '% del total']];
+            agg.forEach(([k, v]) => aoa.push([k, v[0], v[1], TOT ? Math.round(v[1] / TOT * 1000) / 10 : 0]));
+            aoa.push(['TOTAL', N, TOT, 100]);
+            const ws = XLSX.utils.aoa_to_sheet(aoa); ws['!cols'] = [{ wch: 34 }, { wch: 14 }, { wch: 20 }, { wch: 11 }];
+            setMoney(ws, [2], 1);
+            return ws;
+        };
+        XLSX.utils.book_append_sheet(wb, aggSheet(byProy, 'Proyecto'), 'Por Proyecto');
+
+        const aoaM = [['Maestro', 'Especialidad', 'N solicitudes', 'Monto pendiente ($)']];
+        byMaestro.forEach(([k, v]) => aoaM.push([k, v[2], v[0], v[1]]));
+        aoaM.push(['TOTAL', '', N, TOT]);
+        const wsM = XLSX.utils.aoa_to_sheet(aoaM); wsM['!cols'] = [{ wch: 28 }, { wch: 22 }, { wch: 14 }, { wch: 20 }];
+        setMoney(wsM, [3], 1);
+        XLSX.utils.book_append_sheet(wb, wsM, 'Por Maestro');
+
+        XLSX.utils.book_append_sheet(wb, aggSheet(byPart, 'Partida / Familia de pago'), 'Por Partida');
+
+        // Hoja Detalle
+        const det = cand.map(r => {
+            const d = pdate(r.fecha);
+            return [String(r.IDU_solpago || ''), d ? (String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear()) : '-',
+                d ? Math.floor((today - d) / 86400000) : '', pname[String(r.ID_proy || '').trim()] || String(r.ID_proy || '').trim(),
+                mname[String(r.maestro || '').trim()] || String(r.maestro || '').trim(), String(r.Familia_pago || '').trim(), num(r.monto)];
+        }).sort((a, b) => b[6] - a[6]);
+        const aoaD = [['ID Solpago', 'Fecha solicitud', 'Dias en curso', 'Proyecto', 'Maestro', 'Partida', 'Monto ($)']].concat(det);
+        const wsD = XLSX.utils.aoa_to_sheet(aoaD); wsD['!cols'] = [{ wch: 14 }, { wch: 15 }, { wch: 13 }, { wch: 28 }, { wch: 26 }, { wch: 18 }, { wch: 16 }];
+        setMoney(wsD, [6], 1);
+        XLSX.utils.book_append_sheet(wb, wsD, 'Detalle');
+
+        XLSX.writeFile(wb, 'Solpago_EnCurso_AprobadasNoPagadas_' + fechaStr + '.xlsx');
+    } catch (e) {
+        console.error('[EXPORT EnCurso]', e);
+        alert('Error al generar el Excel: ' + e.message);
+    } finally {
+        if (btn) { btn.disabled = false; btn.classList.remove('animate-pulse'); if (old != null) btn.innerHTML = old; }
+    }
+}
+
+// ===== ALERTAS GLOBALES (vista gerencia) =====
+const ALERTA_CFG = {
+    garantiaDias: 60,      // garantia "por vencer" si vence en < N dias
+    contratoDias: 30,      // contrato "por vencer" si vence en < N dias
+    cobroGapPts: 15,       // cobro atrasado si (avance% - cobrado%) > N puntos
+    recepcionAvance: 90,   // obra "terminada" sin recepcion si avance >= N%
+    atrasoPts: 20,         // avance atrasado si (esperado% - real%) > N puntos vs plan
+    ritmoMeses: 2          // ventana para el ritmo informativo (pts/mes)
+};
+const ALERTA_META = {
+    garantia:  { icon: '🛡️', label: 'Garantía',  color: '#0891b2' },
+    contrato:  { icon: '📅', label: 'Contrato',  color: '#9333ea' },
+    cobro:     { icon: '💰', label: 'Cobro vs avance', color: '#16a34a' },
+    recepcion: { icon: '🏠', label: 'Recepción', color: '#2563eb' },
+    ritmo:     { icon: '⏱️', label: 'Avance atrasado', color: '#ea580c' }
+};
+const _padN = (n) => String(n).padStart(2, '0');
+const _hoyISO = () => { const d = new Date(); return `${d.getFullYear()}-${_padN(d.getMonth() + 1)}-${_padN(d.getDate())}`; };
+const _diasEntre = (aISO, bISO) => Math.round((new Date(bISO + 'T00:00:00') - new Date(aISO + 'T00:00:00')) / 86400000);
+const _sumarDias = (iso, n) => { const d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${_padN(d.getMonth() + 1)}-${_padN(d.getDate())}`; };
+const _mesMenos = (mk, n) => { let [y, m] = mk.split('-').map(Number); m -= n; while (m < 1) { m += 12; y--; } return `${y}-${_padN(m)}`; };
+const _avanceEnMes = (serie, mk) => { let v = 0; for (const s of serie) { if (s.mes <= mk) v = s.avance; else break; } return v; };
+const _sevColor = (sev) => sev >= 3 ? { bg: 'bg-red-50', txt: 'text-red-700', bd: 'border-red-200', dot: 'bg-red-500' }
+    : sev === 2 ? { bg: 'bg-orange-50', txt: 'text-orange-700', bd: 'border-orange-200', dot: 'bg-orange-500' }
+    : { bg: 'bg-amber-50', txt: 'text-amber-700', bd: 'border-amber-200', dot: 'bg-amber-400' };
+
+const SparklineS = ({ serie, w = 96, h = 26, color = '#7c3aed' }) => {
+    if (!serie || serie.length < 2) return <span className="text-gray-300 text-[10px]">sin datos</span>;
+    const n = serie.length;
+    const pts = serie.map((s, i) => { const x = (i / (n - 1)) * w; const y = h - (Math.min(100, Math.max(0, s.avance)) / 100) * h; return `${x.toFixed(1)},${y.toFixed(1)}`; }).join(' ');
+    const last = serie[n - 1];
+    const ly = h - (Math.min(100, Math.max(0, last.avance)) / 100) * h;
+    return (
+        <svg width={w} height={h} style={{ overflow: 'visible' }}>
+            <line x1="0" y1={h} x2={w} y2={h} stroke="#e5e7eb" strokeWidth="1" />
+            <polyline points={pts} fill="none" stroke={color} strokeWidth="1.6" strokeLinejoin="round" />
+            <circle cx={w} cy={ly} r="2.5" fill={color} />
+        </svg>
+    );
+};
+
+function buildAlertasGlobales() {
+    const cfg = ALERTA_CFG;
+    const hoy = _hoyISO();
+    const mesActual = hoy.substring(0, 7);
+    // pre-agrupaciones
+    const benefByProy = {};
+    BENEFICIARIOS_DATA.forEach(b => { const p = String(b.ID_Proy || ''); if (p) (benefByProy[p] = benefByProy[p] || []).push(b); });
+    const pagadoByProy = {};
+    EEPP_DATA.forEach(e => { if (String(e.Estado || '').includes('Pagado')) { const p = String(e.ID_Proy || ''); pagadoByProy[p] = (pagadoByProy[p] || 0) + (e.Monto || 0); } });
+    const garByProy = {};
+    GARANTIAS_DATA.forEach(g => { const p = String(g.ID_Proy || ''); (garByProy[p] = garByProy[p] || []).push(g); });
+
+    return PROYECTOS_DATA.map(p => {
+        const pid = p.ID_proy;
+        const finalizado = p.estado === 'finalizado';
+        const vivs = benefByProy[pid] || [];
+        const nViv = vivs.length;
+        const recep = vivs.filter(v => v.fecha_recepcion).length;
+        // obra efectivamente terminada: marcada finalizado O con 100% de recepciones
+        const terminada = finalizado || (nViv > 0 && recep === nViv);
+        const av = AVANCE_MENSUAL_DATA[pid] || null;
+        const _rawPct = AVANCE_GANTT_DATA[pid] != null ? AVANCE_GANTT_DATA[pid].pct : null;
+        const avance = (terminada && _rawPct == null) ? 100 : (_rawPct != null ? _rawPct : 0);
+        const serie = av ? av.serie : [];
+        const montoProy = (MONTOS_PROY_DATA[pid] || {}).total || 0;
+        const pagado = pagadoByProy[pid] || 0;
+        const pctCobrado = montoProy > 0 ? (pagado / montoProy * 100) : null;
+        // ritmo (promedio puntos/mes en los ultimos N meses calendario hasta hoy)
+        let ritmo = null;
+        if (av && serie.length) {
+            const aHoy = _avanceEnMes(serie, mesActual);
+            const aAntes = _avanceEnMes(serie, _mesMenos(mesActual, cfg.ritmoMeses));
+            ritmo = Math.round((aHoy - aAntes) / cfg.ritmoMeses * 10) / 10;
+        }
+        // contrato
+        let contratoDias = null;
+        if (p.fecha_inicio && p.duracion) contratoDias = _diasEntre(hoy, _sumarDias(p.fecha_inicio, p.duracion));
+        // avance esperado segun plazo del contrato (lineal) y atraso = esperado - real
+        // (atraso > 0 => va por detras del plan; atraso < 0 => adelantado)
+        let esperado = null, atraso = null;
+        if (p.fecha_inicio && p.duracion) {
+            const diasTrans = Math.max(0, _diasEntre(p.fecha_inicio, hoy));
+            esperado = Math.min(100, diasTrans / p.duracion * 100);
+            atraso = esperado - avance;
+        }
+        // garantias
+        const gars = garByProy[pid] || [];
+        let garDiasMin = null;
+        gars.forEach(g => { if (g.fecha_vcmto) { const d = _diasEntre(hoy, g.fecha_vcmto); if (garDiasMin === null || d < garDiasMin) garDiasMin = d; } });
+
+        const alertas = [];
+        // 1) Garantias
+        if (garDiasMin !== null) {
+            if (garDiasMin < 0) alertas.push({ tipo: 'garantia', sev: 3, label: 'Garantía vencida', detalle: `hace ${Math.abs(garDiasMin)}d` });
+            else if (garDiasMin < cfg.garantiaDias) alertas.push({ tipo: 'garantia', sev: garDiasMin < 15 ? 2 : 1, label: 'Garantía por vencer', detalle: `en ${garDiasMin}d` });
+        }
+        // 2) Contrato (solo obras no terminadas)
+        if (!terminada && contratoDias !== null) {
+            if (contratoDias < 0) alertas.push({ tipo: 'contrato', sev: 3, label: 'Contrato vencido', detalle: `hace ${Math.abs(contratoDias)}d` });
+            else if (contratoDias < cfg.contratoDias) alertas.push({ tipo: 'contrato', sev: 2, label: 'Contrato por vencer', detalle: `en ${contratoDias}d` });
+        }
+        // 3) Cobro atrasado vs avance (solo obras no terminadas, con Montos)
+        if (!terminada && pctCobrado !== null) {
+            const gap = avance - pctCobrado;
+            if (gap > cfg.cobroGapPts) alertas.push({ tipo: 'cobro', sev: gap > 30 ? 2 : 1, label: 'Cobro atrasado', detalle: `avance ${Math.round(avance)}% vs cobrado ${Math.round(pctCobrado)}%` });
+        }
+        // 4) Obra >=90% sin recepcion total
+        if (!terminada && avance >= cfg.recepcionAvance && recep < nViv) {
+            alertas.push({ tipo: 'recepcion', sev: 2, label: 'Obra avanzada sin recepción', detalle: `${recep}/${nViv} recepcionadas` });
+        }
+        // 5) Avance atrasado vs PLAN (avance real por debajo del esperado segun el
+        //    plazo del contrato). Reemplaza el umbral absoluto pts/mes, que daba
+        //    falsos positivos en obras nuevas o adelantadas (ej. Ñuke Mapu).
+        if (!terminada && atraso !== null && avance < 98 && atraso > cfg.atrasoPts) {
+            alertas.push({ tipo: 'ritmo', sev: atraso > 35 ? 2 : 1, label: 'Avance atrasado', detalle: `${Math.round(avance)}% real vs ${Math.round(esperado)}% esperado (${Math.round(atraso)} pts)` });
+        }
+        const sev = alertas.reduce((m, a) => Math.max(m, a.sev), 0);
+        return { pid, nombre: `${p.ID_proy} · ${p.NOMBRE_PROYECTO}`, comuna: p.COMUNA, finalizado, terminada, avance, serie, ritmo, esperado, atraso, pctCobrado, recep, nViv, contratoDias, garDiasMin, alertas, sev };
+    });
+}
+
+const AlertasGlobales = ({ onClose, onSelectProyecto }) => {
+    const data = React.useMemo(() => buildAlertasGlobales(), []);
+    const [filtro, setFiltro] = React.useState('todas'); // todas | critica | <tipo>
+    const [ocultarTerminados, setOcultarTerminados] = React.useState(true);
+    const [orden, setOrden] = React.useState('urgencia');
+    // base segun "ocultar terminados"; los KPI y la tabla respetan este filtro
+    const base = ocultarTerminados ? data.filter(d => !d.terminada) : data;
+    const conAlertas = base.filter(d => d.alertas.length > 0);
+    const resumen = React.useMemo(() => {
+        const r = { obras: conAlertas.length, criticas: conAlertas.filter(d => d.sev >= 3).length, porTipo: {} };
+        Object.keys(ALERTA_META).forEach(t => r.porTipo[t] = conAlertas.filter(d => d.alertas.some(a => a.tipo === t)).length);
+        return r;
+    }, [base]);
+    let filtradas = conAlertas;
+    if (filtro === 'critica') filtradas = conAlertas.filter(d => d.sev >= 3);
+    else if (filtro !== 'todas') filtradas = conAlertas.filter(d => d.alertas.some(a => a.tipo === filtro));
+    const _atrasoVal = (d) => d.atraso == null ? -999 : d.atraso;
+    const _gapVal = (d) => d.pctCobrado == null ? -1 : (d.avance - d.pctCobrado);
+    const COMPARADORES = {
+        urgencia: (a, b) => b.sev - a.sev || b.alertas.length - a.alertas.length || a.nombre.localeCompare(b.nombre),
+        atraso:   (a, b) => _atrasoVal(b) - _atrasoVal(a) || a.nombre.localeCompare(b.nombre),
+        avance:   (a, b) => a.avance - b.avance || a.nombre.localeCompare(b.nombre),
+        cobro:    (a, b) => _gapVal(b) - _gapVal(a) || a.nombre.localeCompare(b.nombre),
+        nombre:   (a, b) => a.nombre.localeCompare(b.nombre)
+    };
+    filtradas = [...filtradas].sort(COMPARADORES[orden] || COMPARADORES.urgencia);
+
+    const KpiCard = ({ label, value, color, active, onClick }) => (
+        <button onClick={onClick} className={`flex-1 min-w-[120px] text-left rounded-xl border p-3 transition-all ${active ? 'ring-2 ring-offset-1' : ''}`} style={{ background: color + '14', borderColor: color + '40', ['--tw-ring-color']: color }}>
+            <p className="text-2xl font-bold font-mono" style={{ color }}>{value}</p>
+            <p className="text-[11px] text-gray-500 mt-0.5">{label}</p>
+        </button>
+    );
+
+    return (
+        <div className="fixed inset-0 z-[70] bg-black/50 flex items-start justify-center pt-4 px-3 overflow-y-auto" onClick={(e) => e.target === e.currentTarget && onClose()}>
+            <div className="bg-gray-50 rounded-xl shadow-2xl w-full max-w-7xl mb-10">
+                {/* Header */}
+                <div className="sticky top-0 z-10 bg-white border-b border-gray-200 rounded-t-xl px-5 py-3 flex items-center justify-between">
+                    <div>
+                        <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2"><span>🚨</span> Alertas — Vista Gerencia</h2>
+                        <p className="text-[11px] text-gray-400">{resumen.obras} obras con pendientes · {resumen.criticas} críticas · actualizado {_hoyISO()}</p>
+                    </div>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl font-bold w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100">×</button>
+                </div>
+
+                <div className="p-5 space-y-4">
+                    {/* KPIs */}
+                    <div className="flex flex-wrap gap-2">
+                        <KpiCard label="Obras con alertas" value={resumen.obras} color="#475569" active={filtro === 'todas'} onClick={() => setFiltro('todas')} />
+                        <KpiCard label="Críticas" value={resumen.criticas} color="#dc2626" active={filtro === 'critica'} onClick={() => setFiltro('critica')} />
+                        {Object.entries(ALERTA_META).map(([t, m]) => (
+                            <KpiCard key={t} label={m.label} value={resumen.porTipo[t]} color={m.color} active={filtro === t} onClick={() => setFiltro(filtro === t ? 'todas' : t)} />
+                        ))}
+                    </div>
+
+                    {/* Controles: filtro tipo (chip activo), ordenar, ocultar terminados */}
+                    <div className="flex flex-wrap items-center gap-3 text-xs">
+                        <span className="text-gray-400">Filtro:</span>
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-violet-50 text-violet-700 border border-violet-200 font-medium">
+                            {filtro === 'todas' ? 'Todas' : filtro === 'critica' ? 'Críticas' : ALERTA_META[filtro].label}
+                            {filtro !== 'todas' && <button onClick={() => setFiltro('todas')} className="ml-1 text-violet-400 hover:text-violet-700 font-bold">×</button>}
+                        </span>
+                        <span className="text-gray-300">·</span>
+                        <label className="flex items-center gap-1.5 text-gray-600">
+                            <span>Ordenar por:</span>
+                            <select value={orden} onChange={e => setOrden(e.target.value)} className="border border-gray-300 rounded-lg px-2 py-1 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-violet-400">
+                                <option value="urgencia">Urgencia</option>
+                                <option value="atraso">Mayor atraso vs plan</option>
+                                <option value="avance">Menor avance</option>
+                                <option value="cobro">Mayor brecha de cobro</option>
+                                <option value="nombre">Nombre</option>
+                            </select>
+                        </label>
+                        <label className="flex items-center gap-1.5 text-gray-600 cursor-pointer select-none ml-auto">
+                            <input type="checkbox" checked={ocultarTerminados} onChange={e => setOcultarTerminados(e.target.checked)} className="accent-violet-600" />
+                            <span>Ocultar terminados</span>
+                        </label>
+                        <span className="text-gray-400">{filtradas.length} obra{filtradas.length !== 1 ? 's' : ''}</span>
+                    </div>
+
+                    {/* Tabla */}
+                    {filtradas.length === 0 ? (
+                        <div className="bg-white border border-gray-200 rounded-xl p-10 text-center text-gray-400 text-sm">Sin alertas en este filtro 🎉</div>
+                    ) : (
+                        <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="text-left text-gray-500 border-b border-gray-200 bg-gray-50 text-xs">
+                                            <th className="py-2 px-3">Proyecto</th>
+                                            <th className="py-2 px-3 text-center">Avance</th>
+                                            <th className="py-2 px-3 text-center">vs Plan</th>
+                                            <th className="py-2 px-3 text-center">Cobro vs avance</th>
+                                            <th className="py-2 px-3 text-center">Garantía</th>
+                                            <th className="py-2 px-3 text-center">Contrato</th>
+                                            <th className="py-2 px-3 text-center">Recep.</th>
+                                            <th className="py-2 px-3">Alertas</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {filtradas.map(d => {
+                                            const sc = _sevColor(d.sev);
+                                            const vpCol = d.atraso == null ? 'text-gray-300' : d.atraso > 20 ? 'text-red-600' : d.atraso > 0 ? 'text-amber-600' : 'text-green-600';
+                                            const vpTxt = d.atraso == null ? '—' : d.atraso > 0 ? '▼' + Math.round(d.atraso) : '▲' + Math.round(-d.atraso);
+                                            return (
+                                                <tr key={d.pid} className="border-b border-gray-100 hover:bg-violet-50/40 cursor-pointer" onClick={() => onSelectProyecto(d.pid)}>
+                                                    <td className="py-2 px-3">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className={`inline-block w-1.5 h-8 rounded ${sc.dot}`}></span>
+                                                            <div>
+                                                                <p className="font-semibold text-gray-800 leading-tight">{d.nombre}</p>
+                                                                <p className="text-[10px] text-gray-400">{d.pid} · {d.comuna}{d.finalizado ? ' · finalizado' : ''}</p>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="py-2 px-3">
+                                                        <div className="flex flex-col items-center">
+                                                            <SparklineS serie={d.serie} />
+                                                            <span className="text-[11px] font-mono font-bold text-gray-700">{Math.round(d.avance)}%</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className={`py-2 px-3 text-center font-mono font-bold ${vpCol}`} title={`Avance real ${Math.round(d.avance)}% vs esperado ${d.esperado != null ? Math.round(d.esperado) + '%' : '?'} (${d.ritmo != null ? d.ritmo + ' pts/mes' : 'sin ritmo'}). ▲ adelantado · ▼ atrasado`}>{vpTxt}</td>
+                                                    <td className="py-2 px-3 text-center text-xs">
+                                                        {d.pctCobrado == null ? <span className="text-gray-300">sin Montos</span>
+                                                            : <span><span className="font-mono font-semibold text-green-700">{Math.round(d.pctCobrado)}%</span> <span className="text-gray-400">vs {Math.round(d.avance)}%</span></span>}
+                                                    </td>
+                                                    <td className="py-2 px-3 text-center text-xs">{d.garDiasMin == null ? <span className="text-gray-300">—</span> : d.garDiasMin < 0 ? <span className="text-red-600 font-semibold">vencida</span> : <span className={d.garDiasMin < 60 ? 'text-amber-600 font-semibold' : 'text-gray-500'}>{d.garDiasMin}d</span>}</td>
+                                                    <td className="py-2 px-3 text-center text-xs">{d.contratoDias == null ? <span className="text-gray-300">—</span> : d.contratoDias < 0 ? <span className="text-red-600 font-semibold">vencido</span> : <span className={d.contratoDias < 30 ? 'text-amber-600 font-semibold' : 'text-gray-500'}>{d.contratoDias}d</span>}</td>
+                                                    <td className="py-2 px-3 text-center text-xs font-mono text-gray-600">{d.recep}/{d.nViv}</td>
+                                                    <td className="py-2 px-3">
+                                                        <div className="flex flex-wrap gap-1">
+                                                            {d.alertas.map((a, i) => { const ac = _sevColor(a.sev); return (
+                                                                <span key={i} title={a.detalle} className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border ${ac.bg} ${ac.txt} ${ac.bd}`}>{ALERTA_META[a.tipo].icon} {a.label}</span>
+                                                            ); })}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+                    <p className="text-[10px] text-gray-400 text-center">Umbrales: garantía &lt;{ALERTA_CFG.garantiaDias}d · contrato &lt;{ALERTA_CFG.contratoDias}d · cobro atrasado &gt;{ALERTA_CFG.cobroGapPts} pts · avance atrasado &gt;{ALERTA_CFG.atrasoPts} pts bajo el esperado por plazo. "vs Plan": ▲ adelantado / ▼ atrasado. Clic en una fila para abrir el proyecto.</p>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const App = () => {
+    const defaultProy = [...PROYECTOS_DATA].sort((a, b) => (b.fecha_inicio || '').localeCompare(a.fecha_inicio || ''))[0]?.ID_proy || "";
+    const [proyectoSel, setProyectoSel] = React.useState(defaultProy);
+    const [tab, setTab] = React.useState("viviendas");
+    const [expandida, setExpandida] = React.useState(null);
+    const [proySearch, setProySearch] = React.useState("");
+    const [proyOpen, setProyOpen] = React.useState(false);
+    const proyRef = React.useRef(null);
+    React.useEffect(() => {
+        const handler = e => { if (proyRef.current && !proyRef.current.contains(e.target)) setProyOpen(false); };
+        document.addEventListener("mousedown", handler);
+        return () => document.removeEventListener("mousedown", handler);
+    }, []);
+    const [filtro, setFiltro] = React.useState("todos");
+    const [busqueda, setBusqueda] = React.useState("");
+
+    // Grupos con persistencia en Firebase
+    const [gruposConfig, setGruposConfig] = React.useState({});
+    const [fbReady, setFbReady] = React.useState(false);
+    const gruposRef = React.useRef(null);
+    const obsRef = React.useRef(null);
+    const actRef = React.useRef(null);
+    const consultasRef = React.useRef(null);
+    const skipGruposPush = React.useRef(true);
+    const skipObsPush = React.useRef(true);
+    const skipActPush = React.useRef(true);
+    const skipConsPush = React.useRef(true);
+    const sugRef = React.useRef(null);
+    const skipSugPush = React.useRef(true);
+    const ocultadosRef = React.useRef(null);
+    const skipOcultadosPush = React.useRef(true);
+    const cierresForzadosRef = React.useRef(null);
+    const skipCierresForzadosPush = React.useRef(true);
+
+    React.useEffect(() => {
+        // Listener Firebase para Grupos
+        gruposRef.current = fbDB.ref('grupos');
+        gruposRef.current.on('value', (snap) => {
+            const val = snap.val();
+            skipGruposPush.current = true;
+            setGruposConfig(val || {});
+        });
+        // Listener Firebase para Observaciones
+        obsRef.current = fbDB.ref('observaciones');
+        obsRef.current.on('value', (snap) => {
+            const val = snap.val();
+            skipObsPush.current = true;
+            setObservaciones(val || {});
+            setFbReady(true);
+        });
+        // Listener Firebase para Actividades de Habilitacion
+        actRef.current = fbDB.ref('actividades');
+        actRef.current.on('value', (snap) => {
+            const val = snap.val();
+            skipActPush.current = true;
+            setActividades(val || {});
+        });
+        // Listener Firebase para Consultas por Etapa
+        consultasRef.current = fbDB.ref('consultas');
+        consultasRef.current.on('value', (snap) => {
+            const val = snap.val();
+            skipConsPush.current = true;
+            setConsultas(val || {});
+        });
+        // Listener Firebase para Muestras Hormigon
+        muestrasRef.current = fbDB.ref('muestras_hormigon');
+        muestrasRef.current.on('value', (snap) => {
+            const val = snap.val();
+            skipMuestrasPush.current = true;
+            setMuestrasHormigon(val || {});
+        });
+        // Listener Firebase para Config/Historico de Muestras (por proyecto)
+        muestrasConfigRef.current = fbDB.ref('muestras_config');
+        muestrasConfigRef.current.on('value', (snap) => {
+            skipMuestrasConfigPush.current = true;
+            setMuestrasConfig(snap.val() || {});
+        });
+        // Listener Firebase para Sugerencias
+        sugRef.current = fbDB.ref('sugerencias');
+        sugRef.current.on('value', (snap) => {
+            const val = snap.val();
+            skipSugPush.current = true;
+            setSugerencias(val ? Object.values(val).sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '')) : []);
+        });
+        // Listener Firebase para Proyectos Terminados (manual)
+        proyTermRef.current = fbDB.ref('proyectos_terminados');
+        proyTermRef.current.on('value', (snap) => {
+            setProyTerminados(snap.val() || {});
+        });
+        // Listener Firebase para Beneficiarios Ocultos
+        ocultadosRef.current = fbDB.ref('ocultados');
+        ocultadosRef.current.on('value', (snap) => {
+            const val = snap.val();
+            skipOcultadosPush.current = true;
+            setOcultados(val || {});
+        });
+        // Listener Firebase para Cierres Forzados
+        cierresForzadosRef.current = fbDB.ref('cierres_forzados');
+        cierresForzadosRef.current.on('value', (snap) => {
+            skipCierresForzadosPush.current = true;
+            setCierresForzados(snap.val() || {});
+        });
+        // Listener Firebase para Resumen Comentarios
+        resumenRef.current = fbDB.ref('resumen_comentarios');
+        resumenRef.current.on('value', (snap) => {
+            setResumenComentarios(snap.val() || {});
+        });
+        // Listener Firebase para Programa de Gantt (generado por actualizar_gantt_programa.py)
+        ganttProgramaRef.current = fbDB.ref('gantt_programa');
+        ganttProgramaRef.current.once('value').then(snap => {
+            setGanttPrograma(snap.val() || {});
+        });
+        fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/avance_gantt.json')
+            .then(r => r.json()).then(d => { AVANCE_GANTT_DATA = d || {}; setAvanceGanttEstado(d || {}); }).catch(() => {});
+        // Listener Firebase para Personal de Obra (capataces y residentes)
+        personalObraRef.current = fbDB.ref('personal_obra');
+        personalObraRef.current.on('value', snap => setPersonalObra(snap.val() || {}));
+        // Listener Firebase para Registro Global de Personal
+        personalGlobalRef.current = fbDB.ref('personal_global');
+        personalGlobalRef.current.on('value', snap => setPersonalGlobal(snap.val() || {}));
+        return () => {
+            if (gruposRef.current) gruposRef.current.off();
+            if (obsRef.current) obsRef.current.off();
+            if (actRef.current) actRef.current.off();
+            if (consultasRef.current) consultasRef.current.off();
+            if (sugRef.current) sugRef.current.off();
+            if (muestrasRef.current) muestrasRef.current.off();
+            if (muestrasConfigRef.current) muestrasConfigRef.current.off();
+            if (ocultadosRef.current) ocultadosRef.current.off();
+            if (cierresForzadosRef.current) cierresForzadosRef.current.off();
+            if (resumenRef.current) resumenRef.current.off();
+            if (proyTermRef.current) proyTermRef.current.off();
+            if (ganttProgramaRef.current) ganttProgramaRef.current.off();
+            if (personalObraRef.current) personalObraRef.current.off();
+            if (personalGlobalRef.current) personalGlobalRef.current.off();
+        };
+    }, []);
+
+    // Push grupos a Firebase cuando cambia localmente
+    React.useEffect(() => {
+        if (skipGruposPush.current) { skipGruposPush.current = false; return; }
+        if (gruposRef.current) gruposRef.current.set(gruposConfig);
+    }, [gruposConfig]);
+
+    // Observaciones por beneficiario (Firebase)
+    const [observaciones, setObservaciones] = React.useState({});
+    const [showResumenObs, setShowResumenObs] = React.useState(false);
+    const [showValidacion, setShowValidacion] = React.useState(false);
+    const [showAlertas, setShowAlertas] = React.useState(false);
+    // Total de obras NO terminadas con alertas (para el badge del boton global,
+    // consistente con el panel que por defecto oculta terminados)
+    const obrasConAlertas = React.useMemo(() => { try { return buildAlertasGlobales().filter(d => !d.finalizado && d.alertas.length > 0).length; } catch (_) { return 0; } }, []);
+    const [showTE1, setShowTE1] = React.useState(false);
+    const [te1Data, setTe1Data] = React.useState(null);
+    const [te1Loading, setTe1Loading] = React.useState(false);
+    const [te1Error, setTe1Error] = React.useState(null);
+
+    // Sugerencias de mejora (Firebase)
+    const [showSugerencias, setShowSugerencias] = React.useState(false);
+    const [sugerencias, setSugerencias] = React.useState([]);
+
+    // Push observaciones a Firebase cuando cambia localmente
+    React.useEffect(() => {
+        if (skipObsPush.current) { skipObsPush.current = false; return; }
+        if (obsRef.current) obsRef.current.set(observaciones);
+    }, [observaciones]);
+
+    // Actividades de habilitacion por beneficiario (Firebase)
+    const [actividades, setActividades] = React.useState({});
+
+    React.useEffect(() => {
+        if (skipActPush.current) { skipActPush.current = false; return; }
+        if (actRef.current) actRef.current.set(actividades);
+    }, [actividades]);
+
+    // Consultas por etapa (Firebase)
+    const [consultas, setConsultas] = React.useState({});
+
+    // Refresh button state (top-level para evitar hooks en IIFE)
+    const [refreshing, setRefreshing] = React.useState(false);
+    const [lastUpdate, setLastUpdate] = React.useState(null);
+
+    // Sugerencias form state (top-level)
+    const [textoSug, setTextoSug] = React.useState('');
+    const [imgSug, setImgSug] = React.useState(null);
+    const [imgPreview, setImgPreview] = React.useState(null);
+    const textareaRef = React.useRef(null);
+
+    // TE1 filter state (top-level)
+    const [filtroTE1, setFiltroTE1] = React.useState('');
+
+    // Muestras de Hormigon (Firebase)
+    const [muestrasHormigon, setMuestrasHormigon] = React.useState({});
+    const muestrasRef = React.useRef(null);
+    const skipMuestrasPush = React.useRef(true);
+    const [showMuestras, setShowMuestras] = React.useState(false);
+    // Config/estandar + historico de muestras, por proyecto (Firebase: muestras_config)
+    const [muestrasConfig, setMuestrasConfig] = React.useState({});
+    const muestrasConfigRef = React.useRef(null);
+    const skipMuestrasConfigPush = React.useRef(true);
+
+    React.useEffect(() => {
+        if (skipConsPush.current) { skipConsPush.current = false; return; }
+        if (consultasRef.current) consultasRef.current.set(consultas);
+    }, [consultas]);
+
+    // Push muestras a Firebase cuando cambia localmente
+    React.useEffect(() => {
+        if (skipMuestrasPush.current) { skipMuestrasPush.current = false; return; }
+        if (muestrasRef.current) muestrasRef.current.set(muestrasHormigon);
+    }, [muestrasHormigon]);
+
+    // Push config/historico de muestras a Firebase
+    React.useEffect(() => {
+        if (skipMuestrasConfigPush.current) { skipMuestrasConfigPush.current = false; return; }
+        if (muestrasConfigRef.current) muestrasConfigRef.current.set(muestrasConfig);
+    }, [muestrasConfig]);
+
+    // Muestras Hormigon: registrar toma de muestras por proyecto
+    // Estructura: muestrasHormigon[proyectoId] = array de registros
+    const registrarMuestra = (data) => {
+        const key = proyectoSel;
+        const muestrasId = Date.now().toString();
+        const entry = { ...data, id: muestrasId, fecha: data.fecha || fechaChile(), resultadoPedido: false, fechaResultado: null };
+        const next = { ...muestrasHormigon };
+        if (!next[key]) next[key] = [];
+        next[key] = [...next[key], entry];
+        fbDB.ref('muestras_hormigon').set(next);
+        setMuestrasHormigon(next);
+    };
+
+    const marcarResultadoPedido = (muestraId) => {
+        const key = proyectoSel;
+        const next = { ...muestrasHormigon };
+        const arr = next[key] || [];
+        const idx = arr.findIndex(m => m.id === muestraId);
+        if (idx === -1) return;
+        next[key] = [...arr];
+        next[key][idx] = { ...arr[idx], resultadoPedido: true, fechaResultado: fechaChile() };
+        fbDB.ref('muestras_hormigon').set(next);
+        setMuestrasHormigon(next);
+    };
+
+    const eliminarMuestra = (muestraId) => {
+        const key = proyectoSel;
+        const next = { ...muestrasHormigon };
+        const arr = next[key] || [];
+        next[key] = arr.filter(m => m.id !== muestraId);
+        if (next[key].length === 0) delete next[key];
+        fbDB.ref('muestras_hormigon').set(next);
+        setMuestrasHormigon(next);
+    };
+
+    const getMuestrasProy = () => {
+        const raw = muestrasHormigon[proyectoSel];
+        return Array.isArray(raw) ? raw : [];
+    };
+
+    // --- Estandar de muestras por proyecto (requeridas + minimos MPa + historico) ---
+    const getMuestrasCfg = () => {
+        const c = muestrasConfig[proyectoSel] || {};
+        return {
+            requeridas: (c.requeridas != null && c.requeridas !== '') ? Number(c.requeridas) : Math.ceil(viviendas.length / 6),
+            requeridasManual: (c.requeridas != null && c.requeridas !== ''),
+            minCimiento: c.minCimiento || '',
+            minSobrecimiento: c.minSobrecimiento || '',
+            minRadier: c.minRadier || '',
+            historico: c.historico || ''
+        };
+    };
+    const guardarMuestrasCfg = (patch) => {
+        setMuestrasConfig(prev => ({ ...prev, [proyectoSel]: { ...(prev[proyectoSel] || {}), ...patch } }));
+    };
+
+    // Estado de una muestra segun resultados por elemento: pendiente | ok | mala | mala_retomada
+    const muestraEstado = (m) => {
+        const r = m.resultados;
+        const has = r && (r.cimiento || r.sobrecimiento || r.radier);
+        if (!has) return 'pendiente';
+        const malo = r.cimiento === 'mala' || r.sobrecimiento === 'mala' || r.radier === 'mala';
+        if (malo) return m.reTomada ? 'mala_retomada' : 'mala';
+        return 'ok';
+    };
+    const setResultadoElemento = (muestraId, elemento, valor) => {
+        const key = proyectoSel;
+        setMuestrasHormigon(prev => {
+            const arr = prev[key] || [];
+            const idx = arr.findIndex(m => m.id === muestraId);
+            if (idx === -1) return prev;
+            const nextArr = [...arr];
+            const r = { ...(arr[idx].resultados || {}) };
+            r[elemento] = (r[elemento] === valor) ? '' : valor; // toggle
+            nextArr[idx] = { ...arr[idx], resultados: r, fechaResultado: arr[idx].fechaResultado || fechaChile() };
+            return { ...prev, [key]: nextArr };
+        });
+    };
+    // Guarda el valor medido (MPa) por elemento y auto-evalua OK/Mala vs el minimo configurado
+    const setValorElemento = (muestraId, elemento, valor) => {
+        const key = proyectoSel;
+        const cfg = getMuestrasCfg();
+        const min = ({ cimiento: cfg.minCimiento, sobrecimiento: cfg.minSobrecimiento, radier: cfg.minRadier })[elemento];
+        setMuestrasHormigon(prev => {
+            const arr = prev[key] || [];
+            const idx = arr.findIndex(m => m.id === muestraId);
+            if (idx === -1) return prev;
+            const nextArr = [...arr];
+            const valores = { ...(arr[idx].valores || {}) };
+            valores[elemento] = valor;
+            const resultados = { ...(arr[idx].resultados || {}) };
+            // Si hay valor medido y minimo configurado, deriva OK/Mala automaticamente
+            if (valor !== '' && min !== '' && min != null && !isNaN(Number(valor)) && !isNaN(Number(min))) {
+                resultados[elemento] = Number(valor) >= Number(min) ? 'ok' : 'mala';
+            }
+            nextArr[idx] = { ...arr[idx], valores, resultados, fechaResultado: arr[idx].fechaResultado || fechaChile() };
+            return { ...prev, [key]: nextArr };
+        });
+    };
+    const toggleReTomada = (muestraId) => {
+        const key = proyectoSel;
+        setMuestrasHormigon(prev => {
+            const arr = prev[key] || [];
+            const idx = arr.findIndex(m => m.id === muestraId);
+            if (idx === -1) return prev;
+            const nextArr = [...arr];
+            nextArr[idx] = { ...arr[idx], reTomada: !arr[idx].reTomada };
+            return { ...prev, [key]: nextArr };
+        });
+    };
+    // Resumen de completitud del proyecto bajo la nueva regla
+    const getMuestrasResumen = () => {
+        const arr = getMuestrasProy();
+        const cfg = getMuestrasCfg();
+        const okCount = arr.filter(m => muestraEstado(m) === 'ok').length;
+        const malaPend = arr.filter(m => muestraEstado(m) === 'mala').length;
+        const pendientes = arr.filter(m => muestraEstado(m) === 'pendiente').length;
+        const completo = okCount >= cfg.requeridas && malaPend === 0;
+        return { okCount, malaPend, pendientes, requeridas: cfg.requeridas, completo, total: arr.length };
+    };
+    // Serializa los registros de muestras a texto (para el historico)
+    const dumpMuestrasTexto = (arr) => arr.map((m, i) => `- Muestra #${i + 1} | ${m.fecha || ''} | ${m.cantidad || 1} probeta(s)` + (m.casasNombres && m.casasNombres.length ? ` | Casas: ${m.casasNombres.join(', ')}` : '') + (m.notas ? ` | ${m.notas}` : '') + (m.resultadoPedido ? ' | [Resultado OK - formato anterior]' : '')).join('\n');
+
+    // Auto-volcado del historico: al abrir el modal, si el proyecto tiene registros y aun
+    // no hay historico guardado, se rellena por defecto (una vez) para no perder lo ya ingresado.
+    React.useEffect(() => {
+        if (!showMuestras || !proyectoSel) return;
+        const arr = getMuestrasProy();
+        const cfg = muestrasConfig[proyectoSel] || {};
+        if (arr.length > 0 && !cfg.historico) {
+            const dump = dumpMuestrasTexto(arr);
+            if (dump) guardarMuestrasCfg({ historico: dump });
+        }
+    }, [showMuestras, proyectoSel]);
+
+    // Resumen comentarios (Firebase) - para tick de incorporar al resumen
+    const [resumenComentarios, setResumenComentarios] = React.useState({});
+    const resumenRef = React.useRef(null);
+
+    // Personal de obra (capataces y residentes) — Firebase
+    const [personalObra, setPersonalObra] = React.useState({});
+    const personalObraRef = React.useRef(null);
+    const [personalGlobal, setPersonalGlobal] = React.useState({});
+    const personalGlobalRef = React.useRef(null);
+    const [showModalPersonal, setShowModalPersonal] = React.useState(false);
+    const [showInformes, setShowInformes] = React.useState(false);
+    const [showConfigGeneral, setShowConfigGeneral] = React.useState(false);
+    const informesRef = React.useRef(null);
+    React.useEffect(() => {
+        const handler = e => { if (informesRef.current && !informesRef.current.contains(e.target)) setShowInformes(false); };
+        document.addEventListener("mousedown", handler);
+        return () => document.removeEventListener("mousedown", handler);
+    }, []);
+
+    // Proyectos marcados como terminados manualmente (Firebase)
+    const [proyTerminados, setProyTerminados] = React.useState({});
+    const proyTermRef = React.useRef(null);
+
+    // Programa de ejecución desde Gantt de control (Firebase — escrito por actualizar_gantt_programa.py)
+    const [ganttPrograma, setGanttPrograma] = React.useState({});
+    const ganttProgramaRef = React.useRef(null);
+    const [avanceGanttEstado, setAvanceGanttEstado] = React.useState({});
+
+    const marcarTerminado = (proyId, motivo) => {
+        const entry = { fecha: fechaChile(), motivo: motivo || '' };
+        fbDB.ref('proyectos_terminados/' + proyId).set(entry);
+    };
+
+    const desmarcarTerminado = (proyId) => {
+        fbDB.ref('proyectos_terminados/' + proyId).remove();
+    };
+
+    // Beneficiarios ocultos (Firebase)
+    const [ocultados, setOcultados] = React.useState({});
+
+    React.useEffect(() => {
+        if (skipOcultadosPush.current) { skipOcultadosPush.current = false; return; }
+        if (ocultadosRef.current) ocultadosRef.current.set(ocultados);
+    }, [ocultados]);
+
+    // Cierres Forzados (Firebase)
+    const [cierresForzados, setCierresForzados] = React.useState({});
+
+    React.useEffect(() => {
+        if (skipCierresForzadosPush.current) { skipCierresForzadosPush.current = false; return; }
+        if (cierresForzadosRef.current) cierresForzadosRef.current.set(cierresForzados);
+    }, [cierresForzados]);
+
+    const forzarCierre = (idBenef, motivo) => {
+        const entry = { motivo: motivo || "", fecha: fechaChile(), done: true };
+        const next = { ...cierresForzados, [idBenef]: entry };
+        fbDB.ref('cierres_forzados').set(next);
+        setCierresForzados(next);
+    };
+
+    const deshacerCierre = (idBenef) => {
+        const next = { ...cierresForzados };
+        delete next[idBenef];
+        fbDB.ref('cierres_forzados').set(next);
+        setCierresForzados(next);
+    };
+
+    const ocultarBeneficiario = (idBenef, motivo) => {
+        const entry = { motivo: motivo || "", fecha: fechaChile() };
+        const next = { ...ocultados, [idBenef]: entry };
+        fbDB.ref('ocultados').set(next);
+        setOcultados(next);
+    };
+
+    const mostrarBeneficiario = (idBenef) => {
+        const next = { ...ocultados };
+        delete next[idBenef];
+        fbDB.ref('ocultados').set(next);
+        setOcultados(next);
+    };
+
+    const toggleConsulta = (idBenef, etapaKey) => {
+        setConsultas(prev => {
+            const benCons = prev[idBenef] || {};
+            const next = { ...prev };
+            if (benCons[etapaKey]) {
+                const { [etapaKey]: _, ...rest } = benCons;
+                if (Object.keys(rest).length === 0) delete next[idBenef];
+                else next[idBenef] = rest;
+            } else {
+                next[idBenef] = { ...benCons, [etapaKey]: { done: true, fecha: fechaChile() } };
+            }
+            fbDB.ref('consultas').set(next);
+            return next;
+        });
+    };
+
+    const toggleActividad = (idBenef, actNombre) => {
+        setActividades(prev => {
+            const benActs = prev[idBenef] || {};
+            const next = { ...prev };
+            if (benActs[actNombre]) {
+                const { [actNombre]: _, ...rest } = benActs;
+                if (Object.keys(rest).length === 0) delete next[idBenef];
+                else next[idBenef] = rest;
+            } else {
+                next[idBenef] = { ...benActs, [actNombre]: { done: true, fecha: fechaChile() } };
+            }
+            fbDB.ref('actividades').set(next);
+            return next;
+        });
+    };
+
+    const addObservacion = (idBenef, texto) => {
+        setObservaciones(prev => {
+            const obs = prev[idBenef] || [];
+            const next = { ...prev, [idBenef]: [...obs, { texto, fecha: fechaChile(), id: Date.now() }] };
+            fbDB.ref('observaciones').set(next);
+            return next;
+        });
+    };
+
+    const deleteObservacion = (idBenef, obsId) => {
+        setObservaciones(prev => {
+            const obs = (prev[idBenef] || []).filter(o => o.id !== obsId);
+            const next = { ...prev };
+            if (obs.length === 0) delete next[idBenef];
+            else next[idBenef] = obs;
+            fbDB.ref('observaciones').set(next);
+            return next;
+        });
+    };
+
+    const addSugerencia = (texto, imagen) => {
+        const id = Date.now();
+        const sug = { id, texto, imagen: imagen || null, fecha: fechaChile(), resuelta: false };
+        fbDB.ref('sugerencias/' + id).set(sug);
+    };
+
+    const toggleSugResuelta = (sugId) => {
+        const sug = sugerencias.find(s => s.id === sugId);
+        if (sug) {
+            fbDB.ref('sugerencias/' + sugId).update({ resuelta: !sug.resuelta, fechaResolucion: !sug.resuelta ? fechaChile() : null });
+        }
+    };
+
+    const deleteSugerencia = (sugId) => {
+        fbDB.ref('sugerencias/' + sugId).remove();
+    };
+
+    const pendientesSug = sugerencias.filter(s => !s.resuelta).length;
+
+    const beneficiarios = React.useMemo(() => BENEFICIARIOS_DATA.filter(b => String(b.ID_Proy) === String(proyectoSel)), [proyectoSel]);
+
+    const viviendas = React.useMemo(() => beneficiarios.map(b => {
+        const estados = calcularEstadoEtapas(b.ID_Benef);
+        const desps = DESPACHOS_DATA.filter(d => String(d.ID_Benef) === String(b.ID_Benef));
+        const numDespachos = desps.length;
+        const primerDespacho = desps.length > 0 ? desps.reduce((min, d) => d.Fecha < min ? d.Fecha : min, desps[0].Fecha) : "9999";
+        return { ...b, estadoEtapas: estados, estadoGeneral: getEstadoGeneral(estados), avance: calcularAvance(estados), numDespachos, primerDespacho };
+    }), [beneficiarios]);
+
+    const proy = PROYECTOS_DATA.find(p => String(p.ID_proy) === String(proyectoSel));
+    const grupos = gruposConfig[proyectoSel] || [];
+
+    const setGruposForProy = (newGrupos) => {
+        setGruposConfig(prev => ({...prev, [proyectoSel]: newGrupos}));
+    };
+
+    // Actualiza el comentario corto de un grupo (persiste en Firebase via setGruposConfig effect)
+    const actualizarComentarioGrupo = React.useCallback((grupoId, comentario) => {
+        setGruposConfig(prev => {
+            const arr = prev[proyectoSel] || [];
+            const next = arr.map(g => g.id === grupoId ? { ...g, comentario: comentario || '' } : g);
+            return { ...prev, [proyectoSel]: next };
+        });
+    }, [proyectoSel]);
+
+    // KPIs
+    const kpis = React.useMemo(() => {
+        const avanceDesp = viviendas.length ? Math.round(viviendas.reduce((s, v) => s + v.avance.porcentaje, 0) / viviendas.length) : 0;
+        const conInsp = viviendas.filter(v => getInspeccion(v.ID_Benef));
+        const avanceInsp = viviendas.length ? Math.round(viviendas.reduce((s, v) => { const i = getInspeccion(v.ID_Benef); return s + (i ? i.pct_total : 0); }, 0) / viviendas.length) : 0;
+        const totalPagadoProy = viviendas.reduce((s, v) => s + getTotalPagado(v.ID_Benef), 0);
+        const conAlertasRojas = viviendas.filter(v => calcCoherencia(v.ID_Benef, v.estadoEtapas).some(a => a.tipo === "rojo")).length;
+
+        // Terminada = tiene Recepcion Definitiva (RF) o cierre forzado.
+        const terminadas = viviendas.filter(v => !!v.fecha_recepcion || !!(cierresForzados[v.ID_Benef])).length;
+
+        // Solicitudes pendientes
+        const totalSolicitadas = viviendas.reduce((s, v) => s + Object.values(v.estadoEtapas).filter(e => e.estado === "solicitado").length, 0);
+
+        // Dias promedio fund -> ultima etapa
+        let diasTotal = 0, diasCount = 0;
+        viviendas.filter(v => v.numDespachos > 0).forEach(v => {
+            const fund = v.estadoEtapas["01_FUNDACIONES"];
+            if (fund?.fechaDespacho) {
+                let maxFecha = new Date(fund.fechaDespacho);
+                Object.values(v.estadoEtapas).forEach(info => {
+                    if (info.estado === "despachado" && info.fechaDespacho) {
+                        const f = new Date(info.fechaDespacho);
+                        if (f > maxFecha) maxFecha = f;
+                    }
+                });
+                const dias = Math.floor((maxFecha - new Date(fund.fechaDespacho)) / (1000*60*60*24));
+                if (dias > 0) { diasTotal += dias; diasCount++; }
+            }
+        });
+        const diasPromedio = diasCount > 0 ? Math.round(diasTotal / diasCount) : 0;
+
+        const conRecepcion = viviendas.filter(v => v.fecha_recepcion).length;
+        const conTE1 = viviendas.filter(v => v.has_te1).length;
+
+        // Finalizado: por tabla O por recepciones completas
+        const finalizadoTabla = proy && proy.estado === 'finalizado';
+        const finalizadoRecep = viviendas.length > 0 && conRecepcion === viviendas.length;
+        const finalizadoManual = proyTerminados[proyectoSel] ? true : false;
+        const esFinalizado = finalizadoTabla || finalizadoRecep || finalizadoManual;
+
+        // Fecha de finalizacion: ultima recepcion o fecha de marcado manual
+        let fechaFin = null;
+        if (esFinalizado) {
+            const fechasRecep = viviendas.map(v => v.fecha_recepcion).filter(Boolean).sort();
+            fechaFin = fechasRecep.length > 0 ? fechasRecep[fechasRecep.length - 1] : null;
+            if (!fechaFin && finalizadoManual && proyTerminados[proyectoSel]?.fecha) {
+                fechaFin = proyTerminados[proyectoSel].fecha.substring(0, 10);
+            }
+        }
+
+        return {
+            total: viviendas.length, terminadas,
+            enTiempo: viviendas.filter(v => v.estadoGeneral === "en_tiempo").length,
+            atencion: viviendas.filter(v => v.estadoGeneral === "atencion").length,
+            criticos: viviendas.filter(v => v.estadoGeneral === "critico").length,
+            avance: avanceDesp, avanceInsp, totalPagado: totalPagadoProy,
+            alertasCoherencia: conAlertasRojas, totalSolicitadas, diasPromedio,
+            conRecepcion, conTE1, esFinalizado, fechaFin, finalizadoTabla, finalizadoRecep, finalizadoManual
+        };
+    }, [viviendas]);
+
+    // Contrato info
+    const contratoInfo = React.useMemo(() => {
+        if (!proy) return null;
+        const fi = proy.fecha_inicio;
+        const dur = proy.duracion;
+        if (!fi || !dur) return null;
+        const inicio = new Date(fi);
+        const vencimiento = new Date(inicio);
+        vencimiento.setDate(vencimiento.getDate() + dur);
+        const hoy = new Date();
+        const diasRestantes = Math.floor((vencimiento - hoy) / (1000*60*60*24));
+        return { inicio: fi, duracion: dur, vencimiento: vencimiento.toISOString().substring(0,10), diasRestantes };
+    }, [proy]);
+
+    const garantiasProy = React.useMemo(() => {
+        if (!proy) return [];
+        return GARANTIAS_DATA.filter(g => g.ID_Proy === proy.ID_proy).map(g => {
+            const hoy = new Date();
+            const fv = g.fecha_vcmto ? new Date(g.fecha_vcmto) : null;
+            const diasVcmto = fv ? Math.floor((fv - hoy) / (1000*60*60*24)) : null;
+            return { ...g, diasVcmto };
+        });
+    }, [proy]);
+
+    const eeppProy = React.useMemo(() => {
+        const idsProyecto = new Set(viviendas.map(v => String(v.ID_Benef)));
+        return EEPP_DATA.filter(ep => idsProyecto.has(String(ep.ID_Benef)));
+    }, [viviendas]);
+
+    const eeppResumen = React.useMemo(() => {
+        const pagado = eeppProy.filter(e => e.Estado.includes("Pagado"));
+        const ingresado = eeppProy.filter(e => e.Estado.includes("Ingresado"));
+        const prep = eeppProy.filter(e => !e.Estado.includes("Pagado") && !e.Estado.includes("Ingresado"));
+        const montoPag = pagado.reduce((s, e) => s + e.Monto, 0);
+        const montoIng = ingresado.reduce((s, e) => s + e.Monto, 0);
+        const montoPrep = prep.reduce((s, e) => s + e.Monto, 0);
+        return { pagado: montoPag, ingresado: montoIng, preparacion: montoPrep, total: montoPag + montoIng + montoPrep };
+    }, [eeppProy]);
+
+    // Avance físico real desde Gantt de control (no checkpoints de inspección).
+    const avanceInsp = React.useMemo(() => {
+        const ag = avanceGanttEstado[proyectoSel];
+        return ag != null ? Number(ag.pct) : 0;
+    }, [proyectoSel, avanceGanttEstado]);
+
+    const formatUF = (val) => {
+        if (!val && val !== 0) return '—';
+        return val.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' UF';
+    };
+    const formatFecha = (iso) => {
+        if (!iso) return '—';
+        const [y,m,d] = iso.split('-');
+        return `${d}/${m}/${y}`;
+    };
+
+    // ========== VALIDACION CRUZADA ==========
+    const validaciones = React.useMemo(() => {
+        const checks = [];
+
+        // CHECK 1: Pago M.O. sin Despacho
+        // Compara: Solpago (pagos aprobados) vs Despachos del beneficiario (clasificacion fina)
+        // Detecta: Se pagó maestro pero no hay despacho de material que respalde esa familia.
+        // No se evaluan Electricidad ni Obras Exteriores. Fundaciones respalda con alcantarillado
+        // INTERIOR (planta); Gasfiteria respalda con alcantarillado EXTERIOR + Sol. AC.
+        const c1 = [];
+        viviendas.forEach(v => {
+            const pagos = getSolpago(v.ID_Benef);
+            const tags = despachoTagsDe(v.ID_Benef);
+            Object.entries(CHECK1_FAMILIA_TAGS).forEach(([fam, famTags]) => {
+                const pagosFam = pagos.filter(p => p.Familia_pago === fam);
+                const totalPagado = pagosFam.reduce((s, p) => s + p.monto, 0);
+                // Gasfiteria: los primeros $50.000 son alcantarillado que viene con Fundaciones
+                const umbral = fam === '04 - Gasfiteria' ? 50000 : 0;
+                const tieneDespacho = famTags.some(t => tags.has(t));
+                if (totalPagado > umbral && !tieneDespacho) {
+                    c1.push({ benef: v.NOMBRES + ' ' + v.APELLIDOS, id: v.ID_Benef, familia: FAMILIA_LABELS[fam] || fam, monto: totalPagado });
+                }
+            });
+        });
+        checks.push({
+            id: 'pago_sin_despacho',
+            titulo: 'Pago sin Despacho',
+            desc: 'Se registró pago de Mano de Obra en una familia, pero no hay despacho de material que la respalde. No se evalúan Electricidad ni Obras Exteriores. Fundaciones se respalda con Fundaciones + Alcantarillado interior (planta); Gasfitería con Gasfitería + Sol. AC + Alcantarillado exterior. Gasfitería excluye los primeros $50.000.',
+            compara: 'Solpago (pagos aprobados) vs Despacho (Tipo_despacho clasificado por familia)',
+            tipo: 'rojo',
+            items: c1,
+            render: (it) => `${it.benef} — ${it.familia} (${formatPeso(it.monto)} pagado)`
+        });
+
+        // CHECK 2: Inspección alta sin Despacho (a nivel PARTIDA)
+        // Compara: cada partida de inspeccion (>=50%) vs el despacho fino que la respalda.
+        // Evita el falso positivo de marcar toda una familia cuando solo una partida con su
+        // despacho propio (ej. Alcant. Ext. = la fosa) elevaba el promedio familiar.
+        const c2 = [];
+        viviendas.forEach(v => {
+            const insp = getInspeccion(v.ID_Benef);
+            if (!insp || !insp.partidas) return;
+            const tags = despachoTagsDe(v.ID_Benef);
+            Object.entries(insp.partidas).forEach(([partida, pct]) => {
+                const backing = PARTIDA_DESPACHO[partida];
+                if (!backing || backing.length === 0) return; // no evaluada (Electricidad) o desconocida
+                if (pct >= 50 && !backing.some(t => tags.has(t))) {
+                    c2.push({ benef: v.NOMBRES + ' ' + v.APELLIDOS, id: v.ID_Benef, partida, pct });
+                }
+            });
+        });
+        checks.push({
+            id: 'insp_sin_despacho',
+            titulo: 'Inspección sin Despacho',
+            desc: 'Una partida de inspección registra avance significativo (>=50%) pero no hay despacho del material que la respalda. Se compara por partida (no por familia completa): así una partida con su propio despacho (ej. Alcant. Ext. = la fosa) ya no marca a toda la Gasfitería. No se evalúa Electricidad.',
+            compara: 'Ejecucion (% inspección por partida) vs Despacho que respalda esa partida',
+            tipo: 'rojo',
+            items: c2,
+            render: (it) => `${it.benef} — ${it.partida} (Insp: ${it.pct}%)`
+        });
+
+        // CHECK 3: Despacho sin Inspección (a nivel DESPACHO)
+        // Por cada despacho del beneficiario, revisa las partidas que ESE material produce:
+        // si todas siguen <10% tras el plazo esperado, marca.
+        // Plazos por tag: ap_interior=7d, gasfiteria=10d, resto=12d.
+        // (Red Agua Pot. debe inspeccionarse ~7d tras "11-Viv.Red agua potable";
+        //  Art.Baño/Cocina ~10d tras "23-Viv.Art.baño / 24-Viv.Art.cocina")
+        const CHECK3_PLAZO = { ap_interior: 7, gasfiteria: 10, sol_ac: 10 };
+        const c3 = [];
+        viviendas.forEach(v => {
+            const insp = getInspeccion(v.ID_Benef);
+            const partidas = (insp && insp.partidas) || {};
+            const tagsFecha = despachoTagsFechaDe(v.ID_Benef);
+            Object.entries(tagsFecha).forEach(([tag, fecha]) => {
+                const backed = DESPACHO_PARTIDAS[tag];
+                if (!backed || backed.length === 0) return;
+                const dias = Math.floor((new Date() - new Date(fecha)) / (1000*60*60*24));
+                const plazo = CHECK3_PLAZO[tag] ?? 12;
+                if (dias <= plazo) return;
+                const maxPct = backed.reduce((m, p) => Math.max(m, partidas[p] || 0), 0);
+                if (maxPct < 10) {
+                    c3.push({ benef: v.NOMBRES + ' ' + v.APELLIDOS, id: v.ID_Benef, material: DESPACHO_LABEL[tag] || tag, dias, pct: maxPct, plazo });
+                }
+            });
+        });
+        checks.push({
+            id: 'desp_sin_insp',
+            titulo: 'Despacho sin Inspección',
+            desc: 'Se despachó un material pero las partidas de inspección que produce siguen bajo 10% tras el plazo esperado: Red Agua Pot. = 7 días, Gasfitería/Sol.AC = 10 días, resto = 12 días. Se evalúa por tipo de despacho. No se evalúan Electricidad ni Agua Potable exterior.',
+            compara: 'Despacho (fecha entrega, clasificado) vs Inspección de las partidas que produce',
+            tipo: 'naranja',
+            items: c3,
+            render: (it) => `${it.benef} — ${it.material} (${it.dias}d desde despacho, Insp: ${it.pct}%)`
+        });
+
+        // CHECK 4: Solicitud vencida (>8 días sin despacho)
+        // Compara: soldepacho (solicitudes) vs Despacho
+        // Detecta: Solicitud que sigue "solicitada" (no cubierta por despacho) hace mas de 8 dias
+        const c4 = [];
+        viviendas.forEach(v => {
+            Object.entries(v.estadoEtapas).forEach(([key, info]) => {
+                if (info.estado === "solicitado" && info.diasSolicitud > 8) {
+                    c4.push({ benef: v.NOMBRES + ' ' + v.APELLIDOS, id: v.ID_Benef, etapa: info.nombre, dias: info.diasSolicitud });
+                }
+            });
+        });
+        checks.push({
+            id: 'sol_vencida',
+            titulo: 'Solicitud Vencida (+8 días)',
+            desc: 'Se solicitó despacho de material hace más de 8 días y aún no se registra la entrega. Verificar si hubo problemas de stock o si falta registrar el despacho.',
+            compara: 'soldepacho (fecha solicitud) vs Despacho (fecha entrega)',
+            tipo: 'naranja',
+            items: c4,
+            render: (it) => `${it.benef} — ${it.etapa} (${it.dias} días esperando)`
+        });
+
+        // CHECK 5: Vivienda habilitada sin actividad
+        // Compara: Beneficiario (habilitado) vs Despacho
+        // Detecta: Beneficiario marcado como hábil pero sin ningún despacho
+        const c5 = [];
+        viviendas.forEach(v => {
+            if (v.habil && v.numDespachos === 0) {
+                const dias = calcularDias(v.fecha_hpc);
+                if (dias !== null && dias > 14) {
+                    c5.push({ benef: v.NOMBRES + ' ' + v.APELLIDOS, id: v.ID_Benef, dias });
+                }
+            }
+        });
+        checks.push({
+            id: 'habil_sin_desp',
+            titulo: 'Habilitada sin Despachos (+14 días)',
+            desc: 'El beneficiario está "Hábil para construir" desde hace más de 14 días pero no tiene ningún despacho registrado. Verificar si está pendiente el inicio de obra.',
+            compara: 'Beneficiario (fecha HPC) vs Despacho (registros)',
+            tipo: 'amarillo',
+            items: c5,
+            render: (it) => `${it.benef} (${it.dias} días habilitada sin despacho)`
+        });
+
+        // CHECK 6: Posible Pago en Exceso
+        // Compara: Solpago (total pagado por familia) vs Tabla_pago (presupuesto M.O. Vivienda + RC)
+        // Detecta: Lo pagado supera la suma de presupuestos Vivienda + Recinto Complementario
+        const c6 = [];
+        viviendas.forEach(v => {
+            const tipViv = v.tipologia_viv_id;
+            const tipRC = v.tipologia_rc_id;
+            if (!tipViv && !tipRC) return;
+            const _presProyC6 = PRESUPUESTO_DATA[v.ID_Proy] || {};
+            const presViv = _presProyC6[tipViv] || {};
+            const presRC  = _presProyC6[tipRC] || {};
+
+            // Unir familias de ambas tipologías
+            const todasFamilias = new Set([...Object.keys(presViv), ...Object.keys(presRC)]);
+            const pagos = getSolpago(v.ID_Benef);
+
+            todasFamilias.forEach(familia => {
+                const montoViv = presViv[familia] || 0;
+                const montoRC = presRC[familia] || 0;
+                const montoBase = montoViv + montoRC;
+                if (montoBase <= 0) return;
+
+                const pagosFam = pagos.filter(p => p.Familia_pago === familia);
+                const totalPagado = pagosFam.reduce((s, p) => s + p.monto, 0);
+                if (totalPagado > montoBase) {
+                    const exceso = totalPagado - montoBase;
+                    if (exceso < 10000) return; // ignorar excesos menores a $10.000
+                    const pctExceso = Math.round((exceso / montoBase) * 100);
+                    c6.push({
+                        benef: v.NOMBRES + ' ' + v.APELLIDOS,
+                        id: v.ID_Benef,
+                        familia,
+                        pagado: totalPagado,
+                        presupuesto: montoBase,
+                        exceso,
+                        pctExceso,
+                        tieneRC: montoRC > 0
+                    });
+                }
+            });
+        });
+        c6.sort((a, b) => b.exceso - a.exceso);
+        checks.push({
+            id: 'pago_exceso',
+            titulo: 'Posible Pago en Exceso',
+            desc: 'El total pagado en Mano de Obra supera la suma de presupuestos Vivienda + Recinto Complementario (Tabla_pago) por más de $10.000. Solo compara pagos aprobados.',
+            compara: 'Solpago (pagos aprobados) vs Tabla_pago (presupuesto Viv + RC por tipología)',
+            tipo: 'rojo',
+            items: c6,
+            render: (it) => `${it.benef} — ${it.familia}: Pagado ${formatPeso(it.pagado)} vs Presup. ${formatPeso(it.presupuesto)}${it.tieneRC ? ' (Viv+RC)' : ''} (+${formatPeso(it.exceso)}, +${it.pctExceso}%)`
+        });
+
+        // CHECK 7: Muestras de Hormigon incompletas
+        // Completo = muestras OK >= requeridas (config o 1 cada 6 casas) y sin malas pendientes de re-toma
+        const c7 = [];
+        const muestrasArr = (() => { const raw = muestrasHormigon[proyectoSel]; return Array.isArray(raw) ? raw : []; })();
+        if (viviendas.length > 0) {
+            const cfgM = muestrasConfig[proyectoSel] || {};
+            const requeridas = (cfgM.requeridas != null && cfgM.requeridas !== '') ? Number(cfgM.requeridas) : Math.ceil(viviendas.length / 6);
+            const okCount = muestrasArr.filter(m => muestraEstado(m) === 'ok').length;
+            const malaPend = muestrasArr.filter(m => muestraEstado(m) === 'mala').length;
+            if (okCount < requeridas || malaPend > 0) {
+                c7.push({ totalCasas: viviendas.length, muestrasRequeridas: requeridas, okCount, malaPend, faltantes: Math.max(requeridas - okCount, 0) });
+            }
+        }
+        checks.push({
+            id: 'muestras_hormigon',
+            titulo: 'Muestras Hormigon Incompletas',
+            desc: 'La toma de muestras no esta completa: deben llegar las requeridas con resultado OK y ninguna mala pendiente de re-toma.',
+            compara: 'Registro Muestras (resultados por elemento) vs Estandar del proyecto',
+            tipo: 'naranja',
+            items: c7,
+            render: (it) => `${it.totalCasas} casas, requiere ${it.muestrasRequeridas} OK, tiene ${it.okCount} OK` + (it.malaPend > 0 ? `, ${it.malaPend} mala(s) por re-tomar` : '') + (it.faltantes > 0 ? ` (faltan ${it.faltantes})` : '')
+        });
+
+        // CHECK 8: Resultados de laboratorio pendientes (28 dias)
+        // Detecta: Muestras tomadas hace mas de 28 dias sin que se haya marcado "resultado pedido"
+        const c8 = [];
+        const hoy = new Date();
+        muestrasArr.forEach(m => {
+            if (muestraEstado(m) !== 'pendiente') return;
+            const fechaToma = new Date(m.fecha);
+            const diasDesde = Math.floor((hoy - fechaToma) / (1000 * 60 * 60 * 24));
+            if (diasDesde >= 28) {
+                c8.push({
+                    muestraId: m.id,
+                    fecha: m.fecha,
+                    dias: diasDesde,
+                    cantidad: m.cantidad || 0,
+                    casasNombres: m.casasNombres || []
+                });
+            }
+        });
+        checks.push({
+            id: 'resultado_lab_pendiente',
+            titulo: 'Pedir Resultado Laboratorio',
+            desc: 'Han pasado mas de 28 dias desde la toma de muestras de hormigon. Se debe solicitar los resultados al laboratorio.',
+            compara: 'Registro Muestras (fecha toma) vs Fecha actual',
+            tipo: 'rojo',
+            items: c8,
+            render: (it) => `Muestra del ${it.fecha} (${it.dias} dias), ${it.cantidad} probeta(s)${it.casasNombres.length > 0 ? ' — Casas: ' + it.casasNombres.join(', ') : ''}`
+        });
+
+        return checks;
+    }, [viviendas, muestrasHormigon, muestrasConfig]);
+
+    const totalHallazgos = validaciones.reduce((s, c) => s + c.items.length, 0);
+
+    const tabs = [["viviendas","Viviendas"],["matriz","Matriz"],["distribucion","Distribución"],["financiero","Financiero"],["mano_obra","M.O."],["estados_pago","Estados de Pago"],["estado_general","Estado General"],["configuracion","Configuración Obra"]];
+
+    return (
+        <div className="min-h-screen bg-gray-50">
+            {/* CONFIGURACION GENERAL MODAL */}
+            <ConfigGeneralModal show={showConfigGeneral} onClose={() => setShowConfigGeneral(false)} viviendas={viviendas} proyectoSel={proyectoSel} />
+            {/* TOP BAR */}
+            <div className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
+                <div className="max-w-[1400px] mx-auto px-4 py-3">
+                    <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 bg-violet-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">SC</div>
+                            <span className="text-sm font-bold text-gray-600 hidden sm:inline">SCRaices v3 <span className="ml-1.5 bg-green-500 text-white text-[9px] px-1.5 py-0.5 rounded align-middle">LIVE</span></span>
+                        </div>
+                        <div ref={proyRef} className="relative flex-1 max-w-md" style={{position:"relative"}}>
+                            <div
+                                className="bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 w-full flex items-center gap-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                style={{userSelect:"none"}}
+                                onClick={() => { setProyOpen(o => !o); setProySearch(""); }}
+                            >
+                                {(() => {
+                                    const p = PROYECTOS_DATA.find(x => String(x.ID_proy) === String(proyectoSel));
+                                    if (!p) return <span className="text-gray-400">Seleccionar proyecto...</span>;
+                                    const bens = BENEFICIARIOS_DATA.filter(b => String(b.ID_Proy) === String(p.ID_proy));
+                                    const nCerradas = bens.filter(b => b.fecha_recepcion || cierresForzados[b.ID_Benef]).length;
+                                    const fin = p.estado === 'finalizado' || (bens.length > 0 && nCerradas === bens.length);
+                                    return <span className="flex-1 truncate">{fin ? '✓ ' : ''}{p.ID_proy} · {p.NOMBRE_PROYECTO} — {p.COMUNA} ({bens.length} viv.)</span>;
+                                })()}
+                                <svg style={{flexShrink:0,transition:"transform 0.15s",transform:proyOpen?"rotate(180deg)":"rotate(0deg)"}} width="14" height="14" viewBox="0 0 20 20" fill="none"><path d="M5 7.5l5 5 5-5" stroke="#9ca3af" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                            </div>
+                            {proyOpen && <div className="absolute left-0 top-full mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg z-[200]" style={{minWidth:"320px"}}>
+                                <div className="p-2 border-b border-gray-100">
+                                    <input
+                                        autoFocus
+                                        type="text"
+                                        placeholder="Buscar proyecto..."
+                                        value={proySearch}
+                                        onChange={e => setProySearch(e.target.value)}
+                                        onKeyDown={e => {
+                                            if (e.key === "Escape") setProyOpen(false);
+                                            if (e.key === "Enter") {
+                                                const filtered = PROYECTOS_DATA.filter(p => {
+                                                    const q = proySearch.toLowerCase();
+                                                    return !q || p.ID_proy.toLowerCase().includes(q) || p.NOMBRE_PROYECTO.toLowerCase().includes(q) || (p.COMUNA||"").toLowerCase().includes(q);
+                                                });
+                                                if (filtered.length > 0) {
+                                                    setProyectoSel(filtered[0].ID_proy); setExpandida(null); setTab("viviendas"); setProyOpen(false);
+                                                }
+                                            }
+                                        }}
+                                        className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-violet-400"
+                                    />
+                                </div>
+                                <div style={{maxHeight:"260px",overflowY:"auto"}}>
+                                    {PROYECTOS_DATA.filter(p => {
+                                        const q = proySearch.toLowerCase();
+                                        return !q || p.ID_proy.toLowerCase().includes(q) || p.NOMBRE_PROYECTO.toLowerCase().includes(q) || (p.COMUNA||"").toLowerCase().includes(q);
+                                    }).map(p => {
+                                        const bens = BENEFICIARIOS_DATA.filter(b => String(b.ID_Proy) === String(p.ID_proy));
+                                        const nCerradas = bens.filter(b => b.fecha_recepcion || cierresForzados[b.ID_Benef]).length;
+                                        const fin = p.estado === 'finalizado' || (bens.length > 0 && nCerradas === bens.length);
+                                        const sel = String(p.ID_proy) === String(proyectoSel);
+                                        return <div
+                                            key={p.ID_proy}
+                                            onClick={() => { setProyectoSel(p.ID_proy); setExpandida(null); setTab("viviendas"); setProyOpen(false); setProySearch(""); }}
+                                            className={`px-3 py-2 text-sm cursor-pointer flex items-center gap-2 ${sel ? "bg-violet-50 text-violet-700 font-semibold" : "text-gray-700 hover:bg-gray-50"}`}
+                                        >
+                                            <span className="text-xs font-mono text-gray-400 w-10 shrink-0">{p.ID_proy}</span>
+                                            <span className="flex-1 truncate">{fin ? <span className="text-green-600 mr-1">✓</span> : null}{p.NOMBRE_PROYECTO}</span>
+                                            <span className="text-xs text-gray-400 shrink-0">{p.COMUNA} · {bens.length}v</span>
+                                        </div>;
+                                    })}
+                                </div>
+                            </div>}
+                        </div>
+                        {grupos.length > 0 && <div className="flex items-center gap-1.5 text-xs text-gray-500"><IconGroup /><span>{grupos.length} grupos</span></div>}
+                        {typeof APPS_SCRIPT_URL !== 'undefined' && (
+                            <button onClick={async () => {
+                                if (refreshing) return;
+                                setRefreshing(true);
+                                try {
+                                    const raw = await fetchAllData();
+                                    processRawData(raw);
+                                    if (typeof saveProcessedCache === 'function') saveProcessedCache();
+                                    setLastUpdate(new Date());
+                                    renderApp();
+                                } catch(e) {
+                                    console.error('[REFRESH]', e);
+                                } finally {
+                                    setRefreshing(false);
+                                }
+                            }} title={lastUpdate ? 'Actualizado ' + lastUpdate.toLocaleTimeString('es-CL') : 'Actualizar datos'} className={`p-1.5 rounded-lg text-gray-400 hover:text-violet-600 hover:bg-violet-50 transition-colors ${refreshing ? 'animate-spin' : ''}`}>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+                            </button>
+                        )}
+                        {typeof APPS_SCRIPT_URL !== 'undefined' && (
+                            <button onClick={async () => {
+                                if (te1Loading) return;
+                                setTe1Loading(true);
+                                setTe1Error(null);
+                                setShowTE1(true);
+                                try {
+                                    const TE1_SHEET_ID = '1QCoIpiQKV1LB6XgUwwoC_e4crRD5mIANLxon9ZVwsg8';
+                                    const url = APPS_SCRIPT_URL + '?sheetId=' + encodeURIComponent(TE1_SHEET_ID) + '&tables=' + encodeURIComponent('Hoja 1');
+                                    console.log('[TE1] Fetching:', url);
+                                    const resp = await fetch(url, { redirect: 'follow' });
+                                    console.log('[TE1] Response status:', resp.status, 'type:', resp.type);
+                                    const text = await resp.text();
+                                    console.log('[TE1] Response length:', text.length, 'preview:', text.substring(0, 200));
+                                    let data;
+                                    try { data = JSON.parse(text); } catch(pe) {
+                                        throw new Error('Respuesta no es JSON. Puede ser problema de permisos del Apps Script. Abrir en nueva pestaña: ' + url);
+                                    }
+                                    if (data.error) throw new Error(data.error);
+                                    const rows = data['Hoja 1']?.rows || data[Object.keys(data)[0]]?.rows || [];
+                                    // Ordenar por Fecha Inscripcion descendente (mas recientes primero)
+                                    rows.sort((a, b) => {
+                                        const fa = (a['Fecha Inscripcion'] || '').split('/').reverse().join('');
+                                        const fb = (b['Fecha Inscripcion'] || '').split('/').reverse().join('');
+                                        return fb.localeCompare(fa);
+                                    });
+                                    console.log('[TE1] OK:', rows.length, 'registros (ordenados desc)');
+                                    setTe1Data(rows);
+                                } catch(e) {
+                                    console.error('[TE1] Error:', e);
+                                    setTe1Error(e.message);
+                                } finally {
+                                    setTe1Loading(false);
+                                }
+                            }} title="Leer TE1" className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition-colors">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                            </button>
+                        )}
+                        <div className="flex flex-col ml-auto gap-0"><div className="flex items-center gap-2">
+                        <button type="button" onClick={() => window.open('estado_proyectos.html', '_blank')} title="Estado de Proyectos — seguimiento y coordinación de obras" className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-violet-700 bg-violet-50 border border-violet-300 hover:bg-violet-100 transition-colors whitespace-nowrap shrink-0">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" opacity=".3" fill="currentColor"/><path d="M3 9h18"/><path d="M9 3v18"/><circle cx="15" cy="15" r="2" fill="currentColor" stroke="none"/><circle cx="6" cy="6" r="1.2" fill="currentColor" stroke="none"/></svg>
+                            <span className="hidden md:inline">Estado de Proyectos</span>
+                        </button>
+                        <button type="button" onClick={() => window.open('bitacora_miniexcavadora.html', '_blank')} title="Bitácora diaria de actividades de la miniexcavadora" className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-400 hover:bg-amber-100 transition-colors whitespace-nowrap shrink-0">
+                            <span style={{fontSize:'13px',lineHeight:1}}>🚜</span>
+                            <span className="hidden md:inline">Bitácora Miniexcavadora</span>
+                        </button>
+                        <button type="button" onClick={() => setShowModalPersonal(true)} title="Registro global de personal de la organización" className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-violet-700 bg-violet-50 border border-violet-300 hover:bg-violet-100 transition-colors whitespace-nowrap shrink-0">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+                            <span className="hidden md:inline">Personal</span>
+                        </button>
+                        <button type="button" onClick={(e) => { exportarSolpagoEnCurso(e.currentTarget); }} title="Descargar Excel: Solicitudes de pago M.O. aprobadas pero NO pagadas (en curso)" className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-violet-700 bg-violet-50 border border-violet-300 hover:bg-violet-100 transition-colors whitespace-nowrap shrink-0">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M12 3v12m0 0l-4-4m4 4l4-4"/></svg>
+                            <span className="hidden md:inline">Pagos en curso</span>
+                        </button>
+                        <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowSugerencias(true); }} title="Sugerencias de mejora" className="relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-violet-700 bg-violet-50 border border-violet-300 hover:bg-violet-100 transition-colors whitespace-nowrap shrink-0">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                            <span className="hidden md:inline">Sugerencias</span>
+                            {pendientesSug > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">{pendientesSug}</span>}
+                        </button>
+                        </div>
+                        <div className="flex items-center gap-2 mt-1.5 pt-1.5 border-t border-gray-100">
+                        <div ref={informesRef} className="relative">
+                            <button
+                                type="button"
+                                onClick={() => setShowInformes(v => !v)}
+                                title="Generar informes HTML descargables"
+                                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-colors whitespace-nowrap shrink-0 ${showInformes ? 'bg-indigo-600 text-white border border-indigo-600' : 'text-indigo-700 bg-indigo-50 border border-indigo-300 hover:bg-indigo-100'}`}
+                            >
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                                Informes
+                                <svg width="11" height="11" viewBox="0 0 20 20" fill="none" style={{transition:"transform 0.15s",transform:showInformes?"rotate(180deg)":"rotate(0deg)"}}><path d="M5 7.5l5 5 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                            </button>
+                            {showInformes && (
+                                <div className="absolute left-0 top-full mt-1.5 bg-white border border-gray-200 rounded-xl shadow-xl z-[200] p-3 flex flex-wrap gap-2" style={{minWidth:"520px"}}>
+                                    <div className="w-full text-[10px] text-gray-400 font-semibold uppercase tracking-wider mb-1 px-0.5">Selecciona el informe a descargar</div>
+                                    <button onClick={() => { window._raicesInformeFns?.residente?.(); setShowInformes(false); }} className="flex items-center gap-2 px-3 py-1.5 bg-amber-700 hover:bg-amber-800 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors whitespace-nowrap" title="HTML de avance de obra para el residente">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                                        Residente
+                                    </button>
+                                    <button onClick={() => { window._raicesInformeFns?.capataz?.(); setShowInformes(false); }} className="flex items-center gap-2 px-3 py-1.5 bg-teal-700 hover:bg-teal-800 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors whitespace-nowrap" title="Un HTML por cada capataz del proyecto">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+                                        Capataz
+                                    </button>
+                                    <button onClick={() => { window._raicesInformeFns?.adquisiciones?.(); setShowInformes(false); }} className="flex items-center gap-2 px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors whitespace-nowrap" title="Multi-obras: checkpoints, curvas S y ritmos">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                                        Adquisiciones
+                                    </button>
+                                    <button onClick={() => { window._raicesInformeFns?.ejecutivo?.(); setShowInformes(false); }} className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-900 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors whitespace-nowrap" title="Multi-obras con selector y tabs (Resumen, Checkpoints, Curvas S, Ritmos, Viviendas)">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                                        Ejecutivo
+                                    </button>
+                                    <button onClick={() => { window._raicesInformeFns?.recepciones?.(); setShowInformes(false); }} className="flex items-center gap-2 px-3 py-1.5 bg-indigo-700 hover:bg-indigo-800 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors whitespace-nowrap" title="Multi-obras para coordinador de recepciones">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                                        Recepciones
+                                    </button>
+                                    <button onClick={() => { window._raicesInformeFns?.estadosPago?.(); setShowInformes(false); }} className="flex items-center gap-2 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors whitespace-nowrap" title="Estados de pago, garantías y pagos M.O. por obra">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                                        Estados de Pago
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                        <button type="button" onClick={() => setShowConfigGeneral(true)} title="Configuración general transversal a todas las obras" className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-slate-700 bg-slate-50 border border-slate-300 hover:bg-slate-100 transition-colors whitespace-nowrap shrink-0">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14M12 2v2m0 16v2m-7.07-4.93 1.41-1.41M17.66 6.34l1.41-1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+                            Configuración General
+                        </button>
+                        <button type="button" onClick={() => setShowAlertas(true)} title="Alertas globales de gerencia: obras con situaciones críticas" className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border transition-colors whitespace-nowrap shrink-0 ${obrasConAlertas > 0 ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100' : 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'}`}>
+                            <span style={{fontSize:'12px',lineHeight:1}}>🚨</span>
+                            {obrasConAlertas > 0 ? `${obrasConAlertas} con alertas` : 'Sin alertas'}
+                            {obrasConAlertas > 0 && <span className="text-[9px] font-normal opacity-70">(gerencia)</span>}
+                        </button>
+                        {kpis.esFinalizado ? (
+                            <span className="flex items-center gap-1.5 px-2.5 py-1.5 bg-green-50 border border-green-300 rounded-lg text-[11px] font-semibold text-green-700 whitespace-nowrap shrink-0">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                Terminado
+                                {kpis.finalizadoManual && <button onClick={() => desmarcarTerminado(proyectoSel)} className="text-green-400 hover:text-red-500 ml-1" title="Desmarcar">&times;</button>}
+                            </span>
+                        ) : (
+                            <button onClick={() => {
+                                const motivo = prompt('Motivo (ej: 1 casa no se construira):');
+                                if (motivo !== null) marcarTerminado(proyectoSel, motivo);
+                            }} title="Marcar proyecto como terminado" className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-violet-700 bg-violet-50 border border-violet-300 hover:bg-violet-100 transition-colors whitespace-nowrap shrink-0">
+                                Marcar Terminado
+                            </button>
+                        )}
+                        </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="max-w-[1400px] mx-auto px-4 py-4">
+                {/* HEADER: Contrato + Garantías + EP */}
+                <HeaderProyecto proy={proy} garantiasProy={garantiasProy} eeppResumen={eeppResumen} kpis={kpis} avanceInsp={avanceInsp} nViviendas={viviendas.length} ganttProg={ganttPrograma[proyectoSel] || null} />
+
+                {/* Banner Finalizado */}
+                {kpis.esFinalizado && (
+                    <div className="mb-4 bg-green-50 border border-green-300 rounded-xl px-5 py-3 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
+                                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7"/></svg>
+                            </div>
+                            <div>
+                                <h3 className="text-green-800 font-bold text-sm">Proyecto Finalizado</h3>
+                                <p className="text-green-600 text-xs">
+                                    {kpis.finalizadoManual && !kpis.finalizadoRecep && `Marcado manualmente${proyTerminados[proyectoSel]?.motivo ? ': ' + proyTerminados[proyectoSel].motivo : ''}`}
+                                    {kpis.finalizadoRecep && !kpis.finalizadoTabla && !kpis.finalizadoManual && "Todas las recepciones definitivas completadas"}
+                                    {kpis.finalizadoTabla && kpis.finalizadoRecep && "Marcado como finalizado — recepciones completas"}
+                                    {kpis.finalizadoTabla && !kpis.finalizadoRecep && !kpis.finalizadoManual && "Marcado como finalizado en AppSheet"}
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            {kpis.fechaFin && (() => {
+                                const p = kpis.fechaFin.split('-');
+                                return <div className="text-right">
+                                    <p className="text-[10px] text-green-600 uppercase font-medium">Fecha finalizacion</p>
+                                    <p className="text-lg font-bold font-mono text-green-700">{p[2]}/{p[1]}/{p[0]}</p>
+                                </div>;
+                            })()}
+                            {kpis.finalizadoManual && <button onClick={() => desmarcarTerminado(proyectoSel)} className="text-[10px] text-green-600 hover:text-red-500 underline ml-2">Desmarcar</button>}
+                        </div>
+                    </div>
+                )}
+
+                {/* KPIs */}
+                <div className="grid grid-cols-5 lg:grid-cols-10 gap-1.5 mb-3">
+                    <div className="bg-white rounded-lg p-2 border border-gray-200 shadow-sm"><p className="text-[9px] text-gray-500 uppercase">Viviendas</p><p className="text-base font-bold font-mono">{kpis.total}</p></div>
+                    <div className="bg-white rounded-lg p-2 border border-green-200 shadow-sm"><p className="text-[9px] text-green-600">Terminadas</p><p className="text-base font-bold font-mono text-green-700">{kpis.terminadas}</p><p className="text-[8px] text-gray-400">{kpis.total > 0 ? Math.round(kpis.terminadas/kpis.total*100) : 0}%</p></div>
+                    <div className="bg-white rounded-lg p-2 border border-green-200 shadow-sm"><p className="text-[9px] text-green-600">En Tiempo</p><p className="text-base font-bold font-mono text-green-600">{kpis.enTiempo}</p></div>
+                    <div className="bg-white rounded-lg p-2 border border-yellow-200 shadow-sm"><p className="text-[9px] text-yellow-600">Atención</p><p className="text-base font-bold font-mono text-yellow-600">{kpis.atencion}</p></div>
+                    <div className="bg-white rounded-lg p-2 border border-red-200 shadow-sm"><p className="text-[9px] text-red-600">Críticas</p><p className="text-base font-bold font-mono text-red-600">{kpis.criticos}</p>{kpis.alertasCoherencia > 0 && <p className="text-[8px] text-red-400">{kpis.alertasCoherencia} alertas</p>}</div>
+                    <div className="bg-white rounded-lg p-2 border border-purple-200 shadow-sm"><p className="text-[9px] text-purple-600">Solicitadas</p><p className="text-base font-bold font-mono text-purple-600">{kpis.totalSolicitadas}</p><p className="text-[8px] text-gray-400">esp. desp.</p></div>
+                    <div className="bg-white rounded-lg p-2 border border-gray-200 shadow-sm"><p className="text-[9px] text-gray-500">Días Prom.</p><p className="text-base font-bold font-mono">{kpis.diasPromedio}d</p><p className="text-[8px] text-gray-400">Fund→últ.</p></div>
+                    <div className="bg-white rounded-lg p-2 border border-violet-200 shadow-sm overflow-hidden"><p className="text-[9px] text-violet-600">Total Pagado</p><p className={`font-bold font-mono text-violet-700 mt-0.5 ${kpis.totalPagado >= 100000000 ? "text-[10px]" : kpis.totalPagado >= 10000000 ? "text-xs" : "text-sm"}`}>{formatPeso(kpis.totalPagado)}</p></div>
+                    <div className="bg-white rounded-lg p-2 border border-blue-200 shadow-sm"><p className="text-[9px] text-blue-600">Recep. Def.</p><p className="text-base font-bold font-mono text-blue-700">{kpis.conRecepcion}<span className="text-xs text-gray-400 font-normal">/{kpis.total}</span></p></div>
+                    <div className="bg-white rounded-lg p-2 border border-amber-200 shadow-sm"><p className="text-[9px] text-amber-600">TE1</p><p className="text-base font-bold font-mono text-amber-700">{kpis.conTE1}<span className="text-xs text-gray-400 font-normal">/{kpis.total}</span></p></div>
+                </div>
+
+                {/* VALIDACION + MUESTRAS — fila única */}
+                <div className="flex flex-wrap gap-2 mb-3 items-center">
+                {/* VALIDACION CRUZADA - Botón + Modal */}
+                <button onClick={() => setShowValidacion(true)} className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${totalHallazgos > 0 ? 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100' : 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'}`}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        {totalHallazgos > 0
+                            ? <><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></>
+                            : <><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></>
+                        }
+                    </svg>
+                    {totalHallazgos > 0 ? `${totalHallazgos} hallazgo${totalHallazgos !== 1 ? 's' : ''} en validación cruzada` : 'Validación cruzada OK'}
+                </button>
+                {/* MUESTRAS HORMIGON - Botón + Modal */}
+                {(() => {
+                    if (viviendas.length === 0) return null;
+                    const rm = getMuestrasResumen();
+                    const cls = rm.malaPend > 0 ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'
+                        : rm.completo ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'
+                        : rm.total > 0 ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
+                        : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100';
+                    return <button onClick={() => setShowMuestras(true)} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${cls}`}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M9 3h6v2a3 3 0 0 1-6 0V3z"/><path d="M12 5v6"/><path d="M8 11h8l1 10H7L8 11z"/>
+                        </svg>
+                        Muestras Hormigón {rm.okCount}/{rm.requeridas}
+                        {rm.malaPend > 0 && <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{rm.malaPend} mala{rm.malaPend > 1 ? 's' : ''}</span>}
+                        {rm.completo && <span className="bg-green-600 text-white text-[10px] px-1.5 py-0.5 rounded-full">Completo</span>}
+                    </button>;
+                })()}
+                </div>{/* fin flex alertas */}
+                {showMuestras && (() => {
+                    const muestrasArr = getMuestrasProy();
+                    const cfg = getMuestrasCfg();
+                    const rm = getMuestrasResumen();
+                    const ELEMENTOS = [['cimiento', 'Cimiento', cfg.minCimiento], ['sobrecimiento', 'Sobrecimiento', cfg.minSobrecimiento], ['radier', 'Radier', cfg.minRadier]];
+                    const estadoBadge = { ok: ['bg-green-100 text-green-700', 'OK'], mala: ['bg-red-100 text-red-700', 'MALA — re-tomar'], mala_retomada: ['bg-gray-100 text-gray-500', 'Mala (re-tomada)'], pendiente: ['bg-amber-100 text-amber-700', 'Pendiente'] };
+                    return <div className="fixed inset-0 z-[60] bg-black/40 flex items-start justify-center pt-8 px-4" onClick={(e) => e.target === e.currentTarget && setShowMuestras(false)}>
+                        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[88vh] overflow-hidden flex flex-col">
+                            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+                                <div>
+                                    <h2 className="text-lg font-bold text-gray-800">Muestras de Hormigón — Fundaciones</h2>
+                                    <p className="text-xs text-gray-500 mt-0.5">Cada muestra registra Cimiento, Sobrecimiento y Radier. Completo = muestras OK ≥ requeridas y sin malas pendientes.</p>
+                                </div>
+                                <button onClick={() => setShowMuestras(false)} className="text-gray-400 hover:text-gray-600 text-xl font-bold w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100">x</button>
+                            </div>
+                            <div className="overflow-y-auto p-6 space-y-5">
+                                {/* Resumen del proyecto */}
+                                <div className={`rounded-xl border px-4 py-3 ${rm.completo ? 'border-green-200 bg-green-50/60' : rm.malaPend > 0 ? 'border-red-200 bg-red-50/50' : 'border-blue-200 bg-blue-50/50'}`}>
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-sm font-semibold text-gray-800">{proy ? `${proy.ID_proy} · ${proy.NOMBRE_PROYECTO}` : proyectoSel}</p>
+                                            <p className="text-[11px] text-gray-600 mt-0.5">
+                                                {viviendas.length} casa{viviendas.length !== 1 ? 's' : ''} · Requiere {rm.requeridas} muestra{rm.requeridas !== 1 ? 's' : ''} OK · <b className="text-green-700">{rm.okCount} OK</b>{rm.malaPend > 0 ? <span className="text-red-600"> · {rm.malaPend} mala(s) pendiente(s)</span> : ''}{rm.pendientes > 0 ? <span className="text-amber-600"> · {rm.pendientes} sin resultado</span> : ''}
+                                            </p>
+                                        </div>
+                                        {rm.completo
+                                            ? <span className="text-[10px] bg-green-600 text-white px-2.5 py-1 rounded-full font-medium">Completo ✓</span>
+                                            : rm.malaPend > 0
+                                                ? <span className="text-[10px] bg-red-100 text-red-700 px-2.5 py-1 rounded-full font-medium">Hay malas por re-tomar</span>
+                                                : <span className="text-[10px] bg-orange-100 text-orange-700 px-2.5 py-1 rounded-full font-medium">Faltan {Math.max(rm.requeridas - rm.okCount, 0)} OK</span>
+                                        }
+                                    </div>
+                                </div>
+
+                                {/* Estandar del proyecto (configurable) */}
+                                <div className="rounded-xl border border-violet-200 overflow-hidden">
+                                    <div className="px-4 py-2.5 bg-violet-50 border-b border-violet-200">
+                                        <h3 className="text-xs font-semibold text-violet-800">⚙ Estándar del proyecto</h3>
+                                    </div>
+                                    <div className="px-4 py-3 grid grid-cols-2 md:grid-cols-4 gap-3" key={proyectoSel}>
+                                        <div>
+                                            <label className="text-[10px] text-gray-500 block mb-1">Muestras requeridas</label>
+                                            <input type="number" min="0" defaultValue={cfg.requeridasManual ? cfg.requeridas : ''} placeholder={`auto ${Math.ceil(viviendas.length / 6)}`} onBlur={(e) => guardarMuestrasCfg({ requeridas: e.target.value === '' ? '' : parseInt(e.target.value) })} className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-violet-400" />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] text-gray-500 block mb-1">Mín. Cimiento (MPa)</label>
+                                            <input type="number" min="0" defaultValue={cfg.minCimiento} onBlur={(e) => guardarMuestrasCfg({ minCimiento: e.target.value })} className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-violet-400" />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] text-gray-500 block mb-1">Mín. Sobrecimiento (MPa)</label>
+                                            <input type="number" min="0" defaultValue={cfg.minSobrecimiento} onBlur={(e) => guardarMuestrasCfg({ minSobrecimiento: e.target.value })} className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-violet-400" />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] text-gray-500 block mb-1">Mín. Radier (MPa)</label>
+                                            <input type="number" min="0" defaultValue={cfg.minRadier} onBlur={(e) => guardarMuestrasCfg({ minRadier: e.target.value })} className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-violet-400" />
+                                        </div>
+                                    </div>
+                                    <p className="px-4 pb-2 text-[10px] text-gray-400">Si dejas vacía la cantidad, se usa 1 cada 6 casas. Los mínimos son la referencia para marcar OK/Mala.</p>
+                                </div>
+
+                                {/* Lista de muestras registradas */}
+                                {muestrasArr.length > 0 && (
+                                    <div className="rounded-xl border border-gray-200 overflow-hidden">
+                                        <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-200">
+                                            <h3 className="text-xs font-semibold text-gray-700">Muestras registradas ({muestrasArr.length})</h3>
+                                        </div>
+                                        <div className="divide-y divide-gray-100">
+                                            {muestrasArr.map((m, i) => {
+                                                const est = muestraEstado(m);
+                                                const [bcls, blabel] = estadoBadge[est] || estadoBadge.pendiente;
+                                                const legacy = !m.resultados && (m.resultadoPedido || m.cantidad);
+                                                return <div key={m.id} className={`px-4 py-3 ${est === 'mala' ? 'bg-red-50/50' : ''}`}>
+                                                    <div className="flex items-center justify-between gap-3 mb-2">
+                                                        <div className="flex items-center gap-2 min-w-0">
+                                                            <span className="text-xs font-semibold text-gray-700">Muestra #{i + 1}</span>
+                                                            <span className="text-[10px] text-gray-400">{m.fecha}</span>
+                                                            {m.casasNombres && m.casasNombres.length > 0 && <span className="text-[10px] text-gray-400 truncate">· {m.casasNombres.join(', ')}</span>}
+                                                        </div>
+                                                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                                                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${bcls}`}>{blabel}</span>
+                                                            <button onClick={() => eliminarMuestra(m.id)} className="text-gray-300 hover:text-red-500 transition-colors" title="Eliminar">
+                                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    {legacy && <p className="text-[10px] text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-1 mb-2">Formato anterior{m.cantidad ? ` · ${m.cantidad} probeta(s)` : ''}{m.resultadoPedido ? ' · marcada "Resultado OK" antes' : ''}. Re-ingresa los resultados por elemento abajo.</p>}
+                                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                                        {ELEMENTOS.map(([key, label, min]) => {
+                                                            const val = (m.resultados || {})[key] || '';
+                                                            const medido = (m.valores || {})[key];
+                                                            return <div key={key} className="border border-gray-100 rounded-lg px-2 py-1.5 bg-gray-50/40">
+                                                                <div className="text-[10px] text-gray-600 leading-tight mb-1">{label}{min ? <span className="text-gray-400"> · mín {min} MPa</span> : ''}</div>
+                                                                <div className="flex items-center gap-1">
+                                                                    <input type="number" min="0" step="0.1" defaultValue={medido != null ? medido : ''} placeholder="MPa" onBlur={(e) => setValorElemento(m.id, key, e.target.value)} className="w-16 px-1.5 py-0.5 border border-gray-300 rounded text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                                                                    <button onClick={() => setResultadoElemento(m.id, key, 'ok')} className={`text-[10px] px-2 py-0.5 rounded font-medium transition-colors ${val === 'ok' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-500 hover:bg-green-100'}`}>OK</button>
+                                                                    <button onClick={() => setResultadoElemento(m.id, key, 'mala')} className={`text-[10px] px-2 py-0.5 rounded font-medium transition-colors ${val === 'mala' ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-500 hover:bg-red-100'}`}>Mala</button>
+                                                                </div>
+                                                                {medido != null && medido !== '' && min && !isNaN(Number(medido)) && !isNaN(Number(min)) && (
+                                                                    <div className={`text-[9px] mt-0.5 font-medium ${Number(medido) >= Number(min) ? 'text-green-600' : 'text-red-600'}`}>{Number(medido) >= Number(min) ? `✓ ${medido} ≥ ${min}` : `✗ ${medido} < ${min}`}</div>
+                                                                )}
+                                                            </div>;
+                                                        })}
+                                                    </div>
+                                                    {est === 'mala' && (
+                                                        <div className="mt-2 flex items-center justify-between gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-1.5">
+                                                            <span className="text-[11px] text-red-700 font-medium">⚠ Muestra con resultado malo — debe volver a tomarse.</span>
+                                                            <button onClick={() => toggleReTomada(m.id)} className="text-[10px] bg-white border border-red-300 text-red-700 px-2 py-0.5 rounded-full hover:bg-red-100 font-medium whitespace-nowrap">Marcar re-tomada</button>
+                                                        </div>
+                                                    )}
+                                                    {est === 'mala_retomada' && (
+                                                        <div className="mt-2 flex items-center justify-between gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1">
+                                                            <span className="text-[11px] text-gray-500">Re-tomada (resuelta). No bloquea el "Completo".</span>
+                                                            <button onClick={() => toggleReTomada(m.id)} className="text-[10px] text-gray-400 hover:text-red-600 underline whitespace-nowrap">Deshacer</button>
+                                                        </div>
+                                                    )}
+                                                    {m.notas && <p className="text-[10px] text-gray-500 mt-1 italic">{m.notas}</p>}
+                                                </div>;
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Formulario para registrar nueva muestra */}
+                                <div className="rounded-xl border border-gray-200 overflow-hidden">
+                                    <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-200">
+                                        <h3 className="text-xs font-semibold text-gray-700">Registrar nueva muestra</h3>
+                                    </div>
+                                    <div className="px-4 py-3">
+                                        <div className="flex items-end gap-2">
+                                            <div className="flex-1">
+                                                <label className="text-[10px] text-gray-500 block mb-1">Probetas (info)</label>
+                                                <input type="number" min="1" defaultValue="1" id="mh_cant" className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                                            </div>
+                                            <div className="flex-[2]">
+                                                <label className="text-[10px] text-gray-500 block mb-1">Casas incluidas (opcional)</label>
+                                                <input type="text" placeholder="ej: Lopez, Perez, Soto" id="mh_casas" className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                                            </div>
+                                            <div className="flex-[2]">
+                                                <label className="text-[10px] text-gray-500 block mb-1">Notas</label>
+                                                <input type="text" placeholder="Laboratorio, obs..." id="mh_notas" className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                                            </div>
+                                            <button onClick={() => {
+                                                const cant = parseInt(document.getElementById('mh_cant').value) || 1;
+                                                const casasStr = document.getElementById('mh_casas').value;
+                                                const notas = document.getElementById('mh_notas').value;
+                                                const casasNombres = casasStr ? casasStr.split(',').map(c => c.trim()).filter(Boolean) : [];
+                                                registrarMuestra({ cantidad: cant, casasNombres, notas, resultados: { cimiento: '', sobrecimiento: '', radier: '' }, reTomada: false });
+                                                document.getElementById('mh_cant').value = '1';
+                                                document.getElementById('mh_casas').value = '';
+                                                document.getElementById('mh_notas').value = '';
+                                            }} className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap">+ Registrar</button>
+                                        </div>
+                                        <p className="text-[10px] text-gray-400 mt-2">Cada registro es una muestra. Tras registrarla, marca OK/Mala por elemento en la lista de arriba.</p>
+                                    </div>
+                                </div>
+
+                                {/* Historico (texto libre) */}
+                                <div className="rounded-xl border border-gray-200 overflow-hidden">
+                                    <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-200">
+                                        <h3 className="text-xs font-semibold text-gray-700">Histórico (texto libre)</h3>
+                                    </div>
+                                    <div className="px-4 py-3">
+                                        <textarea id="mh_historico" key={proyectoSel + (cfg.historico ? '_h' : '_d')} defaultValue={cfg.historico || dumpMuestrasTexto(muestrasArr)} onBlur={(e) => guardarMuestrasCfg({ historico: e.target.value })} rows={5} placeholder="Información histórica de muestras (se guarda en Firebase). Útil para no perder lo ya ingresado mientras re-ingresas en el formato nuevo." className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-400 font-mono leading-relaxed" />
+                                        <p className="text-[10px] text-gray-400 mt-1">Se completa por defecto con los registros existentes y se guarda al salir del campo (también queda respaldado automáticamente).</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="px-6 py-3 border-t border-gray-100 bg-gray-50/50">
+                                <p className="text-[10px] text-gray-400 text-center">Completo cuando hay {rm.requeridas} muestras OK y ninguna mala pendiente de re-toma. Las re-tomas extra no estorban.</p>
+                            </div>
+                        </div>
+                    </div>;
+                })()}
+                {showAlertas && (
+                    <AlertasGlobales
+                        onClose={() => setShowAlertas(false)}
+                        onSelectProyecto={(pid) => { setProyectoSel(pid); setShowAlertas(false); setTab('estado_general'); }}
+                    />
+                )}
+                {showValidacion && (
+                    <div className="fixed inset-0 z-[60] bg-black/40 flex items-start justify-center pt-12 px-4" onClick={(e) => e.target === e.currentTarget && setShowValidacion(false)}>
+                        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+                            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+                                <div>
+                                    <h2 className="text-lg font-bold text-gray-800">Validación Cruzada</h2>
+                                    <p className="text-xs text-gray-500 mt-0.5">Compara datos entre tablas para detectar inconsistencias</p>
+                                </div>
+                                <button onClick={() => setShowValidacion(false)} className="text-gray-400 hover:text-gray-600 text-xl font-bold w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100">x</button>
+                            </div>
+                            <div className="overflow-y-auto p-6 space-y-4">
+                                {validaciones.map(check => (
+                                    <div key={check.id} className={`rounded-xl border ${check.items.length === 0 ? 'border-green-200 bg-green-50/50' : check.tipo === 'rojo' ? 'border-red-200 bg-red-50/30' : check.tipo === 'naranja' ? 'border-orange-200 bg-orange-50/30' : 'border-yellow-200 bg-yellow-50/30'}`}>
+                                        <div className="px-4 py-3">
+                                            <div className="flex items-center gap-2">
+                                                {check.items.length === 0
+                                                    ? <span className="w-5 h-5 rounded-full bg-green-500 text-white flex items-center justify-center text-xs font-bold">&#10003;</span>
+                                                    : <span className={`w-5 h-5 rounded-full text-white flex items-center justify-center text-xs font-bold ${check.tipo === 'rojo' ? 'bg-red-500' : check.tipo === 'naranja' ? 'bg-orange-500' : 'bg-yellow-500'}`}>{check.items.length}</span>
+                                                }
+                                                <h3 className="font-semibold text-sm text-gray-800">{check.titulo}</h3>
+                                            </div>
+                                            <p className="text-[11px] text-gray-500 mt-1 leading-relaxed">{check.desc}</p>
+                                            <p className="text-[10px] text-gray-400 mt-0.5 font-mono">Compara: {check.compara}</p>
+                                        </div>
+                                        {check.items.length > 0 && (
+                                            <div className="border-t border-gray-200/60 px-4 py-2 space-y-1 max-h-40 overflow-y-auto">
+                                                {check.items.map((it, i) => (
+                                                    <p key={i} className="text-xs text-gray-700 py-0.5 flex items-start gap-1.5">
+                                                        <span className="text-gray-300 font-mono text-[10px] mt-px">{i+1}.</span>
+                                                        <span>{check.render(it)}</span>
+                                                    </p>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="px-6 py-3 border-t border-gray-100 bg-gray-50/50">
+                                <p className="text-[10px] text-gray-400 text-center">Los hallazgos no son necesariamente errores. Verificar caso a caso en AppSheet.</p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* TABS */}
+                <div className="flex items-center gap-1 mb-4 overflow-x-auto hide-scrollbar border-b border-gray-200 pb-px">
+                    {tabs.map(([key, label]) => (
+                        <button key={key} onClick={() => setTab(key)} className={`px-4 py-2.5 text-sm font-medium rounded-t-lg transition-colors whitespace-nowrap flex items-center gap-1.5 ${key === "estado_general" ? (tab === key ? "bg-white text-[#8B2332] border border-[#8B2332]/30 border-b-white shadow-sm -mb-px" : "text-[#8B2332] bg-red-50 hover:bg-red-100 border border-[#8B2332]/20 border-b-transparent -mb-px") : (tab === key ? "bg-white text-violet-700 border border-gray-200 border-b-white shadow-sm -mb-px" : "text-gray-500 hover:text-gray-700 hover:bg-gray-100")}`}>
+                            {key === "estado_general" && <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>}
+                            {label}
+                            {key === "viviendas" && kpis.criticos > 0 && <span className="ml-2 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{kpis.criticos}</span>}
+                            {key === "configuracion" && grupos.length > 0 && <span className="ml-1.5 bg-violet-100 text-violet-600 text-[10px] px-1.5 py-0.5 rounded-full">{grupos.length}G</span>}
+                        </button>
+                    ))}
+                </div>
+
+                {/* CONTENIDO */}
+                <div className="min-h-[500px]">
+                    {tab === "viviendas" && <ViviendasTab viviendas={viviendas} grupos={grupos} expandida={expandida} setExpandida={setExpandida} filtro={filtro} setFiltro={setFiltro} busqueda={busqueda} setBusqueda={setBusqueda} observaciones={observaciones} addObservacion={addObservacion} deleteObservacion={deleteObservacion} showResumenObs={showResumenObs} setShowResumenObs={setShowResumenObs} actividades={actividades} toggleActividad={toggleActividad} consultas={consultas} toggleConsulta={toggleConsulta} ocultados={ocultados} ocultarBeneficiario={ocultarBeneficiario} mostrarBeneficiario={mostrarBeneficiario} onUpdateComentarioGrupo={actualizarComentarioGrupo} resumenComentarios={resumenComentarios} cierresForzados={cierresForzados} forzarCierre={forzarCierre} deshacerCierre={deshacerCierre} />}
+                    {tab === "matriz" && <MatrizAvance viviendas={viviendas} grupos={grupos} />}
+                    {tab === "distribucion" && <DistribucionTab viviendas={viviendas} />}
+                    {tab === "financiero" && <FinancieroTab viviendas={viviendas} />}
+                    {tab === "mano_obra" && <ManoDeObraTab viviendas={viviendas} />}
+                    {tab === "estados_pago" && <EstadosPagoTab viviendas={viviendas} />}
+                    <div style={{display: tab === "estado_general" ? undefined : "none"}}><EstadoGeneralTab viviendas={viviendas} observaciones={observaciones} grupos={grupos} resumenComentarios={resumenComentarios} proyectoSel={proyectoSel} proy={proy} garantiasProy={garantiasProy} muestrasProy={getMuestrasProy()} muestrasResumen={getMuestrasResumen()} kpis={kpis} cierresForzados={cierresForzados} /></div>
+                    {tab === "configuracion" && <ConfiguracionView grupos={grupos} setGrupos={setGruposForProy} viviendas={viviendas} proyectoSel={proyectoSel} personalObra={personalObra} personalObraRef={personalObraRef} personalGlobal={personalGlobal} />}
+                </div>
+
+                {/* Leyenda */}
+                <div className="mt-6 flex items-center justify-center gap-6 text-[10px] text-gray-400">
+                    {[["bg-blue-500","Despachado"],["bg-purple-500","Solicitado"],["bg-green-500","En Tiempo"],["bg-yellow-500","Atención"],["bg-red-500","Crítico"],["bg-gray-300","Bloqueado"]].map(([c,l]) => (
+                        <span key={l} className="flex items-center gap-1.5"><span className={`w-2.5 h-2.5 rounded-full ${c}`}></span>{l}</span>
+                    ))}
+                </div>
+                <p className="text-center text-[10px] text-gray-300 mt-4 mb-8">SCRaices v3 — Vista Unificada + Grupos — {new Date().toLocaleString('es-CL')}</p>
+            </div>
+
+            {/* MODAL PERSONAL GLOBAL */}
+            {showModalPersonal && React.createElement(ModalPersonalGlobal, {
+                personalGlobal, fbDB,
+                onClose: () => setShowModalPersonal(false)
+            })}
+
+            {/* MODAL SUGERENCIAS */}
+            {showSugerencias && (
+                <div className="fixed inset-0 z-[60] bg-black/40 flex items-start justify-center pt-8 px-4" onClick={(e) => e.target === e.currentTarget && setShowSugerencias(false)}>
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+                            <div>
+                                <h2 className="text-lg font-bold text-gray-800">Sugerencias de Mejora</h2>
+                                <p className="text-xs text-gray-500 mt-0.5">{sugerencias.length} total, {pendientesSug} pendientes</p>
+                            </div>
+                            <button onClick={() => setShowSugerencias(false)} className="text-gray-400 hover:text-gray-600 text-xl font-bold w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100">x</button>
+                        </div>
+
+                        {/* Formulario nueva sugerencia */}
+                        <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+                            <textarea
+                                ref={textareaRef}
+                                value={textoSug}
+                                onChange={(e) => setTextoSug(e.target.value)}
+                                onPaste={(e) => {
+                                    const items = e.clipboardData?.items;
+                                    if (!items) return;
+                                    for (let i = 0; i < items.length; i++) {
+                                        if (items[i].type.startsWith('image/')) {
+                                            e.preventDefault();
+                                            const file = items[i].getAsFile();
+                                            const reader = new FileReader();
+                                            reader.onload = (ev) => {
+                                                const img = new Image();
+                                                img.onload = () => {
+                                                    const canvas = document.createElement('canvas');
+                                                    const maxW = 800;
+                                                    const scale = img.width > maxW ? maxW / img.width : 1;
+                                                    canvas.width = img.width * scale;
+                                                    canvas.height = img.height * scale;
+                                                    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                                                    const compressed = canvas.toDataURL('image/jpeg', 0.7);
+                                                    setImgSug(compressed);
+                                                    setImgPreview(compressed);
+                                                };
+                                                img.src = ev.target.result;
+                                            };
+                                            reader.readAsDataURL(file);
+                                            break;
+                                        }
+                                    }
+                                }}
+                                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (textoSug.trim()) { addSugerencia(textoSug.trim(), imgSug); setTextoSug(''); setImgSug(null); setImgPreview(null); } } }}
+                                placeholder="Describir mejora... (Ctrl+V para pegar imagen)"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-violet-400"
+                                rows={3}
+                            />
+                            {imgPreview && (
+                                <div className="mt-2 relative inline-block">
+                                    <img src={imgPreview} className="max-h-32 rounded-lg border border-gray-200" />
+                                    <button onClick={() => { setImgSug(null); setImgPreview(null); }} className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center hover:bg-red-600">x</button>
+                                </div>
+                            )}
+                            <div className="flex items-center gap-2 mt-2">
+                                <button onClick={() => { if (!textoSug.trim()) return; addSugerencia(textoSug.trim(), imgSug); setTextoSug(''); setImgSug(null); setImgPreview(null); }} disabled={!textoSug.trim()} className="px-4 py-1.5 bg-violet-600 text-white text-sm rounded-lg hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Enviar</button>
+                                <label className="px-3 py-1.5 text-xs text-gray-500 border border-gray-300 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors">
+                                    Adjuntar imagen
+                                    <input type="file" accept="image/*" onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (!file || !file.type.startsWith('image/')) return;
+                                        const reader = new FileReader();
+                                        reader.onload = (ev) => {
+                                            const img = new Image();
+                                            img.onload = () => {
+                                                const canvas = document.createElement('canvas');
+                                                const maxW = 800;
+                                                const scale = img.width > maxW ? maxW / img.width : 1;
+                                                canvas.width = img.width * scale;
+                                                canvas.height = img.height * scale;
+                                                canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                                                const compressed = canvas.toDataURL('image/jpeg', 0.7);
+                                                setImgSug(compressed);
+                                                setImgPreview(compressed);
+                                            };
+                                            img.src = ev.target.result;
+                                        };
+                                        reader.readAsDataURL(file);
+                                    }} className="hidden" />
+                                </label>
+                            </div>
+                        </div>
+
+                        {/* Lista de sugerencias */}
+                        <div className="overflow-y-auto flex-1 p-6 space-y-3">
+                            {sugerencias.length === 0 && <p className="text-gray-400 text-sm text-center py-8">No hay sugerencias aun</p>}
+                            {sugerencias.map(sug => (
+                                <div key={sug.id} className={`rounded-xl border p-4 transition-colors ${sug.resuelta ? 'bg-green-50/50 border-green-200' : 'bg-white border-gray-200'}`}>
+                                    <div className="flex items-start gap-3">
+                                        <button onClick={() => toggleSugResuelta(sug.id)} className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${sug.resuelta ? 'bg-green-500 border-green-500 text-white' : 'border-gray-300 hover:border-violet-400'}`}>
+                                            {sug.resuelta && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>}
+                                        </button>
+                                        <div className="flex-1 min-w-0">
+                                            <p className={`text-sm leading-relaxed ${sug.resuelta ? 'text-gray-400 line-through' : 'text-gray-700'}`}>{sug.texto}</p>
+                                            {sug.imagen && (
+                                                <img src={sug.imagen} className="mt-2 max-h-48 rounded-lg border border-gray-200 cursor-pointer hover:opacity-90" onClick={() => window.open(sug.imagen, '_blank')} />
+                                            )}
+                                            <div className="flex items-center gap-3 mt-2">
+                                                <span className="text-[10px] text-gray-400">{sug.fecha}</span>
+                                                {sug.resuelta && sug.fechaResolucion && <span className="text-[10px] text-green-500">Resuelta {sug.fechaResolucion}</span>}
+                                                <button onClick={() => deleteSugerencia(sug.id)} className="text-[10px] text-red-400 hover:text-red-600 ml-auto">Eliminar</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL TE1 */}
+            {showTE1 && (
+                <div className="fixed inset-0 z-[60] bg-black/40 flex items-start justify-center pt-8 px-4" onClick={(e) => e.target === e.currentTarget && setShowTE1(false)}>
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+                            <div>
+                                <h2 className="text-lg font-bold text-gray-800">TE1 — Certificados Eléctricos</h2>
+                                <p className="text-xs text-gray-500 mt-0.5">Datos desde Google Sheets (SEC)</p>
+                            </div>
+                            <button onClick={() => setShowTE1(false)} className="text-gray-400 hover:text-gray-600 text-xl font-bold w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100">x</button>
+                        </div>
+                        <div className="overflow-y-auto p-6">
+                            {te1Loading && (
+                                <div className="flex items-center justify-center py-12 gap-3">
+                                    <div className="w-5 h-5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+                                    <span className="text-sm text-gray-500">Consultando Sheet TE1...</span>
+                                </div>
+                            )}
+                            {te1Error && (
+                                <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-center">
+                                    <p className="text-red-700 text-sm font-medium">Error al leer TE1</p>
+                                    <p className="text-red-500 text-xs mt-1">{te1Error}</p>
+                                    <p className="text-gray-400 text-[10px] mt-3">Verifica que el Apps Script tenga acceso al Sheet TE1 y que se haya re-desplegado con el parametro sheetId.</p>
+                                </div>
+                            )}
+                            {te1Data && !te1Loading && (() => {
+                                const cols = te1Data.length > 0 ? Object.keys(te1Data[0]) : [];
+                                const filtered = filtroTE1
+                                    ? te1Data.filter(r => Object.values(r).some(v => String(v).toLowerCase().includes(filtroTE1.toLowerCase())))
+                                    : te1Data;
+                                return <div>
+                                    <div className="flex items-center gap-3 mb-4">
+                                        <p className="text-sm text-gray-600 font-medium">{te1Data.length} registros</p>
+                                        <input type="text" placeholder="Filtrar..." value={filtroTE1} onChange={e => setFiltroTE1(e.target.value)} className="flex-1 max-w-xs px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400" />
+                                        {filtroTE1 && <p className="text-xs text-gray-400">{filtered.length} resultados</p>}
+                                    </div>
+                                    {cols.length > 0 ? (
+                                        <div className="overflow-x-auto border border-gray-200 rounded-xl">
+                                            <table className="w-full text-xs">
+                                                <thead>
+                                                    <tr className="bg-gray-50">
+                                                        {cols.map(c => <th key={c} className="px-3 py-2 text-left font-semibold text-gray-600 border-b border-gray-200 whitespace-nowrap">{c}</th>)}
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {filtered.slice(0, 100).map((row, i) => (
+                                                        <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
+                                                            {cols.map(c => <td key={c} className="px-3 py-1.5 border-b border-gray-100 whitespace-nowrap max-w-[200px] truncate" title={String(row[c] || '')}>{String(row[c] || '')}</td>)}
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                            {filtered.length > 100 && <p className="text-center text-xs text-gray-400 py-2">Mostrando 100 de {filtered.length}</p>}
+                                        </div>
+                                    ) : <p className="text-gray-400 text-sm text-center py-8">Sin datos</p>}
+                                </div>;
+                            })()}
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+// Función de render (llamada después de cargar datos)
+        let _reactRoot = null;
+        function renderApp() {
+            try {
+                console.log('[v3 LIVE] renderApp() - PROYECTOS:', PROYECTOS_DATA.length, 'BENEF:', BENEFICIARIOS_DATA.length, 'DESP:', DESPACHOS_DATA.length, 'SOLPAGO:', SOLPAGO_DATA.length);
+                if (!_reactRoot) {
+                    _reactRoot = ReactDOM.createRoot(document.getElementById('root'));
+                }
+                _reactRoot.render(<App />);
+                console.log('[v3 LIVE] render() OK');
+            } catch(e) {
+                console.error('[v3 LIVE] Error en renderApp:', e);
+                document.getElementById('root').innerHTML = '<div style="padding:40px;font-family:monospace;"><h2 style="color:red;">Error al renderizar</h2><pre style="background:#f5f5f5;padding:20px;border-radius:8px;overflow:auto;white-space:pre-wrap;">' + e.message + '\n' + e.stack + '</pre><button onclick="location.reload()" style="margin-top:16px;padding:8px 16px;background:#7c3aed;color:white;border:none;border-radius:6px;cursor:pointer;">Reintentar</button></div>';
+            }
+        }
+
+        // En modo LIVE: cargar datos primero, luego renderizar
+        if (typeof APPS_SCRIPT_URL !== 'undefined' && APPS_SCRIPT_URL) {
+            initLiveData();
+        } else {
+            renderApp();
+        }
+
