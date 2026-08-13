@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Panel de Control v3 - SG Raices (Live)</title>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="./tailwind.css">
     <script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -25,22 +25,6 @@
         };
         const fbApp = firebase.initializeApp(firebaseConfig);
         const fbDB = firebase.database();
-    </script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        'raices-red': '#8B2332',
-                        'raices-dark': '#1a1a2e'
-                    },
-                    fontFamily: {
-                        sans: ['IBM Plex Sans', 'sans-serif'],
-                        mono: ['IBM Plex Mono', 'monospace']
-                    }
-                }
-            }
-        }
     </script>
     <style>
         * { font-family: 'IBM Plex Sans', sans-serif; }

@@ -1,10 +1,11 @@
 // Service Worker - SCRaices Dashboard PWA
-const CACHE_NAME = 'scraices-v3';
+const CACHE_NAME = 'scraices-v4';
 
 // Solo cachear assets estáticos, los datos siempre se cargan frescos
 const STATIC_ASSETS = [
   './index_live_v3.html',
   './app_compiled.js',
+  './tailwind.css',
   './manifest.json',
   './icon-192.png',
   './icon-512.png'
