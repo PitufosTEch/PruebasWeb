@@ -8827,6 +8827,8 @@ const ROLES_PERSONAL = [
     { key: 'prevencion',         label: 'Prevencionista de Riesgos' },
     { key: 'oficina_tecnica',    label: 'Oficina Técnica' },
     { key: 'coord_recepciones',  label: 'Coordinador de recepciones' },
+    { key: 'sat',                label: 'SAT' },
+    { key: 'fto',                label: 'FTO' },
 ];
 
 const INFORME_TIPOS = [
@@ -8882,7 +8884,7 @@ const ModalPersonalGlobal = ({ personalGlobal, fbDB, onClose }) => {
         fbDB.ref(`personal_global/${key}/alerta_climatica`).set(current ? null : true);
     };
 
-    const ROLES_MAP = { capataz:'Capataz', residente:'Residente', gerente:'Gerente', coordinador:'Coordinador', coordinador_pagos:'Coordinador de pagos', logistica:'Logística', rrhh:'Recursos Humanos' };
+    const ROLES_MAP = { capataz:'Capataz', residente:'Residente', gerente:'Gerente', coordinador:'Coordinador', coordinador_pagos:'Coordinador de pagos', logistica:'Logística', rrhh:'Recursos Humanos', prevencion:'Prevencionista de Riesgos', oficina_tecnica:'Oficina Técnica', coord_recepciones:'Coordinador de recepciones', sat:'SAT', fto:'FTO' };
     const rolesPresentes = [...new Set(lista.map(([,p]) => p.rol))].sort();
 
     return (

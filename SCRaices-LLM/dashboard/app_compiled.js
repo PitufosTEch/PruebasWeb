@@ -10820,6 +10820,12 @@ const ROLES_PERSONAL = [{
 }, {
   key: 'coord_recepciones',
   label: 'Coordinador de recepciones'
+}, {
+  key: 'sat',
+  label: 'SAT'
+}, {
+  key: 'fto',
+  label: 'FTO'
 }];
 const INFORME_TIPOS = [{
   key: 'residente',
@@ -10924,7 +10930,12 @@ const ModalPersonalGlobal = ({
     coordinador: 'Coordinador',
     coordinador_pagos: 'Coordinador de pagos',
     logistica: 'Logística',
-    rrhh: 'Recursos Humanos'
+    rrhh: 'Recursos Humanos',
+    prevencion: 'Prevencionista de Riesgos',
+    oficina_tecnica: 'Oficina Técnica',
+    coord_recepciones: 'Coordinador de recepciones',
+    sat: 'SAT',
+    fto: 'FTO'
   };
   const rolesPresentes = [...new Set(lista.map(([, p]) => p.rol))].sort();
   return React.createElement("div", {
