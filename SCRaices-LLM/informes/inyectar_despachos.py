@@ -532,8 +532,6 @@ def escribir_despachos_firebase() -> bool:
     """
     Descarga el Excel de Drive, genera el HTML de despachos por proyecto
     y lo escribe en Firebase RTDB bajo /despachos_html/{pid}.
-    Debe ejecutarse ANTES de que Playwright capture los informes para que
-    generarInformeAdquisicionesHTML() pueda leer los datos del dashboard en vivo.
     """
     import requests
     proyectos = _cargar_datos_proyectos()
@@ -551,59 +549,6 @@ def escribir_despachos_firebase() -> bool:
     except Exception as e:
         print(f"  [Despachos] ERROR Firebase: {e}")
         return False
-
-
-# ── API pública ───────────────────────────────────────────────────────────────
-
-def inyectar_resumen_despachos(pdf_dir: Path, fecha: str) -> bool:
-    """Inyecta el tab Despachos en el Informe_Adquisiciones_{fecha}.html generado."""
-    pdf_dir    = Path(pdf_dir)
-    candidatos = sorted(pdf_dir.glob(f"Informe_Adquisiciones_{fecha}*.html"))
-    if not candidatos:
-        print(f"  [Despachos] No se encontró Informe_Adquisiciones_{fecha}*.html — omitiendo")
-        return False
-
-    html_path = candidatos[0]
-    proyectos = _cargar_datos_proyectos()
-    if proyectos is None:
-        return False
-
-    despachos_por_idx = _generar_despachos_por_idx(proyectos)
-    html = _aplicar_inyeccion(
-        html_path.read_text(encoding="utf-8", errors="replace"),
-        despachos_por_idx,
-    )
-    html_path.write_text(html, encoding="utf-8")
-    print(f"  [Despachos] Tab inyectado → {html_path.name} ({html_path.stat().st_size:,} bytes)")
-    return True
-
-
-def inyectar_en_dashboard() -> bool:
-    """
-    Descarga el Excel de Drive e inyecta (o actualiza) el tab Despachos en
-    SCRaices-LLM/dashboard/index_live_v3.html dentro del repositorio local.
-    Retorna True si el archivo cambió.
-    """
-    dash = DASHBOARD_PATH
-    if not dash.exists():
-        print(f"  [Dashboard] No encontrado: {dash} — omitiendo")
-        return False
-
-    proyectos = _cargar_datos_proyectos()
-    if proyectos is None:
-        return False
-
-    despachos_por_idx = _generar_despachos_por_idx(proyectos)
-    html_original = dash.read_text(encoding="utf-8", errors="replace")
-    html_nuevo    = _aplicar_inyeccion(html_original, despachos_por_idx)
-
-    if html_nuevo == html_original:
-        print("  [Dashboard] Sin cambios en el dashboard.")
-        return False
-
-    dash.write_text(html_nuevo, encoding="utf-8")
-    print(f"  [Dashboard] index_live_v3.html actualizado ({dash.stat().st_size:,} bytes)")
-    return True
 
 
 # ── API para Residente y Capataz ──────────────────────────────────────────────
@@ -681,7 +626,6 @@ def _generar_seccion_semana(bens: list, meses: list, titulo: str,
 def generar_seccion_residente(datos: dict) -> str:
     """
     Retorna HTML con despachos del período actual (mes1) para todos los beneficiarios.
-    Para inyectar al final del Informe_Residente antes de convertir a PDF.
     Retorna "" si no hay datos o ningún beneficiario tiene despachos en mes1.
     """
     if not datos or not datos.get("beneficiarios"):
@@ -697,7 +641,6 @@ def generar_seccion_residente(datos: dict) -> str:
 def generar_seccion_capataz(datos: dict, nombre_capataz: str) -> str:
     """
     Retorna HTML con despachos del período actual filtrado por capataz.
-    Para inyectar al final del Informe_Capataz antes de convertir a PDF.
     Usa comparación normalizada (sin acentos, minúsculas) para tolerar diferencias de formato.
     Retorna "" si no hay datos o el capataz no tiene despachos en mes1.
     """
