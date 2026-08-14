@@ -233,10 +233,11 @@ def _leer_gantt_datos(sheets_svc, spreadsheet_id, hoja) -> tuple:
     min_ser, max_ser = min(serials), max(serials)
 
     # ── Casos fuera de rango ───────────────────────────────────────────────────
+    pct_override = None
     if hoy_ser >= max_ser:
         log.info(f"    Gantt '{hoja}': hoy >= última columna Gantt → pct_prog=100%")
-        return 100.0, None
-    if hoy_ser < min_ser - 7:
+        pct_override = 100.0
+    elif hoy_ser < min_ser - 7:
         log.info(f"    Gantt '{hoja}': hoy < inicio → pct_prog=0%")
         return 0.0, None
 
@@ -249,7 +250,7 @@ def _leer_gantt_datos(sheets_svc, spreadsheet_id, hoja) -> tuple:
         cur_ci, _, cur_s = min(date_cols, key=lambda x: abs(x[2] - hoy_ser))
         best_dist = min(abs(s - hoy_ser) for _, _, s in date_cols)
 
-    if best_dist > 14:
+    if best_dist > 14 and pct_override is None:
         log.warning(f"    Gantt '{hoja}': columna actual no encontrada (dist={best_dist})")
         return None, None
 
@@ -320,7 +321,8 @@ def _leer_gantt_datos(sheets_svc, spreadsheet_id, hoja) -> tuple:
             f"({min(mensual)} → {max(mensual)})"
         )
 
-    return pct_actual, (mensual if mensual else None)
+    pct_final = pct_override if pct_override is not None else pct_actual
+    return pct_final, (mensual if mensual else None)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
