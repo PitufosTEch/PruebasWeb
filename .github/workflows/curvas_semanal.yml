@@ -1,12 +1,14 @@
-name: Actualización Curvas S Semanal
+name: Actualización Curvas S Diaria
 
 # Cada proyecto corre en un runner paralelo independiente (matrix strategy).
 # Tiempo estimado: ~10-15 min (el proyecto más lento) en vez de 60-90 min en serie.
 # Post-proceso (sincronizar_dashboard, gantt, avance) corre al terminar todos.
+#
+# Horario: 11:00 UTC = 08:00 Chile verano (UTC-3, oct-abr) / 07:00 Chile invierno (UTC-4, may-sep)
 
 on:
   schedule:
-    - cron: '0 12 * * 1-5'   # Lunes a viernes 12:00 UTC (09:00 Chile)
+    - cron: '0 11 * * *'   # Todos los días 11:00 UTC (08:00 Chile verano / 07:00 Chile invierno)
   workflow_dispatch: {}
 
 permissions:
@@ -106,7 +108,16 @@ jobs:
           GITHUB_TOKEN:          ${{ secrets.GITHUB_TOKEN }}
           FIREBASE_URL:          https://scraices-dashboard-default-rtdb.firebaseio.com
           APPSHEET_COOKIES_B64:  ${{ secrets.APPSHEET_COOKIES_B64 }}
-        run: python ${{ matrix.script }}.py
+        run: |
+          for intento in 1 2 3; do
+            python ${{ matrix.script }}.py && break
+            if [ "$intento" -eq 3 ]; then
+              echo "::error::Los 3 intentos fallaron para ${{ matrix.label }}"
+              exit 1
+            fi
+            echo "Intento $intento fallido — reintentando en 60s..."
+            sleep 60
+          done
 
       - name: Resumen en caso de error
         if: failure()
@@ -149,7 +160,13 @@ jobs:
           GOOGLE_CLIENT_SECRET:  ${{ secrets.GOOGLE_CLIENT_SECRET }}
           GITHUB_TOKEN:          ${{ secrets.GITHUB_TOKEN }}
           FIREBASE_URL:          https://scraices-dashboard-default-rtdb.firebaseio.com
-        run: python sincronizar_dashboard.py
+        run: |
+          for intento in 1 2 3; do
+            python sincronizar_dashboard.py && break
+            if [ "$intento" -eq 3 ]; then exit 1; fi
+            echo "Intento $intento fallido — reintentando en 30s..."
+            sleep 30
+          done
 
       - name: Actualizar programa Gantt en Firebase
         working-directory: SCRaices-LLM/curvas_s
