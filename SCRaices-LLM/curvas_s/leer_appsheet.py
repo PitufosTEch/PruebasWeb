@@ -1,7 +1,7 @@
 """
 leer_appsheet.py
 ================
-Lee datos de avance (avance_obras) de cualquier proyecto AppSheet.
+Lee datos de avance real (Resumen_insp.Total = Total Avances inspeccionado) de cualquier proyecto AppSheet.
 
 Modos de autenticación (en orden de prioridad):
   1. CLOUD: env var APPSHEET_COOKIES_B64 (base64 de cookies JSON)
@@ -30,7 +30,7 @@ from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
 # Configuración
 # ─────────────────────────────────────────────────────────────────────────────
 APPSHEET_URL        = "https://www.appsheet.com/start/e07d4aa1-e59e-4b9b-bf4c-32582e74e8fc?platform=desktop"
-TABLA_IDX           = 4
+TABLA_IDX           = 9   # Resumen_insp (Total Avances inspeccionado)
 AUTH_FILE           = r"C:\Users\rodri\.claude\appsheet_auth.json"
 CHROME_PROFILE      = r"C:\Users\rodri\AppData\Local\Google\Chrome\User Data"
 CHROME_PROFILE_WORK = r"C:\Users\rodri\.claude\chrome_work_profile"
@@ -55,10 +55,10 @@ JS_EXTRACT = """
     var result = [];
     for (var i = 0; i < rowKeys.length; i++) {
         var row = tbl.Rows[rowKeys[i]];
-        if (row.ID_Proy === projectId) {
-            var pct = Math.round(parseFloat(row.avance_obras || 0) * 10000) / 100;
+        if (row.Proyecto === projectId) {
+            var pct = Math.round(parseFloat(row.Total || 0) * 10000) / 100;
             result.push({
-                nombre: ((row.APELLIDOS || '') + ' ' + (row.NOMBRES || '')).toUpperCase().trim(),
+                nombre: (row.Nombre || '').toUpperCase().trim(),
                 avance: pct
             });
         }

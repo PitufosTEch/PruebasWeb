@@ -1,4 +1,4 @@
-"""
+﻿"""
 curvas_automatico_maiten.py  -  Automatizacion semanal Curvas S - Proyecto El Maiten (P126)
 ============================================================================================
 - Fecha de control:  date.today() (automatica)
@@ -640,7 +640,7 @@ def generar_grafico_grupo(nombre_grupo, beneficiarios, control, outdir, pct_prog
         _diff = pct_real_avg - _pct_p
         _signo = "+" if _diff >= 0 else ""
         ax.annotate(
-            f"Prog: {_pct_p:.1f}%\nReal: {pct_real_avg:.1f}%\nDesv: {_signo}{_diff:.1f}%",
+            f"Prog: {_pct_p:.2f}%\nReal: {pct_real_avg:.2f}%\nDesv: {_signo}{_diff:.2f}%",
             xy=(control, prog[idx_ctrl]),
             xycoords='data',
             xytext=(0.97, 0.06),
@@ -743,8 +743,8 @@ def generar_grafico_total(grupos, control, fines_proy_global, outdir, pct_prog_g
         diff = pct_real_total - _pct_p_t
         signo = "+" if diff >= 0 else ""
         ax2.annotate(
-            f"Prog:  {_pct_p_t:.1f}%\nReal:  {pct_real_total:.1f}%\n"
-            f"Desv: {signo}{diff:.1f}%",
+            f"Prog:  {_pct_p_t:.2f}%\nReal:  {pct_real_total:.2f}%\n"
+            f"Desv: {signo}{diff:.2f}%",
             xy=(control, prog_en_ctrl),
             xycoords='data',
             xytext=(0.97, 0.06),

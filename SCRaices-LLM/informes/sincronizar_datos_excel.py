@@ -357,8 +357,8 @@ def _sincronizar_hoja(ws, pid: str, sheets_svc, preview: bool = False) -> int:
             _safe_write(ws, row_idx, 2,  b["nombre"])
             _safe_write(ws, row_idx, 3,  f"Grupo {num_grupo}")
             _safe_write(ws, row_idx, 4,  capataz)
-            _safe_write(ws, row_idx, 5,  f"{b['avance']:.1f}%")
-            _safe_write(ws, row_idx, 6,  f"{b['avance']:.1f}%")
+            _safe_write(ws, row_idx, 5,  f"{b['avance']:.2f}%")
+            _safe_write(ws, row_idx, 6,  f"{b['avance']:.2f}%")
             _safe_write(ws, row_idx, 7,  f"{spi_b:.3f}")
             _safe_write(ws, row_idx, 8,  "[MC]")
 
