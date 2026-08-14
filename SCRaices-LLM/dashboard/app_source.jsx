@@ -5932,15 +5932,16 @@ ${(()=>{const _avs=(AVANCE_MENSUAL_DATA[String(d.pr.ID_proy)]||{}).serie||[];con
         const obrasConCurva = PROYECTOS_DATA.filter(p => (CURVAS_S_CONFIG[p.ID_proy] || []).length > 0);
         if (obrasConCurva.length === 0) { alert('No hay obras activas con curvas S configuradas.'); return; }
 
-        let ganttRaw = {}, gruposRaw = {}, obsRaw = {}, avanceGanttRaw = {}, despachosHtmlRaw = {}, despachosDataRaw = {};
+        let ganttRaw = {}, gruposRaw = {}, obsRaw = {}, avanceGanttRaw = {}, despachosHtmlRaw = {}, despachosDataRaw = {}, personalObraRaw = {};
         try {
-            const [rGantt, rGrupos, rObs, rAvGantt, rDesp, rDespData] = await Promise.all([
+            const [rGantt, rGrupos, rObs, rAvGantt, rDesp, rDespData, rPersonal] = await Promise.all([
                 fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/gantt_programa.json'),
                 fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/grupos.json'),
                 fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/observaciones.json'),
                 fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/avance_gantt.json'),
                 fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/despachos_html.json'),
-                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/despachos_data.json')
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/despachos_data.json'),
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/personal_obra.json')
             ]);
             ganttRaw        = (await rGantt.json())    || {};
             gruposRaw       = (await rGrupos.json())   || {};
@@ -5948,7 +5949,8 @@ ${(()=>{const _avs=(AVANCE_MENSUAL_DATA[String(d.pr.ID_proy)]||{}).serie||[];con
             avanceGanttRaw  = (await rAvGantt.json())  || {};
             despachosHtmlRaw= (await rDesp.json())     || {};
             despachosDataRaw= (await rDespData.json()) || {};
-        } catch(e) { ganttRaw = {}; gruposRaw = {}; obsRaw = {}; avanceGanttRaw = {}; despachosHtmlRaw = {}; despachosDataRaw = {}; }
+            personalObraRaw = (await rPersonal.json()) || {};
+        } catch(e) { ganttRaw = {}; gruposRaw = {}; obsRaw = {}; avanceGanttRaw = {}; despachosHtmlRaw = {}; despachosDataRaw = {}; personalObraRaw = {}; }
 
         const getCapataz = (idProy, curvaLabel) => {
             const gList = gruposRaw[idProy] || [];
@@ -5989,6 +5991,7 @@ ${(()=>{const _avs=(AVANCE_MENSUAL_DATA[String(d.pr.ID_proy)]||{}).serie||[];con
                 const agPct = _ag ? _ag.pct : null;
                 const agCol = agPct == null ? '#94a3b8' : agPct >= 80 ? '#16a34a' : agPct >= 50 ? '#2563eb' : '#dc2626';
                 h += `Estado General</div>
+${_buildPersonalBanda(personalObraRaw[obra.ID_proy] || {})}
 <div class="summary-grid">
   <div class="summary-card" style="border-left:3px solid ${agCol};"><div class="summary-card-label">Avance Real</div><div class="summary-card-value" style="color:${agCol};">${agPct != null ? Number(agPct).toFixed(2) + '%' : '—'}</div><div class="summary-card-detail">${_ag ? _ag.n + '/' + _ag.total + ' con avance' : 'Sin datos Gantt'}</div></div>
   <div class="summary-card"><div class="summary-card-label">Viviendas</div><div class="summary-card-value">${tot}</div><div class="summary-card-detail">Beneficiarios</div></div>
@@ -6238,21 +6241,23 @@ ${js2}
         if (obrasConCurva.length === 0) { alert('No hay obras activas con curvas S configuradas.'); return; }
 
         // Obtener datos de programa, grupos, observaciones y comentarios destacados desde Firebase
-        let ganttRaw = {}, gruposRaw = {}, obsRaw = {}, resumenComRaw = {}, avanceGanttRaw = {};
+        let ganttRaw = {}, gruposRaw = {}, obsRaw = {}, resumenComRaw = {}, avanceGanttRaw = {}, personalObraRaw = {};
         try {
-            const [rGantt, rGrupos, rObs, rResCom, rAvGantt] = await Promise.all([
+            const [rGantt, rGrupos, rObs, rResCom, rAvGantt, rPersonal] = await Promise.all([
                 fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/gantt_programa.json'),
                 fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/grupos.json'),
                 fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/observaciones.json'),
                 fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/resumen_comentarios.json'),
-                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/avance_gantt.json')
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/avance_gantt.json'),
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/personal_obra.json')
             ]);
             ganttRaw      = (await rGantt.json())   || {};
             gruposRaw     = (await rGrupos.json())  || {};
             obsRaw        = (await rObs.json())     || {};
             resumenComRaw = (await rResCom.json())  || {};
             avanceGanttRaw = (await rAvGantt.json()) || {};
-        } catch(e) { ganttRaw = {}; gruposRaw = {}; obsRaw = {}; resumenComRaw = {}; avanceGanttRaw = {}; }
+            personalObraRaw = (await rPersonal.json()) || {};
+        } catch(e) { ganttRaw = {}; gruposRaw = {}; obsRaw = {}; resumenComRaw = {}; avanceGanttRaw = {}; personalObraRaw = {}; }
 
         // Devuelve el capataz para un label de curva (ej "Grupo 1 · El Maitén") y un proyecto
         const getCapataz = (idProy, curvaLabel) => {
@@ -6320,6 +6325,7 @@ ${js2}
                 const agPct = _ag ? _ag.pct : null;
                 const agCol = agPct == null ? '#94a3b8' : agPct >= 80 ? '#16a34a' : agPct >= 50 ? '#2563eb' : '#dc2626';
                 h += `Estado General</div>
+${_buildPersonalBanda(personalObraRaw[obra.ID_proy] || {})}
 <div class="summary-grid">
   <div class="summary-card" style="border-left:3px solid ${agCol};"><div class="summary-card-label">Avance Real</div><div class="summary-card-value" style="color:${agCol};">${agPct != null ? Number(agPct).toFixed(2) + '%' : '—'}</div><div class="summary-card-detail">${_ag ? _ag.n + '/' + _ag.total + ' con avance' : 'Sin datos Gantt'}</div></div>
   <div class="summary-card"><div class="summary-card-label">Viviendas</div><div class="summary-card-value">${tot}</div><div class="summary-card-detail">Beneficiarios</div></div>
@@ -6927,21 +6933,23 @@ ${js}</body></html>`;
         const obrasConCurva = PROYECTOS_DATA.filter(p => (CURVAS_S_CONFIG[p.ID_proy] || []).length > 0);
         if (obrasConCurva.length === 0) { alert('No hay obras activas con curvas S configuradas.'); return; }
 
-        let ganttRaw = {}, gruposRaw = {}, obsRaw = {}, resumenComRaw = {}, avanceGanttRaw = {};
+        let ganttRaw = {}, gruposRaw = {}, obsRaw = {}, resumenComRaw = {}, avanceGanttRaw = {}, personalObraRaw = {};
         try {
-            const [rGantt, rGrupos, rObs, rResCom, rAvGantt] = await Promise.all([
+            const [rGantt, rGrupos, rObs, rResCom, rAvGantt, rPersonal] = await Promise.all([
                 fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/gantt_programa.json'),
                 fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/grupos.json'),
                 fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/observaciones.json'),
                 fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/resumen_comentarios.json'),
-                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/avance_gantt.json')
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/avance_gantt.json'),
+                fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/personal_obra.json')
             ]);
             ganttRaw      = (await rGantt.json())   || {};
             gruposRaw     = (await rGrupos.json())  || {};
             obsRaw        = (await rObs.json())     || {};
             resumenComRaw = (await rResCom.json())  || {};
             avanceGanttRaw = (await rAvGantt.json()) || {};
-        } catch(e) { ganttRaw = {}; gruposRaw = {}; obsRaw = {}; resumenComRaw = {}; avanceGanttRaw = {}; }
+            personalObraRaw = (await rPersonal.json()) || {};
+        } catch(e) { ganttRaw = {}; gruposRaw = {}; obsRaw = {}; resumenComRaw = {}; avanceGanttRaw = {}; personalObraRaw = {}; }
 
         const getCapataz = (idProy, curvaLabel) => {
             const gList = gruposRaw[idProy] || [];
@@ -7006,6 +7014,7 @@ ${js}</body></html>`;
                 const agPct = _ag ? _ag.pct : null;
                 const agCol = agPct == null ? '#94a3b8' : agPct >= 80 ? '#16a34a' : agPct >= 50 ? '#2563eb' : '#dc2626';
                 h += `Estado General</div>
+${_buildPersonalBanda(personalObraRaw[obra.ID_proy] || {})}
 <div class="summary-grid">
   <div class="summary-card" style="border-left:3px solid ${agCol};"><div class="summary-card-label">Avance Real</div><div class="summary-card-value" style="color:${agCol};">${agPct != null ? Number(agPct).toFixed(2) + '%' : '—'}</div><div class="summary-card-detail">${_ag ? _ag.n + '/' + _ag.total + ' con avance' : 'Sin datos Gantt'}</div></div>
   <div class="summary-card"><div class="summary-card-label">Viviendas</div><div class="summary-card-value">${tot}</div><div class="summary-card-detail">Beneficiarios</div></div>
