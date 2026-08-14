@@ -30,7 +30,7 @@ import curvas_cloud_utils as _ccu
 # ─────────────────────────────────────────────────────────────────────────────
 DRIVE_IDS_DIR   = r"C:\Users\rodri\OneDrive\Documentos Claude Code"
 GITHUB_REPO     = "PitufosTEch/PruebasWeb"
-GITHUB_FILE     = "SCRaices-LLM/dashboard/index_live_v3.html"
+GITHUB_FILE     = "SCRaices-LLM/dashboard/app_compiled.js"
 GITHUB_BRANCH   = "master"
 GITHUB_TOKEN_FILE = r"C:\Users\rodri\.claude\github_token.txt"  # fallback local
 
@@ -201,7 +201,7 @@ def download_html(token):
 # 3. EXTRAER CURVAS_S_CONFIG ACTUAL del HTML
 # ─────────────────────────────────────────────────────────────────────────────
 def extract_current_config(html):
-    m = re.search(r"const CURVAS_S_CONFIG = \{(.+?)\};", html, re.DOTALL)
+    m = re.search(r"const CURVAS_S_CONFIG\s*=\s*\{(.+?)\};", html, re.DOTALL)
     if not m:
         raise RuntimeError("No se encontró CURVAS_S_CONFIG en el HTML.")
     block = m.group(1)
@@ -234,7 +234,7 @@ def build_new_js_block(expected_config, current_config):
 # ─────────────────────────────────────────────────────────────────────────────
 def update_github(html, sha, new_js_block, token):
     new_html = re.sub(
-        r"const CURVAS_S_CONFIG = \{.+?\};",
+        r"const CURVAS_S_CONFIG\s*=\s*\{.+?\};",
         new_js_block,
         html,
         flags=re.DOTALL,
