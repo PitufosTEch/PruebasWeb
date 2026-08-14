@@ -10826,6 +10826,9 @@ const ROLES_PERSONAL = [{
 }, {
   key: 'fto',
   label: 'FTO'
+}, {
+  key: 'social',
+  label: 'Social'
 }];
 const INFORME_TIPOS = [{
   key: 'residente',
@@ -10935,7 +10938,8 @@ const ModalPersonalGlobal = ({
     oficina_tecnica: 'Oficina Técnica',
     coord_recepciones: 'Coordinador de recepciones',
     sat: 'SAT',
-    fto: 'FTO'
+    fto: 'FTO',
+    social: 'Social'
   };
   const rolesPresentes = [...new Set(lista.map(([, p]) => p.rol))].sort();
   return React.createElement("div", {
