@@ -6582,6 +6582,13 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
 @media (max-width:768px){.tabs{padding:0 8px;flex-wrap:wrap;}.tab-btn{font-size:11px;padding:9px 10px;flex:1 1 auto;text-align:center;min-width:0;}.obra-jumper-wrap{margin-left:0;width:calc(100% - 16px);max-width:100%;margin:4px 8px 6px;}.blk{margin:8px;padding:14px 12px;}.sg{grid-template-columns:1fr 1fr;}}
 @media print{.ftr{display:none;}.tabs{display:none;}.sec{display:block!important;}.blk{page-break-after:always;border:none;border-radius:0;margin:0;}}
 .seg-dot{cursor:help;display:inline-block;}
+.personal-banda{background:#f8fafc;border-bottom:1px solid #e2e8f0;padding:5px 24px;display:flex;align-items:center;gap:0;white-space:nowrap;overflow-x:auto;}
+.pb-item{display:inline-flex;align-items:center;gap:6px;padding:0 12px;border-right:1px solid #e2e8f0;}
+.pb-item:first-child{padding-left:0;}.pb-item:last-child{border-right:none;}
+.pb-av{width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;flex-shrink:0;}
+.pb-info{display:flex;flex-direction:column;line-height:1.2;}
+.pb-name{font-size:10px;font-weight:600;color:#1e293b;}
+.pb-role{font-size:9px;color:#64748b;}
 </style>`;
   const _JS_INF = '<scr' + 'ipt>function mst(t,b){document.querySelectorAll(\'.sec\').forEach(s=>s.classList.remove(\'active\'));document.querySelectorAll(\'.tab-btn\').forEach(x=>x.classList.remove(\'active\'));document.getElementById(\'s-\'+t).classList.add(\'active\');b.classList.add(\'active\');}function jumpToObra(idx){if(idx===\'\')return;var sec=document.querySelector(\'.sec.active\');var block=sec&&sec.querySelector(\'.obra-block[data-obra="\'+idx+\'"]\');if(block)block.scrollIntoView({behavior:\'smooth\',block:\'start\'});}(function(){var w=document.getElementById(\'ojWrap\'),inp=document.getElementById(\'ojInput\'),lst=document.getElementById(\'ojList\');if(!w)return;function openL(){lst.classList.add(\'open\');}function closeL(){lst.classList.remove(\'open\');inp.value=\'\';}inp.addEventListener(\'focus\',openL);inp.addEventListener(\'click\',openL);inp.addEventListener(\'input\',function(){var q=this.value.toLowerCase();lst.querySelectorAll(\'.obra-jumper-item\').forEach(function(li){li.classList.toggle(\'oj-hidden\',q&&!li.textContent.toLowerCase().includes(q));});openL();});lst.addEventListener(\'click\',function(e){var li=e.target.closest(\'.obra-jumper-item\');if(!li)return;jumpToObra(li.dataset.idx);closeL();});document.addEventListener(\'click\',function(e){if(!w.contains(e.target))closeL();});})();</scr' + 'ipt>';
   const _buildSecciones = (vivs, grps, curvasFiltro, capatazDesp, ganttRaw, despachosData) => {
@@ -6788,7 +6795,49 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
       sDesp
     };
   };
-  const _emitirInformeHTML = (titulo, subtitulo, semana, fechaGen, secs, obras = []) => {
+  const _buildPersonalBanda = personalData => {
+    if (!personalData || Object.keys(personalData).length === 0) return '';
+    const esc = escapeHtmlBasic;
+    const RLABELS = {
+      capataz: 'Capataz',
+      residente: 'Residente',
+      gerente: 'Gerente',
+      coordinador: 'Coordinador',
+      coordinador_pagos: 'Coord. Pagos',
+      logistica: 'Logística',
+      rrhh: 'RRHH',
+      prevencion: 'Prevención',
+      oficina_tecnica: 'Of. Técnica',
+      coord_recepciones: 'Coord. Recepciones',
+      sat: 'SAT',
+      fto: 'FTO',
+      social: 'Social'
+    };
+    const RCOLORS = {
+      capataz: ['#dbeafe', '#1d4ed8'],
+      residente: ['#f3e8ff', '#7e22ce'],
+      gerente: ['#ccfbf1', '#0f766e'],
+      coordinador: ['#fed7aa', '#9a3412'],
+      coordinador_pagos: ['#fed7aa', '#9a3412'],
+      sat: ['#fef9c3', '#854d0e'],
+      social: ['#fce7f3', '#9d174d'],
+      prevencion: ['#dcfce7', '#15803d'],
+      logistica: ['#e0f2fe', '#0369a1'],
+      rrhh: ['#f1f5f9', '#475569'],
+      oficina_tecnica: ['#fef3c7', '#92400e'],
+      coord_recepciones: ['#ede9fe', '#6d28d9'],
+      fto: ['#ffedd5', '#c2410c']
+    };
+    const ORDER = ['capataz', 'residente', 'gerente', 'coordinador', 'sat', 'social', 'prevencion', 'logistica', 'rrhh', 'oficina_tecnica', 'coord_recepciones', 'coordinador_pagos', 'fto'];
+    const personas = Object.values(personalData).sort((a, b) => ORDER.indexOf(a.rol ?? '') + 99 - (ORDER.indexOf(b.rol ?? '') + 99));
+    const items = personas.map(p => {
+      const ini = (p.nombre || '?').split(' ').slice(0, 2).map(w => w[0] || '').join('').toUpperCase();
+      const [bg, col] = RCOLORS[p.rol] || ['#f1f5f9', '#475569'];
+      return `<div class="pb-item"><div class="pb-av" style="background:${bg};color:${col};">${ini}</div><div class="pb-info"><span class="pb-name">${esc(p.nombre || '')}</span><span class="pb-role">${RLABELS[p.rol] || p.rol || ''}</span></div></div>`;
+    }).join('');
+    return `<div class="personal-banda">${items}</div>`;
+  };
+  const _emitirInformeHTML = (titulo, subtitulo, semana, fechaGen, secs, obras = [], bandaHtml = '') => {
     const TABS = [['resumen', 'Resumen'], ['checkpoints', 'Checkpoints'], ['curvas', 'Curvas S'], ['ritmos', 'Ritmos y comentarios'], ['viviendas', 'Viviendas'], ['despachos', 'Despachos'], ['mo', 'M.O.']];
     const tabsHtml = TABS.map(([k, l], i) => `<button class="tab-btn${i === 0 ? ' active' : ''}" onclick="mst('${k}',this)">${l}</button>`).join('');
     const ojHtml = obras.length > 1 ? `<div class="obra-jumper-wrap" id="ojWrap"><input class="obra-jumper-input" id="ojInput" type="text" placeholder="&#128269; Ir a obra..." autocomplete="off"><span class="obra-jumper-arrow">&#9660;</span><ul class="obra-jumper-list" id="ojList">${obras.map((o, i) => `<li class="obra-jumper-item" data-idx="${i}">${escapeHtmlBasic(o.nombre)}</li>`).join('')}</ul></div>` : '';
@@ -6797,6 +6846,7 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
 <title>${titulo} — Sem ${semana}</title>${_CSS_INF}</head><body>
 <div class="cnt">
   <div class="hdr"><span style="font-size:20px;">🏗️</span><h1>${titulo}</h1><span class="hdr-sub">${subtitulo}</span></div>
+  ${bandaHtml}
   <div class="tabs">${tabsHtml}${ojHtml}</div>
   <div class="content">${secsHtml}</div>
   <div class="ftr"><span style="font-size:11px;color:#94a3b8;">Generado: ${fechaGen}</span><button class="btn btn-dark" onclick="window.print();">🖨️ Imprimir / PDF</button></div>
@@ -6817,13 +6867,15 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
     let ganttRaw = {},
       gruposRaw = {},
       obsRaw = {},
-      avGanttLocal = {};
+      avGanttLocal = {},
+      personalObraLocal = {};
     try {
-      const [rG, rGr, rObs, rAg] = await Promise.all([fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/gantt_programa.json'), fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/grupos.json'), fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/observaciones.json'), fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/avance_gantt.json')]);
+      const [rG, rGr, rObs, rAg, rPers] = await Promise.all([fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/gantt_programa.json'), fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/grupos.json'), fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/observaciones.json'), fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/avance_gantt.json'), fetch(`https://scraices-dashboard-default-rtdb.firebaseio.com/personal_obra/${proyectoSel}.json`)]);
       ganttRaw = (await rG.json()) || {};
       gruposRaw = (await rGr.json()) || {};
       obsRaw = (await rObs.json()) || {};
       avGanttLocal = (await rAg.json()) || {};
+      personalObraLocal = (await rPers.json()) || {};
     } catch (_e) {}
     const resNombre = (gruposRaw[proyectoSel] || []).map(g => g.residente).filter(Boolean)[0] || null;
     let proysList = [];
@@ -7502,7 +7554,7 @@ ${(() => {
     });
     const titulo = resNombre ? `Reporte Residente: ${resNombre}` : `Reporte Residente — ${proyectoSel}`;
     const subtitulo = `${proysList.length > 1 ? proysList.length + ' obras' : proysList[0]?.ID_proy || proyectoSel} · Semana ${sem} · ${fechaGen}`;
-    const html = _emitirInformeHTML(titulo, subtitulo, sem, fechaGen, [sR, sCk, sCurv, sRit, sViv, sDesp, sMO], proyData);
+    const html = _emitirInformeHTML(titulo, subtitulo, sem, fechaGen, [sR, sCk, sCurv, sRit, sViv, sDesp, sMO], proyData, _buildPersonalBanda(personalObraLocal));
     const _rNom = (resNombre || proyectoSel).replace(/[^a-zA-Z0-9À-ſ]/g, '_');
     const _fn = `Reporte_Residente_${_rNom}_Sem${sem}.html`;
     const _bl = new Blob([html], {
@@ -7531,11 +7583,13 @@ ${(() => {
     });
     const proyNombre = proy ? `${proy.ID_proy} · ${proy.NOMBRE_PROYECTO}` : proyectoSel;
     let ganttRaw = {},
-      despachosData = null;
+      despachosData = null,
+      personalObraLocal = {};
     try {
-      const [rG, rD] = await Promise.all([fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/gantt_programa.json'), fetch(`https://scraices-dashboard-default-rtdb.firebaseio.com/despachos_data/${proyectoSel}.json`)]);
+      const [rG, rD, rPers] = await Promise.all([fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/gantt_programa.json'), fetch(`https://scraices-dashboard-default-rtdb.firebaseio.com/despachos_data/${proyectoSel}.json`), fetch(`https://scraices-dashboard-default-rtdb.firebaseio.com/personal_obra/${proyectoSel}.json`)]);
       ganttRaw = (await rG.json()) || {};
       despachosData = await rD.json();
+      personalObraLocal = (await rPers.json()) || {};
     } catch (_e) {}
     const gruposData = agruparViviendas(datos, grupos);
     const gruposCapataz = gruposData.filter(g => g.capataz === capatazFiltro && g.viviendas.length > 0);
@@ -7554,7 +7608,7 @@ ${(() => {
       return mm ? grupoNums.has(parseInt(mm[1])) : false;
     });
     const secs = _buildSecciones(vivCapataz, gruposCapataz, curvasCapataz, capatazFiltro, ganttRaw, despachosData);
-    const html = _emitirInformeHTML(`Reporte Capataz: ${capatazFiltro} — ${proyNombre}`, `Semana ${sem} · ${fechaGen}`, sem, fechaGen, [secs.sR, secs.sCk, secs.sCurv, secs.sRit, secs.sViv, secs.sDesp]);
+    const html = _emitirInformeHTML(`Reporte Capataz: ${capatazFiltro} — ${proyNombre}`, `Semana ${sem} · ${fechaGen}`, sem, fechaGen, [secs.sR, secs.sCk, secs.sCurv, secs.sRit, secs.sViv, secs.sDesp], [], _buildPersonalBanda(personalObraLocal));
     const _capSafe = capatazFiltro.replace(/[^a-zA-Z0-9À-ſ]/g, '_');
     const _fn = `Reporte_Capataz_${_capSafe}_${proyectoSel}_Sem${sem}.html`;
     const _bl = new Blob([html], {
