@@ -5408,12 +5408,20 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
         const RCOLORS = { capataz:['#dbeafe','#1d4ed8'], residente:['#f3e8ff','#7e22ce'], gerente:['#ccfbf1','#0f766e'], coordinador:['#fed7aa','#9a3412'], coordinador_pagos:['#fed7aa','#9a3412'], sat:['#fef9c3','#854d0e'], social:['#fce7f3','#9d174d'], prevencion:['#dcfce7','#15803d'], logistica:['#e0f2fe','#0369a1'], rrhh:['#f1f5f9','#475569'], oficina_tecnica:['#fef3c7','#92400e'], coord_recepciones:['#ede9fe','#6d28d9'], fto:['#ffedd5','#c2410c'] };
         const ORDER = ['capataz','residente','gerente','coordinador','sat','social','prevencion','logistica','rrhh','oficina_tecnica','coord_recepciones','coordinador_pagos','fto'];
         const personas = Object.values(personalData).sort((a,b) => (ORDER.indexOf(a.rol??'') + 99) - (ORDER.indexOf(b.rol??'') + 99));
-        const items = personas.map(p => {
+        const lastIdx = personas.length - 1;
+        const items = personas.map((p, i) => {
             const ini = (p.nombre||'?').split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
             const [bg,col] = RCOLORS[p.rol] || ['#f1f5f9','#475569'];
-            return `<div class="pb-item"><div class="pb-av" style="background:${bg};color:${col};">${ini}</div><div class="pb-info"><span class="pb-name">${esc(p.nombre||'')}</span><span class="pb-role">${RLABELS[p.rol]||p.rol||''}</span></div></div>`;
+            const borderR = i < lastIdx ? '1px solid #e2e8f0' : 'none';
+            const paddingL = i === 0 ? '0' : '12px';
+            return `<div style="display:inline-flex;align-items:center;gap:6px;padding:0 12px 0 ${paddingL};border-right:${borderR};">` +
+                `<div style="width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:600;flex-shrink:0;background:${bg};color:${col};">${ini}</div>` +
+                `<div style="display:flex;flex-direction:column;line-height:1.25;">` +
+                `<span style="font-size:11px;font-weight:600;color:#1e293b;white-space:nowrap;">${esc(p.nombre||'')}</span>` +
+                `<span style="font-size:9px;color:#64748b;white-space:nowrap;">${RLABELS[p.rol]||p.rol||''}</span>` +
+                `</div></div>`;
         }).join('');
-        return `<div class="personal-banda">${items}</div>`;
+        return `<div style="background:#f8fafc;border-bottom:1px solid #e2e8f0;padding:5px 24px;display:flex;align-items:center;gap:0;white-space:nowrap;overflow-x:auto;">${items}</div>`;
     };
 
     const _emitirInformeHTML = (titulo, subtitulo, semana, fechaGen, secs, obras=[], bandaHtml='') => {
@@ -6006,7 +6014,7 @@ ${_buildPersonalBanda(personalObraRaw[obra.ID_proy] || {})}
                     const pctProg = _ag != null ? Math.min(100, _ag.pct_prog ?? _ag.pct ?? 0) : null;
                     const barVal  = pctProg !== null ? pctProg : (pg.plazo > 0 ? Math.min(100, Math.round((pg.plazo - Math.max(0, diasR)) / pg.plazo * 100)) : 0);
                     const barCol  = barVal>=100?'#ef4444':barVal>=80?'#f59e0b':barVal>=50?'#3b82f6':'#22c55e';
-                    h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📋 Programa de Obra</h3>
+                    h += `<h3 style="font-size:11px;font-weight:700;color:#475569;margin:10px 0 5px;text-transform:uppercase;letter-spacing:.4px;">📋 Programa de Obra</h3>
 <div class="summary-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));">
   <div class="summary-card"><div class="summary-card-label">Inicio</div><div style="font-size:11px;font-weight:700;">${fmtFecha(pg.inicio)}</div></div>
   <div class="summary-card"><div class="summary-card-label">Término</div><div style="font-size:11px;font-weight:700;">${fmtFecha(pg.finProg)}</div></div>
@@ -6016,10 +6024,10 @@ ${_buildPersonalBanda(personalObraRaw[obra.ID_proy] || {})}
 <div style="margin:10px 0 4px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;"><span>${fmtFecha(pg.inicio)}</span><span style="font-weight:600;">${pctProg !== null ? Number(pctProg).toFixed(2) + '% programado' : '—'}</span><span>${fmtFecha(pg.finProg)}</span></div>
 <div style="height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden;"><div style="height:100%;width:${barVal}%;background:${barCol};border-radius:6px;"></div></div>`;
                 } else {
-                    h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📋 Programa de Obra</h3><p style="color:#94a3b8;font-size:12px;">Sin datos de programa disponibles.</p>`;
+                    h += `<h3 style="font-size:11px;font-weight:700;color:#475569;margin:10px 0 5px;text-transform:uppercase;letter-spacing:.4px;">📋 Programa de Obra</h3><p style="color:#94a3b8;font-size:12px;">Sin datos de programa disponibles.</p>`;
                 }
                 const agBarCol = (agPct??0)>=80?'#16a34a':(agPct??0)>=50?'#3b82f6':(agPct??0)>=25?'#f59e0b':'#ef4444';
-                h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📊 Avance real a la fecha</h3>
+                h += `<h3 style="font-size:11px;font-weight:700;color:#475569;margin:10px 0 5px;text-transform:uppercase;letter-spacing:.4px;">📊 Avance real a la fecha</h3>
 <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;"><span style="font-size:14px;font-weight:800;color:${agBarCol};font-family:monospace;">${agPct != null ? Number(agPct).toFixed(2) : '—'}%</span><span style="font-size:11px;color:#94a3b8;">${_ag ? _ag.n+'/'+_ag.total+' con avance' : 'Sin datos Curvas S'}</span></div>
 <div style="height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden;"><div style="height:100%;width:${agPct??0}%;background:${agBarCol};border-radius:6px;"></div></div>`;
             } else if (tab === 'checkpoints') {
@@ -6112,7 +6120,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .content{background:#f0f4f8;min-height:380px;}
 .section{display:none;}
 .section.active{display:block;}
-.obra-block{background:#fff;margin:12px;border-radius:10px;padding:24px;border:1px solid #e2e8f0;}
+.obra-block{background:#fff;margin:10px;border-radius:8px;padding:14px 18px;border:1px solid #e2e8f0;}
 .footer{background:#f8fafc;border-top:1px solid #e2e8f0;padding:12px 24px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;}
 .btn{padding:8px 14px;border:1px solid #d1d5db;border-radius:6px;background:#fff;cursor:pointer;font-size:12px;font-weight:600;color:#374151;}
 .btn:hover{background:#f3f4f6;}
@@ -6123,7 +6131,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .summary-card-label{font-size:9px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;flex-shrink:0;}
 .summary-card-value{font-size:11px;font-weight:700;color:#0f172a;font-family:monospace;}
 .summary-card-detail{font-size:9px;color:#94a3b8;}
-.breadcrumb{font-size:12px;color:#94a3b8;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid #e2e8f0;}
+.breadcrumb{font-size:11px;color:#94a3b8;margin-bottom:10px;padding-bottom:7px;border-bottom:1px solid #e2e8f0;}
 .breadcrumb strong{color:#0f172a;}
 .curvas-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-top:12px;}
 .curva-card{border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;}
@@ -6342,7 +6350,7 @@ ${_buildPersonalBanda(personalObraRaw[obra.ID_proy] || {})}
                     const cCol = cDiasR === null ? '#6b7280' : cDiasR < 0 ? '#dc2626' : cDiasR < 30 ? '#b45309' : '#16a34a';
                     const cPctTr = cDur > 0 && cFin ? Math.min(100, Math.round((cDur - Math.max(0, cDiasR)) / cDur * 100)) : 0;
                     const cBarCol = cPctTr >= 100 ? '#ef4444' : cPctTr >= 80 ? '#f59e0b' : cPctTr >= 50 ? '#3b82f6' : '#22c55e';
-                    h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📄 Contrato</h3>
+                    h += `<h3 style="font-size:11px;font-weight:700;color:#475569;margin:10px 0 5px;text-transform:uppercase;letter-spacing:.4px;">📄 Contrato</h3>
 <div class="summary-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));">
   <div class="summary-card"><div class="summary-card-label">Inicio</div><div style="font-size:11px;font-weight:700;">${fmtFecha(cIni)}</div></div>
   <div class="summary-card"><div class="summary-card-label">Término</div><div style="font-size:11px;font-weight:700;">${fmtFecha(cFin)}</div></div>
@@ -6362,7 +6370,7 @@ ${_buildPersonalBanda(personalObraRaw[obra.ID_proy] || {})}
                     const pctProg = _ag != null ? Math.min(100, _ag.pct_prog ?? _ag.pct ?? 0) : null;
                     const barVal  = pctProg !== null ? pctProg : (pg.plazo > 0 ? Math.min(100, Math.round((pg.plazo - Math.max(0, diasR)) / pg.plazo * 100)) : 0);
                     const barCol  = barVal >= 100 ? '#ef4444' : barVal >= 80 ? '#f59e0b' : barVal >= 50 ? '#3b82f6' : '#22c55e';
-                    h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📋 Programa de Obra</h3>
+                    h += `<h3 style="font-size:11px;font-weight:700;color:#475569;margin:10px 0 5px;text-transform:uppercase;letter-spacing:.4px;">📋 Programa de Obra</h3>
 <div class="summary-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));">
   <div class="summary-card"><div class="summary-card-label">Inicio</div><div style="font-size:11px;font-weight:700;">${fmtFecha(pg.inicio)}</div></div>
   <div class="summary-card"><div class="summary-card-label">Término</div><div style="font-size:11px;font-weight:700;">${fmtFecha(pg.finProg)}</div></div>
@@ -6372,11 +6380,11 @@ ${_buildPersonalBanda(personalObraRaw[obra.ID_proy] || {})}
 <div style="margin:10px 0 4px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;"><span>${fmtFecha(pg.inicio)}</span><span style="font-weight:600;">${pctProg !== null ? Number(pctProg).toFixed(2) + '% programado' : '—'}</span><span>${fmtFecha(pg.finProg)}</span></div>
 <div style="height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden;"><div style="height:100%;width:${barVal}%;background:${barCol};border-radius:6px;"></div></div>`;
                 } else {
-                    h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📋 Programa de Obra</h3><p style="color:#94a3b8;font-size:12px;">Sin datos de programa disponibles.</p>`;
+                    h += `<h3 style="font-size:11px;font-weight:700;color:#475569;margin:10px 0 5px;text-transform:uppercase;letter-spacing:.4px;">📋 Programa de Obra</h3><p style="color:#94a3b8;font-size:12px;">Sin datos de programa disponibles.</p>`;
                 }
                 // Avance real a la fecha
                 
-                h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📊 Avance real a la fecha</h3>
+                h += `<h3 style="font-size:11px;font-weight:700;color:#475569;margin:10px 0 5px;text-transform:uppercase;letter-spacing:.4px;">📊 Avance real a la fecha</h3>
 <div class="summary-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));">
   <div class="summary-card"><div class="summary-card-label">Avance Real</div><div style="font-size:14px;font-weight:800;color:${agCol};">${agPct != null ? Number(agPct).toFixed(2) : '—'}%</div></div>
   <div class="summary-card"><div class="summary-card-label">Inspeccionadas</div><div style="font-size:11px;font-weight:700;">${conInsp} / ${tot}</div><div style="font-size:11px;color:#94a3b8;">viviendas</div></div>
@@ -6707,7 +6715,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .content{background:#f0f4f8;min-height:380px;}
 .section{display:none;}
 .section.active{display:block;}
-.obra-block{background:#fff;margin:12px;border-radius:10px;padding:24px;border:1px solid #e2e8f0;}
+.obra-block{background:#fff;margin:10px;border-radius:8px;padding:14px 18px;border:1px solid #e2e8f0;}
 .footer{background:#f8fafc;border-top:1px solid #e2e8f0;padding:12px 24px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;}
 .btn{padding:8px 14px;border:1px solid #d1d5db;border-radius:6px;background:#fff;cursor:pointer;font-size:12px;font-weight:600;color:#374151;}
 .btn:hover{background:#f3f4f6;}
@@ -6722,9 +6730,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .summary-card-label{font-size:9px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;flex-shrink:0;}
 .summary-card-value{font-size:11px;font-weight:700;color:#0f172a;font-family:monospace;}
 .summary-card-detail{font-size:9px;color:#94a3b8;}
-.breadcrumb{font-size:12px;color:#94a3b8;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid #e2e8f0;}
+.breadcrumb{font-size:11px;color:#94a3b8;margin-bottom:10px;padding-bottom:7px;border-bottom:1px solid #e2e8f0;}
 .breadcrumb strong{color:#0f172a;}
-.sec-h3{font-size:13px;font-weight:700;color:#1e293b;margin:20px 0 10px;padding-bottom:6px;border-bottom:1px solid #e2e8f0;}
+.sec-h3{font-size:12px;font-weight:700;color:#1e293b;margin:12px 0 7px;padding-bottom:4px;border-bottom:1px solid #e2e8f0;}
 .sec-h3:first-child{margin-top:0;}
 .curvas-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-top:12px;}
 .curva-card{border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;}
@@ -7030,7 +7038,7 @@ ${_buildPersonalBanda(personalObraRaw[obra.ID_proy] || {})}
                     const cCol = cDiasR === null ? '#6b7280' : cDiasR < 0 ? '#dc2626' : cDiasR < 30 ? '#b45309' : '#16a34a';
                     const cPctTr = cDur > 0 && cFin ? Math.min(100, Math.round((cDur - Math.max(0, cDiasR)) / cDur * 100)) : 0;
                     const cBarCol = cPctTr >= 100 ? '#ef4444' : cPctTr >= 80 ? '#f59e0b' : cPctTr >= 50 ? '#3b82f6' : '#22c55e';
-                    h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📄 Contrato</h3>
+                    h += `<h3 style="font-size:11px;font-weight:700;color:#475569;margin:10px 0 5px;text-transform:uppercase;letter-spacing:.4px;">📄 Contrato</h3>
 <div class="summary-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));">
   <div class="summary-card"><div class="summary-card-label">Inicio</div><div style="font-size:11px;font-weight:700;">${fmtFecha(cIni)}</div></div>
   <div class="summary-card"><div class="summary-card-label">Término</div><div style="font-size:11px;font-weight:700;">${fmtFecha(cFin)}</div></div>
@@ -7048,7 +7056,7 @@ ${_buildPersonalBanda(personalObraRaw[obra.ID_proy] || {})}
                     const pctProg = _ag != null ? Math.min(100, _ag.pct_prog ?? _ag.pct ?? 0) : null;
                     const barVal  = pctProg !== null ? pctProg : (pg.plazo > 0 ? Math.min(100, Math.round((pg.plazo - Math.max(0, diasR)) / pg.plazo * 100)) : 0);
                     const barCol  = barVal >= 100 ? '#ef4444' : barVal >= 80 ? '#f59e0b' : barVal >= 50 ? '#3b82f6' : '#22c55e';
-                    h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📋 Programa de Obra</h3>
+                    h += `<h3 style="font-size:11px;font-weight:700;color:#475569;margin:10px 0 5px;text-transform:uppercase;letter-spacing:.4px;">📋 Programa de Obra</h3>
 <div class="summary-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));">
   <div class="summary-card"><div class="summary-card-label">Inicio</div><div style="font-size:11px;font-weight:700;">${fmtFecha(pg.inicio)}</div></div>
   <div class="summary-card"><div class="summary-card-label">Término</div><div style="font-size:11px;font-weight:700;">${fmtFecha(pg.finProg)}</div></div>
@@ -7058,10 +7066,10 @@ ${_buildPersonalBanda(personalObraRaw[obra.ID_proy] || {})}
 <div style="margin:10px 0 4px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;"><span>${fmtFecha(pg.inicio)}</span><span style="font-weight:600;">${pctProg !== null ? Number(pctProg).toFixed(2) + '% programado' : '—'}</span><span>${fmtFecha(pg.finProg)}</span></div>
 <div style="height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden;"><div style="height:100%;width:${barVal}%;background:${barCol};border-radius:6px;"></div></div>`;
                 } else {
-                    h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📋 Programa de Obra</h3><p style="color:#94a3b8;font-size:12px;">Sin datos de programa disponibles.</p>`;
+                    h += `<h3 style="font-size:11px;font-weight:700;color:#475569;margin:10px 0 5px;text-transform:uppercase;letter-spacing:.4px;">📋 Programa de Obra</h3><p style="color:#94a3b8;font-size:12px;">Sin datos de programa disponibles.</p>`;
                 }
                 
-                h += `<h3 style="font-size:13px;color:#333;margin:16px 0 8px;">📊 Avance real a la fecha</h3>
+                h += `<h3 style="font-size:11px;font-weight:700;color:#475569;margin:10px 0 5px;text-transform:uppercase;letter-spacing:.4px;">📊 Avance real a la fecha</h3>
 <div class="summary-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));">
   <div class="summary-card"><div class="summary-card-label">Avance Real</div><div style="font-size:14px;font-weight:800;color:${agCol};">${agPct != null ? Number(agPct).toFixed(2) : '—'}%</div></div>
   <div class="summary-card"><div class="summary-card-label">Inspeccionadas</div><div style="font-size:11px;font-weight:700;">${conInsp} / ${tot}</div><div style="font-size:11px;color:#94a3b8;">viviendas</div></div>
@@ -7171,7 +7179,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .content{background:#f0f4f8;min-height:380px;}
 .section{display:none;}
 .section.active{display:block;}
-.obra-block{background:#fff;margin:12px;border-radius:10px;padding:24px;border:1px solid #e2e8f0;}
+.obra-block{background:#fff;margin:10px;border-radius:8px;padding:14px 18px;border:1px solid #e2e8f0;}
 .footer{background:#f8fafc;border-top:1px solid #e2e8f0;padding:12px 24px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;}
 .btn{padding:8px 14px;border:1px solid #d1d5db;border-radius:6px;background:#fff;cursor:pointer;font-size:12px;font-weight:600;color:#374151;}
 .btn:hover{background:#f3f4f6;}
@@ -7182,7 +7190,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .summary-card-label{font-size:9px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;flex-shrink:0;}
 .summary-card-value{font-size:11px;font-weight:700;color:#0f172a;font-family:monospace;}
 .summary-card-detail{font-size:9px;color:#94a3b8;}
-.breadcrumb{font-size:12px;color:#94a3b8;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid #e2e8f0;}
+.breadcrumb{font-size:11px;color:#94a3b8;margin-bottom:10px;padding-bottom:7px;border-bottom:1px solid #e2e8f0;}
 .breadcrumb strong{color:#0f172a;}
 .curvas-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-top:12px;}
 .curva-card{border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;}
@@ -7670,7 +7678,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .content{background:#f0f4f8;min-height:380px;}
 .section{display:none;}
 .section.active{display:block;}
-.obra-block{background:#fff;margin:12px;border-radius:10px;padding:24px;border:1px solid #e2e8f0;}
+.obra-block{background:#fff;margin:10px;border-radius:8px;padding:14px 18px;border:1px solid #e2e8f0;}
 .footer{background:#f8fafc;border-top:1px solid #e2e8f0;padding:12px 24px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;}
 .btn{padding:8px 14px;border:1px solid #d1d5db;border-radius:6px;background:#fff;cursor:pointer;font-size:12px;font-weight:600;color:#374151;}
 .btn:hover{background:#f3f4f6;}
@@ -7678,7 +7686,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .btn-pdf:hover{background:#1e293b;}
 .breadcrumb{font-size:12px;color:#94a3b8;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid #e8e8e8;}
 .breadcrumb strong{color:#0f172a;}
-.sec-h3{font-size:13px;font-weight:700;color:#1e293b;margin:20px 0 10px;padding-bottom:6px;border-bottom:1px solid #e2e8f0;}
+.sec-h3{font-size:12px;font-weight:700;color:#1e293b;margin:12px 0 7px;padding-bottom:4px;border-bottom:1px solid #e2e8f0;}
 .sec-h3:first-child{margin-top:0;}
 .summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:5px;margin-bottom:8px;}
 .summary-card{padding:3px 7px;border-radius:5px;border:1px solid #e2e8f0;background:#f8fafc;display:flex;align-items:baseline;gap:5px;overflow:hidden;}
