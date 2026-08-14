@@ -48,8 +48,9 @@ from googleapiclient.http import MediaFileUpload
 # ─────────────────────────────────────────────────────────────────────────────
 SPREADSHEET_ID = "1t_1j62f_3l1nrlufmvhnV-o1WTplv0OnQL_JdVaWgKA"
 GANTT_HOJA       = "Ñuke Mapu"
+OBRA_FOLDER    = "Nuke Mapu"
 TOKEN_FILE     = _ccu.TOKEN_FILE
-OUTPUT_DIR     = _ccu.get_output_dir()
+OUTPUT_DIR     = _ccu.get_output_dir_obra(OBRA_FOLDER)
 
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -863,32 +864,14 @@ def insertar_imagenes_en_sheets(sheets_svc):
 # ─────────────────────────────────────────────────────────────────────────────
 def actualizar_drive(drive_svc, outdir):
     global DRIVE_IDS
-    log.info("Actualizando archivos en Google Drive...")
-    nuevos = {}
-    for name, file_id in list(DRIVE_IDS.items()):
-        path = Path(outdir) / name
-        if not path.exists():
-            log.warning(f"  No encontrado: {path}, saltando.")
-            nuevos[name] = file_id
-            continue
-        media = MediaFileUpload(str(path), mimetype="image/png", resumable=False)
-        if file_id:
-            try:
-                drive_svc.files().delete(fileId=file_id).execute()
-            except Exception:
-                pass
-        res = drive_svc.files().create(
-            body={"name": name, "mimeType": "image/png"},
-            media_body=media, fields="id"
-        ).execute()
-        new_id = res["id"]
-        drive_svc.permissions().create(
-            fileId=new_id, body={"type": "anyone", "role": "reader"},
-        ).execute()
-        nuevos[name] = new_id
-        log.info(f"  Recreado (sin cache CDN): {name} -> {new_id}")
-    DRIVE_IDS.update(nuevos)
-    _ccu.save_drive_ids("nuke_mapu", DRIVE_IDS)
+    # Seed migration: si Firebase/JSON aún no tiene IDs para este proyecto,
+    # sembrar con los IDs hardcodeados para que el update in-place funcione.
+    existing = _ccu.load_drive_ids("nuke_mapu")
+    if not existing:
+        _ccu.save_drive_ids("nuke_mapu", DRIVE_IDS)
+    DRIVE_IDS = _ccu.actualizar_drive_organizado(
+        drive_svc, outdir, list(DRIVE_IDS.keys()), OBRA_FOLDER, "nuke_mapu"
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────

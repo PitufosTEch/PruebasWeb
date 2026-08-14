@@ -46,8 +46,9 @@ from googleapiclient.http import MediaFileUpload
 # ─────────────────────────────────────────────────────────────────────────────
 SPREADSHEET_ID = "151wIDnZn8_b7egJKLQKUcD6QDCflEWF5OlAU9KWgc-M"
 GANTT_HOJA       = "% Avance"
+OBRA_FOLDER    = "Aliwen"
 TOKEN_FILE     = _ccu.TOKEN_FILE
-OUTPUT_DIR     = _ccu.get_output_dir()
+OUTPUT_DIR     = _ccu.get_output_dir_obra(OBRA_FOLDER)
 
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -786,46 +787,8 @@ def insertar_imagenes_en_sheets(sheets_svc, drive_ids):
 # ─────────────────────────────────────────────────────────────────────────────
 # 7. SUBIR A DRIVE
 # ─────────────────────────────────────────────────────────────────────────────
-def _crear_o_actualizar_drive(drive_svc, name, path_local, drive_ids):
-    """Sube imagen a Drive: actualiza si ya tiene ID, crea nuevo si no."""
-    media = MediaFileUpload(str(path_local), mimetype="image/png", resumable=False)
-    existing_id = drive_ids.get(name, "")
-
-    if existing_id:
-        try:
-            drive_svc.files().delete(fileId=existing_id).execute()
-        except Exception:
-            pass
-    file_meta = {
-        "name": name,
-        "mimeType": "image/png",
-    }
-    result = drive_svc.files().create(
-        body=file_meta,
-        media_body=media,
-        fields="id",
-    ).execute()
-    new_id = result["id"]
-    # Hacer publico para que Sheets pueda mostrarlo
-    drive_svc.permissions().create(
-        fileId=new_id,
-        body={"role": "reader", "type": "anyone"},
-    ).execute()
-    log.info(f"  Recreado (sin cache CDN): {name} -> {new_id}")
-    return new_id
-
-
-def actualizar_drive(drive_svc, outdir, drive_ids):
-    log.info("Actualizando archivos en Google Drive...")
-    nuevos_ids = {}
-    for name in CHART_NAMES:
-        path = Path(outdir) / name
-        if not path.exists():
-            log.warning(f"  No encontrado: {path}, saltando.")
-            continue
-        new_id = _crear_o_actualizar_drive(drive_svc, name, path, drive_ids)
-        nuevos_ids[name] = new_id
-    return nuevos_ids
+def actualizar_drive(drive_svc, outdir, drive_ids=None):
+    return _ccu.actualizar_drive_organizado(drive_svc, outdir, CHART_NAMES, OBRA_FOLDER, "aliwen")
 
 
 # ─────────────────────────────────────────────────────────────────────────────

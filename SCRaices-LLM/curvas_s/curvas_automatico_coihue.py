@@ -37,8 +37,9 @@ from googleapiclient.http import MediaFileUpload
 SPREADSHEET_ID   = "1GiaZ1i3BN3mbgFmg16Ze5E25R0jEmYULtCWRy6cKaHo"
 GANTT_HOJA       = "Programa de obra"
 APPSHEET_PROJECT = "P39"
+OBRA_FOLDER    = "El Coihue"
 TOKEN_FILE     = _ccu.TOKEN_FILE
-OUTPUT_DIR     = _ccu.get_output_dir()
+OUTPUT_DIR     = _ccu.get_output_dir_obra(OBRA_FOLDER)
 DRIVE_IDS_FILE = None  # gestionado por _ccu (Firebase en cloud, JSON en local)
 
 SCOPES = [
@@ -755,36 +756,7 @@ def _save_drive_ids(ids):
 
 
 def actualizar_drive(drive_svc, outdir):
-    log.info("Actualizando archivos en Google Drive...")
-    drive_ids = _load_drive_ids()
-    nuevos = {}
-
-    for chart_name in CHART_NAMES:
-        path = Path(outdir) / chart_name
-        if not path.exists():
-            log.warning(f"  No encontrado: {path}, saltando.")
-            continue
-        media = MediaFileUpload(str(path), mimetype="image/png", resumable=False)
-        existing_id = drive_ids.get(chart_name, "")
-        if existing_id:
-            try:
-                drive_svc.files().delete(fileId=existing_id).execute()
-            except Exception:
-                pass
-        res = drive_svc.files().create(
-            body={"name": chart_name, "mimeType": "image/png"},
-            media_body=media, fields="id"
-        ).execute()
-        new_id = res["id"]
-        drive_svc.permissions().create(
-            fileId=new_id, body={"type": "anyone", "role": "reader"},
-        ).execute()
-        nuevos[chart_name] = new_id
-        log.info(f"  Recreado (sin cache CDN): {chart_name} -> {new_id}")
-
-    drive_ids.update(nuevos)
-    _save_drive_ids(drive_ids)
-    return drive_ids
+    return _ccu.actualizar_drive_organizado(drive_svc, outdir, CHART_NAMES, OBRA_FOLDER, "coihue")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
