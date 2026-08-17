@@ -1,0 +1,68 @@
+name: Informes Semanales — Lunes
+
+# Envía los informes HTML a los destinatarios configurados en Firebase (personal_global).
+# Horario: lunes 13:00 UTC = 10:00 AM hora Chile (UTC-3).
+# El workflow de curvas_semanal corre a las 11:00 UTC y puede tardar hasta 60 min,
+# por lo que 13:00 UTC garantiza que el snapshot está fresco antes de enviar.
+
+on:
+  schedule:
+    - cron: '0 13 * * 1'   # Lunes 13:00 UTC = 10:00 AM Chile
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Modo prueba (no envía correos)'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: informes-lunes
+  cancel-in-progress: false
+
+jobs:
+  enviar-informes:
+    name: Generar y enviar informes
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: informes-pip-${{ runner.os }}-${{ hashFiles('SCRaices-LLM/informes/requirements.txt') }}
+          restore-keys: informes-pip-${{ runner.os }}-
+
+      - name: Instalar dependencias
+        run: |
+          pip install --upgrade pip
+          pip install requests
+
+      - name: Enviar informes semanales
+        working-directory: SCRaices-LLM/informes
+        env:
+          FIREBASE_URL:        ${{ secrets.FIREBASE_URL }}
+          GMAIL_APP_PASSWORD:  ${{ secrets.GMAIL_APP_PASSWORD }}
+          # DRY_RUN:
+          #   - Cron automático (lunes): siempre false → envía correos reales
+          #   - workflow_dispatch sin input: usa el default del input (true = prueba)
+          #   - workflow_dispatch con input seleccionado: usa lo que eligió el usuario
+          DRY_RUN: ${{ github.event_name == 'schedule' && 'false' || inputs.dry_run || 'true' }}
+        run: python enviar_informes_lunes.py
+
+      - name: Resumen en caso de error
+        if: failure()
+        run: echo "::error::El envío de informes falló. Revisa el log completo."
