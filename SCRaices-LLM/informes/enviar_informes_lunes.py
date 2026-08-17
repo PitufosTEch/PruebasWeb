@@ -314,7 +314,7 @@ def build_mappings_test(grupos: dict) -> tuple:
 def enviar_correo(destinatario: str, nombre: str,
                   adjuntos: dict[str, str], fecha: str) -> bool:
     msg = MIMEMultipart('mixed')
-    msg['From']    = GMAIL_USER
+    msg['From']    = f'Informes Raíces <{GMAIL_USER}>'
     msg['To']      = destinatario
     msg['Subject'] = f'Informes Semanales · Constructora Raíces · {fecha}'
 
