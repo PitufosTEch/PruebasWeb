@@ -1,9 +1,10 @@
 name: Informes Semanales — Lunes
 
-# Envía los informes HTML a los destinatarios configurados en Firebase (personal_global).
-# Horario: lunes 13:00 UTC = 10:00 AM hora Chile (UTC-3).
-# El workflow de curvas_semanal corre a las 11:00 UTC y puede tardar hasta 60 min,
-# por lo que 13:00 UTC garantiza que el snapshot está fresco antes de enviar.
+# Genera los informes usando Playwright (mismo motor que el dashboard)
+# y los envía por Gmail SMTP a los destinatarios en Firebase personal_global.
+#
+# Horario: lunes 13:00 UTC = 10:00 AM Chile.
+# curvas_semanal corre a 11:00 UTC y tarda hasta 60 min → datos frescos a las 13:00.
 
 on:
   schedule:
@@ -19,7 +20,7 @@ on:
           - 'true'
           - 'false'
       test_email:
-        description: 'Enviar SOLO a este correo (deja vacío para envío normal a todos)'
+        description: 'Enviar SOLO a este correo (vacío = todos los destinatarios)'
         required: false
         default: ''
         type: string
@@ -35,7 +36,7 @@ jobs:
   enviar-informes:
     name: Generar y enviar informes
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v4
@@ -51,24 +52,32 @@ jobs:
           key: informes-pip-${{ runner.os }}-${{ hashFiles('SCRaices-LLM/informes/requirements.txt') }}
           restore-keys: informes-pip-${{ runner.os }}-
 
-      - name: Instalar dependencias
+      - name: Instalar dependencias Python
         run: |
           pip install --upgrade pip
-          pip install requests
+          pip install requests playwright
 
-      - name: Enviar informes semanales
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}
+          restore-keys: playwright-chromium-
+
+      - name: Instalar Playwright Chromium
+        run: playwright install chromium --with-deps
+
+      - name: Generar y enviar informes
         working-directory: SCRaices-LLM/informes
         env:
           FIREBASE_URL:        ${{ secrets.FIREBASE_URL }}
           GMAIL_APP_PASSWORD:  ${{ secrets.GMAIL_APP_PASSWORD }}
-          # DRY_RUN:
-          #   - Cron automático (lunes): siempre false → envía correos reales
-          #   - workflow_dispatch sin input: usa el default del input (true = prueba)
-          #   - workflow_dispatch con input seleccionado: usa lo que eligió el usuario
-          DRY_RUN:     ${{ github.event_name == 'schedule' && 'false' || inputs.dry_run || 'true' }}
-          TEST_EMAIL:  ${{ inputs.test_email || '' }}
+          # Cron automático siempre envía (DRY_RUN=false).
+          # workflow_dispatch: usa el input elegido (default true = no envía).
+          DRY_RUN:    ${{ github.event_name == 'schedule' && 'false' || inputs.dry_run || 'true' }}
+          TEST_EMAIL: ${{ inputs.test_email || '' }}
         run: python enviar_informes_lunes.py
 
       - name: Resumen en caso de error
         if: failure()
-        run: echo "::error::El envío de informes falló. Revisa el log completo."
+        run: echo "::error::Envío de informes falló. Revisa el log completo."
