@@ -32,6 +32,8 @@ FIREBASE_URL   = os.environ.get('FIREBASE_URL', 'https://scraices-dashboard-defa
 GMAIL_USER     = 'rodrigolagoslira@gmail.com'
 GMAIL_PASS     = os.environ.get('GMAIL_APP_PASSWORD', '')
 DRY_RUN        = os.environ.get('DRY_RUN', 'false').lower() != 'false'
+# TEST_EMAIL: si está definido, ignora personal_global y envía SOLO a este correo
+TEST_EMAIL     = os.environ.get('TEST_EMAIL', '').strip()
 
 SNAPSHOT_URL = (
     'https://raw.githubusercontent.com/PitufosTEch/PruebasWeb/'
@@ -727,9 +729,10 @@ def enviar_correo(destinatario: str, nombre: str,
 def main():
     now_cl = datetime.now(timezone(timedelta(hours=-3)))
     fecha  = now_cl.strftime('%d/%m/%Y')
+    test_mode = bool(TEST_EMAIL)
     print(f'\n{"="*60}')
     print(f'  Informes Semanales Raíces · {fecha}')
-    print(f'  DRY_RUN={DRY_RUN}')
+    print(f'  DRY_RUN={DRY_RUN}  TEST_EMAIL={TEST_EMAIL or "(ninguno)"}')
     print(f'{"="*60}\n')
 
     # 1. Cargar datos
@@ -737,18 +740,25 @@ def main():
     snap = load_snapshot()
     fb   = load_firebase()
 
-    # 2. Leer personal con correo e informes asignados
+    # 2. Construir lista de destinatarios
     print('\n[ 2/3 ] Procesando destinatarios …')
-    personal = fb.get('personal_global', {}) or {}
-    destinatarios = []
-    for key, persona in personal.items():
-        correo  = (persona.get('correo') or '').strip()
-        tipos   = persona.get('informes') or []
-        nombre  = persona.get('nombre', 'Equipo')
-        if not correo or not tipos:
-            continue
-        destinatarios.append({'correo': correo, 'nombre': nombre, 'tipos': tipos})
-        print(f'  → {nombre} <{correo}> : {", ".join(tipos)}')
+    if test_mode:
+        # Modo prueba: SOLO el correo indicado, todos los tipos de informe
+        todos_tipos = list(GENERATORS.keys())
+        destinatarios = [{'correo': TEST_EMAIL, 'nombre': 'Prueba', 'tipos': todos_tipos}]
+        print(f'  ⚠ MODO PRUEBA — envío exclusivo a {TEST_EMAIL}')
+        print(f'  Tipos incluidos: {", ".join(todos_tipos)}')
+    else:
+        personal = fb.get('personal_global', {}) or {}
+        destinatarios = []
+        for key, persona in personal.items():
+            correo  = (persona.get('correo') or '').strip()
+            tipos   = persona.get('informes') or []
+            nombre  = persona.get('nombre', 'Equipo')
+            if not correo or not tipos:
+                continue
+            destinatarios.append({'correo': correo, 'nombre': nombre, 'tipos': tipos})
+            print(f'  → {nombre} <{correo}> : {", ".join(tipos)}')
 
     if not destinatarios:
         print('  ! Sin destinatarios configurados con correo e informes asignados.')

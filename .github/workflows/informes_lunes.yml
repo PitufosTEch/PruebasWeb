@@ -18,6 +18,11 @@ on:
         options:
           - 'true'
           - 'false'
+      test_email:
+        description: 'Enviar SOLO a este correo (deja vacío para envío normal a todos)'
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: read
@@ -60,7 +65,8 @@ jobs:
           #   - Cron automático (lunes): siempre false → envía correos reales
           #   - workflow_dispatch sin input: usa el default del input (true = prueba)
           #   - workflow_dispatch con input seleccionado: usa lo que eligió el usuario
-          DRY_RUN: ${{ github.event_name == 'schedule' && 'false' || inputs.dry_run || 'true' }}
+          DRY_RUN:     ${{ github.event_name == 'schedule' && 'false' || inputs.dry_run || 'true' }}
+          TEST_EMAIL:  ${{ inputs.test_email || '' }}
         run: python enviar_informes_lunes.py
 
       - name: Resumen en caso de error
