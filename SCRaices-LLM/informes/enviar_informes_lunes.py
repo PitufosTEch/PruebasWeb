@@ -58,12 +58,12 @@ ACTIVE_PROJ_IDS = {
     'P12',  'P14', 'P116', 'P31', 'P131', 'P28',
 }
 
-# Funciones JS multi-obra (no necesitan proyectoSel)
+# Propiedad en window._raicesInformeFns para cada tipo de informe multi-obra
 MULTI_OBRA_FN = {
-    'html_navegable':     'generarInformeMultiObras',
-    'adquisiciones_html': 'generarInformeAdquisicionesHTML',
-    'recepciones_html':   'generarInformeRecepciones',
-    'estados_pago_html':  'generarEstadosPagoHTML',
+    'html_navegable':     'ejecutivo',
+    'adquisiciones_html': 'adquisiciones',
+    'recepciones_html':   'recepciones',
+    'estados_pago_html':  'estadosPago',
 }
 
 INFORME_LABELS = {
@@ -108,12 +108,15 @@ async def _capturar(page, js_call: str) -> str | None:
 
 
 async def _set_proyecto(page, proj_id: str):
-    """Set the dashboard's currently selected project."""
+    """Change the dashboard's selected project via React state setter."""
     await page.evaluate(f"""() => {{
-        window.proyectoSel = {json.dumps(proj_id)};
-        window.proy = (window.PROYECTOS_DATA || [])
-            .find(p => p.ID_proy === {json.dumps(proj_id)}) || null;
+        if (typeof window._raicesSetProy === 'function') {{
+            window._raicesSetProy({json.dumps(proj_id)});
+        }} else {{
+            window.proyectoSel = {json.dumps(proj_id)};
+        }}
     }}""")
+    await asyncio.sleep(3)  # Wait for React re-render and useEffect
 
 
 async def generar_informes_playwright(
@@ -160,6 +163,7 @@ async def generar_informes_playwright(
             return {}
 
         print(f'  Dashboard cargado OK en {int(time.time()-t0)}s')
+        await asyncio.sleep(8)  # Wait for React render + useEffect to populate _raicesInformeFns
 
         # 1. Multi-obra
         for tipo in tipos_multi:
@@ -168,7 +172,7 @@ async def generar_informes_playwright(
                 continue
             label = INFORME_LABELS.get(tipo, tipo)
             print(f'  [{label}] ', end='', flush=True)
-            html = await _capturar(page, f'await window.__informes.{fn}()')
+            html = await _capturar(page, f'await window._raicesInformeFns.{fn}()')
             if html:
                 resultados[tipo] = html
                 print(f'OK ({len(html)//1024} KB)')
@@ -179,7 +183,7 @@ async def generar_informes_playwright(
         for nombre, proj_id in residentes_proyectos.items():
             print(f'  [Residente: {nombre} / {proj_id}] ', end='', flush=True)
             await _set_proyecto(page, proj_id)
-            html = await _capturar(page, 'await window.__informes.generarInformeResidenteHTML()')
+            html = await _capturar(page, 'await window._raicesInformeFns.residente()')
             if html:
                 resultados[('residente', nombre)] = html
                 print(f'OK ({len(html)//1024} KB)')
@@ -194,7 +198,7 @@ async def generar_informes_playwright(
                 await _set_proyecto(page, proj_id)
                 html = await _capturar(
                     page,
-                    f'await window.__informes.generarReporteCapataz({json.dumps(nombre)})'
+                    f'await window._raicesInformeFns.generarReporteCapatazPorNombre({json.dumps(nombre)})'
                 )
                 if html:
                     resultados[('capataz', nombre, proj_id)] = html
