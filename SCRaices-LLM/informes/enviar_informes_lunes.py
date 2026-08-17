@@ -168,7 +168,7 @@ async def generar_informes_playwright(
                 continue
             label = INFORME_LABELS.get(tipo, tipo)
             print(f'  [{label}] ', end='', flush=True)
-            html = await _capturar(page, f'await {fn}()')
+            html = await _capturar(page, f'await window.__informes.{fn}()')
             if html:
                 resultados[tipo] = html
                 print(f'OK ({len(html)//1024} KB)')
@@ -179,7 +179,7 @@ async def generar_informes_playwright(
         for nombre, proj_id in residentes_proyectos.items():
             print(f'  [Residente: {nombre} / {proj_id}] ', end='', flush=True)
             await _set_proyecto(page, proj_id)
-            html = await _capturar(page, 'await generarInformeResidenteHTML()')
+            html = await _capturar(page, 'await window.__informes.generarInformeResidenteHTML()')
             if html:
                 resultados[('residente', nombre)] = html
                 print(f'OK ({len(html)//1024} KB)')
@@ -194,7 +194,7 @@ async def generar_informes_playwright(
                 await _set_proyecto(page, proj_id)
                 html = await _capturar(
                     page,
-                    f'await generarReporteCapataz({json.dumps(nombre)})'
+                    f'await window.__informes.generarReporteCapataz({json.dumps(nombre)})'
                 )
                 if html:
                     resultados[('capataz', nombre, proj_id)] = html
