@@ -108,15 +108,8 @@ async def _capturar(page, js_call: str) -> str | None:
 
 
 async def _set_proyecto(page, proj_id: str):
-    """Change the dashboard's selected project via React state setter."""
-    await page.evaluate(f"""() => {{
-        if (typeof window._raicesSetProy === 'function') {{
-            window._raicesSetProy({json.dumps(proj_id)});
-        }} else {{
-            window.proyectoSel = {json.dumps(proj_id)};
-        }}
-    }}""")
-    await asyncio.sleep(3)  # Wait for React re-render and useEffect
+    """Set window.proyectoSel (functions read it from closure, project change is best-effort)."""
+    await page.evaluate(f'() => {{ window.proyectoSel = {json.dumps(proj_id)}; }}')
 
 
 async def generar_informes_playwright(
