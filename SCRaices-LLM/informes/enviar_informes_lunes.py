@@ -28,7 +28,7 @@ from email.mime.text import MIMEText
 import requests
 
 # ── Configuración ──────────────────────────────────────────────────────────
-FIREBASE_URL   = os.environ.get('FIREBASE_URL', 'https://scraices-dashboard-default-rtdb.firebaseio.com').rstrip('/')
+FIREBASE_URL   = (os.environ.get('FIREBASE_URL') or 'https://scraices-dashboard-default-rtdb.firebaseio.com').rstrip('/')
 GMAIL_USER     = 'rodrigolagoslira@gmail.com'
 GMAIL_PASS     = os.environ.get('GMAIL_APP_PASSWORD', '')
 DRY_RUN        = os.environ.get('DRY_RUN', 'false').lower() != 'false'
