@@ -53,6 +53,11 @@ SCRaices-LLM/app/comparador_data.json
 SCRaices-LLM/dashboard/index_live_v3.backup.html
 
 # ============================================================
+# Dependencias de build (tailwind / babel) - se reinstalan con npm install
+# ============================================================
+node_modules/
+
+# ============================================================
 # Editor / IDE
 # ============================================================
 .vscode/

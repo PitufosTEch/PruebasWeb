@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vehículos Livianos — SCRaíces</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛻</text></svg>">
+<style>
+:root{
+  --ground:#EDEFF2; --panel:#FFFFFF; --panel-2:#F6F7F9; --panel-3:#E9ECF0;
+  --line:#D5DBE2; --line-soft:#E6EAEF;
+  --ink:#14181D; --ink-2:#4A5461; --ink-3:#7C8794;
+  --accent:#9A6708; --accent-fill:#E0A928; --accent-soft:#FAF0D9; --accent-line:#E6CF9B;
+  --ok:#2C7355; --ok-soft:#E2F0E9; --ok-line:#B6D8C8;
+  --warn:#9C6D12; --warn-soft:#FAEFD6; --warn-line:#E4CB93;
+  --crit:#9E3627; --crit-soft:#F8E4E0; --crit-line:#E9BDB4;
+  --plate-band:#1A4E8A; --seg-s:44%; --seg-l:43%;
+  --shadow:0 1px 2px rgba(20,24,29,.06), 0 6px 16px -8px rgba(20,24,29,.14);
+  --font-ui:ui-sans-serif,system-ui,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --font-mono:ui-monospace,"Cascadia Mono","Segoe UI Mono",Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0; background:var(--ground); color:var(--ink); font-family:var(--font-ui); font-size:14px; line-height:1.5; -webkit-font-smoothing:antialiased}
+h1,h2,h3,h4{margin:0; letter-spacing:-.015em}
+p{margin:0}
+button{font:inherit; color:inherit; cursor:pointer}
+:focus-visible{outline:2px solid var(--accent-fill); outline-offset:2px; border-radius:4px}
+@media (prefers-reduced-motion:reduce){*{transition:none !important; animation:none !important}}
+.wrap{max-width:1340px; margin:0 auto; padding:0 20px}
+.hidden{display:none !important}
+code{font-family:var(--font-mono); font-size:11.5px; background:var(--panel-3); padding:1px 5px; border-radius:4px}
+
+.headstack{position:sticky; top:0; z-index:60; box-shadow:var(--shadow)}
+.topbar{background:var(--panel); border-bottom:1px solid var(--line)}
+.topbar-inner{display:flex; flex-wrap:wrap; align-items:center; gap:14px; padding:12px 20px; max-width:1340px; margin:0 auto}
+.back{display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:650; color:var(--ink-2); text-decoration:none; border:1px solid var(--line); background:var(--panel-2); border-radius:8px; padding:6px 11px}
+.back:hover{border-color:var(--ink-3); color:var(--ink)}
+.brand{display:flex; align-items:baseline; gap:10px; margin-right:auto}
+.brand h1{font-size:17px; font-weight:700}
+.brand .sub{font-size:11.5px; color:var(--ink-3); letter-spacing:.04em; text-transform:uppercase; font-weight:600}
+.seg{display:flex; gap:3px; background:var(--panel-2); border:1px solid var(--line); border-radius:9px; padding:3px}
+.seg button{border:0; background:transparent; border-radius:6px; padding:7px 13px; font-size:12.5px; font-weight:600; color:var(--ink-2); white-space:nowrap; transition:background .13s,color .13s}
+.seg button:hover{color:var(--ink)}
+.seg button[aria-selected="true"]{background:var(--ink); color:var(--panel)}
+.srcchip{display:inline-flex; align-items:center; gap:7px; font-size:11px; font-weight:600; color:var(--ink-2); background:var(--panel-2); border:1px solid var(--line); border-radius:999px; padding:5px 11px}
+.srcchip .dot{width:6px;height:6px;border-radius:50%;background:var(--ok)}
+.srcchip.load .dot{background:var(--warn); animation:pulse 1s infinite}
+.srcchip.err .dot{background:var(--crit)}
+@keyframes pulse{50%{opacity:.3}}
+.reload{border:1px solid var(--line); background:var(--panel-2); border-radius:8px; padding:6px 10px; font-size:12px; font-weight:650; color:var(--ink-2)}
+.reload:hover{border-color:var(--ink-3); color:var(--ink)}
+
+.abar{background:var(--crit-soft); border-bottom:1px solid var(--crit-line)}
+.abar-in{display:flex; flex-wrap:wrap; align-items:center; gap:9px; padding:9px 20px; max-width:1340px; margin:0 auto}
+.abar .head{display:flex; align-items:center; gap:8px; font-size:11px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--crit); margin-right:3px}
+.abar .head .pip{width:8px; height:8px; border-radius:50%; background:var(--crit)}
+.achip{display:inline-flex; align-items:center; gap:7px; border:1px solid var(--line); background:var(--panel); border-radius:999px; padding:4px 11px 4px 8px; font-size:12px; font-weight:600; color:var(--ink-2); transition:border-color .13s,background .13s,color .13s}
+.achip:hover{border-color:var(--ink-3); color:var(--ink)}
+.achip .n{font-family:var(--font-mono); font-size:11px; font-weight:700; min-width:19px; height:19px; border-radius:999px; display:grid; place-items:center; padding:0 5px; color:#fff}
+.achip.crit .n{background:var(--crit)} .achip.warn .n{background:var(--warn)}
+.achip[aria-pressed="true"]{background:var(--ink); border-color:var(--ink); color:var(--panel)}
+.abar .expand{margin-left:auto; display:inline-flex; align-items:center; gap:7px; border:1px solid var(--crit-line); background:var(--panel); border-radius:8px; padding:5px 12px; font-size:12px; font-weight:650; color:var(--crit)}
+.abar .expand:hover{background:var(--crit-soft)}
+.clearf{border:1px solid var(--line); background:var(--panel); border-radius:999px; padding:4px 10px; font-size:11.5px; font-weight:650; color:var(--ink-2)}
+
+.apanel{background:var(--panel); border-bottom:1px solid var(--line); max-height:min(62vh,540px); overflow-y:auto}
+.apanel-in{max-width:1340px; margin:0 auto; padding:16px 20px 20px; display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:13px}
+.agrp{border:1px solid var(--line); border-radius:11px; overflow:hidden; background:var(--panel-2)}
+.agrp header{display:flex; align-items:center; gap:9px; padding:10px 13px; border-bottom:1px solid var(--line); background:var(--panel)}
+.agrp header .sq{width:9px; height:9px; border-radius:2px; flex:none}
+.agrp.crit header .sq{background:var(--crit)} .agrp.warn header .sq{background:var(--warn)}
+.agrp header h4{font-size:12.5px; font-weight:700; flex:1}
+.agrp header .cnt{font-family:var(--font-mono); font-size:11px; font-weight:700; color:var(--ink-3)}
+.agrp .why{padding:8px 13px 0; font-size:11.5px; color:var(--ink-3); line-height:1.45}
+.agrp ul{list-style:none; margin:0; padding:9px 13px 12px; display:flex; flex-direction:column; gap:6px}
+.agrp li{display:flex; gap:9px; align-items:baseline; font-size:12.3px; color:var(--ink-2)}
+.plink{font-family:var(--font-mono); font-size:11px; font-weight:700; letter-spacing:.05em; border:1px solid var(--line); background:var(--panel); border-radius:4px; padding:2px 6px; color:var(--ink); flex:none}
+.plink:hover{border-color:var(--accent-fill); background:var(--accent-soft); color:var(--accent)}
+
+.kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin:22px 0 18px}
+.kpi{background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:13px 15px}
+.kpi .lab{font-size:10.5px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--ink-3)}
+.kpi .val{font-size:26px; font-weight:700; line-height:1.15; margin-top:5px; font-variant-numeric:tabular-nums}
+.kpi .hint{font-size:11.5px; color:var(--ink-3); margin-top:2px}
+.kpi.is-warn .val{color:var(--warn)} .kpi.is-crit .val{color:var(--crit)}
+
+.plate{display:inline-flex; align-items:stretch; border:1.5px solid var(--ink); border-radius:4px; overflow:hidden; background:var(--panel); line-height:1; flex:none}
+.plate .band{width:7px; background:var(--plate-band); flex:none}
+.plate .txt{font-family:var(--font-mono); font-weight:700; font-size:13.5px; letter-spacing:.09em; padding:5px 8px 5px 7px; color:var(--ink); white-space:nowrap}
+.plate.sm .txt{font-size:11.5px; padding:3px 6px 3px 5px} .plate.sm .band{width:5px}
+.plate.lg .txt{font-size:16px; padding:6px 10px 6px 9px}
+
+.badge{display:inline-flex; align-items:center; gap:5px; font-size:10.5px; font-weight:700; letter-spacing:.045em; text-transform:uppercase; padding:3px 8px; border-radius:5px; border:1px solid var(--line); background:var(--panel-2); color:var(--ink-2); white-space:nowrap}
+.badge.ok{background:var(--ok-soft); border-color:var(--ok-line); color:var(--ok)}
+.badge.warn{background:var(--warn-soft); border-color:var(--warn-line); color:var(--warn)}
+.badge.crit{background:var(--crit-soft); border-color:var(--crit-line); color:var(--crit)}
+.badge.accent{background:var(--accent-soft); border-color:var(--accent-line); color:var(--accent)}
+
+.filters{display:flex; flex-wrap:wrap; gap:18px; margin-bottom:18px; align-items:center}
+.fgroup{display:flex; align-items:center; gap:7px; flex-wrap:wrap}
+.fgroup > span{font-size:10.5px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--ink-3)}
+.chip{border:1px solid var(--line); background:var(--panel); border-radius:999px; padding:5px 12px; font-size:12px; font-weight:600; color:var(--ink-2); transition:border-color .13s,background .13s,color .13s}
+.chip:hover{border-color:var(--ink-3); color:var(--ink)}
+.chip[aria-pressed="true"]{background:var(--ink); border-color:var(--ink); color:var(--panel)}
+.search{border:1px solid var(--line); background:var(--panel); border-radius:999px; padding:6px 13px; font-size:12.5px; color:var(--ink); min-width:200px; font-family:inherit}
+.search::placeholder{color:var(--ink-3)}
+
+.grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:13px}
+.card{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:15px; display:flex; flex-direction:column; gap:11px; box-shadow:var(--shadow); position:relative; overflow:hidden; scroll-margin-top:190px}
+.card::before{content:""; position:absolute; inset:0 auto 0 0; width:3px; background:var(--line)}
+.card.st-ok::before{background:var(--ok)}
+.card.st-warn::before{background:var(--warn-line)}
+.card.st-crit::before{background:var(--crit)}
+.card.st-off::before{background:var(--ink-3)}
+.card.st-off{opacity:.74}
+.card.ghost{border-style:dashed; background:var(--panel-2)}
+.card.flash{animation:flash 1.6s ease-out}
+@keyframes flash{0%,42%{box-shadow:0 0 0 3px var(--accent-fill), var(--shadow)}100%{box-shadow:0 0 0 0 transparent, var(--shadow)}}
+.card-top{display:flex; align-items:flex-start; justify-content:space-between; gap:10px}
+.card-veh{font-size:14px; font-weight:700; line-height:1.3}
+.card-meta{font-size:11.5px; color:var(--ink-3); margin-top:2px}
+.holder{display:flex; align-items:center; gap:10px; padding:10px; background:var(--panel-2); border-radius:9px; border:1px solid var(--line-soft)}
+.avatar{width:32px; height:32px; border-radius:8px; flex:none; display:grid; place-items:center; font-family:var(--font-mono); font-size:11.5px; font-weight:700; color:#fff}
+.avatar.none{background:var(--crit-soft) !important; color:var(--crit); border:1px dashed var(--crit-line)}
+.holder .who{font-size:13px; font-weight:650; line-height:1.25}
+.holder .role{font-size:10.5px; color:var(--ink-3); text-transform:uppercase; letter-spacing:.06em; font-weight:700; margin-top:1px}
+.tags{display:flex; flex-wrap:wrap; gap:5px}
+.cal-list{display:flex; flex-direction:column; gap:5px; border-radius:8px; padding:9px 10px; background:var(--crit-soft); border:1px solid var(--crit-line)}
+.cal-list.only-warn{background:var(--warn-soft); border-color:var(--warn-line)}
+.cal-list .ci{display:flex; gap:7px; align-items:baseline; font-size:11.6px; line-height:1.35; color:var(--ink-2)}
+.cal-list .ci .m{flex:none; font-size:9px}
+.cal-list .ci.crit .m{color:var(--crit)} .cal-list .ci.warn .m{color:var(--warn)}
+.mini{display:flex; gap:6px; border-top:1px solid var(--line-soft); padding-top:10px; margin-top:auto}
+.mm{flex:1; text-align:center; border-radius:7px; padding:6px 4px; border:1px solid var(--line-soft); background:var(--panel-2)}
+.mm .dl{font-size:9.5px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-3)}
+.mm .dv{font-size:12px; font-weight:700; margin-top:2px; font-variant-numeric:tabular-nums}
+.mm.yes .dv{color:var(--ok)} .mm.no .dv{color:var(--crit)} .mm.warn .dv{color:var(--warn)}
+
+.tablewrap{background:var(--panel); border:1px solid var(--line); border-radius:12px; overflow:hidden; box-shadow:var(--shadow)}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse; width:100%; font-size:12.8px}
+thead th{text-align:left; font-size:10.5px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--ink-3); padding:11px 13px; background:var(--panel-2); border-bottom:1px solid var(--line); white-space:nowrap}
+thead th.sortable{cursor:pointer; user-select:none}
+thead th.sortable:hover{color:var(--ink)}
+thead th .arw{opacity:.35; margin-left:4px}
+thead th[aria-sort]:not([aria-sort="none"]){color:var(--ink)}
+thead th[aria-sort]:not([aria-sort="none"]) .arw{opacity:1; color:var(--accent)}
+tbody td{padding:9px 13px; border-bottom:1px solid var(--line-soft); vertical-align:middle}
+tbody tr{cursor:pointer; transition:background .1s}
+tbody tr:hover{background:var(--panel-2)}
+tbody tr[aria-selected="true"]{background:var(--accent-soft)}
+tbody tr:last-child td{border-bottom:0}
+td.num{font-variant-numeric:tabular-nums; font-family:var(--font-mono); font-size:11.5px; color:var(--ink-2)}
+.acount{display:inline-flex; align-items:center; gap:4px}
+.acount i{width:7px; height:7px; border-radius:50%; display:block}
+.acount i.c{background:var(--crit)} .acount i.w{background:var(--warn)}
+.layout-b{display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:14px; align-items:start}
+@media (max-width:1060px){.layout-b{grid-template-columns:minmax(0,1fr)}}
+.drawer{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:17px; box-shadow:var(--shadow); position:sticky; top:190px; max-height:calc(100vh - 210px); overflow-y:auto}
+.drawer h3{font-size:14px; font-weight:700; margin-bottom:2px}
+.drawer .dsub{font-size:12px; color:var(--ink-3); margin-bottom:14px}
+.dl-row{display:flex; justify-content:space-between; gap:12px; padding:7px 0; border-bottom:1px solid var(--line-soft); font-size:12.5px}
+.dl-row:last-child{border-bottom:0}
+.dl-row dt{color:var(--ink-3); font-weight:600; white-space:nowrap}
+.dl-row dd{margin:0; text-align:right; font-weight:650}
+.dl-row dd.mono{font-family:var(--font-mono); font-size:11.5px; font-variant-numeric:tabular-nums}
+.empty-drawer{color:var(--ink-3); font-size:12.5px; text-align:center; padding:34px 12px}
+.htitle{font-size:10.5px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--ink-3); margin:18px 0 9px}
+.hist{position:relative; padding-left:16px}
+.hist::before{content:""; position:absolute; left:4px; top:5px; bottom:5px; width:2px; background:var(--line)}
+.hev{position:relative; padding:0 0 12px 4px}
+.hev .hd{font-family:var(--font-mono); font-size:10.5px; color:var(--ink-3); font-variant-numeric:tabular-nums}
+.hev .hq{font-size:12.5px; font-weight:650; line-height:1.35}
+.hev .hs{font-size:11px; color:var(--ink-3)}
+.hev.now .hq{color:var(--accent)}
+
+.tlwrap{background:var(--panel); border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow); padding:0 0 8px}
+.tlhead{display:grid; grid-template-columns:200px minmax(0,1fr); border-bottom:1px solid var(--line); background:var(--panel-2)}
+.tlhead .lbl{padding:9px 12px; font-size:10.5px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--ink-3); border-right:1px solid var(--line)}
+.axis{position:relative; height:34px}
+.axis .yr{position:absolute; top:0; bottom:0; border-left:1px solid var(--line); padding:9px 0 0 7px; font-size:10.5px; font-weight:700; color:var(--ink-3); font-family:var(--font-mono)}
+.tlrow{display:grid; grid-template-columns:200px minmax(0,1fr); border-bottom:1px solid var(--line-soft); align-items:center; scroll-margin-top:200px}
+.tlrow:last-child{border-bottom:0}
+.tlrow:hover{background:var(--panel-2)}
+.tlrow.flash{background:var(--accent-soft)}
+.tlrow .veh{padding:7px 12px; border-right:1px solid var(--line); min-width:0; display:flex; align-items:center; gap:7px; flex-wrap:wrap}
+.tlrow .veh .who2{font-size:11px; color:var(--ink-3); width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.track{position:relative; height:30px; margin:5px 0}
+.track .gl{position:absolute; top:-5px; bottom:-5px; border-left:1px solid var(--line-soft)}
+.sgm{position:absolute; top:4px; height:22px; border-radius:3px; overflow:hidden; display:flex; align-items:center; padding:0 5px; min-width:3px}
+.sgm span{font-size:10px; font-weight:700; color:#fff; white-space:nowrap; text-shadow:0 1px 1px rgba(0,0,0,.35); overflow:hidden}
+.sgm.bodega{background:var(--ink-3)}
+.sgm.baja{background:repeating-linear-gradient(45deg,var(--ink-3) 0 4px,var(--panel-3) 4px 8px)}
+.sgm.taller{background:var(--crit)} .sgm.oficina{background:var(--plate-band)}
+.today{position:absolute; top:-6px; bottom:-6px; width:2px; background:var(--crit); z-index:4}
+.today::after{content:"hoy"; position:absolute; top:-1px; left:4px; font-size:9.5px; font-weight:700; color:var(--crit)}
+.track .today::after{content:none}   /* la etiqueta "hoy" va solo en el eje, no en cada fila */
+.dotc{width:8px; height:8px; border-radius:50%; display:inline-block; flex:none}
+
+.state{text-align:center; padding:70px 20px; color:var(--ink-3)}
+.state h2{font-size:15px; color:var(--ink-2); margin-bottom:6px}
+.spin{width:26px; height:26px; border:3px solid var(--line); border-top-color:var(--accent-fill); border-radius:50%; margin:0 auto 14px; animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+footer{margin:34px 0 46px; padding-top:18px; border-top:1px solid var(--line); font-size:12px; color:var(--ink-3)}
+footer strong{color:var(--ink-2); font-weight:650}
+footer ul{margin:8px 0 0; padding-left:18px; display:flex; flex-direction:column; gap:4px}
+</style>
+</head>
+<body>
+
+<div class="headstack">
+  <div class="topbar"><div class="topbar-inner">
+    <a class="back" href="index_live_v3.html">← Dashboard</a>
+    <div class="brand"><h1>Vehículos Livianos</h1><span class="sub">Flota · responsables · custodia</span></div>
+    <div class="seg" role="tablist" aria-label="Vistas">
+      <button role="tab" id="tab-a" aria-controls="p-a" aria-selected="true">Fichas</button>
+      <button role="tab" id="tab-b" aria-controls="p-b" aria-selected="false">Tabla</button>
+      <button role="tab" id="tab-c" aria-controls="p-c" aria-selected="false">Custodia</button>
+    </div>
+    <span class="srcchip load" id="status"><span class="dot"></span><span id="status-txt">Cargando…</span></span>
+    <button class="reload" id="reload" title="Volver a leer AppSheet">↻</button>
+  </div></div>
+  <div class="abar hidden" id="abar-wrap"><div class="abar-in" id="abar"></div></div>
+  <div class="apanel hidden" id="apanel"><div class="apanel-in" id="apanel-in"></div></div>
+</div>
+
+<main class="wrap">
+  <div class="state" id="state"><div class="spin"></div><h2>Leyendo AppSheet…</h2><p>Equipos, Control_equipos, Usuarios y Proyectos</p></div>
+
+  <section id="p-a" role="tabpanel" aria-labelledby="tab-a" class="hidden">
+    <div class="kpis" id="kpis-a"></div>
+    <div class="filters" id="filters-a"></div>
+    <div class="grid" id="grid-a"></div>
+  </section>
+
+  <section id="p-b" role="tabpanel" aria-labelledby="tab-b" class="hidden">
+    <div class="filters" id="filters-b"></div>
+    <div class="layout-b">
+      <div class="tablewrap"><div class="scroll"><table id="tbl-b">
+        <thead><tr>
+          <th class="sortable" data-k="_alSort">Acot.<span class="arw">↕</span></th>
+          <th class="sortable" data-k="patente">Patente<span class="arw">↕</span></th>
+          <th class="sortable" data-k="desc">Vehículo<span class="arw">↕</span></th>
+          <th class="sortable" data-k="responsable">A cargo de<span class="arw">↕</span></th>
+          <th class="sortable" data-k="ccLabel">Centro de costo<span class="arw">↕</span></th>
+          <th class="sortable" data-k="estadoCat">Estado<span class="arw">↕</span></th>
+          <th class="sortable" data-k="_rtSort">Rev. técnica<span class="arw">↕</span></th>
+          <th class="sortable" data-k="nTramos">Traspasos<span class="arw">↕</span></th>
+          <th class="sortable" data-k="ultimoMov">Último mov.<span class="arw">↕</span></th>
+        </tr></thead><tbody id="tb-b"></tbody>
+      </table></div></div>
+      <aside class="drawer" id="drawer-b"></aside>
+    </div>
+  </section>
+
+  <section id="p-c" role="tabpanel" aria-labelledby="tab-c" class="hidden">
+    <div class="filters" id="filters-c"></div>
+    <div class="tlwrap">
+      <div class="tlhead"><div class="lbl">Unidad · a cargo hoy</div><div class="axis" id="axis"></div></div>
+      <div id="tlrows"></div>
+    </div>
+  </section>
+
+  <footer id="foot" class="hidden">
+    <strong>De dónde sale cada dato.</strong> En AppSheet los vehículos son un equipo más:
+    <ul>
+      <li><code>Equipos</code> filtrada por <code>Tipo_equipo = "Vehiculos livianos"</code> — responsable, centro de costo, estado, marca, vencimiento de revisión técnica, valor del activo y fotos.</li>
+      <li><code>Control_equipos</code> — historial de traspasos. Cada traspaso deja dos filas: la del que entrega («traspasada por…») y la del que recibe. La línea de custodia usa solo las segundas, que marcan al nuevo tenedor.</li>
+      <li><code>Usuarios</code> — resuelve los correos a nombre, rol y departamento. <code>Proyectos</code> — resuelve el centro de costo al nombre de la obra.</li>
+      <li><strong>Tabla embebida:</strong> tarjeta de combustible y ruta de peaje salen de «Aramco - Ruta Sur.xlsx» y las pólizas de la carpeta «PÓLIZAS SEGUROS» de Drive. Son planillas sueltas sin API, así que están fijas en el código — actualízalas en el bloque <code>AUX</code> si cambian.</li>
+    </ul>
+  </footer>
+</main>
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+   Panel de Vehículos Livianos — SCRaíces
+   Datos en vivo desde el Apps Script que ya usa el dashboard.
+═══════════════════════════════════════════════════════════ */
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxcJowX3a3XBmSNiKOCesj1jRkQWS1VIsMbvdt-x7ckK8ZXMauI6gRgCGsoT77xYxpP/exec";
+const TABLAS = "Equipos,Control_equipos,Usuarios,Proyectos";
+const TIPO_LIVIANO = "vehiculos livianos";
+
+/* Planillas de Drive sin API — mantener a mano. Clave = patente sin guion. */
+const AUX = {
+  PPZG88:{anio:2021,color:"Gris",prop:"Propio",tarj:"14499944",ruta:"24112",pol:true,cond:"Alexis Curivil"},
+  SPKF29:{anio:2023,color:"Roja",prop:"Propio",tarj:"83932569",ruta:"24113",pol:true,cond:"Enrique Lopez"},
+  TSKV58:{anio:2025,color:"Blanca",prop:"Propio",tarj:"52636936",ruta:"24114",pol:true,cond:"Juan Jose Carroza"},
+  TSGF35:{anio:2025,color:"Blanca",prop:"Propio",tarj:"31947362",ruta:"24115",pol:true,cond:"Jairo Alvarez"},
+  HSHJ58:{anio:2016,color:"Gris",prop:"Propio",tarj:"74926687",ruta:"24116",pol:false,cond:"William Peña"},
+  KPCD23:{anio:2018,color:"Roja",prop:"Propio",tarj:"64370243",ruta:"24117",pol:false,cond:"Cristian Millanao"},
+  LLYT19:{anio:2019,color:"Roja",prop:"Propio",tarj:"33681571",ruta:"24118",pol:true,cond:"Anibal Martinez"},
+  KFCS14:{anio:2018,color:"Roja",prop:"Propio",tarj:"81697388",ruta:"24119",pol:false,cond:"Oficina"},
+  TTHT69:{anio:2025,color:"Roja",prop:"Propio",tarj:"77887241",ruta:"24120",pol:true,cond:"",nota:"Tarjeta Aramco bloqueada — marcada «camioneta para venta»"},
+  TDDK57:{anio:2024,color:"Roja",prop:"Propio",tarj:"08296579",ruta:"24121",pol:false,cond:"Ricardo Maldonado"},
+  SKPR69:{anio:2023,color:"Blanca",prop:"Propio",tarj:"23046041",ruta:"",pol:true,cond:"Ricardo Cocio"},
+  STLT57:{anio:2023,color:"",prop:"Propio",tarj:"97523784",ruta:"",pol:false,cond:"Juan Carroza",nota:"Aramco la marca «sin retirar»"},
+  VCTV24:{anio:2025,color:"Gris plata",prop:"Leasing Itaú",tarj:"41365985",ruta:"24222",pol:false,cond:"Rodrigo Lagos"},
+  VCTT65:{anio:2025,color:"Gris plata",prop:"Leasing Itaú",tarj:"46201383",ruta:"24123",pol:false,cond:"Anyelo Morales"},
+  VPRG42:{anio:2026,color:"Blanca",prop:"Leasing Itaú",tarj:"89370798",ruta:"24124",pol:false,cond:"Maria E. Guiñez"},
+  TZTX50:{anio:2025,color:"Blanca",prop:"Leasing Itaú",tarj:"95207182",ruta:"24125",pol:false,cond:""},
+  TZTX49:{anio:2025,color:"Gris plata",prop:"Leasing Itaú",tarj:"44355447",ruta:"24127",pol:false,cond:"Arturo Neira"},
+  LRBW59:{pol:true}
+};
+/* En la planilla Aramco pero sin ficha en Equipos */
+const GHOST = [
+  {patente:"PJCH50", desc:"Ford Raptor", marca:"FORD RAPTOR", cc:"GERENCIA", resp:"", aux:{anio:2021,color:"Negra",prop:"Propio",tarj:"",ruta:"24126"}},
+  {patente:"LZDH11", desc:"Ford Raptor", marca:"FORD RAPTOR", cc:"GERENCIA", resp:"", aux:{anio:2020,color:"Negra",prop:"Sin clasificar",tarj:"",ruta:""}},
+  {patente:"SBSP23", desc:"Toyota 4Runner", marca:"TOYOTA 4RUNNER", cc:"GERENCIA", resp:"Carla Espinoza", aux:{anio:2022,color:"Gris",prop:"Sin clasificar",tarj:"29587980",ruta:"24128"}},
+  {patente:"VYVH39", desc:"Volkswagen (leasing)", marca:"VOLKSWAGEN", cc:"", resp:"", aux:{anio:2026,color:"",prop:"Leasing Itaú",tarj:"",ruta:""}}
+];
+const ALIAS = {
+  "bodega@scraices.cl":"Bodega", "ebodega@scraices.cl":"Bodega (entrada)", "oficina@scraices.cl":"Oficina",
+  "prevencion@scraices.cl":"Prevención", "constructora@scraices.cl":"Constructora", "debaja@scraices.cl":"Dado de baja",
+  "taller@scraices.cl":"Taller"
+};
+const ESP = {"Bodega":"bodega","Bodega (entrada)":"bodega","Dado de baja":"baja","Taller":"taller","Oficina":"oficina","Prevención":"oficina","Constructora":"oficina"};
+
+const HOY = new Date(); HOY.setHours(0,0,0,0);
+const MES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const dash = s => s ? esc(s) : '<span style="color:var(--ink-3)">—</span>';
+const pat = p => p && p.length > 4 ? p.slice(0,4) + "-" + p.slice(4) : (p || "—");
+const plate = (p,c) => `<span class="plate ${c||""}"><span class="band"></span><span class="txt">${esc(pat(p))}</span></span>`;
+const ini = n => n ? n.replace(/\(.*\)/,"").trim().split(/\s+/).slice(0,2).map(w => w[0]).join("").toUpperCase() : "—";
+const fecha = v => { const s = String(v || ""); return s ? s.split("T")[0] : ""; };
+const fmt = d => { if (!d) return ""; const [y,m,dd] = d.split("-"); return `${+dd} ${MES[+m-1]} ${y.slice(2)}`; };
+const dias = (a,b) => Math.round((b - a) / 86400000);
+const hue = s => { let h = 0; for (const c of s) h = (h*31 + c.charCodeAt(0)) % 360; return h; };
+const colorFor = q => ESP[q] ? "" : `background:hsl(${hue(q)} var(--seg-s) var(--seg-l))`;
+const norm = s => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\(.*\)/, "").trim();
+const limpia = s => String(s || "").trim();
+
+/* ═══ Reglas de acotación ═══ */
+const TIPOS = [
+  {id:"rt_vencida", sev:"crit", lab:"Revisión técnica vencida",
+   why:"La RT vencida deja el vehículo sin cobertura y expone a multa en control carretero.",
+   test:v => !v.baja && !v.ghost && v.rtCat === "vencida",
+   txt: v => `RT venció el ${fmt(v.ventRT)} — hace ${Math.abs(v.rtDias)} días`},
+  {id:"sin_ficha", sev:"crit", lab:"Sin ficha en Equipos",
+   why:"Está en la planilla Aramco pero no existe como equipo en AppSheet: nadie controla sus traspasos.",
+   test:v => v.ghost, txt: v => `Solo existe en Aramco (${v.ccLabel || "sin centro de costo"})`},
+  {id:"discrepancia", sev:"crit", lab:"Responsable no coincide con Aramco",
+   why:"AppSheet y la planilla de combustible apuntan a personas distintas: una de las dos está desactualizada.",
+   test:v => v.aux.cond && v.responsable && !v.baja && norm(v.aux.cond) !== norm(v.responsable),
+   txt: v => `Equipos dice ${v.responsable}, Aramco dice ${v.aux.cond}`},
+  {id:"traspaso", sev:"warn", lab:"Traspaso sin cerrar",
+   why:"Quedó en estado «traspasada por…»: alguien la entregó y el receptor nunca la aceptó.",
+   test:v => v.estadoCat === "Traspaso pendiente", txt: v => esc(v.estado)},
+  {id:"rt_sin", sev:"warn", lab:"Sin fecha de revisión técnica",
+   why:"La ficha no tiene Venc_RT, así que no hay forma de saber si está al día.",
+   test:v => !v.baja && !v.ghost && v.rtCat === "sin", txt: () => "Campo Venc_RT vacío en la ficha"},
+  {id:"rt_pronto", sev:"warn", lab:"Revisión técnica por vencer",
+   why:"Vence dentro de los próximos 60 días: conviene agendarla.",
+   test:v => !v.baja && !v.ghost && v.rtCat === "pronto",
+   txt: v => `Vence el ${fmt(v.ventRT)} — en ${v.rtDias} días`},
+  {id:"sin_cc", sev:"warn", lab:"Sin centro de costo",
+   why:"No se puede imputar su costo diario a ninguna obra.",
+   test:v => !v.baja && !v.ghost && !v.cc, txt: () => "Campo Centro_costo vacío"},
+  {id:"sin_mov", sev:"warn", lab:"Asignada sin movimientos",
+   why:"Tiene responsable en la ficha pero nunca pasó por Control_equipos: la entrega no quedó registrada.",
+   test:v => !v.baja && !v.ghost && v.nTramos === 0 && v.responsable,
+   txt: v => `A cargo de ${v.responsable}, cero traspasos registrados`},
+  {id:"sin_aramco", sev:"warn", lab:"Sin tarjeta de combustible",
+   why:"Unidad activa que no aparece en la planilla Aramco: sin tarjeta ni ruta de peaje asignada.",
+   test:v => !v.baja && !v.ghost && !v.aux.tarj, txt: () => "No figura en «Aramco - Ruta Sur»"},
+  {id:"quieta", sev:"warn", lab:"Sin movimiento hace más de un año",
+   why:"El último traspaso es muy antiguo: puede que la custodia real ya no sea la que dice el sistema.",
+   test:v => !v.baja && !v.ghost && v.diasSinMov !== null && v.diasSinMov > 365,
+   txt: v => `Último movimiento el ${fmt(v.ultimoMov)} — hace ${Math.round(v.diasSinMov/30)} meses`}
+];
+
+let V = [], RES = [], ACT = [], aFilter = null, busq = "";
+let sortK = "_alSort", sortDir = 1, selP = null;
+let fA = {estado:"Todos", cc:"Todos", rt:"Todos"}, fC = "Solo activas";
+let T0 = new Date(2023,0,1), T1 = new Date(), SPAN = 1;
+
+/* ═══ Carga ═══ */
+async function cargar(){
+  setStatus("load", "Cargando…");
+  try{
+    const url = APPS_SCRIPT_URL + "?tables=" + encodeURIComponent(TABLAS) + "&t=" + Date.now();
+    const resp = await fetch(url, {redirect:"follow"});
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    const raw = await resp.json();
+    if (raw.error) throw new Error(raw.error);
+    construir(raw);
+    if (!V.length) throw new Error('No se encontraron filas con Tipo_equipo = "Vehiculos livianos"');
+    document.getElementById("state").classList.add("hidden");
+    document.getElementById("foot").classList.remove("hidden");
+    document.getElementById("abar-wrap").classList.remove("hidden");
+    /* Mostrar la pestaña activa (al cargar, siempre Fichas) */
+    ["a","b","c"].forEach(k => document.getElementById("p-" + k)
+      .classList.toggle("hidden", document.getElementById("tab-" + k).getAttribute("aria-selected") !== "true"));
+    setStatus("ok", V.length + " unidades");
+    render();
+  } catch(e){
+    console.error("[Vehículos] Error:", e);
+    setStatus("err", "Error de carga");
+    document.getElementById("state").innerHTML =
+      `<h2>No se pudieron leer los datos</h2><p>${esc(e.message)}</p>
+       <p style="margin-top:12px"><button class="reload" onclick="cargar()">Reintentar</button></p>`;
+  }
+}
+function setStatus(cls, txt){
+  const el = document.getElementById("status");
+  el.className = "srcchip " + (cls === "ok" ? "" : cls);
+  document.getElementById("status-txt").textContent = txt;
+}
+
+function construir(raw){
+  const eq  = (raw.Equipos && raw.Equipos.rows) || [];
+  const ce  = (raw.Control_equipos && raw.Control_equipos.rows) || [];
+  const us  = (raw.Usuarios && raw.Usuarios.rows) || [];
+  const pr  = (raw.Proyectos && raw.Proyectos.rows) || [];
+
+  const USR = {};
+  us.forEach(u => { const m = limpia(u.email).toLowerCase(); if (m) USR[m] = {nombre:limpia(u.Nombre) || m, rol:limpia(u.Rol)}; });
+  const PROY = {};
+  pr.forEach(p => { const id = limpia(p.ID_proy); if (id) PROY[id] = limpia(p.NOMBRE_PROYECTO); });
+
+  const persona = mail => {
+    const m = limpia(mail).toLowerCase();
+    if (!m) return {nombre:"", rol:"", email:""};
+    if (ALIAS[m]) return {nombre:ALIAS[m], rol:"area", email:m};
+    if (USR[m])   return {nombre:USR[m].nombre, rol:USR[m].rol, email:m};
+    return {nombre:m.split("@")[0], rol:"", email:m};
+  };
+
+  /* Movimientos agrupados por equipo */
+  const porEq = {};
+  ce.forEach(m => { const k = limpia(m.IDU_equipo); if (!k) return; (porEq[k] = porEq[k] || []).push(m); });
+
+  const livianos = eq.filter(e => norm(e.Tipo_equipo) === TIPO_LIVIANO);
+
+  V = livianos.map(e => {
+    const movs = porEq[limpia(e.IDU_equipo)] || [];
+
+    /* Historial: las filas "traspasada por X" son la contraparte del que entrega.
+       Las de estado real marcan al nuevo tenedor. */
+    const hist = movs
+      .filter(m => !/^traspasada|^traspaso rechazado/i.test(limpia(m.estado)) && fecha(m.fecha_salida))
+      .map(m => ({
+        f: fecha(m.fecha_salida),
+        p: persona(m.responsable),
+        estado: limpia(m.estado),
+        obs: limpia(m.observaciones || m.Observacion).replace(/\s+/g, " ")
+      }))
+      .sort((a,b) => a.f.localeCompare(b.f));
+
+    const tramos = [];
+    hist.forEach(h => {
+      const ult = tramos[tramos.length - 1];
+      if (ult && ult.quien === h.p.nombre){ ult.hasta = h.f; ult.estado = h.estado; return; }
+      tramos.push({quien:h.p.nombre, email:h.p.email, desde:h.f, hasta:h.f, estado:h.estado, obs:h.obs});
+    });
+    for (let i = 0; i < tramos.length - 1; i++) tramos[i].hasta = tramos[i+1].desde;
+    if (tramos.length) tramos[tramos.length - 1].hasta = "";
+
+    const act = persona(e.responsable);
+    const ultimoMov = hist.length ? hist[hist.length - 1].f : "";
+    const rt = fecha(e.Venc_RT);
+    const cc = limpia(e.Centro_costo);
+    const patente = (limpia(e.Num_ident_equipo) || limpia(e.Patente).replace(/[.\-]/g, "")).toUpperCase();
+
+    return {
+      id: limpia(e.IDU_equipo), patente,
+      desc: limpia(e.Descripcion), marca: limpia(e.Marca) || limpia(e.Modelo),
+      cc, ccNombre: PROY[cc] || "", responsable: act.nombre, email: act.email, rol: act.rol,
+      estado: limpia(e.estado2) || limpia(e.estado), ventRT: rt,
+      rtDias: rt ? dias(HOY, new Date(rt + "T00:00:00")) : null,
+      valor: limpia(e["Valor Activo"]), costoDia: limpia(e["costo dia"]),
+      nMov: movs.length, nTramos: tramos.length, ultimoMov,
+      diasSinMov: ultimoMov ? dias(new Date(ultimoMov + "T00:00:00"), HOY) : null,
+      fotos: [e.img1, e.img2, e.img3].filter(x => limpia(x)).length,
+      tramos, ghost:false
+    };
+  });
+
+  GHOST.forEach(g => V.push({
+    id:"", patente:g.patente, desc:g.desc, marca:g.marca, cc:g.cc, ccNombre:"",
+    responsable:g.resp, email:"", rol:"", estado:"", ventRT:"", rtDias:null,
+    valor:"", costoDia:"", nMov:0, nTramos:0, ultimoMov:"", diasSinMov:null, fotos:0,
+    tramos:[], aux:g.aux, ghost:true
+  }));
+
+  V.forEach(v => {
+    v.aux = v.aux || AUX[v.patente] || {};
+    v.baja = v.responsable === "Dado de baja";
+    v.ccLabel = v.ccNombre || v.cc || "";
+    const e = (v.estado || "").toLowerCase();
+    v.estadoCat = v.ghost ? "Sin ficha" : v.baja ? "De baja"
+                : e.indexOf("en terreno") === 0 ? "En terreno"
+                : e.indexOf("en bodega") === 0 || e.indexOf("devuelto") === 0 ? "En bodega"
+                : e.indexOf("en taller") === 0 ? "En taller"
+                : e.indexOf("traspasada") === 0 ? "Traspaso pendiente" : "Sin estado";
+    v._rtSort = v.rtDias === null ? 99999 : v.rtDias;
+    v.rtCat = v.rtDias === null ? "sin" : v.rtDias < 0 ? "vencida" : v.rtDias < 60 ? "pronto" : "vigente";
+  });
+  V.forEach(v => {
+    v.alertas = TIPOS.filter(t => t.test(v)).map(t => ({id:t.id, sev:t.sev, lab:t.lab, txt:t.txt(v)}));
+    v.nCrit = v.alertas.filter(a => a.sev === "crit").length;
+    v.nWarn = v.alertas.filter(a => a.sev === "warn").length;
+    v._alSort = -(v.nCrit * 100 + v.nWarn);
+    v.sev = v.nCrit ? "crit" : v.baja ? "off" : v.nWarn ? "warn" : "ok";
+  });
+  V.sort((a,b) => a.patente.localeCompare(b.patente));
+  ACT = V.filter(v => !v.baja && !v.ghost);
+  RES = TIPOS.map(t => ({...t, units: V.filter(v => v.alertas.some(a => a.id === t.id))})).filter(t => t.units.length);
+
+  const fechas = V.flatMap(v => v.tramos.map(t => t.desde)).filter(Boolean).sort();
+  T0 = fechas.length ? new Date(fechas[0] + "T00:00:00") : new Date(2023,0,1);
+  T0 = new Date(T0.getFullYear(), 0, 1);
+  T1 = new Date(HOY.getFullYear(), HOY.getMonth() + 1, 1);
+  SPAN = T1 - T0;
+}
+
+/* ═══ Render ═══ */
+function render(){ abar(); apanel(); kpisA(); filtersA(); gridA(); filtersB(); tableB(); drawerB(); axis(); filtersC(); rowsC(); }
+const pasaFiltro = v => (!aFilter || v.alertas.some(a => a.id === aFilter)) &&
+  (!busq || (v.patente + " " + v.desc + " " + v.marca + " " + v.responsable + " " + v.ccLabel).toLowerCase().includes(busq));
+
+function abar(){
+  const total = RES.reduce((s,t) => s + t.units.length, 0);
+  const uds = new Set(RES.flatMap(t => t.units.map(u => u.patente))).size;
+  const open = !document.getElementById("apanel").classList.contains("hidden");
+  document.getElementById("abar").innerHTML =
+    `<span class="head"><span class="pip"></span>${total} acotaciones en ${uds} unidades</span>` +
+    RES.map(t => `<button class="achip ${t.sev}" data-t="${t.id}" aria-pressed="${aFilter===t.id}" title="${esc(t.why)}"><span class="n">${t.units.length}</span>${esc(t.lab)}</button>`).join("") +
+    (aFilter ? `<button class="clearf" id="clearf">✕ quitar filtro</button>` : "") +
+    `<button class="expand" id="toggle-ap">${open ? "▲ Ocultar detalle" : "▼ Ver detalle"}</button>`;
+  document.querySelectorAll("#abar .achip").forEach(b => b.addEventListener("click", () => {
+    aFilter = aFilter === b.dataset.t ? null : b.dataset.t; abar(); gridA(); tableB(); rowsC();
+  }));
+  const cf = document.getElementById("clearf");
+  if (cf) cf.addEventListener("click", () => { aFilter = null; abar(); gridA(); tableB(); rowsC(); });
+  document.getElementById("toggle-ap").addEventListener("click", () => {
+    document.getElementById("apanel").classList.toggle("hidden"); abar();
+  });
+}
+function apanel(){
+  document.getElementById("apanel-in").innerHTML = RES.map(t => `<div class="agrp ${t.sev}">
+    <header><span class="sq"></span><h4>${esc(t.lab)}</h4><span class="cnt">${t.units.length}</span></header>
+    <p class="why">${esc(t.why)}</p>
+    <ul>${t.units.map(u => `<li><button class="plink" data-p="${u.patente}">${pat(u.patente)}</button><span>${u.alertas.find(a => a.id === t.id).txt}</span></li>`).join("")}</ul></div>`).join("");
+  document.querySelectorAll("#apanel-in .plink").forEach(b => b.addEventListener("click", () => irA(b.dataset.p)));
+}
+function irA(p){
+  const tab = ["a","b","c"].find(k => !document.getElementById("p-"+k).classList.contains("hidden"));
+  if (tab === "b"){ selP = p; tableB(); drawerB(); const r = document.querySelector(`#tb-b tr[data-p="${p}"]`); if (r) r.scrollIntoView({block:"center",behavior:"smooth"}); return; }
+  const sel = tab === "c" ? `.tlrow[data-p="${p}"]` : `.card[data-p="${p}"]`;
+  const el = document.querySelector(sel);
+  if (el){ el.scrollIntoView({block:"center",behavior:"smooth"}); el.classList.add("flash"); setTimeout(() => el.classList.remove("flash"), 1600); }
+}
+
+/* Tabs */
+[["tab-a","p-a"],["tab-b","p-b"],["tab-c","p-c"]].forEach(([t,p],_,all) =>
+  document.getElementById(t).addEventListener("click", () => {
+    all.forEach(([t2,p2]) => {
+      const on = t2 === t;
+      document.getElementById(t2).setAttribute("aria-selected", on);
+      document.getElementById(p2).classList.toggle("hidden", !on);
+    });
+    window.scrollTo({top:0, behavior:"smooth"});
+  }));
+
+/* ── A ── */
+function kpisA(){
+  const rtv = ACT.filter(v => v.rtCat === "vencida").length;
+  const conAl = V.filter(v => v.alertas.length).length;
+  document.getElementById("kpis-a").innerHTML = [
+    ["En operación", ACT.length, `${V.filter(v => v.baja).length} de baja · ${V.filter(v => v.ghost).length} sin ficha`],
+    ["Con acotación", conAl, `de ${V.length} unidades`, conAl ? "is-warn" : ""],
+    ["RT vencida", rtv, "entre las activas", rtv ? "is-crit" : ""],
+    ["Traspasos", V.reduce((s,v) => s + v.nTramos, 0), "registrados en total"],
+    ["Responsables", new Set(ACT.filter(v => v.email && !ALIAS[v.email]).map(v => v.email)).size, "personas distintas"],
+  ].map(([l,val,h,c]) => `<div class="kpi ${c||""}"><div class="lab">${l}</div><div class="val">${val}</div><div class="hint">${h}</div></div>`).join("");
+}
+function filtersA(){
+  const ccs = ["Todos", ...[...new Set(V.map(v => v.ccLabel).filter(Boolean))].sort()];
+  const g = (lab,k,os) => `<div class="fgroup"><span>${lab}</span>${os.map(o =>
+    `<button class="chip" data-k="${k}" data-v="${esc(o)}" aria-pressed="${fA[k]===o}">${esc(o)}</button>`).join("")}</div>`;
+  document.getElementById("filters-a").innerHTML =
+    g("Estado","estado",["Todos","En terreno","En bodega","Traspaso pendiente","Sin ficha","De baja"]) +
+    g("Rev. técnica","rt",["Todos","Vencida","Vence pronto","Vigente"]) +
+    g("Centro de costo","cc",ccs);
+  document.querySelectorAll("#filters-a .chip").forEach(b =>
+    b.addEventListener("click", () => { fA[b.dataset.k] = b.dataset.v; filtersA(); gridA(); }));
+}
+function alertList(v){
+  if (!v.alertas.length) return "";
+  return `<div class="cal-list ${v.nCrit ? "" : "only-warn"}">${v.alertas.map(a =>
+    `<div class="ci ${a.sev}"><span class="m">${a.sev === "crit" ? "●" : "▲"}</span><span><strong>${esc(a.lab)}.</strong> ${a.txt}</span></div>`).join("")}</div>`;
+}
+function gridA(){
+  const rtMap = {"Vencida":"vencida","Vence pronto":"pronto","Vigente":"vigente"};
+  const list = V.filter(v => pasaFiltro(v) &&
+      (fA.estado === "Todos" || v.estadoCat === fA.estado) &&
+      (fA.cc === "Todos" || v.ccLabel === fA.cc) &&
+      (fA.rt === "Todos" || v.rtCat === rtMap[fA.rt]))
+    .sort((a,b) => a._alSort - b._alSort || a.patente.localeCompare(b.patente));
+  const el = document.getElementById("grid-a");
+  if (!list.length){ el.innerHTML = `<p style="color:var(--ink-3);padding:24px 0">Ninguna unidad cumple ese filtro.</p>`; return; }
+  el.innerHTML = list.map(v => {
+    const a = v.aux;
+    const rtb = v.rtCat === "vencida" ? `<span class="badge crit">RT vencida ${fmt(v.ventRT)}</span>`
+              : v.rtCat === "pronto"  ? `<span class="badge warn">RT vence ${fmt(v.ventRT)}</span>`
+              : v.rtCat === "vigente" ? `<span class="badge ok">RT al ${fmt(v.ventRT)}</span>` : "";
+    return `<article class="card st-${v.sev} ${v.ghost ? "ghost" : ""}" data-p="${v.patente}">
+      <div class="card-top">
+        <div><div class="card-veh">${esc(v.desc || v.marca)}</div>
+        <div class="card-meta">${a.anio ? a.anio + " · " : ""}${a.color ? a.color.toLowerCase() + " · " : ""}${esc(v.marca)}</div></div>
+        ${plate(v.patente)}
+      </div>
+      <div class="holder">
+        <div class="avatar ${v.responsable ? "" : "none"}" style="${v.responsable ? (colorFor(v.responsable) || "background:var(--ink-3)") : ""}">${ini(v.responsable)}</div>
+        <div style="min-width:0">
+          <div class="who">${esc(v.responsable) || "Sin responsable"}</div>
+          <div class="role">${esc(v.ccLabel || "sin centro de costo")}</div>
+        </div>
+      </div>
+      <div class="tags">
+        <span class="badge ${v.estadoCat === "En terreno" ? "ok" : v.estadoCat === "De baja" ? "" : v.estadoCat === "Sin ficha" ? "crit" : "warn"}">${v.estadoCat}</span>
+        ${rtb}${a.prop ? `<span class="badge ${a.prop === "Propio" ? "" : "accent"}">${esc(a.prop)}</span>` : ""}
+      </div>
+      ${alertList(v)}
+      <div class="mini">
+        <div class="mm"><div class="dl">Traspasos</div><div class="dv">${v.nTramos || "—"}</div></div>
+        <div class="mm ${v.diasSinMov === null ? "" : v.diasSinMov > 365 ? "warn" : "yes"}"><div class="dl">Último mov.</div><div class="dv">${v.ultimoMov ? fmt(v.ultimoMov) : "—"}</div></div>
+        <div class="mm ${a.tarj ? "yes" : "no"}"><div class="dl">Aramco</div><div class="dv">${a.tarj ? "Sí" : "No"}</div></div>
+      </div>
+    </article>`;
+  }).join("");
+}
+
+/* ── B ── */
+function filtersB(){
+  document.getElementById("filters-b").innerHTML =
+    `<div class="fgroup"><span>Buscar</span><input class="search" id="q" type="search" placeholder="patente, modelo, persona u obra" value="${esc(busq)}"></div>`;
+  const q = document.getElementById("q");
+  q.addEventListener("input", () => { busq = q.value.trim().toLowerCase(); tableB(); gridA(); rowsC(); });
+}
+function tableB(){
+  const rows = V.filter(pasaFiltro).sort((a,b) => {
+    const x = a[sortK] ?? "", y = b[sortK] ?? "";
+    return (typeof x === "number" ? x - y : String(x).localeCompare(String(y), "es")) * sortDir;
+  });
+  document.getElementById("tb-b").innerHTML = rows.map(v => `<tr data-p="${v.patente}" aria-selected="${selP===v.patente}">
+    <td>${v.alertas.length
+      ? `<span class="acount" title="${esc(v.alertas.map(a => a.lab).join(" · "))}">${v.nCrit ? '<i class="c"></i>' : ""}${v.nWarn ? '<i class="w"></i>' : ""}<span class="num">${v.alertas.length}</span></span>`
+      : '<span style="color:var(--ok)">✓</span>'}</td>
+    <td>${plate(v.patente,"sm")}</td>
+    <td>${esc(v.desc || v.marca)}</td>
+    <td>${v.baja ? '<span style="color:var(--ink-3)">Dado de baja</span>' : esc(v.responsable) || '<span style="color:var(--crit)">Sin asignar</span>'}</td>
+    <td>${dash(v.ccLabel)}</td>
+    <td><span class="badge ${v.estadoCat==="En terreno"?"ok":v.estadoCat==="De baja"?"":v.estadoCat==="Sin ficha"?"crit":"warn"}">${v.estadoCat}</span></td>
+    <td>${v.rtDias === null ? '<span class="badge warn">sin dato</span>'
+        : v.rtDias < 0 ? `<span class="badge crit">venció ${fmt(v.ventRT)}</span>`
+        : v.rtDias < 60 ? `<span class="badge warn">${fmt(v.ventRT)}</span>`
+        : `<span class="num">${fmt(v.ventRT)}</span>`}</td>
+    <td class="num">${v.nTramos || "—"}</td>
+    <td class="num">${v.ultimoMov ? fmt(v.ultimoMov) : "—"}</td></tr>`).join("");
+  document.querySelectorAll("#tb-b tr").forEach(tr =>
+    tr.addEventListener("click", () => { selP = tr.dataset.p; tableB(); drawerB(); }));
+  document.querySelectorAll("#tbl-b th.sortable").forEach(th => {
+    const on = th.dataset.k === sortK;
+    th.setAttribute("aria-sort", on ? (sortDir === 1 ? "ascending" : "descending") : "none");
+    th.querySelector(".arw").textContent = on ? (sortDir === 1 ? "↑" : "↓") : "↕";
+  });
+}
+document.querySelectorAll("#tbl-b th.sortable").forEach(th => th.addEventListener("click", () => {
+  if (sortK === th.dataset.k) sortDir *= -1; else { sortK = th.dataset.k; sortDir = 1; }
+  tableB();
+}));
+function drawerB(){
+  const el = document.getElementById("drawer-b");
+  const v = V.find(x => x.patente === selP);
+  if (!v){ el.innerHTML = `<div class="empty-drawer">Haz clic en una fila para ver sus acotaciones y el historial completo de custodia.</div>`; return; }
+  const a = v.aux, row = (k,val,m) => `<div class="dl-row"><dt>${k}</dt><dd class="${m?"mono":""}">${val}</dd></div>`;
+  const tr = [...v.tramos].reverse();
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px">
+      ${plate(v.patente,"lg")}
+      <span class="badge ${v.estadoCat==="En terreno"?"ok":v.estadoCat==="De baja"?"":v.estadoCat==="Sin ficha"?"crit":"warn"}">${v.estadoCat}</span>
+    </div>
+    <h3>${esc(v.desc || v.marca)}</h3>
+    <div class="dsub">${esc(v.marca)}${a.anio ? " · " + a.anio : ""}${a.color ? " · " + a.color.toLowerCase() : ""}</div>
+    ${v.alertas.length ? `<div class="htitle" style="margin-top:0">Acotaciones · ${v.alertas.length}</div>${alertList(v)}`
+      : `<div class="badge ok">Sin acotaciones</div>`}
+    <div class="htitle">Ficha</div>
+    <dl>
+      ${row("A cargo de", v.responsable ? esc(v.responsable) : '<span style="color:var(--crit)">Sin asignar</span>')}
+      ${row("Rol", dash(v.rol))}
+      ${row("Correo", v.email ? `<span style="font-size:11px">${esc(v.email)}</span>` : "—")}
+      ${row("Centro de costo", v.ccLabel ? `${esc(v.ccLabel)}${v.cc && v.ccNombre ? ` <span style="color:var(--ink-3)">(${esc(v.cc)})</span>` : ""}` : "—")}
+      ${row("Revisión técnica", v.ventRT ? (v.rtDias < 0 ? `<span style="color:var(--crit)">venció ${fmt(v.ventRT)}</span>` : fmt(v.ventRT)) : '<span style="color:var(--warn)">sin registrar</span>')}
+      ${row("Valor del activo", v.valor && !isNaN(+v.valor) ? "$" + (+v.valor).toLocaleString("es-CL") : "—", true)}
+      ${row("Propiedad", a.prop ? esc(a.prop) : '<span style="color:var(--ink-3)">no está en la nómina</span>')}
+      ${row("Tarjeta Aramco", a.tarj ? esc(a.tarj) : '<span style="color:var(--ink-3)">—</span>', !!a.tarj)}
+      ${row("Ruta peaje", a.ruta ? esc(a.ruta) : '<span style="color:var(--ink-3)">—</span>', !!a.ruta)}
+      ${row("Póliza en Drive", a.pol ? '<span style="color:var(--ok)">Sí</span>' : '<span style="color:var(--ink-3)">no encontrada</span>')}
+      ${row("Fotos en AppSheet", v.fotos || "—")}
+      ${row("Movimientos", `${v.nMov} filas · ${v.nTramos} traspasos`)}
+    </dl>
+    ${a.nota ? `<p style="margin-top:12px;font-size:12px;color:var(--warn);background:var(--warn-soft);border:1px solid var(--warn-line);padding:8px 10px;border-radius:8px">${esc(a.nota)}</p>` : ""}
+    <div class="htitle">Historial de custodia · ${v.nTramos} tramos</div>
+    ${tr.length ? `<div class="hist">${tr.map((t,i) => `
+      <div class="hev ${i===0?"now":""}">
+        <span style="position:absolute;left:-15px;top:5px;width:9px;height:9px;border-radius:50%;border:2px solid var(--panel);${colorFor(t.quien) || "background:var(--ink-3)"}"></span>
+        <div class="hd">${fmt(t.desde)}${t.hasta ? " → " + fmt(t.hasta) : " → hoy"}</div>
+        <div class="hq">${esc(t.quien)}</div>
+        <div class="hs">${esc(t.estado)}${t.obs ? " · " + esc(t.obs) : ""}</div>
+      </div>`).join("")}</div>`
+      : `<p style="font-size:12.5px;color:var(--ink-3)">Sin movimientos registrados.</p>`}`;
+}
+
+/* ── C ── */
+const pct = d => Math.max(0, Math.min(100, (new Date(d) - T0) / SPAN * 100));
+function axis(){
+  let h = "";
+  for (let y = T0.getFullYear(); y <= T1.getFullYear(); y++) h += `<span class="yr" style="left:${pct(new Date(y,0,1))}%">${y}</span>`;
+  h += `<span class="today" style="left:${pct(HOY)}%"></span>`;
+  document.getElementById("axis").innerHTML = h;
+}
+function filtersC(){
+  const os = ["Solo activas","Todas","Con acotaciones"];
+  document.getElementById("filters-c").innerHTML = `<div class="fgroup"><span>Mostrar</span>${
+    os.map(o => `<button class="chip" data-v="${o}" aria-pressed="${fC===o}">${o}</button>`).join("")}</div>`;
+  document.querySelectorAll("#filters-c .chip").forEach(b =>
+    b.addEventListener("click", () => { fC = b.dataset.v; filtersC(); rowsC(); }));
+}
+function rowsC(){
+  let list = V.filter(pasaFiltro);
+  if (fC === "Solo activas") list = list.filter(v => !v.baja && !v.ghost);
+  if (fC === "Con acotaciones") list = list.filter(v => v.alertas.length);
+  list = [...list].sort((a,b) => b.nTramos - a.nTramos);
+  const anios = [];
+  for (let y = T0.getFullYear() + 1; y <= T1.getFullYear(); y++) anios.push(y);
+  document.getElementById("tlrows").innerHTML = list.map(v => {
+    const segs = v.tramos.map(t => {
+      const l = pct(t.desde), r = pct(t.hasta || HOY), w = Math.max(0.35, r - l), cls = ESP[t.quien] || "";
+      return `<div class="sgm ${cls}" style="left:${l}%;width:${w}%;${cls ? "" : colorFor(t.quien)}" title="${esc(t.quien)} — ${fmt(t.desde)} → ${t.hasta ? fmt(t.hasta) : "hoy"}${t.estado ? " · " + esc(t.estado) : ""}"><span>${w > 6 ? esc(t.quien) : ""}</span></div>`;
+    }).join("");
+    const tt = esc(v.alertas.map(a => a.lab).join(" · "));
+    const dot = v.nCrit ? `<span class="dotc" style="background:var(--crit)" title="${tt}"></span>`
+              : v.nWarn ? `<span class="dotc" style="background:var(--warn)" title="${tt}"></span>` : "";
+    return `<div class="tlrow" data-p="${v.patente}">
+      <div class="veh">${dot}${plate(v.patente,"sm")}<div class="who2">${esc(v.responsable || "sin responsable")}</div></div>
+      <div class="track">${anios.map(y => `<span class="gl" style="left:${pct(new Date(y,0,1))}%"></span>`).join("")}
+        <span class="today" style="left:${pct(HOY)}%"></span>${segs || '<span style="position:absolute;left:2px;top:7px;font-size:11px;color:var(--ink-3)">sin movimientos registrados</span>'}</div>
+    </div>`;
+  }).join("");
+}
+
+document.getElementById("reload").addEventListener("click", cargar);
+cargar();
+</script>
+</body>
+</html>
