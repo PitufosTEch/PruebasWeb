@@ -11675,6 +11675,10 @@ const App = () => {
                             <span style={{fontSize:'13px',lineHeight:1}}>🛻</span>
                             <span className="hidden md:inline">Vehículos Livianos</span>
                         </button>
+                        <button type="button" onClick={() => window.open('rendiciones.html', '_blank')} title="Control macro del gasto rendido: por persona, por centro de costo y alertas de movimientos bruscos" className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-400 hover:bg-emerald-100 transition-colors whitespace-nowrap shrink-0">
+                            <span style={{fontSize:'13px',lineHeight:1}}>🧾</span>
+                            <span className="hidden md:inline">Rendiciones</span>
+                        </button>
                         <button type="button" onClick={() => setShowModalPersonal(true)} title="Registro global de personal de la organización" className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-violet-700 bg-violet-50 border border-violet-300 hover:bg-violet-100 transition-colors whitespace-nowrap shrink-0">
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
                             <span className="hidden md:inline">Personal</span>
