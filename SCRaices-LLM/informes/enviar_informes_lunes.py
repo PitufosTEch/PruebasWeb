@@ -46,6 +46,7 @@ GMAIL_USER    = 'rodrigolagoslira@gmail.com'
 GMAIL_PASS    = os.environ.get('GMAIL_APP_PASSWORD', '')
 DRY_RUN       = os.environ.get('DRY_RUN', 'false').lower() != 'false'
 TEST_EMAIL    = os.environ.get('TEST_EMAIL', '').strip()
+RESUMEN_EMAIL = 'rlagos@scraices.cl'  # resumen de estado siempre a este correo
 
 DASHBOARD_URL = (
     'https://pitufostech.github.io/PruebasWeb/'
@@ -311,6 +312,40 @@ def build_mappings_test(grupos: dict) -> tuple:
 
 
 # ── Gmail SMTP ─────────────────────────────────────────────────────────────
+def enviar_resumen(registros: list[dict], fecha: str, dry_run: bool) -> None:
+    """Envía correo de resumen de estado al administrador (RESUMEN_EMAIL)."""
+    if not GMAIL_PASS:
+        return
+    modo = '[DRY RUN] ' if dry_run else ''
+    filas = []
+    for r in registros:
+        estado = '✓' if r['ok'] else '✗ ERROR'
+        adjuntos_str = ', '.join(r['adjuntos']) if r['adjuntos'] else '—'
+        filas.append(f"  {estado}  {r['nombre']} <{r['correo']}>\n"
+                     f"       Adjuntos: {adjuntos_str}")
+    cuerpo = (
+        f'{modo}Resumen de envío — Informes Semanales Raíces · {fecha}\n'
+        f'{"="*60}\n\n'
+        + '\n\n'.join(filas)
+        + f'\n\n{"="*60}\n'
+        + f'Total: {sum(1 for r in registros if r["ok"])} OK · '
+        + f'{sum(1 for r in registros if not r["ok"])} errores\n'
+    )
+    msg = MIMEMultipart()
+    msg['From']    = f'Informes Raíces <{GMAIL_USER}>'
+    msg['To']      = RESUMEN_EMAIL
+    msg['Subject'] = f'{modo}[Resumen] Informes Semanales · {fecha}'
+    msg.attach(MIMEText(cuerpo, 'plain', 'utf-8'))
+    try:
+        with smtplib.SMTP('smtp.gmail.com', 587, timeout=30) as s:
+            s.ehlo(); s.starttls()
+            s.login(GMAIL_USER, GMAIL_PASS)
+            s.sendmail(GMAIL_USER, RESUMEN_EMAIL, msg.as_string())
+        print(f'  [Resumen] enviado a {RESUMEN_EMAIL} ✓')
+    except Exception as e:
+        print(f'  [Resumen] ERROR SMTP: {e}')
+
+
 def enviar_correo(destinatario: str, nombre: str,
                   adjuntos: dict[str, str], fecha: str) -> bool:
     msg = MIMEMultipart('mixed')
@@ -405,6 +440,7 @@ def main():
     # 4. Construir adjuntos y enviar
     print(f'\n[4/4] {"[DRY RUN]" if DRY_RUN else "Enviando correos"}...')
     ok = err = 0
+    registros_resumen: list[dict] = []
 
     for r in recipients:
         adjuntos: dict[str, str] = {}
@@ -444,11 +480,16 @@ def main():
         if DRY_RUN:
             print(f'  [DRY] {r["nombre"]} <{r["correo"]}>'
                   f' → {", ".join(adjuntos)}')
+            registros_resumen.append({'nombre': r['nombre'], 'correo': r['correo'],
+                                      'adjuntos': list(adjuntos), 'ok': True})
             ok += 1
         else:
             print(f'  Enviando a {r["nombre"]} <{r["correo"]}>'
                   f' ({len(adjuntos)} adjuntos)...', end=' ', flush=True)
-            if enviar_correo(r['correo'], r['nombre'], adjuntos, fecha):
+            exito = enviar_correo(r['correo'], r['nombre'], adjuntos, fecha)
+            registros_resumen.append({'nombre': r['nombre'], 'correo': r['correo'],
+                                      'adjuntos': list(adjuntos), 'ok': exito})
+            if exito:
                 print('✓')
                 ok += 1
             else:
@@ -457,6 +498,10 @@ def main():
     print(f'\n{"="*60}')
     print(f'  Resultado: {ok} OK · {err} errores')
     print(f'{"="*60}\n')
+
+    # Enviar resumen de estado al administrador
+    print('[Resumen] Enviando correo de estado...')
+    enviar_resumen(registros_resumen, fecha, DRY_RUN)
 
     if err:
         sys.exit(1)
