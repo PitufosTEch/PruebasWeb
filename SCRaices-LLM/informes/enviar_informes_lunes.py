@@ -271,12 +271,17 @@ def build_mappings(personal: dict, grupos: dict) -> tuple:
             entry['residente_nombre'] = match
 
         if 'por_capataz' in tipos:
-            match = next(
-                (c for c in cap_a_proy
-                 if _norm(nombre) in _norm(c) or _norm(c) in _norm(nombre)),
-                None
-            )
-            entry['capataz_nombre'] = match
+            # Soporte para campo explícito en Firebase
+            fb_cap = (persona.get('capataz_nombre') or '').strip()
+            if fb_cap:
+                entry['capataz_nombre'] = fb_cap  # puede ser "__todos__" o nombre exacto
+            else:
+                match = next(
+                    (c for c in cap_a_proy
+                     if _norm(nombre) in _norm(c) or _norm(c) in _norm(nombre)),
+                    None
+                )
+                entry['capataz_nombre'] = match
 
         recipients.append(entry)
 
@@ -466,7 +471,14 @@ def main():
             # Capataz (uno por proyecto)
             elif tipo == 'por_capataz':
                 cn = r.get('capataz_nombre')
-                if cn:
+                if cn == '__todos__':
+                    # Recibir todos los reportes de todos los capataces
+                    for key, html in resultados.items():
+                        if isinstance(key, tuple) and key[0] == 'capataz':
+                            _, cap_n, pid = key
+                            label = f'Capataz_{cap_n.split()[0]}_{pid}'
+                            adjuntos[label] = html
+                elif cn:
                     for pid in needed_cap.get(cn, []):
                         key = ('capataz', cn, pid)
                         if key in resultados:
