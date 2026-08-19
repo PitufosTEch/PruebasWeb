@@ -295,39 +295,22 @@ def build_mappings(personal: dict, grupos: dict) -> tuple:
     return needed_res, needed_cap, recipients
 
 
-def build_mappings_test(grupos: dict) -> tuple:
-    """Modo TEST: elige un residente y un capataz de muestra."""
-    res_a_proy: dict[str, str]        = {}
-    cap_a_proy: dict[str, list[str]]  = {}
+def build_mappings_test(personal: dict, grupos: dict) -> tuple:
+    """
+    Modo TEST: usa todos los capataces/residentes (igual que producción)
+    pero envía TODO al TEST_EMAIL en lugar de a los destinatarios reales.
+    """
+    needed_res, needed_cap, recipients = build_mappings(personal, grupos)
 
-    for pid, grp_list in grupos.items():
-        if pid not in ACTIVE_PROJ_IDS or not isinstance(grp_list, list):
-            continue
-        for g in grp_list:
-            res = (g.get('residente') or '').strip()
-            cap = (g.get('capataz') or '').strip()
-            if res and res not in res_a_proy:
-                res_a_proy[res] = pid
-            if cap and cap not in cap_a_proy:
-                cap_a_proy.setdefault(cap, [])
-                if pid not in cap_a_proy[cap]:
-                    cap_a_proy[cap].append(pid)
+    # Un recipient de prueba por cada persona real (mismo adjunto, distinto dest.)
+    test_recipients = []
+    for r in recipients:
+        test_r = dict(r)
+        test_r['correo'] = TEST_EMAIL
+        test_r['nombre'] = f'[TEST] {r["nombre"]}'
+        test_recipients.append(test_r)
 
-    # Muestra: primer residente y primer capataz encontrados
-    sample_res  = dict(list(res_a_proy.items())[:1])
-    sample_cap  = dict(list(cap_a_proy.items())[:1])
-    res_nombre  = list(sample_res.keys())[0]  if sample_res  else None
-    cap_nombre  = list(sample_cap.keys())[0]  if sample_cap  else None
-
-    todos_tipos = list(MULTI_OBRA_FN.keys()) + ['residente', 'por_capataz']
-    recipient = {
-        'correo':           TEST_EMAIL,
-        'nombre':           'Prueba',
-        'tipos':            todos_tipos,
-        'residente_nombre': res_nombre,
-        'capataz_nombre':   cap_nombre,
-    }
-    return sample_res, sample_cap, [recipient]
+    return needed_res, needed_cap, test_recipients
 
 
 # ── Gmail SMTP ─────────────────────────────────────────────────────────────
@@ -422,7 +405,7 @@ def main():
     # 2. Mappings
     print('\n[2/4] Construyendo destinatarios...')
     if test_mode:
-        needed_res, needed_cap, recipients = build_mappings_test(grupos)
+        needed_res, needed_cap, recipients = build_mappings_test(personal, grupos)
         print(f'  ⚠ MODO PRUEBA → {TEST_EMAIL}')
     else:
         needed_res, needed_cap, recipients = build_mappings(personal, grupos)
