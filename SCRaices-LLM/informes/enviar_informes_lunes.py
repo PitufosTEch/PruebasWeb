@@ -108,9 +108,34 @@ async def _capturar(page, js_call: str) -> str | None:
     return await page.evaluate('() => window.__captured')
 
 
-async def _set_proyecto(page, proj_id: str):
-    """Set window.proyectoSel (functions read it from closure, project change is best-effort)."""
-    await page.evaluate(f'() => {{ window.proyectoSel = {json.dumps(proj_id)}; }}')
+async def _seleccionar_proyecto_ui(page, proj_id: str, current: list) -> None:
+    """
+    Cambia el proyecto activo clickeando el dropdown del dashboard.
+    Dispara re-render React + recarga datos/grupos para ese proyecto.
+    current = [proj_id_actual]  (lista mutable compartida para evitar re-selecciones)
+    """
+    if current[0] == proj_id:
+        return
+    print(f'    → seleccionando {proj_id} en dropdown...', end=' ', flush=True)
+    try:
+        # Abrir dropdown: el botón del selector tiene un chevron SVG con este path
+        btn = page.locator('button').filter(
+            has=page.locator('path[d="M5 7.5l5 5 5-5"]')
+        ).first
+        await btn.click(timeout=6000)
+
+        # Escribir el ID en el input de búsqueda y confirmar con Enter
+        search = page.get_by_placeholder('Buscar proyecto...')
+        await search.wait_for(state='visible', timeout=6000)
+        await search.fill(proj_id)
+        await search.press('Enter')
+
+        # Esperar que React recargue datos/grupos del proyecto
+        await asyncio.sleep(7)
+        current[0] = proj_id
+        print('OK')
+    except Exception as e:
+        print(f'ERROR: {e}')
 
 
 async def generar_informes_playwright(
@@ -134,8 +159,15 @@ async def generar_informes_playwright(
         page = await (await browser.new_context()).new_page()
 
         live_done = [False]
-        page.on('console',   lambda m: live_done.__setitem__(0, True)
-                             if '[LIVE] Datos' in m.text else None)
+        current_proj = [None]  # rastrear proyecto seleccionado actualmente en UI
+
+        def _on_console(m):
+            if '[LIVE] Datos' in m.text:
+                live_done[0] = True
+            elif m.type in ('warning', 'error') or '[ALERT]' in m.text:
+                print(f'  [CON:{m.type}] {m.text[:120]}')
+
+        page.on('console',   _on_console)
         page.on('pageerror', lambda e: print(f'  [PAGEERROR] {e}'))
 
         print('  Abriendo dashboard...')
@@ -175,21 +207,21 @@ async def generar_informes_playwright(
 
         # 2. Residente (por proyecto de referencia)
         for nombre, proj_id in residentes_proyectos.items():
+            await _seleccionar_proyecto_ui(page, proj_id, current_proj)
             print(f'  [Residente: {nombre} / {proj_id}] ', end='', flush=True)
-            await _set_proyecto(page, proj_id)
             html = await _capturar(page, 'await window._raicesInformeFns.residente()')
             if html:
                 resultados[('residente', nombre)] = html
                 print(f'OK ({len(html)//1024} KB)')
             else:
-                print('vacío (nombre no coincide con grupos?)')
+                print('vacío')
 
         # 3. Capataz (por nombre y proyecto)
         for nombre, proj_ids in capataces_proyectos.items():
             for proj_id in proj_ids:
+                await _seleccionar_proyecto_ui(page, proj_id, current_proj)
                 print(f'  [Capataz: {nombre} / {proj_id}] ',
                       end='', flush=True)
-                await _set_proyecto(page, proj_id)
                 html = await _capturar(
                     page,
                     f'await window._raicesInformeFns.generarReporteCapatazPorNombre({json.dumps(nombre)})'
