@@ -192,16 +192,19 @@ async def generar_informes_playwright(
             else:
                 print('vacío')
 
-        # 2. Residente (por proyecto de referencia)
-        for nombre, proj_id in residentes_proyectos.items():
-            await _seleccionar_proyecto_ui(page, proj_id, current_proj)
-            print(f'  [Residente: {nombre} / {proj_id}] ', end='', flush=True)
-            html = await _capturar(page, 'await window._raicesInformeFns.residente()')
-            if html:
-                resultados[('residente', nombre)] = html
-                print(f'OK ({len(html)//1024} KB)')
-            else:
-                print('vacío')
+        # 2. Residente (por proyecto de referencia o todos los proyectos)
+        for nombre, proj_id_o_lista in residentes_proyectos.items():
+            proj_ids = proj_id_o_lista if isinstance(proj_id_o_lista, list) else [proj_id_o_lista]
+            for proj_id in proj_ids:
+                await _seleccionar_proyecto_ui(page, proj_id, current_proj)
+                label = nombre if nombre != '__todos__' else f'__todos__/{proj_id}'
+                print(f'  [Residente: {label} / {proj_id}] ', end='', flush=True)
+                html = await _capturar(page, 'await window._raicesInformeFns.residente()')
+                if html:
+                    resultados[('residente', nombre, proj_id)] = html
+                    print(f'OK ({len(html)//1024} KB)')
+                else:
+                    print('vacío')
 
         # 3. Capataz (por nombre y proyecto)
         for nombre, proj_ids in capataces_proyectos.items():
@@ -263,12 +266,16 @@ def build_mappings(personal: dict, grupos: dict) -> tuple:
         entry: dict = {'correo': correo, 'nombre': nombre, 'tipos': tipos}
 
         if 'residente' in tipos:
-            match = next(
-                (r for r in res_a_proy
-                 if _norm(nombre) in _norm(r) or _norm(r) in _norm(nombre)),
-                None
-            )
-            entry['residente_nombre'] = match
+            fb_res = (persona.get('residente_nombre') or '').strip()
+            if fb_res:
+                entry['residente_nombre'] = fb_res  # puede ser "__todos__" o nombre exacto
+            else:
+                match = next(
+                    (r for r in res_a_proy
+                     if _norm(nombre) in _norm(r) or _norm(r) in _norm(nombre)),
+                    None
+                )
+                entry['residente_nombre'] = match
 
         if 'por_capataz' in tipos:
             # Soporte para campo explícito en Firebase
@@ -286,16 +293,25 @@ def build_mappings(personal: dict, grupos: dict) -> tuple:
         recipients.append(entry)
 
     # Filtrar solo los residentes/capataces realmente necesarios
-    needed_res: dict[str, str]        = {}
-    needed_cap: dict[str, list[str]]  = {}
+    needed_res: dict[str, str | list]  = {}
+    needed_cap: dict[str, list[str]]   = {}
+    res_todos_needed = False
 
     for r in recipients:
         rn = r.get('residente_nombre')
-        if rn and rn in res_a_proy:
+        if rn == '__todos__':
+            res_todos_needed = True
+        elif rn and rn in res_a_proy:
             needed_res[rn] = res_a_proy[rn][0]
         cn = r.get('capataz_nombre')
-        if cn and cn in cap_a_proy:
+        if cn == '__todos__':
+            for cap, pids in cap_a_proy.items():
+                needed_cap[cap] = pids
+        elif cn and cn in cap_a_proy:
             needed_cap[cn] = cap_a_proy[cn]
+
+    if res_todos_needed:
+        needed_res['__todos__'] = sorted(ACTIVE_PROJ_IDS)
 
     return needed_res, needed_cap, recipients
 
@@ -460,11 +476,19 @@ def main():
 
             # Residente
             elif tipo == 'residente':
-                rn  = r.get('residente_nombre')
-                key = ('residente', rn) if rn else None
-                if key and key in resultados:
-                    adjuntos['Residente'] = resultados[key]
-                elif not rn:
+                rn = r.get('residente_nombre')
+                if rn == '__todos__':
+                    for key, html in resultados.items():
+                        if isinstance(key, tuple) and key[0] == 'residente' and key[1] == '__todos__':
+                            adjuntos[f'Residente_{key[2]}'] = html
+                elif rn:
+                    # Buscar la key del proyecto asignado (primer proyecto del residente)
+                    matches = [(k, v) for k, v in resultados.items()
+                               if isinstance(k, tuple) and k[0] == 'residente' and k[1] == rn]
+                    for key, html in matches:
+                        adjuntos['Residente'] = html
+                        break
+                else:
                     print(f'  ! {r["nombre"]}: sin residente_nombre, '
                           'agrega el campo a personal_global en Firebase')
 
