@@ -192,19 +192,16 @@ async def generar_informes_playwright(
             else:
                 print('vacío')
 
-        # 2. Residente (por proyecto de referencia o todos los proyectos)
-        for nombre, proj_id_o_lista in residentes_proyectos.items():
-            proj_ids = proj_id_o_lista if isinstance(proj_id_o_lista, list) else [proj_id_o_lista]
-            for proj_id in proj_ids:
-                await _seleccionar_proyecto_ui(page, proj_id, current_proj)
-                label = nombre if nombre != '__todos__' else f'__todos__/{proj_id}'
-                print(f'  [Residente: {label} / {proj_id}] ', end='', flush=True)
-                html = await _capturar(page, 'await window._raicesInformeFns.residente()')
-                if html:
-                    resultados[('residente', nombre, proj_id)] = html
-                    print(f'OK ({len(html)//1024} KB)')
-                else:
-                    print('vacío')
+        # 2. Residente (un informe por residente usando su proyecto principal)
+        for nombre, proj_id in residentes_proyectos.items():
+            await _seleccionar_proyecto_ui(page, proj_id, current_proj)
+            print(f'  [Residente: {nombre} / {proj_id}] ', end='', flush=True)
+            html = await _capturar(page, 'await window._raicesInformeFns.residente()')
+            if html:
+                resultados[('residente', nombre, proj_id)] = html
+                print(f'OK ({len(html)//1024} KB)')
+            else:
+                print('vacío')
 
         # 3. Capataz (por nombre y proyecto)
         for nombre, proj_ids in capataces_proyectos.items():
@@ -293,14 +290,16 @@ def build_mappings(personal: dict, grupos: dict) -> tuple:
         recipients.append(entry)
 
     # Filtrar solo los residentes/capataces realmente necesarios
-    needed_res: dict[str, str | list]  = {}
-    needed_cap: dict[str, list[str]]   = {}
-    res_todos_needed = False
+    needed_res: dict[str, str]        = {}
+    needed_cap: dict[str, list[str]]  = {}
 
     for r in recipients:
         rn = r.get('residente_nombre')
         if rn == '__todos__':
-            res_todos_needed = True
+            # Expandir: un informe por cada residente activo (multi-obra de ese residente)
+            for res_name, pids in res_a_proy.items():
+                if res_name not in needed_res:
+                    needed_res[res_name] = pids[0]
         elif rn and rn in res_a_proy:
             needed_res[rn] = res_a_proy[rn][0]
         cn = r.get('capataz_nombre')
@@ -309,9 +308,6 @@ def build_mappings(personal: dict, grupos: dict) -> tuple:
                 needed_cap[cap] = pids
         elif cn and cn in cap_a_proy:
             needed_cap[cn] = cap_a_proy[cn]
-
-    if res_todos_needed:
-        needed_res['__todos__'] = sorted(ACTIVE_PROJ_IDS)
 
     return needed_res, needed_cap, recipients
 
@@ -478,16 +474,16 @@ def main():
             elif tipo == 'residente':
                 rn = r.get('residente_nombre')
                 if rn == '__todos__':
+                    # Un adjunto por cada residente activo
                     for key, html in resultados.items():
-                        if isinstance(key, tuple) and key[0] == 'residente' and key[1] == '__todos__':
-                            adjuntos[f'Residente_{key[2]}'] = html
+                        if isinstance(key, tuple) and key[0] == 'residente':
+                            res_nombre = key[1].replace(' ', '_')
+                            adjuntos[f'Residente_{res_nombre}'] = html
                 elif rn:
-                    # Buscar la key del proyecto asignado (primer proyecto del residente)
-                    matches = [(k, v) for k, v in resultados.items()
-                               if isinstance(k, tuple) and k[0] == 'residente' and k[1] == rn]
-                    for key, html in matches:
-                        adjuntos['Residente'] = html
-                        break
+                    for key, html in resultados.items():
+                        if isinstance(key, tuple) and key[0] == 'residente' and key[1] == rn:
+                            adjuntos['Residente'] = html
+                            break
                 else:
                     print(f'  ! {r["nombre"]}: sin residente_nombre, '
                           'agrega el campo a personal_global en Firebase')
