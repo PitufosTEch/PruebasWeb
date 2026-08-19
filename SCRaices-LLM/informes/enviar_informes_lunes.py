@@ -110,32 +110,19 @@ async def _capturar(page, js_call: str) -> str | None:
 
 async def _seleccionar_proyecto_ui(page, proj_id: str, current: list) -> None:
     """
-    Cambia el proyecto activo clickeando el dropdown del dashboard.
-    Dispara re-render React + recarga datos/grupos para ese proyecto.
-    current = [proj_id_actual]  (lista mutable compartida para evitar re-selecciones)
+    Cambia el proyecto activo llamando window._raicesSetProy(proj_id).
+    Expuesto desde el App component via useEffect — dispara re-render React
+    y recarga datos/grupos para ese proyecto en la closure de los informes.
+    current = [proj_id_actual]  (lista mutable para evitar cambios innecesarios)
     """
     if current[0] == proj_id:
         return
-    print(f'    → seleccionando {proj_id} en dropdown...', end=' ', flush=True)
-    try:
-        # Abrir dropdown: el botón del selector tiene un chevron SVG con este path
-        btn = page.locator('button').filter(
-            has=page.locator('path[d="M5 7.5l5 5 5-5"]')
-        ).first
-        await btn.click(timeout=6000)
-
-        # Escribir el ID en el input de búsqueda y confirmar con Enter
-        search = page.get_by_placeholder('Buscar proyecto...')
-        await search.wait_for(state='visible', timeout=6000)
-        await search.fill(proj_id)
-        await search.press('Enter')
-
-        # Esperar que React recargue datos/grupos del proyecto
-        await asyncio.sleep(7)
-        current[0] = proj_id
-        print('OK')
-    except Exception as e:
-        print(f'ERROR: {e}')
+    print(f'    → seleccionando {proj_id}...', end=' ', flush=True)
+    await page.evaluate(f'() => window._raicesSetProy && window._raicesSetProy({json.dumps(proj_id)})')
+    # Esperar re-render React + fetch datos/grupos + useEffect line-1855 re-run
+    await asyncio.sleep(8)
+    current[0] = proj_id
+    print('OK')
 
 
 async def generar_informes_playwright(
