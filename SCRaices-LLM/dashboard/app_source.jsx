@@ -10245,9 +10245,95 @@ const ConfiguracionView = ({ grupos, setGrupos, viviendas, proyectoSel, personal
 
 // ===== APP PRINCIPAL =====
 // ===== EXPORTAR: Solicitudes de Pago M.O. APROBADAS pero NO PAGADAS (EN CURSO) =====
+// Modal para exportar solicitudes de pago M.O. con filtros de tipo y fecha
+function ModalExportPagos({ onClose }) {
+    const [tipoPago, setTipoPago] = React.useState('en_curso');
+    const [fDesde, setFDesde] = React.useState('');
+    const [fHasta, setFHasta] = React.useState('');
+    const [loading, setLoading] = React.useState(false);
+    const btnRef = React.useRef(null);
+
+    const handleExportar = async () => {
+        setLoading(true);
+        await exportarSolpagoEnCurso(null, { tipo: tipoPago, fechaDesde: fDesde, fechaHasta: fHasta });
+        setLoading(false);
+    };
+
+    const tipoDesc = {
+        en_curso: 'Aprobadas sin comprobante de pago (pendientes de pago)',
+        historico: 'Aprobadas con comprobante de pago registrado',
+        ambos: 'Todas las aprobadas, independiente del estado de pago',
+    };
+
+    return (
+        <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center px-4"
+            onClick={e => e.target === e.currentTarget && onClose()}>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+                    <div>
+                        <h2 className="text-base font-bold text-gray-800">Exportar Pagos Mano de Obra</h2>
+                        <p className="text-xs text-gray-500 mt-0.5">Descarga Excel con solicitudes aprobadas</p>
+                    </div>
+                    <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl font-bold leading-none">&times;</button>
+                </div>
+                <div className="px-6 py-5 space-y-5">
+                    <div>
+                        <p className="text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">Tipo de solicitudes</p>
+                        <div className="flex gap-2">
+                            {[['en_curso', 'En Curso'], ['historico', 'Históricas'], ['ambos', 'Ambas']].map(([v, l]) => (
+                                <button key={v} type="button" onClick={() => setTipoPago(v)}
+                                    className={`flex-1 py-2 px-3 rounded-lg text-xs font-semibold border transition-colors ${tipoPago === v ? 'bg-violet-600 text-white border-violet-600' : 'bg-white text-gray-600 border-gray-300 hover:border-violet-400'}`}>
+                                    {l}
+                                </button>
+                            ))}
+                        </div>
+                        <p className="text-[10px] text-gray-400 mt-1.5">{tipoDesc[tipoPago]}</p>
+                    </div>
+                    <div>
+                        <p className="text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">
+                            Rango de fechas <span className="text-gray-400 font-normal normal-case">(opcional — filtra por fecha de solicitud)</span>
+                        </p>
+                        <div className="flex gap-3 items-end">
+                            <div className="flex-1">
+                                <label className="text-[10px] text-gray-500 block mb-1">Desde</label>
+                                <input type="date" value={fDesde} onChange={e => setFDesde(e.target.value)}
+                                    className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-violet-500" />
+                            </div>
+                            <div className="flex-1">
+                                <label className="text-[10px] text-gray-500 block mb-1">Hasta</label>
+                                <input type="date" value={fHasta} onChange={e => setFHasta(e.target.value)}
+                                    className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-violet-500" />
+                            </div>
+                            {(fDesde || fHasta) && (
+                                <button type="button" onClick={() => { setFDesde(''); setFHasta(''); }}
+                                    className="text-[10px] text-gray-400 hover:text-red-500 pb-1.5 shrink-0">Limpiar</button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+                <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
+                    <button type="button" onClick={onClose}
+                        className="flex-1 py-2 rounded-lg text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors">
+                        Cancelar
+                    </button>
+                    <button ref={btnRef} type="button" onClick={handleExportar} disabled={loading}
+                        className="flex-1 py-2 rounded-lg text-xs font-semibold text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-60 transition-colors flex items-center justify-center gap-1.5">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M12 3v12m0 0l-4-4m4 4l4-4"/>
+                        </svg>
+                        {loading ? 'Descargando...' : 'Descargar Excel'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+
 // Hace su propia consulta fresca al Apps Script (independiente del pipeline del dashboard)
-// Criterio: Estado Solicitud = Aprobado  Y  sin Comprobante (Estado Operacion pendiente).
-async function exportarSolpagoEnCurso(btn) {
+// Criterio configurado por los filtros del modal (tipo + rango de fechas).
+async function exportarSolpagoEnCurso(btn, filtros = {}) {
+    const { tipo = 'en_curso', fechaDesde = '', fechaHasta = '' } = filtros;
     if (typeof XLSX === 'undefined') { alert('No se pudo cargar la libreria de Excel (XLSX). Revisa tu conexion y recarga.'); return; }
     if (typeof APPS_SCRIPT_URL === 'undefined') { alert('No hay conexion a la base (APPS_SCRIPT_URL no definido).'); return; }
     const old = btn ? btn.innerHTML : null;
@@ -10272,9 +10358,28 @@ async function exportarSolpagoEnCurso(btn) {
         const num = x => { const n = parseFloat(String(x == null ? '' : x).replace(/[$\s.]/g, '').replace(',', '.')); return isNaN(n) ? 0 : n; };
         const pdate = s => { s = String(s || '').trim(); if (!s) return null; if (s.includes('T')) s = s.split('T')[0]; const m = s.match(/(\d{4})-(\d{1,2})-(\d{1,2})/); if (m) return new Date(+m[1], +m[2] - 1, +m[3]); const d = new Date(s); return isNaN(d.getTime()) ? null : d; };
 
-        // FILTRO: Aprobado (Estado Solicitud) + sin Comprobante (no pagado / en curso)
-        const cand = SP.filter(s => String(s.Estado || '').toLowerCase().includes('aprobad') && !String(s.Comprobante || '').trim());
-        if (cand.length === 0) { alert('No se encontraron solicitudes APROBADAS sin pagar. (Revisa el criterio o que haya datos.)'); return; }
+        // Rango de fechas opcional (por fecha de solicitud)
+        const dDesde = fechaDesde ? new Date(fechaDesde + 'T00:00:00') : null;
+        const dHasta = fechaHasta ? new Date(fechaHasta + 'T23:59:59') : null;
+
+        // FILTRO por tipo (en_curso / historico / ambos) + rango de fecha solicitud
+        const cand = SP.filter(s => {
+            if (!String(s.Estado || '').toLowerCase().includes('aprobad')) return false;
+            const tieneComp = Boolean(String(s.Comprobante || '').trim());
+            if (tipo === 'en_curso' && tieneComp) return false;
+            if (tipo === 'historico' && !tieneComp) return false;
+            if (dDesde || dHasta) {
+                const fd = pdate(s.fecha);
+                if (!fd) return false;
+                if (dDesde && fd < dDesde) return false;
+                if (dHasta && fd > dHasta) return false;
+            }
+            return true;
+        });
+
+        const tipoLabel = tipo === 'en_curso' ? 'EN CURSO (no pagadas)' : tipo === 'historico' ? 'HISTORICAS (pagadas)' : 'EN CURSO + HISTORICAS';
+        const rangoLabel = (fechaDesde || fechaHasta) ? ((fechaDesde || '...') + ' a ' + (fechaHasta || '...')) : 'sin filtro de fecha';
+        if (cand.length === 0) { alert('No se encontraron solicitudes para los filtros seleccionados.\nTipo: ' + tipoLabel + '\nFechas: ' + rangoLabel); return; }
         const N = cand.length;
         const TOT = cand.reduce((a, r) => a + num(r.monto), 0);
         const today = new Date();
@@ -10286,12 +10391,11 @@ async function exportarSolpagoEnCurso(btn) {
         };
         const byProy = aggregate(r => pname[String(r.ID_proy || '').trim()] || String(r.ID_proy || '').trim());
         const byPart = aggregate(r => String(r.Familia_pago || '').trim());
-        // Maestro con especialidad
         const mAgg = {};
         cand.forEach(r => { const code = String(r.maestro || '').trim(); const nm = mname[code] || code || '(sin maestro)'; if (!mAgg[nm]) mAgg[nm] = [0, 0, mesp[code] || '']; mAgg[nm][0]++; mAgg[nm][1] += num(r.monto); });
         const byMaestro = Object.entries(mAgg).sort((a, b) => b[1][1] - a[1][1]);
 
-        const ages = cand.map(r => { const d = pdate(r.fecha); return d ? Math.floor((today - d) / 86400000) : null; }).filter(x => x != null);
+        const ages = cand.filter(r => !String(r.Comprobante || '').trim()).map(r => { const d = pdate(r.fecha); return d ? Math.floor((today - d) / 86400000) : null; }).filter(x => x != null);
         const fechaStr = today.getFullYear() + String(today.getMonth() + 1).padStart(2, '0') + String(today.getDate()).padStart(2, '0');
 
         const wb = XLSX.utils.book_new();
@@ -10303,26 +10407,30 @@ async function exportarSolpagoEnCurso(btn) {
         };
 
         // Hoja Resumen
-        const resumen = [
-            ['Solicitudes de Pago M.O. APROBADAS pero NO PAGADAS (EN CURSO)'],
-            ['Criterio: Estado Solicitud = Aprobado  Y  sin Comprobante (Estado Operacion = pendiente)'],
+        const resumenRows = [
+            ['Solicitudes de Pago M.O. — ' + tipoLabel],
+            ['Rango de fechas', rangoLabel],
             ['Generado', today.toLocaleString('es-CL')],
             [],
-            ['Total solicitudes en curso', N],
-            ['Monto total pendiente ($)', TOT],
-            ['Antiguedad promedio (dias)', ages.length ? Math.round(ages.reduce((a, b) => a + b, 0) / ages.length) : 0],
-            ['Antiguedad maxima (dias)', ages.length ? Math.max.apply(null, ages) : 0],
-            ['Proyectos involucrados', byProy.length],
-            ['Maestros involucrados', byMaestro.length],
-            ['Partidas involucradas', byPart.length],
+            ['Total solicitudes', N],
+            ['Monto total ($)', TOT],
+            ['Pendientes (sin pagar)', cand.filter(r => !String(r.Comprobante || '').trim()).length],
+            ['Pagadas (con comprobante)', cand.filter(r => Boolean(String(r.Comprobante || '').trim())).length],
         ];
-        const wsR = XLSX.utils.aoa_to_sheet(resumen); wsR['!cols'] = [{ wch: 50 }, { wch: 28 }];
+        if (ages.length) {
+            resumenRows.push(['Antiguedad promedio en curso (dias)', Math.round(ages.reduce((a, b) => a + b, 0) / ages.length)]);
+            resumenRows.push(['Antiguedad maxima en curso (dias)', Math.max.apply(null, ages)]);
+        }
+        resumenRows.push(['Proyectos involucrados', byProy.length]);
+        resumenRows.push(['Maestros involucrados', byMaestro.length]);
+        resumenRows.push(['Partidas involucradas', byPart.length]);
+        const wsR = XLSX.utils.aoa_to_sheet(resumenRows); wsR['!cols'] = [{ wch: 50 }, { wch: 30 }];
         if (wsR['B6']) wsR['B6'].z = '#,##0';
         XLSX.utils.book_append_sheet(wb, wsR, 'Resumen');
 
-        // Hojas de agregacion (Proyecto / Partida)
+        // Hojas de agregacion
         const aggSheet = (agg, col1) => {
-            const aoa = [[col1, 'N solicitudes', 'Monto pendiente ($)', '% del total']];
+            const aoa = [[col1, 'N solicitudes', 'Monto ($)', '% del total']];
             agg.forEach(([k, v]) => aoa.push([k, v[0], v[1], TOT ? Math.round(v[1] / TOT * 1000) / 10 : 0]));
             aoa.push(['TOTAL', N, TOT, 100]);
             const ws = XLSX.utils.aoa_to_sheet(aoa); ws['!cols'] = [{ wch: 34 }, { wch: 14 }, { wch: 20 }, { wch: 11 }];
@@ -10331,35 +10439,45 @@ async function exportarSolpagoEnCurso(btn) {
         };
         XLSX.utils.book_append_sheet(wb, aggSheet(byProy, 'Proyecto'), 'Por Proyecto');
 
-        const aoaM = [['Maestro', 'Especialidad', 'N solicitudes', 'Monto pendiente ($)']];
+        const aoaM = [['Maestro', 'Especialidad', 'N solicitudes', 'Monto ($)']];
         byMaestro.forEach(([k, v]) => aoaM.push([k, v[2], v[0], v[1]]));
         aoaM.push(['TOTAL', '', N, TOT]);
         const wsM = XLSX.utils.aoa_to_sheet(aoaM); wsM['!cols'] = [{ wch: 28 }, { wch: 22 }, { wch: 14 }, { wch: 20 }];
         setMoney(wsM, [3], 1);
         XLSX.utils.book_append_sheet(wb, wsM, 'Por Maestro');
-
         XLSX.utils.book_append_sheet(wb, aggSheet(byPart, 'Partida / Familia de pago'), 'Por Partida');
 
         // Hoja Detalle
         const det = cand.map(r => {
             const d = pdate(r.fecha);
-            return [String(r.IDU_solpago || ''), d ? (String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear()) : '-',
-                d ? Math.floor((today - d) / 86400000) : '', pname[String(r.ID_proy || '').trim()] || String(r.ID_proy || '').trim(),
-                mname[String(r.maestro || '').trim()] || String(r.maestro || '').trim(), String(r.Familia_pago || '').trim(), num(r.monto)];
-        }).sort((a, b) => b[6] - a[6]);
-        const aoaD = [['ID Solpago', 'Fecha solicitud', 'Dias en curso', 'Proyecto', 'Maestro', 'Partida', 'Monto ($)']].concat(det);
-        const wsD = XLSX.utils.aoa_to_sheet(aoaD); wsD['!cols'] = [{ wch: 14 }, { wch: 15 }, { wch: 13 }, { wch: 28 }, { wch: 26 }, { wch: 18 }, { wch: 16 }];
-        setMoney(wsD, [6], 1);
+            const pagado = Boolean(String(r.Comprobante || '').trim());
+            const diasPend = (!pagado && d) ? Math.floor((today - d) / 86400000) : '';
+            return [
+                String(r.IDU_solpago || ''),
+                d ? (String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear()) : '-',
+                pagado ? 'Pagado' : 'Pendiente',
+                diasPend,
+                pname[String(r.ID_proy || '').trim()] || String(r.ID_proy || '').trim(),
+                mname[String(r.maestro || '').trim()] || String(r.maestro || '').trim(),
+                String(r.Familia_pago || '').trim(),
+                num(r.monto),
+            ];
+        }).sort((a, b) => b[7] - a[7]);
+        const aoaD = [['ID Solpago', 'Fecha solicitud', 'Estado pago', 'Dias pendiente', 'Proyecto', 'Maestro', 'Partida', 'Monto ($)']].concat(det);
+        const wsD = XLSX.utils.aoa_to_sheet(aoaD); wsD['!cols'] = [{ wch: 14 }, { wch: 15 }, { wch: 13 }, { wch: 14 }, { wch: 28 }, { wch: 26 }, { wch: 18 }, { wch: 16 }];
+        setMoney(wsD, [7], 1);
         XLSX.utils.book_append_sheet(wb, wsD, 'Detalle');
 
-        XLSX.writeFile(wb, 'Solpago_EnCurso_AprobadasNoPagadas_' + fechaStr + '.xlsx');
+        const sufijo = tipo === 'en_curso' ? 'EnCurso' : tipo === 'historico' ? 'Historico' : 'Todos';
+        XLSX.writeFile(wb, 'Solpago_' + sufijo + '_' + fechaStr + '.xlsx');
     } catch (e) {
-        console.error('[EXPORT EnCurso]', e);
+        console.error('[EXPORT Solpago]', e);
         alert('Error al generar el Excel: ' + e.message);
     } finally {
         if (btn) { btn.disabled = false; btn.classList.remove('animate-pulse'); if (old != null) btn.innerHTML = old; }
     }
 }
+
 
 // ===== ALERTAS GLOBALES (vista gerencia) =====
 const ALERTA_CFG = {
@@ -10998,6 +11116,7 @@ const App = () => {
     const [personalGlobal, setPersonalGlobal] = React.useState({});
     const personalGlobalRef = React.useRef(null);
     const [showModalPersonal, setShowModalPersonal] = React.useState(false);
+    const [showModalPagos, setShowModalPagos] = React.useState(false);
     const [showInformes, setShowInformes] = React.useState(false);
     const [showConfigGeneral, setShowConfigGeneral] = React.useState(false);
     const informesRef = React.useRef(null);
@@ -11683,7 +11802,7 @@ const App = () => {
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
                             <span className="hidden md:inline">Personal</span>
                         </button>
-                        <button type="button" onClick={(e) => { exportarSolpagoEnCurso(e.currentTarget); }} title="Descargar Excel: Solicitudes de pago M.O. aprobadas pero NO pagadas (en curso)" className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-violet-700 bg-violet-50 border border-violet-300 hover:bg-violet-100 transition-colors whitespace-nowrap shrink-0">
+                        <button type="button" onClick={() => setShowModalPagos(true)} title="Exportar Excel: Solicitudes de pago M.O. aprobadas — filtra por fecha y estado" className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-violet-700 bg-violet-50 border border-violet-300 hover:bg-violet-100 transition-colors whitespace-nowrap shrink-0">
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M12 3v12m0 0l-4-4m4 4l4-4"/></svg>
                             <span className="hidden md:inline">Pagos en curso</span>
                         </button>
@@ -12103,6 +12222,9 @@ const App = () => {
                 personalGlobal, fbDB,
                 onClose: () => setShowModalPersonal(false)
             })}
+            {/* MODAL PAGOS M.O. */}
+            {showModalPagos && <ModalExportPagos onClose={() => setShowModalPagos(false)} />}
+
 
             {/* MODAL SUGERENCIAS */}
             {showSugerencias && (
