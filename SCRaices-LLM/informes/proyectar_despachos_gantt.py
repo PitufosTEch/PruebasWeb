@@ -233,6 +233,28 @@ def _proyectar_fila(
     )
 
 
+# ── Limpieza de [MC] stale para beneficiarios terminados ────────────────────
+
+def _limpiar_mc_stale(ws, fila: dict, preview: bool) -> bool:
+    """
+    Para un beneficiario terminado (av_viv=100%): si alguna celda mes1/mes2/mes3
+    contiene items [MC], los borra (los [SOL] se conservan).
+    Retorna True si hubo cambio.
+    """
+    cambio = False
+    for key in ("m1c", "m2c", "m3c"):
+        cell = fila[key]
+        etapas = _parse_etapas_celda(cell.value)
+        solo_sol = [e for e in etapas if e["tag"] == "SOL"]
+        tiene_mc = any(e["tag"] == "MC" for e in etapas)
+        if tiene_mc:
+            nuevo = _formatear_celda(solo_sol)
+            if not preview:
+                cell.value = nuevo
+            cambio = True
+    return cambio
+
+
 # ── Procesamiento de cada hoja ───────────────────────────────────────────────
 
 def _procesar_hoja(ws, spi_objetivo: float, cfg: dict, preview: bool = False) -> int:
@@ -326,7 +348,11 @@ def _procesar_hoja(ws, spi_objetivo: float, cfg: dict, preview: bool = False) ->
     modificadas = 0
     for fila in filas:
         if fila.get("ben_start") is None:
-            continue  # terminado
+            # Terminado (av_viv >= 100%): limpiar cualquier [MC] stale que quede en el Excel
+            if _limpiar_mc_stale(ws, fila, preview):
+                modificadas += 1
+                print(f"    {fila['nombre'][:35]:<35}  av=100% — limpiando [MC] stale")
+            continue
 
         ben_start = fila["ben_start"]
         schedule  = _build_schedule(cfg, ben_start, spi_ef)
