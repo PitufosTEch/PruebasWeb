@@ -670,26 +670,47 @@ FIREBASE_DESP_DATA_URL = "https://scraices-dashboard-default-rtdb.firebaseio.com
 def escribir_despachos_data_firebase() -> bool:
     """
     Escribe datos estructurados de despachos en Firebase /despachos_data/{pid}
-    para que el dashboard JS pueda renderizarlos en Reporte Residente y Capataz.
-    Formato por proyecto: {titulo, meses:[str], beneficiarios:[{nombre, capataz, mes1}]}
-    Solo incluye beneficiarios con mes1 no vacío.
+    para que el dashboard JS pueda renderizarlos en el informe de Adquisiciones.
+    Incluye todos los campos: mes1, mes2, mes3, p50, spi, av_viv, av_total, desp_real.
+    Incluye todos los beneficiarios con algún dato en mes1/mes2/mes3.
     """
     import requests
     proyectos = _cargar_datos_proyectos()
     if proyectos is None:
         return False
 
+    def _tiene_datos(b):
+        return any(
+            b.get(k) and b[k] not in ("—", "", "None")
+            for k in ("mes1", "mes2", "mes3")
+        )
+
     payload = {}
     for pid, datos in proyectos.items():
         if datos is None:
             continue
         bens_con_desp = [
-            {"nombre": b["nombre"], "capataz": b["capataz"], "mes1": b["mes1"]}
+            {
+                "nombre":    b["nombre"],
+                "grupo":     b.get("grupo", ""),
+                "capataz":   b.get("capataz", ""),
+                "av_viv":    b.get("av_viv", ""),
+                "av_total":  b.get("av_total", ""),
+                "spi":       b.get("spi", ""),
+                "modo":      b.get("modo", ""),
+                "desp_real": b.get("desp_real", ""),
+                "mes1":      b.get("mes1", "—"),
+                "mes2":      b.get("mes2", "—"),
+                "mes3":      b.get("mes3", "—"),
+                "p50":       b.get("p50", ""),
+            }
             for b in datos.get("beneficiarios", [])
-            if b.get("mes1") and b["mes1"] not in ("—", "")
+            if _tiene_datos(b)
         ]
         payload[pid] = {
             "titulo":        datos.get("titulo", pid),
+            "meta":          datos.get("meta", ""),
+            "spi_str":       datos.get("spi_str", ""),
             "meses":         datos.get("meses", []),
             "beneficiarios": bens_con_desp,
         }
