@@ -211,6 +211,10 @@ def _proyectar_fila(
             frac = k / n
             fecha = ben_start + timedelta(days=frac * cp_dias_tot / spi_ef)
 
+        # Excluir etapas cuya fecha proyectada ya pasó (ya debieron despacharse)
+        if fecha < TODAY:
+            continue
+
         mes = _date_to_mes(fecha)
         if mes:
             nuevas_mc[mes].append(etapa)
