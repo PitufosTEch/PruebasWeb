@@ -1668,7 +1668,7 @@ const PARTIDA_DESPACHO = {
     "Pintura Ext.": ['pintura_ext'],
     "Pintura Int.": ['pintura_int'],
     "Red Agua Pot.": ['ap_interior'],
-    "Art. Baño": ['gasfiteria'],
+    "Art. Baño": ['gasfiteria', 'sol_ac'],
     "Art. Cocina": ['gasfiteria', 'sol_ac'],
     "Agua Pot. Ext.": [],
     "Alcant. Ext.": ['alc_exterior'],
