@@ -336,25 +336,121 @@ def enviar_resumen(registros: list[dict], fecha: str, dry_run: bool) -> None:
     if not GMAIL_PASS:
         return
     modo = '[DRY RUN] ' if dry_run else ''
-    filas = []
+    n_ok  = sum(1 for r in registros if r['ok'])
+    n_err = sum(1 for r in registros if not r['ok'])
+
+    # ── Texto plano (fallback) ──────────────────────────────────────────────
+    filas_txt = []
     for r in registros:
         estado = '✓' if r['ok'] else '✗ ERROR'
         adjuntos_str = ', '.join(r['adjuntos']) if r['adjuntos'] else '—'
-        filas.append(f"  {estado}  {r['nombre']} <{r['correo']}>\n"
-                     f"       Adjuntos: {adjuntos_str}")
-    cuerpo = (
+        filas_txt.append(f"  {estado}  {r['nombre']} <{r['correo']}>\n"
+                         f"       Adjuntos: {adjuntos_str}")
+    cuerpo_txt = (
         f'{modo}Resumen de envío — Informes Semanales Raíces · {fecha}\n'
         f'{"="*60}\n\n'
-        + '\n\n'.join(filas)
+        + '\n\n'.join(filas_txt)
         + f'\n\n{"="*60}\n'
-        + f'Total: {sum(1 for r in registros if r["ok"])} OK · '
-        + f'{sum(1 for r in registros if not r["ok"])} errores\n'
+        + f'Total: {n_ok} OK · {n_err} errores\n'
     )
-    msg = MIMEMultipart()
+
+    # ── HTML ────────────────────────────────────────────────────────────────
+    def _chip_color(adj: str) -> str:
+        a = adj.lower()
+        if 'adqui'  in a: return 'background:#FFF4E6;color:#B35A00'
+        if 'estado' in a or 'pago' in a: return 'background:#F0EBFF;color:#5E35B1'
+        if 'resid'  in a: return 'background:#EFF6EC;color:#2D6A4F'
+        return 'background:#EBF5FF;color:#1D6FA5'  # Ejecutivo y otros
+
+    filas_html = ''
+    for r in registros:
+        ok = r['ok']
+        color_borde = '#40916C' if ok else '#D62828'
+        color_estado = '#2D6A4F' if ok else '#D62828'
+        texto_estado = 'Enviado ✓' if ok else 'ERROR ✗'
+        adjs = r['adjuntos'] if r['adjuntos'] else []
+        chips = ' · '.join(r['adjuntos']) if adjs else '—'
+        filas_html += f"""
+        <tr>
+          <td style="padding:0;width:4px;background:{color_borde}">&nbsp;</td>
+          <td style="padding:13px 20px;border-bottom:1px solid #E0EBE5;font-family:Arial,sans-serif">
+            <span style="font-weight:600;font-size:13px;color:#1C1C1A">{r['nombre']}</span><br>
+            <span style="font-size:11px;color:#8AA398">{r['correo']}</span>
+          </td>
+          <td style="padding:13px 20px;border-bottom:1px solid #E0EBE5;font-size:11px;color:#556B5E;text-align:right;font-family:Arial,sans-serif">
+            <span style="font-family:Arial,sans-serif;font-size:10px;font-weight:700;
+                         letter-spacing:.06em;text-transform:uppercase;color:{color_estado}">{texto_estado}</span><br>
+            <span style="margin-top:4px;display:inline-block">{chips}</span>
+          </td>
+        </tr>"""
+
+    estado_titulo = 'completado sin errores' if n_err == 0 else f'completado con {n_err} error{"es" if n_err!=1 else ""}'
+    color_titulo_span = '#2D6A4F' if n_err == 0 else '#D62828'
+    asunto_prefix = f'{modo}' if modo else ''
+
+    cuerpo_html = f"""<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#F0F4F2;font-family:Arial,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#F0F4F2;padding:32px 16px 48px">
+<tr><td align="center">
+<table width="620" cellpadding="0" cellspacing="0"
+       style="background:#fff;border:1px solid #D6E4DB;border-radius:6px;overflow:hidden;max-width:620px;width:100%">
+
+  <!-- HEADER -->
+  <tr><td style="padding:28px 32px 22px;border-bottom:1px solid #E0EBE5">
+    <table width="100%" cellpadding="0" cellspacing="0"><tr>
+      <td style="vertical-align:bottom">
+        <div style="font-family:Arial,sans-serif;font-size:10px;font-weight:700;
+                    letter-spacing:.14em;text-transform:uppercase;color:#2D6A4F;margin-bottom:8px">
+          {asunto_prefix}Constructora Las Ra&iacute;ces &middot; Informes Semanales
+        </div>
+        <div style="font-family:Arial,sans-serif;font-size:24px;font-weight:700;
+                    color:#1C1C1A;line-height:1.1">
+          Env&iacute;o <span style="color:{color_titulo_span}">{estado_titulo}</span>
+        </div>
+        <div style="font-size:12px;color:#8AA398;margin-top:6px">{fecha}</div>
+      </td>
+      <td style="vertical-align:bottom;text-align:right;padding-left:16px;white-space:nowrap">
+        <div style="font-family:Arial,sans-serif;font-size:52px;font-weight:700;
+                    color:#2D6A4F;line-height:1">{len(registros)}</div>
+        <div style="font-size:11px;color:#8AA398;text-transform:uppercase;
+                    letter-spacing:.06em;margin-top:2px">Destinatarios</div>
+      </td>
+    </tr></table>
+  </td></tr>
+
+  <!-- FILAS -->
+  <tr><td style="padding:0">
+    <table width="100%" cellpadding="0" cellspacing="0">
+{filas_html}
+    </table>
+  </td></tr>
+
+  <!-- FOOTER -->
+  <tr><td style="padding:14px 32px;border-top:1px solid #E0EBE5;background:#F8FAF9">
+    <table width="100%" cellpadding="0" cellspacing="0"><tr>
+      <td style="font-size:12px;color:#556B5E;font-family:Arial,sans-serif">
+        <span style="font-weight:700;color:#2D6A4F">{n_ok} enviados</span>
+        &nbsp;&middot;&nbsp;
+        <span style="font-weight:700;color:{'#D62828' if n_err else '#8AA398'}">{n_err} errores</span>
+      </td>
+      <td style="font-size:11px;color:#8AA398;text-align:right;font-family:Arial,sans-serif">
+        Ra&iacute;ces &mdash; Sistema autom&aacute;tico de informes
+      </td>
+    </tr></table>
+  </td></tr>
+
+</table>
+</td></tr></table>
+</body></html>"""
+
+    # ── Armar mensaje multipart/alternative ────────────────────────────────
+    msg = MIMEMultipart('alternative')
     msg['From']    = f'Informes Raíces <{GMAIL_USER}>'
     msg['To']      = RESUMEN_EMAIL
     msg['Subject'] = f'{modo}[Resumen] Informes Semanales · {fecha}'
-    msg.attach(MIMEText(cuerpo, 'plain', 'utf-8'))
+    msg.attach(MIMEText(cuerpo_txt,  'plain', 'utf-8'))
+    msg.attach(MIMEText(cuerpo_html, 'html',  'utf-8'))
     try:
         with smtplib.SMTP('smtp.gmail.com', 587, timeout=30) as s:
             s.ehlo(); s.starttls()

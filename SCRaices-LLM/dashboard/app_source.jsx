@@ -1611,7 +1611,7 @@ const clasificarDespachoFino = (segmento) => {
     }
     // Fundaciones incluye alcantarillado interior (planta): se instalan juntos.
     // Consistente con CHECK1_FAMILIA_TAGS donde ambos respaldan "01 - Fundaciones".
-    if (t.includes('fundacion') && !t.includes('eifs') && !t.includes('aislacion')) return ['fundacion', 'alc_interior'];
+    if ((t.includes('fundacion') || t.includes('01-')) && !t.includes('eifs') && !t.includes('aislacion')) return ['fundacion', 'alc_interior'];
     if (t.includes('1era')) return ['1era'];
     if (t.includes('ventana')) return ['ventana'];
     if (t.includes('eifs') || t.includes('aislacion fund')) return ['eifs'];
