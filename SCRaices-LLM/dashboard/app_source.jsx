@@ -5974,7 +5974,7 @@ ${(()=>{const _avs=(AVANCE_MENSUAL_DATA[String(d.pr.ID_proy)]||{}).serie||[];con
         const obrasData = obrasConCurva.map(proy => {
             const vivs = BENEFICIARIOS_DATA.filter(b => String(b.ID_Proy) === String(proy.ID_proy));
             return { ID_proy: proy.ID_proy, nombre: `${proy.ID_proy} · ${proy.NOMBRE_PROYECTO}`, viviendas: vivs, grupos: gruposRaw[proy.ID_proy] || [] };
-        });
+        }).filter(o => !o.viviendas.every(v => !!v.fecha_recepcion));
         obrasData.sort((a, b) => ((avanceGanttRaw[b.ID_proy] || {}).pct || 0) - ((avanceGanttRaw[a.ID_proy] || {}).pct || 0));
 
         // Checkpoints para adquisiciones (excluir los 4 de inspección in-situ)
@@ -6106,7 +6106,10 @@ ${_buildPersonalBanda(personalObraRaw[obra.ID_proy] || {})}
                         return secHtml || '<p style="padding:32px;text-align:center;color:#94a3b8;font-size:14px;">Sin datos de despachos disponibles</p>';
                     }
                     const meses = dSem.meses || ['Mes 1', 'Mes 2', 'Mes 3'];
-                    const bens = dSem.beneficiarios;
+                    const _spiM=(dSem.spi_str||'').match(/([\d.]+)/); const _spiOR=_spiM?parseFloat(_spiM[1]):null; const _spiOE=_spiOR?Math.min(_spiOR,1.15):null;
+                    const _pMes=(lbl)=>{const MN={ene:1,feb:2,mar:3,abr:4,may:5,jun:6,jul:7,ago:8,sep:9,oct:10,nov:11,dic:12};const p=(lbl||'').toLowerCase().split(' ');const m=MN[p[0]?.slice(0,3)];const y=parseInt(p[1]);return(m&&y)?{s:new Date(y,m-1,1),e:new Date(y,m,0)}:null;};
+                    const _mesR=meses.map(_pMes); const _hoy=new Date();
+                    const bens=(dSem.beneficiarios||[]).map(b=>{const sN=parseFloat(String(b.spi||'').replace(/[^0-9.]/g,''));const sEf=(!isNaN(sN)&&sN>0)?Math.min(sN,1.15):(_spiOE||1.15);const p0=parseFloat(b.p50);let pC=b.p50;if(!isNaN(p0)&&p0>0&&!isNaN(sN)&&sN>0&&sN!==sEf){pC=Math.max(1,Math.round(p0*sEf/sN));}let m1=b.mes1,m2=b.mes2,m3=b.mes3;if([m1,m2,m3].every(v=>!v||v==='—')&&!isNaN(pC)&&pC>0&&pC<365){const tgt=new Date(_hoy.getTime()+pC*86400000);_mesR.forEach((r,i)=>{if(r&&tgt>=r.s&&tgt<=r.e){if(i===0)m1='[MC] Pendiente';else if(i===1)m2='[MC] Pendiente';else m3='[MC] Pendiente';}});}return{...b,spi:sEf.toFixed(2),p50:pC,mes1:m1,mes2:m2,mes3:m3};});
                     const _fmtEtapasD = (texto) => {
                         if (!texto || texto === '—') return '<span style="color:#d1d5db;font-size:9px;">—</span>';
                         return texto.split(',').map(p => p.trim()).filter(Boolean).map(p => {
@@ -6129,7 +6132,7 @@ ${_buildPersonalBanda(personalObraRaw[obra.ID_proy] || {})}
 <div style="padding:4px 8px;border-radius:6px;border:1px solid #fde68a;background:#fffbeb;"><div style="font-size:9px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.4px;">Con [MC]</div><div style="font-size:13px;font-weight:700;color:#92400e;font-family:monospace;">${nMC}</div></div>
 <div style="padding:4px 8px;border-radius:6px;border:1px solid #e2e8f0;background:#f8fafc;"><div style="font-size:9px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px;">Sin planif.</div><div style="font-size:13px;font-weight:700;color:#6b7280;font-family:monospace;">${nSin}</div></div>
 ${nVenc>0?`<div style="padding:4px 8px;border-radius:6px;border:1px solid #fde68a;background:#fff7ed;"><div style="font-size:9px;font-weight:700;color:#b45309;text-transform:uppercase;letter-spacing:.4px;">⚠️ Vencidos</div><div style="font-size:13px;font-weight:700;color:#b45309;font-family:monospace;">${nVenc}</div></div>`:''}
-${dSem.spi_str?`<div style="padding:4px 8px;border-radius:6px;border:1px solid #e2e8f0;background:#f8fafc;"><div style="font-size:9px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px;">SPI Proyecto</div><div style="font-size:13px;font-weight:700;font-family:monospace;color:${spiC(dSem.spi_str)};">${dSem.spi_str}</div></div>`:''}
+${(_spiOE||dSem.spi_str)?`<div style="padding:4px 8px;border-radius:6px;border:1px solid #e2e8f0;background:#f8fafc;"><div style="font-size:9px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px;">SPI Proyecto</div><div style="font-size:13px;font-weight:700;font-family:monospace;color:${spiC(_spiOE?_spiOE.toFixed(2):dSem.spi_str)};">${_spiOE?_spiOE.toFixed(2)+((_spiOR&&_spiOR>1.15)?` (real: ${_spiOR.toFixed(3)})`:``):dSem.spi_str}</div></div>`:''}
 </div>`;
                     const mesesTh = meses.map(m=>`<th style="padding:6px 6px;background:#334155;color:#cbd5e1;font-size:9px;text-align:left;min-width:120px;">${m}</th>`).join('');
                     const filas = bens.map((b,i)=>{ const bg=i%2===0?'#ffffff':'#f8fafc'; return `<tr style="background:${bg};"><td style="padding:5px 8px;font-size:10px;color:#111827;white-space:nowrap;min-width:160px;position:sticky;left:0;background:${bg};z-index:1;border-right:1px solid #e2e8f0;">${b.nombre}</td><td style="padding:5px 6px;font-size:9px;color:#6b7280;white-space:nowrap;">${b.capataz||'—'}</td><td style="padding:5px 6px;text-align:center;font-size:10px;font-weight:700;font-family:monospace;color:${avC(b.av_total||b.av_viv)};">${b.av_total||b.av_viv||'—'}%</td><td style="padding:5px 6px;text-align:center;font-size:10px;font-weight:700;font-family:monospace;color:${spiC(b.spi)};">${b.spi||'—'}</td><td style="padding:5px 6px;">${_fmtEtapasD(b.mes1)}</td><td style="padding:5px 6px;">${_fmtEtapasD(b.mes2)}</td><td style="padding:5px 6px;">${_fmtEtapasD(b.mes3)}</td></tr>`; }).join('');
