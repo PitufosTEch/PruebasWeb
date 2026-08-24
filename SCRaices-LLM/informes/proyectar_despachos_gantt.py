@@ -9,7 +9,8 @@ generando proyecciones excesivamente optimistas).
 Metodología:
   - Entradas [SOL] = solicitudes confirmadas → NO se mueven (quedan en su mes)
   - Entradas [MC]  = proyecciones Monte Carlo → se re-proyectan con SPI=1.15
-  - P50_ajustado = P50_actual × (SPI_real / SPI_objetivo)
+  - SPI_efectivo = min(SPI_real, SPI_objetivo)  → cap: nunca proyectar más rápido que 1.15
+  - P50_ajustado = P50_actual × (SPI_efectivo / SPI_objetivo)
   - Las etapas [MC] se distribuyen linealmente en P50_ajustado días
   - Se asigna mes1/mes2/mes3 según el mes calendario en que cae cada etapa
   - Etapas que quedan fuera de jul-sep 2026 se eliminan de la vista (→ "—")
@@ -133,11 +134,11 @@ def _reproyectar_beneficiario(
             None,
         )
 
-    # 4) Ajustar P50 usando SPI real. El spi_objetivo (1.15) es el denominador de referencia.
-    #    SPI_real > spi_objetivo → factor > 1 → P50 se extiende (MC era demasiado optimista).
-    #    SPI_real < spi_objetivo → factor < 1 → P50 se reduce (proyecto a ritmo menor).
-    #    SPI_real = spi_objetivo → factor = 1.0, P50 sin cambio.
-    factor = spi_real / spi_objetivo
+    # 4) Ajustar P50 con cap SPI: nunca proyectar más agresivo que spi_objetivo (1.15).
+    #    SPI_real > spi_objetivo → spi_efectivo = spi_objetivo → factor = 1.0 (P50 sin cambio)
+    #    SPI_real ≤ spi_objetivo → spi_efectivo = SPI_real → factor < 1 (P50 se reduce)
+    spi_efectivo = min(spi_real, spi_objetivo)
+    factor = spi_efectivo / spi_objetivo
     p50_ajustado = max(1.0, p50_actual * factor)
 
     # 5) Distribuir las etapas [MC] linealmente en P50_ajustado días
@@ -189,8 +190,9 @@ def _procesar_hoja(ws, spi_objetivo: float, preview: bool = False) -> int:
     if spi_real < 0.1:
         spi_real = 1.0
 
-    factor_display = spi_real / spi_objetivo
-    print(f"  SPI real={spi_real:.4f}  →  objetivo={spi_objetivo}  "
+    spi_ef_display = min(spi_real, spi_objetivo)
+    factor_display = spi_ef_display / spi_objetivo
+    print(f"  SPI real={spi_real:.4f}  →  efectivo={spi_ef_display:.4f}  objetivo={spi_objetivo}  "
           f"(factor P50: ×{factor_display:.3f})")
 
     modificadas = 0
