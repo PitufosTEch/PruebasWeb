@@ -2079,15 +2079,14 @@ const ViviendaCard = ({ beneficiario, estadoEtapas, expanded, onToggle, grupoCol
     const avance = b.avance || calcularAvance(estadoEtapas);
     const insp = getInspeccion(b.ID_Benef);
     const totalPagado = getTotalPagado(b.ID_Benef);
-    const alertas = calcCoherencia(b.ID_Benef, estadoEtapas);
+    const recepDef = !!b.fecha_recepcion;
+    const alertas = recepDef ? [] : calcCoherencia(b.ID_Benef, estadoEtapas);
     const alertasRojas = alertas.filter(a => a.tipo === "rojo");
     const alertasNaranjas = alertas.filter(a => a.tipo === "naranja");
     const ultima = getUltimaEtapa(estadoEtapas);
     const proximaCritica = getProximaCritica(estadoEtapas);
     const solicitadas = Object.entries(estadoEtapas).filter(([,e]) => e.estado === "solicitado");
-    const estadoGeneral = b.estadoGeneral || getEstadoGeneral(estadoEtapas);
-
-    const recepDef = !!b.fecha_recepcion;
+    const estadoGeneral = recepDef ? "en_tiempo" : (b.estadoGeneral || getEstadoGeneral(estadoEtapas));
     const hasCF = !!cierreForzado;
     const borderClass = recepDef ? "border-l-4 border-l-emerald-500 border-emerald-200" : hasCF ? "border-l-4 border-l-amber-500 border-amber-200" : alertasRojas.length > 0 ? "border-l-4 border-l-red-500 border-red-200" : estadoGeneral === "critico" ? "border-l-4 border-l-red-500 border-red-100" : estadoGeneral === "atencion" ? "border-l-4 border-l-yellow-500 border-yellow-100" : "border border-gray-200";
     const gc = grupoColor >= 0 ? GRUPO_COLORS[grupoColor] : null;
@@ -3195,7 +3194,7 @@ const MatrizAvance = ({ viviendas, grupos }) => {
                             {grupo.viviendas.sort((a, b) => (a.primerDespacho || "9999").localeCompare(b.primerDespacho || "9999")).map(v => {
                                 const insp = getInspeccion(v.ID_Benef);
                                 const totalPag = getTotalPagado(v.ID_Benef);
-                                const alerts = calcCoherencia(v.ID_Benef, v.estadoEtapas);
+                                const alerts = v.fecha_recepcion ? [] : calcCoherencia(v.ID_Benef, v.estadoEtapas);
                                 const alertasRojas = alerts.filter(a => a.tipo === "rojo");
                                 const alertasNaranjas = alerts.filter(a => a.tipo === "naranja");
                                 return (
@@ -11422,7 +11421,7 @@ const App = () => {
         const desps = DESPACHOS_DATA.filter(d => String(d.ID_Benef) === String(b.ID_Benef));
         const numDespachos = desps.length;
         const primerDespacho = desps.length > 0 ? desps.reduce((min, d) => d.Fecha < min ? d.Fecha : min, desps[0].Fecha) : "9999";
-        return { ...b, estadoEtapas: estados, estadoGeneral: getEstadoGeneral(estados), avance: calcularAvance(estados), numDespachos, primerDespacho };
+        return { ...b, estadoEtapas: estados, estadoGeneral: b.fecha_recepcion ? "en_tiempo" : getEstadoGeneral(estados), avance: calcularAvance(estados), numDespachos, primerDespacho };
     }), [beneficiarios]);
 
     const proy = PROYECTOS_DATA.find(p => String(p.ID_proy) === String(proyectoSel));
@@ -11447,7 +11446,7 @@ const App = () => {
         const conInsp = viviendas.filter(v => getInspeccion(v.ID_Benef));
         const avanceInsp = viviendas.length ? Math.round(viviendas.reduce((s, v) => { const i = getInspeccion(v.ID_Benef); return s + (i ? i.pct_total : 0); }, 0) / viviendas.length) : 0;
         const totalPagadoProy = viviendas.reduce((s, v) => s + getTotalPagado(v.ID_Benef), 0);
-        const conAlertasRojas = viviendas.filter(v => calcCoherencia(v.ID_Benef, v.estadoEtapas).some(a => a.tipo === "rojo")).length;
+        const conAlertasRojas = viviendas.filter(v => !v.fecha_recepcion && calcCoherencia(v.ID_Benef, v.estadoEtapas).some(a => a.tipo === "rojo")).length;
 
         // Terminada = tiene Recepcion Definitiva (RF) o cierre forzado.
         const terminadas = viviendas.filter(v => !!v.fecha_recepcion || !!(cierresForzados[v.ID_Benef])).length;
