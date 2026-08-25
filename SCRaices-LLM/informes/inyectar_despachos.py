@@ -85,6 +85,7 @@ def _leer_proyecto(ws) -> dict:
     else:
         meses = []
 
+    import re as _re
     beneficiarios = []
     for row in rows[5:]:
         if all(v is None for v in row):
@@ -95,6 +96,9 @@ def _leer_proyecto(ws) -> dict:
             continue
         # Fila de grupo: col B tiene texto, col C en blanco
         if c is None:
+            continue
+        # Excluir filas de separador "GRUPO N" (aunque tengan capataz asignado)
+        if _re.match(r"^\s*GRUPO\b", b, _re.IGNORECASE):
             continue
 
         def _v(r, i):
