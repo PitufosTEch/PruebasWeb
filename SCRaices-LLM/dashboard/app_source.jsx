@@ -5925,7 +5925,83 @@ ${(()=>{const _avs=(AVANCE_MENSUAL_DATA[String(d.pr.ID_proy)]||{}).serie||[];con
         const curvasAll = CURVAS_S_CONFIG[proyectoSel] || [];
         const curvasCapataz = curvasAll.filter(c => { const mm=c.label.match(/[Gg]rupo\s+(\d+)/); return mm ? grupoNums.has(parseInt(mm[1])) : false; });
         const secs = _buildSecciones(vivCapataz, gruposCapataz, curvasCapataz, capatazFiltro, ganttRaw, despachosData);
-        const html = _emitirInformeHTML(`Reporte Capataz: ${capatazFiltro} — ${proyNombre}`, `Semana ${sem} · ${fechaGen}`, sem, fechaGen, [secs.sR,secs.sCk,secs.sCurv,secs.sRit,secs.sViv,secs.sDesp], [], _buildPersonalBanda(personalObraLocal));
+
+        // ── RESUMEN EJECUTIVO para informe capataz (filtrado a sus beneficiarios) ─────────────
+        const _escC = escapeHtmlBasic;
+        const _fFC = iso => { if(!iso) return '—'; const p=String(iso).substring(0,10).split('-'); return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:String(iso); };
+        const _totC = vivCapataz.length;
+        const _agC = avanceGanttData[proyectoSel] || null;
+        const _agPctC = _agC ? _agC.pct : null;
+        const _pgC = ganttRaw[proyectoSel] || null;
+        const _pgDRC = _pgC&&_pgC.finProg ? Math.floor((new Date(_pgC.finProg)-hoy)/86400000) : null;
+        const _pgProgPctC = _agC!=null ? Math.min(100,_agC.pct_prog??_agC.pct??0) : null;
+        const _pgPctC = _pgC&&_pgC.plazo>0 ? Math.min(100,Math.round((_pgC.plazo-Math.max(0,_pgDRC||0))/_pgC.plazo*100)) : 0;
+        const _cIniC = proy?.fecha_inicio||null, _cDurC = proy?.duracion||0;
+        const _cFinC = (_cIniC&&_cDurC>0) ? (()=>{const d=new Date(_cIniC);d.setDate(d.getDate()+_cDurC);return d.toISOString().substring(0,10);})() : null;
+        const _cDRC = _cFinC ? Math.floor((new Date(_cFinC)-hoy)/86400000) : null;
+        const _cPctC = (_cDurC>0&&_cFinC) ? Math.min(100,Math.round((_cDurC-Math.max(0,_cDRC||0))/_cDurC*100)) : 0;
+        const _habC = vivCapataz.filter(v=>v.habil).length;
+        const _enEjecC = vivCapataz.filter(v=>DESPACHOS_DATA.some(d=>String(d.ID_Benef)===String(v.ID_Benef))).length;
+        const _recepC = vivCapataz.filter(v=>{const seg=SEGUIMIENTO_DATA[String(v.ID_Benef)];return seg&&seg._has&&seg._has.recepcion_dom;}).length;
+        const _todasRecepC = _totC>0&&_recepC===_totC;
+        const _diffC = _agPctC!==null&&_pgC ? Math.round((_agPctC-(_pgProgPctC??_pgPctC))*100)/100 : null;
+        const _dColC = _diffC===null?'#94a3b8':_diffC>=0?'#16a34a':'#dc2626';
+        const _dBgC = _diffC===null?'':_diffC>=0?'#f0fdf4':'#fef2f2';
+        const _dTxtC = _diffC===null?'—':(_diffC>=0?'+':'')+Number(_diffC).toFixed(2)+'%';
+        const _cRColC = _cDRC===null?'#94a3b8':_cDRC<0?'#dc2626':_cDRC<30?'#b45309':'#374151';
+        const _pRColC = _pgDRC===null?'#94a3b8':_pgDRC<=90?'#dc2626':'#374151';
+        const _ufrC = _todasRecepC ? vivCapataz.map(v=>{const seg=SEGUIMIENTO_DATA[String(v.ID_Benef)];const fd=v.fecha_recepcion||(seg&&seg.fecha_recep)||null;return fd?new Date(fd):null;}).filter(f=>f&&!isNaN(f.getTime())) : [];
+        const _ulFRC = _ufrC.length ? new Date(Math.max(..._ufrC.map(f=>f.getTime()))) : null;
+        let _pgDRFC=_pgDRC, _pgDRColorC=null, _pgDRTextC=null;
+        if(_todasRecepC&&_pgC&&_pgC.finProg&&_ulFRC){const df=Math.floor((new Date(_pgC.finProg)-_ulFRC)/86400000);_pgDRFC=df;_pgDRColorC=df>=0?'#16a34a':'#dc2626';_pgDRTextC=(df>=0?'+':'')+df+'d';}
+        const _isCrit90C = _pgDRC!==null&&_pgDRC<=90;
+        const _circleC = (_todasRecepC&&_pgDRFC>=0)?'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#16a34a;vertical-align:middle;"></span>':
+            (_isCrit90C)?'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#dc2626;vertical-align:middle;"></span>':
+            (_recepC>0&&_pgC&&_pgC.plazo>0?(()=>{const pEl=Math.max(0,_pgC.plazo-Math.max(0,_pgDRC??0))/_pgC.plazo*100;return pEl>=80?'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#eab308;vertical-align:middle;"></span>':'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#9ca3af;vertical-align:middle;"></span>';})():'');
+        const sResEjecC = `<div class="blk"><h3 class="sh">📋 Resumen ejecutivo de proyectos</h3><div style="overflow-x:auto;overflow-y:auto;max-height:420px;-webkit-overflow-scrolling:touch;">
+<table style="min-width:900px;border-collapse:collapse;font-size:10px;white-space:nowrap;">
+<thead style="position:sticky;top:0;z-index:1;"><tr style="background:#f1f5f9;">
+  <th rowspan="2" style="padding:5px 6px;border:1px solid #e2e8f0;text-align:left;font-size:9px;text-transform:uppercase;color:#475569;">Proyecto</th>
+  <th colspan="3" style="padding:4px 6px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Avance (%)</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;background:#fef9c3;">% Real<br>- % Prog</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Inicio<br>Prog.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Término<br>Prog.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Pzo.<br>Cont.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Pzo.<br>Prog.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Rest.<br>Cont.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Rest.<br>Prog.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Tot.<br>Viv.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Hab.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;text-transform:uppercase;color:#475569;">Viv. en<br>Ejec.</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;background:#f0fdf4;">Recep.<br>DOM</th>
+  <th rowspan="2" style="padding:4px 4px;border:1px solid #e2e8f0;text-align:center;font-size:9px;text-transform:uppercase;color:#475569;">Est.<br>RECEP</th>
+</tr>
+<tr style="background:#f8fafc;">
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;width:72px;min-width:72px;">% Cont.</th>
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;width:72px;min-width:72px;">% Prog.</th>
+  <th style="padding:3px 4px;border:1px solid #e2e8f0;text-align:center;font-size:8px;color:#64748b;width:72px;min-width:72px;">% Real</th>
+</tr></thead><tbody>
+<tr style="border-bottom:1px solid #f1f5f9;${_isCrit90C?'background:#fff1f2;':''}">
+  <td style="padding:5px 6px;border-right:1px solid #f1f5f9;font-size:10px;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_escC(proyNombre)}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${_cPctC!==null?Number(_cPctC).toFixed(2)+'%':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:#374151;">${_pgProgPctC!==null?Number(_pgProgPctC).toFixed(2)+'%':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:${_diffC!==null?(_diffC>=5?'#16a34a':_diffC>=0?'#2563eb':'#dc2626'):'#94a3b8'};">${_agPctC!==null?Number(_agPctC).toFixed(2)+'%':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;font-weight:700;color:${_dColC};background:${_dBgC};">${_dTxtC}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${_fFC(_pgC?.inicio||null)}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${_fFC(_pgC?.finProg||null)}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${_cDurC?_cDurC+'d':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${_pgC?.plazo?_pgC.plazo+'d':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:${_cRColC};">${_cDRC!==null?_cDRC+'d':'—'}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;color:${_pgDRColorC||_pRColC};font-weight:${(_todasRecepC||_isCrit90C)?'700':'400'};">${_pgDRTextC||(_pgDRFC!==null?_pgDRFC+'d':'—')}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${_totC}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;">${_habC}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;font-weight:700;color:#2563eb;">${_enEjecC}</td>
+  <td style="padding:4px 4px;border-right:1px solid #f1f5f9;text-align:center;font-size:10px;font-weight:700;color:${_todasRecepC?'#16a34a':'#374151'};">${_recepC}/${_totC}</td>
+  <td style="padding:4px 4px;text-align:center;">${_circleC}</td>
+</tr>
+</tbody></table></div></div>`;
+
+        const html = _emitirInformeHTML(`Reporte Capataz: ${capatazFiltro} — ${proyNombre}`, `Semana ${sem} · ${fechaGen}`, sem, fechaGen, [sResEjecC+secs.sR,secs.sCk,secs.sCurv,secs.sRit,secs.sViv,secs.sDesp], [], _buildPersonalBanda(personalObraLocal));
         const _capSafe = capatazFiltro.replace(/[^a-zA-Z0-9À-ſ]/g,'_');
         const _fn=`Reporte_Capataz_${_capSafe}_${proyectoSel}_Sem${sem}.html`;
         const _bl=new Blob([html],{type:'text/html;charset=utf-8'}); const _ul=URL.createObjectURL(_bl);
