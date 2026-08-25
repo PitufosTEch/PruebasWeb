@@ -864,7 +864,8 @@ const ETAPAS_CONFIG_FULL = {
                 { must: ['recep','dom'],   not: ['fecha','factib'] },
                 { must: ['rdom'],          not: ['frdom','vdom','fvdom'] },
                 { must: ['nrecep'],        not: [] },
-                { must: ['numerorecep'],   not: [] }
+                { must: ['numerorecep'],   not: [] },
+                { must: ['crecep'],        not: ['ant'] }                       // C_recepcion en tabla documentacion
             ],
             fecha_recep: [
                 { must: ['fecha','recep'], not: [] },
@@ -889,12 +890,22 @@ const ETAPAS_CONFIG_FULL = {
         window._SEG_SAMPLE_ROWS = segRaw.slice(0, 3);
 
         // Detectar dinamicamente la columna que contiene el ID del beneficiario en Seguimiento
-        // (puede ser ID_Benef, ID_benef, IDU_Benef, ID_benef_seg, etc.)
+        // (puede ser ID_Benef, ID_benef, IDU_Benef, ID_benef_seg, IDU_docs, etc.)
         const idColCandidates = segKeysSample.filter(k => {
             const n = normCol(k);
-            return (n === 'idbenef' || n === 'idubenef' || n.startsWith('idbenef') || n.startsWith('idubenef'));
+            return (n === 'idbenef' || n === 'idubenef' || n.startsWith('idbenef') || n.startsWith('idubenef') || n === 'idudocs');
         });
-        const idCol = idColCandidates[0] || null;
+        // Elegir la columna con mayor coincidencia contra idsBenef (evita elegir ID secuencial vs UUID)
+        let idCol = null;
+        if (idColCandidates.length > 0) {
+            const testRows = segRaw.slice(0, 30);
+            let bestCol = null, bestHits = 0;
+            for (const col of idColCandidates) {
+                const hits = testRows.filter(r => idsBenef.has(String(r[col] ?? '').trim())).length;
+                if (hits > bestHits) { bestHits = hits; bestCol = col; }
+            }
+            idCol = bestCol || idColCandidates[0];
+        }
         console.log('[LIVE] Seguimiento: columna ID detectada =', idCol, '(candidatos:', idColCandidates, ')');
 
         // Fallback nombre→ID para "Seguimiento cierre de obras" (AppSheet no incluye ID_Benef).
