@@ -11907,7 +11907,7 @@ const App = () => {
                                     const p = PROYECTOS_DATA.find(x => String(x.ID_proy) === String(proyectoSel));
                                     if (!p) return <span className="text-gray-400">Seleccionar proyecto...</span>;
                                     const bens = BENEFICIARIOS_DATA.filter(b => String(b.ID_Proy) === String(p.ID_proy));
-                                    const nCerradas = bens.filter(b => b.fecha_recepcion || cierresForzados[b.ID_Benef]).length;
+                                    const nCerradas = bens.filter(b => b.fecha_recepcion || cierresForzados[b.ID_Benef] || SEGUIMIENTO_DATA[String(b.ID_Benef)]?._has?.recepcion_dom).length;
                                     const fin = p.estado === 'finalizado' || (bens.length > 0 && nCerradas === bens.length);
                                     const parcial = !fin && nCerradas > 0;
                                     return <span className="flex-1 truncate">{fin ? <span style={{color:"#16a34a",marginRight:"4px"}}>✓</span> : parcial ? <span style={{color:"#ca8a04",marginRight:"4px"}}>✓</span> : null}{p.ID_proy} · {p.NOMBRE_PROYECTO} — {p.COMUNA} ({bens.length} viv.)</span>;
@@ -11943,7 +11943,7 @@ const App = () => {
                                         return !q || p.ID_proy.toLowerCase().includes(q) || p.NOMBRE_PROYECTO.toLowerCase().includes(q) || (p.COMUNA||"").toLowerCase().includes(q);
                                     }).map(p => {
                                         const bens = BENEFICIARIOS_DATA.filter(b => String(b.ID_Proy) === String(p.ID_proy));
-                                        const nCerradas = bens.filter(b => b.fecha_recepcion || cierresForzados[b.ID_Benef]).length;
+                                        const nCerradas = bens.filter(b => b.fecha_recepcion || cierresForzados[b.ID_Benef] || SEGUIMIENTO_DATA[String(b.ID_Benef)]?._has?.recepcion_dom).length;
                                         const fin = p.estado === 'finalizado' || (bens.length > 0 && nCerradas === bens.length);
                                         const parcial = !fin && nCerradas > 0;
                                         const sel = String(p.ID_proy) === String(proyectoSel);
