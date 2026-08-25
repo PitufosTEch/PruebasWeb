@@ -5435,8 +5435,8 @@ h3.sh::after{content:'';flex:1;height:1px;background:#e2e8f0;}
         return `<div style="background:#f8fafc;border-bottom:1px solid #e2e8f0;padding:5px 24px;display:flex;align-items:center;gap:0;white-space:nowrap;overflow-x:auto;">${items}</div>`;
     };
 
-    const _emitirInformeHTML = (titulo, subtitulo, semana, fechaGen, secs, obras=[], bandaHtml='') => {
-        const TABS=[['resumen','Resumen'],['checkpoints','Checkpoints'],['curvas','Curvas S'],['ritmos','Ritmos y comentarios'],['viviendas','Viviendas'],['despachos','Despachos'],['mo','M.O.']];
+    const _emitirInformeHTML = (titulo, subtitulo, semana, fechaGen, secs, obras=[], bandaHtml='', extraTabs=[]) => {
+        const TABS=[['resumen','Resumen'],['checkpoints','Checkpoints'],['curvas','Curvas S'],['ritmos','Ritmos y comentarios'],['viviendas','Viviendas'],['despachos','Despachos'],['mo','M.O.'],...extraTabs];
         const tabsHtml=TABS.map(([k,l],i)=>`<button class="tab-btn${i===0?' active':''}" onclick="mst('${k}',this)">${l}</button>`).join('');
         const ojHtml=obras.length>1?`<div class="obra-jumper-wrap" id="ojWrap"><input class="obra-jumper-input" id="ojInput" type="text" placeholder="&#128269; Ir a obra..." autocomplete="off"><span class="obra-jumper-arrow">&#9660;</span><ul class="obra-jumper-list" id="ojList">${obras.map((o,i)=>`<li class="obra-jumper-item" data-idx="${i}">${escapeHtmlBasic(o.nombre)}</li>`).join('')}</ul></div>`:'';
         const secsHtml=TABS.map(([k],i)=>`<div class="sec${i===0?' active':''}" id="s-${k}">${secs[i]}</div>`).join('');
@@ -5901,10 +5901,25 @@ ${(()=>{const _avs=(AVANCE_MENSUAL_DATA[String(d.pr.ID_proy)]||{}).serie||[];con
 <tbody>${filas}</tbody></table></div></div>`;
         });
 
+        // ── Programa Mensual Acumulado — filtrado a las obras del residente ─────────────────────
+        const sProgMensualR = (() => {
+            const MESES_ES_R=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+            const proyRows = proyData.map(d => ({ id: String(d.pr.ID_proy), nombre: d.nombre }));
+            const allMonths = new Set();
+            proyRows.forEach(({ id }) => { const ag=avGanttLocal[id]||avanceGanttData[id]||null; if(ag&&ag.mensual) Object.keys(ag.mensual).forEach(ym=>allMonths.add(ym)); });
+            if (!allMonths.size) return '<div class="blk"><p style="color:#94a3b8;font-size:12px;padding:16px;text-align:center;">Sin datos de programa mensual. Ejecute las curvas S para generar la serie histórica.</p></div>';
+            const months=[...allMonths].sort();
+            const hoyYM=new Date().toISOString().substring(0,7);
+            const fmtYM=ym=>{const[y,m]=ym.split('-');return`${MESES_ES_R[+m-1]}<br><span style="font-size:8px;">${y}</span>`;};
+            const th=months.map(ym=>{const isCur=ym===hoyYM,isPast=ym<hoyYM;const bg=isCur?'#1d4ed8':isPast?'#334155':'#4b5563';return`<th style="padding:6px 5px;text-align:center;color:${isCur?'#fff':'#cbd5e1'};font-size:9px;font-weight:600;border:1px solid #1e293b;min-width:56px;background:${bg};${isCur?'border-bottom:3px solid #60a5fa;':''}line-height:1.3;">${fmtYM(ym)}</th>`;}).join('');
+            const rows=proyRows.map(({id,nombre},idx)=>{const ag=avGanttLocal[id]||avanceGanttData[id]||null;const mensual=(ag&&ag.mensual)?ag.mensual:{};const bg=idx%2===0?'#fff':'#f8fafc';const tds=months.map(ym=>{const val=mensual[ym];if(val==null)return`<td style="padding:5px 6px;text-align:center;font-size:9px;color:#e2e8f0;border:1px solid #f1f5f9;">—</td>`;const isCur=ym===hoyYM,isFut=ym>hoyYM;const col=val>=100?'#16a34a':val>=75?'#2563eb':val>=50?'#7c3aed':val>=25?'#b45309':'#64748b';return`<td style="padding:5px 6px;text-align:center;font-size:9px;font-weight:${isCur?'700':'500'};color:${col};border:1px solid #f1f5f9;font-family:monospace;${isCur?'border-left:2px solid #1d4ed8;border-right:2px solid #1d4ed8;':''}${isFut?'opacity:0.55;':''}">${Number(val).toFixed(2)}%</td>`;}).join('');return`<tr style="background:${bg};"><td style="padding:6px 10px;font-size:10px;font-weight:600;color:#1e293b;border:1px solid #e2e8f0;position:sticky;left:0;background:${bg};z-index:1;white-space:nowrap;">${escapeHtmlBasic(nombre)}</td>${tds}</tr>`;}).join('');
+            return`<div class="blk" style="padding:16px 0 8px;"><div style="padding:0 16px 10px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;"><div style="font-size:13px;font-weight:700;color:#1e293b;">📅 Programa Mensual Acumulado</div><div style="font-size:9px;color:#94a3b8;">Columna azul = mes actual · Fuente: Gantt de control</div></div><div style="overflow-x:auto;overflow-y:auto;max-height:580px;-webkit-overflow-scrolling:touch;border-top:1px solid #e2e8f0;"><table style="border-collapse:collapse;font-size:10px;white-space:nowrap;min-width:${180+months.length*58}px;"><thead style="position:sticky;top:0;z-index:3;"><tr style="background:#0f172a;"><th style="padding:8px 12px;text-align:left;color:#f1f5f9;font-size:10px;font-weight:700;border:1px solid #1e293b;position:sticky;left:0;z-index:4;background:#0f172a;min-width:180px;">Proyecto</th>${th}</tr></thead><tbody>${rows}</tbody></table></div><div style="padding:8px 16px 4px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;"><span style="font-size:9px;color:#94a3b8;">% Acumulado según Gantt de control:</span><span style="font-size:9px;color:#16a34a;">● ≥100%</span><span style="font-size:9px;color:#2563eb;">● ≥75%</span><span style="font-size:9px;color:#7c3aed;">● ≥50%</span><span style="font-size:9px;color:#b45309;">● ≥25%</span><span style="font-size:9px;color:#64748b;">● &lt;25%</span></div></div>`;
+        })();
+
         // Emitir
         const titulo = resNombre ? `Reporte Residente: ${resNombre}` : `Reporte Residente — ${proyectoSel}`;
         const subtitulo = `${proysList.length>1?proysList.length+' obras':proysList[0]?.ID_proy||proyectoSel} · Semana ${sem} · ${fechaGen}`;
-        const html = _emitirInformeHTML(titulo, subtitulo, sem, fechaGen, [sR, sCk, sCurv, sRit, sViv, sDesp, sMO], proyData, _buildPersonalBanda(personalObraLocal));
+        const html = _emitirInformeHTML(titulo, subtitulo, sem, fechaGen, [sR, sCk, sCurv, sRit, sViv, sDesp, sMO, sProgMensualR], proyData, _buildPersonalBanda(personalObraLocal), [['progmensual','Prog. Mensual']]);
         const _rNom=(resNombre||proyectoSel).replace(/[^a-zA-Z0-9À-ſ]/g,'_');
         const _fn=`Reporte_Residente_${_rNom}_Sem${sem}.html`;
         const _bl=new Blob([html],{type:'text/html;charset=utf-8'});const _ul=URL.createObjectURL(_bl);
@@ -6013,7 +6028,21 @@ ${(()=>{const _avs=(AVANCE_MENSUAL_DATA[String(d.pr.ID_proy)]||{}).serie||[];con
 </tr>
 </tbody></table></div></div>`;
 
-        const html = _emitirInformeHTML(`Reporte Capataz: ${capatazFiltro} — ${proyNombre}`, `Semana ${sem} · ${fechaGen}`, sem, fechaGen, [sResEjecC+secs.sR,secs.sCk,secs.sCurv,secs.sRit,secs.sViv,secs.sDesp], [], _buildPersonalBanda(personalObraLocal));
+        // ── Programa Mensual — obra del capataz ────────────────────────────────
+        const sProgMensualC = (() => {
+            const MESES_ES_C=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+            const ag=avanceGanttData[proyectoSel]||null;
+            const mensual=(ag&&ag.mensual)?ag.mensual:{};
+            const months=Object.keys(mensual).sort();
+            if(!months.length) return'<div class="blk"><p style="color:#94a3b8;font-size:12px;padding:16px;text-align:center;">Sin datos de programa mensual. Ejecute las curvas S para generar la serie histórica.</p></div>';
+            const hoyYM=new Date().toISOString().substring(0,7);
+            const fmtYM=ym=>{const[y,m]=ym.split('-');return`${MESES_ES_C[+m-1]}<br><span style="font-size:8px;">${y}</span>`;};
+            const th=months.map(ym=>{const isCur=ym===hoyYM,isPast=ym<hoyYM;const bg=isCur?'#1d4ed8':isPast?'#334155':'#4b5563';return`<th style="padding:6px 5px;text-align:center;color:${isCur?'#fff':'#cbd5e1'};font-size:9px;font-weight:600;border:1px solid #1e293b;min-width:56px;background:${bg};${isCur?'border-bottom:3px solid #60a5fa;':''}line-height:1.3;">${fmtYM(ym)}</th>`;}).join('');
+            const tds=months.map(ym=>{const val=mensual[ym];if(val==null)return`<td style="padding:5px 6px;text-align:center;font-size:9px;color:#e2e8f0;border:1px solid #f1f5f9;">—</td>`;const isCur=ym===hoyYM,isFut=ym>hoyYM;const col=val>=100?'#16a34a':val>=75?'#2563eb':val>=50?'#7c3aed':val>=25?'#b45309':'#64748b';return`<td style="padding:5px 6px;text-align:center;font-size:9px;font-weight:${isCur?'700':'500'};color:${col};border:1px solid #f1f5f9;font-family:monospace;${isCur?'border-left:2px solid #1d4ed8;border-right:2px solid #1d4ed8;':''}${isFut?'opacity:0.55;':''}">${Number(val).toFixed(2)}%</td>`;}).join('');
+            return`<div class="blk" style="padding:16px 0 8px;"><div style="padding:0 16px 10px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;"><div style="font-size:13px;font-weight:700;color:#1e293b;">📅 Programa Mensual Acumulado</div><div style="font-size:9px;color:#94a3b8;">Columna azul = mes actual · Fuente: Gantt de control</div></div><div style="overflow-x:auto;overflow-y:auto;max-height:580px;-webkit-overflow-scrolling:touch;border-top:1px solid #e2e8f0;"><table style="border-collapse:collapse;font-size:10px;white-space:nowrap;min-width:${180+months.length*58}px;"><thead style="position:sticky;top:0;z-index:3;"><tr style="background:#0f172a;"><th style="padding:8px 12px;text-align:left;color:#f1f5f9;font-size:10px;font-weight:700;border:1px solid #1e293b;position:sticky;left:0;z-index:4;background:#0f172a;min-width:180px;">Proyecto</th>${th}</tr></thead><tbody><tr style="background:#fff;"><td style="padding:6px 10px;font-size:10px;font-weight:600;color:#1e293b;border:1px solid #e2e8f0;position:sticky;left:0;background:#fff;z-index:1;white-space:nowrap;">${escapeHtmlBasic(proyNombre)}</td>${tds}</tr></tbody></table></div><div style="padding:8px 16px 4px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;"><span style="font-size:9px;color:#94a3b8;">% Acumulado según Gantt de control:</span><span style="font-size:9px;color:#16a34a;">● ≥100%</span><span style="font-size:9px;color:#2563eb;">● ≥75%</span><span style="font-size:9px;color:#7c3aed;">● ≥50%</span><span style="font-size:9px;color:#b45309;">● ≥25%</span><span style="font-size:9px;color:#64748b;">● &lt;25%</span></div></div>`;
+        })();
+
+        const html = _emitirInformeHTML(`Reporte Capataz: ${capatazFiltro} — ${proyNombre}`, `Semana ${sem} · ${fechaGen}`, sem, fechaGen, [sResEjecC+secs.sR,secs.sCk,secs.sCurv,secs.sRit,secs.sViv,secs.sDesp,'',sProgMensualC], [], _buildPersonalBanda(personalObraLocal), [['progmensual','Prog. Mensual']]);
         const _capSafe = capatazFiltro.replace(/[^a-zA-Z0-9À-ſ]/g,'_');
         const _fn=`Reporte_Capataz_${_capSafe}_${proyectoSel}_Sem${sem}.html`;
         const _bl=new Blob([html],{type:'text/html;charset=utf-8'}); const _ul=URL.createObjectURL(_bl);
