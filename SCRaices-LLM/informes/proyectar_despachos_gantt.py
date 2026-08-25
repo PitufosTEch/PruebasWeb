@@ -219,32 +219,34 @@ def _cp_dias(cfg: dict) -> float:
 
 def _build_schedule(cfg: dict, ben_start: date, spi_ef: float) -> dict[str, date]:
     """
-    Retorna {codigo: fecha_proyectada} para cada etapa definida en cfg.
-    La fecha es la de INICIO de cada etapa ajustada por spi_ef.
+    Retorna {codigo: fecha_dispatch} para cada etapa definida en cfg.
+    - Etapas 'flexible' o 'desde_inicio_dependencia' se despachan el mismo día que su dependencia.
+    - Entre grupos de despacho consecutivos: mínimo max(duracion_dep/SPI, 7) días.
     """
     etapas = cfg["etapas"]
     cache: dict[str, date] = {}
 
-    def _start(key: str) -> date:
+    def _dispatch(key: str) -> date:
         if key in cache:
             return cache[key]
         etapa = etapas.get(key, {})
         dep   = etapa.get("dependencia")
-        dur_dep = etapas.get(dep, {}).get("duracion", 0) / spi_ef if dep else 0
 
         if dep is None:
-            s = ben_start
-        elif etapa.get("desde_inicio_dependencia"):
-            offset = (etapa.get("tiempo_optimo") or dur_dep * 0.3) / spi_ef
-            s = _start(dep) + timedelta(days=offset)
+            d = ben_start
+        elif etapa.get("flexible") or etapa.get("desde_inicio_dependencia"):
+            # Despachar junto con la dependencia (mismo día de despacho)
+            d = _dispatch(dep)
         else:
-            s = _start(dep) + timedelta(days=dur_dep)
+            dep_date = _dispatch(dep)
+            dur_dep  = etapas.get(dep, {}).get("duracion", 0) / spi_ef
+            d = dep_date + timedelta(days=max(dur_dep, 7))
 
-        cache[key] = s
-        return s
+        cache[key] = d
+        return d
 
     for key in etapas:
-        _start(key)
+        _dispatch(key)
 
     return {etapas[k]["codigo"]: cache[k] for k in etapas}
 
