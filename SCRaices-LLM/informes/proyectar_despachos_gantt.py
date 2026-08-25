@@ -31,6 +31,7 @@ import math
 import unicodedata
 import argparse
 import requests
+from calendar import monthrange
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -38,9 +39,35 @@ SPI_OBJETIVO_DEFAULT = 1.15
 PIPELINE_DIAS        = 10      # días de pipeline entre beneficiarios consecutivos
 
 TODAY = date.today()
-MES1  = (date(2026, 7, 1),  date(2026, 7, 31))
-MES2  = (date(2026, 8, 1),  date(2026, 8, 31))
-MES3  = (date(2026, 9, 1),  date(2026, 9, 30))
+
+# ── Ventana dinámica: mes actual + 2 siguientes ───────────────────────────────
+
+def _add_months(d: date, n: int) -> date:
+    m = d.month - 1 + n
+    return date(d.year + m // 12, m % 12 + 1, 1)
+
+def _ultimo_dia(d: date) -> date:
+    return date(d.year, d.month, monthrange(d.year, d.month)[1])
+
+_m0  = TODAY.replace(day=1)
+MES1 = (_m0,                 _ultimo_dia(_m0))
+MES2 = (_add_months(_m0, 1), _ultimo_dia(_add_months(_m0, 1)))
+MES3 = (_add_months(_m0, 2), _ultimo_dia(_add_months(_m0, 2)))
+
+_MESES_NOMBRE = {1:"Ene",2:"Feb",3:"Mar",4:"Abr",5:"May",6:"Jun",
+                 7:"Jul",8:"Ago",9:"Sep",10:"Oct",11:"Nov",12:"Dic"}
+_MESES_NUM    = {v: k for k, v in _MESES_NOMBRE.items()}
+
+def _mes_str(d: date) -> str:
+    return f"{_MESES_NOMBRE[d.month]} {d.year}"
+
+def _parse_mes_header(h) -> date | None:
+    """Parsea 'Ago 2026' → date(2026, 8, 1)."""
+    m = re.match(r"([A-Za-z]{3})\s+(\d{4})", str(h or "").strip())
+    if not m:
+        return None
+    num = _MESES_NUM.get(m.group(1).capitalize())
+    return date(int(m.group(2)), num, 1) if num else None
 
 DRIVE_FILE_ID    = "1fPYmvioQvYJjKUMuQgDayf3BnSSEJ7Mp"
 HOJAS_EXCLUIDAS  = {"CALENDARIO", "RESUMEN_MES", "RESUMEN"}
@@ -167,6 +194,19 @@ def _cargar_etapas_cfg() -> dict:
         return json.load(f)
 
 
+def _nombres_etapas(cfg: dict) -> dict[str, str]:
+    """Retorna {codigo: 'NN Nombre'} para generar [MC] en filas vacías."""
+    result = {}
+    for key, etapa in cfg["etapas"].items():
+        codigo = etapa.get("codigo", "")
+        if not codigo:
+            continue
+        partes = key.split("_")
+        nombre = " ".join(p.capitalize() for p in partes[1:]) if len(partes) > 1 else key.capitalize()
+        result[codigo] = f"{codigo} {nombre}"
+    return result
+
+
 def _cp_dias(cfg: dict) -> float:
     """Suma de duraciones de la secuencia principal."""
     return sum(
@@ -218,11 +258,14 @@ def _proyectar_fila(
     cp_dias_tot: float,
     spi_ef: float,
     etapas_desp: frozenset = frozenset(),
+    mes_offset: int = 0,
+    nombres_etapas: dict = {},
 ) -> tuple[str, str, str, int | None]:
     """
     Distribuye las etapas [MC] de una fila según el schedule del Gantt.
-    Las etapas [SOL] quedan en su mes original.
-    Devuelve (nuevo_mes1, nuevo_mes2, nuevo_mes3, p50_dias).
+    - [SOL] se desplazan mes_offset meses hacia adelante si la ventana avanzó.
+    - Si no hay [MC] existentes, los genera desde el schedule completo.
+    - Devuelve (nuevo_mes1, nuevo_mes2, nuevo_mes3, p50_dias).
     """
     etapas_orig = {
         1: _parse_etapas_celda(mes1_val),
@@ -230,46 +273,64 @@ def _proyectar_fila(
         3: _parse_etapas_celda(mes3_val),
     }
 
+    # [SOL]: desplazar si la ventana avanzó (mes pasado → MES1 actual)
     sol_por_mes: dict[int, list] = {1: [], 2: [], 3: []}
     mc_lista: list[dict] = []
     for m in (1, 2, 3):
         for e in etapas_orig[m]:
             if e["tag"] == "SOL":
-                sol_por_mes[m].append(e)
+                nuevo_m = max(1, m - mes_offset)
+                if 1 <= nuevo_m <= 3:
+                    sol_por_mes[nuevo_m].append(e)
             else:
                 mc_lista.append(e)
 
-    if not mc_lista:
-        return (
-            _formatear_celda(etapas_orig[1]),
-            _formatear_celda(etapas_orig[2]),
-            _formatear_celda(etapas_orig[3]),
-            None,
-        )
-
     nuevas_mc: dict[int, list] = {1: [], 2: [], 3: []}
-    n = len(mc_lista)
-    for k, etapa in enumerate(mc_lista, start=1):
-        codigo = _codigo_de_etapa(etapa["nombre"])
 
-        # Excluir etapas confirmadas como Despachado en AppSheet
-        if codigo and codigo in etapas_desp:
-            continue
+    if mc_lista:
+        n = len(mc_lista)
+        for k, etapa in enumerate(mc_lista, start=1):
+            codigo = _codigo_de_etapa(etapa["nombre"])
 
-        if codigo in schedule:
-            fecha = schedule[codigo]
-        else:
-            # Fallback lineal para etapas no en config (RC, Quincallería, etc.)
-            frac = k / n
-            fecha = ben_start + timedelta(days=frac * cp_dias_tot / spi_ef)
+            # Excluir etapas confirmadas como Despachado en AppSheet
+            if codigo and codigo in etapas_desp:
+                continue
 
-        # Excluir etapas cuya fecha proyectada ya pasó
-        if fecha < TODAY:
-            continue
+            if codigo in schedule:
+                fecha = schedule[codigo]
+            else:
+                # Fallback lineal para etapas no en config (RC, Quincallería, etc.)
+                frac = k / n
+                fecha = ben_start + timedelta(days=frac * cp_dias_tot / spi_ef)
 
-        mes = _date_to_mes(fecha)
-        if mes:
-            nuevas_mc[mes].append(etapa)
+            if fecha < TODAY:
+                continue
+
+            mes = _date_to_mes(fecha)
+            if mes:
+                nuevas_mc[mes].append(etapa)
+
+    elif nombres_etapas:
+        # Fila vacía: generar [MC] desde el schedule completo
+        for codigo, fecha in sorted(schedule.items(), key=lambda x: x[1]):
+            if codigo in etapas_desp:
+                continue
+            if fecha < TODAY:
+                continue
+            mes = _date_to_mes(fecha)
+            if mes and codigo in nombres_etapas:
+                nuevas_mc[mes].append({"tag": "MC", "nombre": nombres_etapas[codigo]})
+
+    else:
+        # Sin [MC] y sin config: devolver solo [SOL] desplazados
+        completion = ben_start + timedelta(days=cp_dias_tot / spi_ef)
+        p50 = max(1, (completion - TODAY).days)
+        return (
+            _formatear_celda(sol_por_mes[1]),
+            _formatear_celda(sol_por_mes[2]),
+            _formatear_celda(sol_por_mes[3]),
+            p50,
+        )
 
     nuevo = {m: sol_por_mes[m] + nuevas_mc[m] for m in (1, 2, 3)}
 
@@ -309,7 +370,7 @@ def _limpiar_mc_stale(ws, fila: dict, preview: bool) -> bool:
 
 # ── Procesamiento de cada hoja ───────────────────────────────────────────────
 
-def _procesar_hoja(ws, spi_objetivo: float, cfg: dict, preview: bool = False) -> int:
+def _procesar_hoja(ws, spi_objetivo: float, cfg: dict, nombres_eta: dict, preview: bool = False) -> int:
     pid = ws.title
 
     # SPI
@@ -329,11 +390,28 @@ def _procesar_hoja(ws, spi_objetivo: float, cfg: dict, preview: bool = False) ->
     cp = _cp_dias(cfg)
     pipeline_aj = PIPELINE_DIAS / spi_ef
 
-    # av_viv y despachados desde Firebase
-    avance_benef     = _fetch_avance_benef(pid)
-    despachados_pid  = _fetch_despachados(pid)   # [{nombre, etapa}] últimos 90 días
+    # Calcular desplazamiento de ventana respecto al Excel
+    old_m1 = _parse_mes_header(ws.cell(5, 10).value)
+    if old_m1:
+        mes_offset = (MES1[0].year - old_m1.year) * 12 + (MES1[0].month - old_m1.month)
+        mes_offset = max(0, mes_offset)
+    else:
+        mes_offset = 0
 
-    # Leer filas con datos en mes1/mes2/mes3
+    # Actualizar encabezados de columna si la ventana avanzó
+    if mes_offset > 0:
+        if not preview:
+            ws.cell(5, 10).value = _mes_str(MES1[0])
+            ws.cell(5, 11).value = _mes_str(MES2[0])
+            ws.cell(5, 12).value = _mes_str(MES3[0])
+        print(f"  [Ventana] desplazada {mes_offset} mes(es) → "
+              f"{_mes_str(MES1[0])} · {_mes_str(MES2[0])} · {_mes_str(MES3[0])}")
+
+    # av_viv y despachados desde Firebase
+    avance_benef    = _fetch_avance_benef(pid)
+    despachados_pid = _fetch_despachados(pid)   # [{nombre, etapa}] últimos 90 días
+
+    # Leer TODAS las filas de beneficiarios (no solo las que tienen datos en mes)
     filas = []
     for row_idx in range(6, ws.max_row + 1):
         nombre = str(ws.cell(row_idx, 2).value or "").strip()
@@ -342,14 +420,13 @@ def _procesar_hoja(ws, spi_objetivo: float, cfg: dict, preview: bool = False) ->
         # Saltar filas de encabezado de grupo (GRUPO 1, GRUPO 2, GRUPO X, etc.)
         if re.match(r"^\s*GRUPO\b", nombre, re.IGNORECASE):
             continue
+
         m1c = ws.cell(row_idx, 10)
         m2c = ws.cell(row_idx, 11)
         m3c = ws.cell(row_idx, 12)
-        todo_vacio = all(
-            str(c.value or "").strip() in ("—", "-", "", "None")
-            for c in (m1c, m2c, m3c)
-        )
-        if todo_vacio:
+
+        # Saltar filas con celdas combinadas (separadores de sección)
+        if any(type(c).__name__ == "MergedCell" for c in (m1c, m2c, m3c)):
             continue
 
         # av_viv: Firebase primero, luego col E del Excel
@@ -425,6 +502,8 @@ def _procesar_hoja(ws, spi_objetivo: float, cfg: dict, preview: bool = False) ->
             fila["m1c"].value, fila["m2c"].value, fila["m3c"].value,
             ben_start, schedule, cp, spi_ef,
             etapas_desp=etapas_desp,
+            mes_offset=mes_offset,
+            nombres_etapas=nombres_eta,
         )
 
         cambio = (
@@ -514,9 +593,11 @@ def main():
     print(f"Fecha base: {TODAY}   Modo: {'PREVIEW' if preview else 'ACTUALIZAR'}")
     print(f"{'='*60}\n")
 
-    cfg = _cargar_etapas_cfg()
-    cp  = _cp_dias(cfg)
-    print(f"Ruta crítica: {cp:.0f} días  ({' → '.join(cfg.get('secuencia_principal', []))})\n")
+    cfg         = _cargar_etapas_cfg()
+    cp          = _cp_dias(cfg)
+    nombres_eta = _nombres_etapas(cfg)
+    print(f"Ruta crítica: {cp:.0f} días  ({' → '.join(cfg.get('secuencia_principal', []))})")
+    print(f"Ventana:      {_mes_str(MES1[0])} · {_mes_str(MES2[0])} · {_mes_str(MES3[0])}\n")
 
     print("► Descargando Excel de Drive...")
     try:
@@ -532,7 +613,7 @@ def main():
     total = 0
     for pid in project_sheets:
         print(f"\n► {pid}")
-        mod = _procesar_hoja(wb[pid], spi_obj, cfg, preview=preview)
+        mod = _procesar_hoja(wb[pid], spi_obj, cfg, nombres_eta, preview=preview)
         print(f"  → {mod} filas actualizadas")
         total += mod
 

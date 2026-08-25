@@ -679,12 +679,6 @@ def escribir_despachos_data_firebase() -> bool:
     if proyectos is None:
         return False
 
-    def _tiene_datos(b):
-        return any(
-            b.get(k) and b[k] not in ("—", "", "None")
-            for k in ("mes1", "mes2", "mes3")
-        )
-
     payload = {}
     for pid, datos in proyectos.items():
         if datos is None:
@@ -705,7 +699,6 @@ def escribir_despachos_data_firebase() -> bool:
                 "p50":       b.get("p50", ""),
             }
             for b in datos.get("beneficiarios", [])
-            if _tiene_datos(b)
         ]
         payload[pid] = {
             "titulo":        datos.get("titulo", pid),
