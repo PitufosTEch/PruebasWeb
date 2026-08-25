@@ -1040,6 +1040,7 @@ const ETAPAS_CONFIG_FULL = {
             });
         }
         console.log(`[LIVE] Cierre enriquecido desde Beneficiario.BT+: ${benefCierreEnriched} beneficiarios. Total con datos de cierre: ${Object.keys(SEGUIMIENTO_DATA).length}`);
+        window._SEG_DATA_ALL = SEGUIMIENTO_DATA; // debug temporal
 
         // Update diagnostic
         if (window._SEG_DIAG) {
