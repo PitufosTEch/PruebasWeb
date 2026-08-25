@@ -339,6 +339,9 @@ def _procesar_hoja(ws, spi_objetivo: float, cfg: dict, preview: bool = False) ->
         nombre = str(ws.cell(row_idx, 2).value or "").strip()
         if not nombre:
             continue
+        # Saltar filas de encabezado de grupo (GRUPO 1, GRUPO 2, GRUPO X, etc.)
+        if re.match(r"^\s*GRUPO\b", nombre, re.IGNORECASE):
+            continue
         m1c = ws.cell(row_idx, 10)
         m2c = ws.cell(row_idx, 11)
         m3c = ws.cell(row_idx, 12)
