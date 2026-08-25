@@ -113,6 +113,52 @@ def _fetch_avance_benef(pid: str) -> dict:
     return {}
 
 
+# ── Matching robusto de nombres ──────────────────────────────────────────────
+
+def _match_nombre(a: str, b: str) -> bool:
+    """
+    Compara dos nombres tolerando: tildes, orden de palabras, mayúsculas.
+    Pasa 3 filtros en cascada:
+      1. Token-set exacto (después de normalizar)
+      2. Jaccard >= 0.75
+      3. Coincidencia de las 2 palabras más cortas (apellidos en conv. chilena)
+    """
+    def _tokens(s: str) -> set:
+        nfkd = unicodedata.normalize("NFKD", str(s))
+        ascii_s = "".join(c for c in nfkd if not unicodedata.combining(c))
+        return set(re.sub(r"[^A-Z0-9]", " ", ascii_s.upper()).split())
+
+    ta, tb = _tokens(a), _tokens(b)
+    if not ta or not tb:
+        return False
+    # Paso 1: conjuntos idénticos
+    if ta == tb:
+        return True
+    # Paso 2: Jaccard >= 0.75
+    inter = ta & tb
+    union = ta | tb
+    if union and len(inter) / len(union) >= 0.75:
+        return True
+    # Paso 3: los 2 tokens ordenados alfabéticamente coinciden
+    # (apellidos chilenos tienden a ser únicos; el sort neutraliza el orden)
+    sa, sb = sorted(ta), sorted(tb)
+    if len(sa) >= 2 and len(sb) >= 2 and sa[:2] == sb[:2]:
+        return True
+    return False
+
+
+def _fetch_despachados(pid: str) -> list:
+    """Lee /sol_despachados/{pid} → [{nombre, etapa}] desde Firebase."""
+    try:
+        resp = requests.get(f"{FIREBASE_ROOT}/sol_despachados/{pid}.json", timeout=15)
+        if resp.status_code == 200:
+            data = resp.json()
+            return data if isinstance(data, list) else []
+    except Exception:
+        pass
+    return []
+
+
 # ── etapas_config.json ────────────────────────────────────────────────────────
 
 def _cargar_etapas_cfg() -> dict:
@@ -171,6 +217,7 @@ def _proyectar_fila(
     schedule: dict[str, date],
     cp_dias_tot: float,
     spi_ef: float,
+    etapas_desp: frozenset = frozenset(),
 ) -> tuple[str, str, str, int | None]:
     """
     Distribuye las etapas [MC] de una fila según el schedule del Gantt.
@@ -204,6 +251,11 @@ def _proyectar_fila(
     n = len(mc_lista)
     for k, etapa in enumerate(mc_lista, start=1):
         codigo = _codigo_de_etapa(etapa["nombre"])
+
+        # Excluir etapas confirmadas como Despachado en AppSheet
+        if codigo and codigo in etapas_desp:
+            continue
+
         if codigo in schedule:
             fecha = schedule[codigo]
         else:
@@ -211,7 +263,7 @@ def _proyectar_fila(
             frac = k / n
             fecha = ben_start + timedelta(days=frac * cp_dias_tot / spi_ef)
 
-        # Excluir etapas cuya fecha proyectada ya pasó (ya debieron despacharse)
+        # Excluir etapas cuya fecha proyectada ya pasó
         if fecha < TODAY:
             continue
 
@@ -277,8 +329,9 @@ def _procesar_hoja(ws, spi_objetivo: float, cfg: dict, preview: bool = False) ->
     cp = _cp_dias(cfg)
     pipeline_aj = PIPELINE_DIAS / spi_ef
 
-    # av_viv desde Firebase
-    avance_benef = _fetch_avance_benef(pid)
+    # av_viv y despachados desde Firebase
+    avance_benef     = _fetch_avance_benef(pid)
+    despachados_pid  = _fetch_despachados(pid)   # [{nombre, etapa}] últimos 90 días
 
     # Leer filas con datos en mes1/mes2/mes3
     filas = []
@@ -357,9 +410,18 @@ def _procesar_hoja(ws, spi_objetivo: float, cfg: dict, preview: bool = False) ->
         ben_start = fila["ben_start"]
         schedule  = _build_schedule(cfg, ben_start, spi_ef)
 
+        # Códigos de etapa ya despachadas para este beneficiario (AppSheet)
+        etapas_desp = frozenset(
+            _codigo_de_etapa(d["etapa"])
+            for d in despachados_pid
+            if _match_nombre(fila["nombre"], d["nombre"])
+            and _codigo_de_etapa(d["etapa"])
+        )
+
         n_mes1, n_mes2, n_mes3, p50 = _proyectar_fila(
             fila["m1c"].value, fila["m2c"].value, fila["m3c"].value,
             ben_start, schedule, cp, spi_ef,
+            etapas_desp=etapas_desp,
         )
 
         cambio = (

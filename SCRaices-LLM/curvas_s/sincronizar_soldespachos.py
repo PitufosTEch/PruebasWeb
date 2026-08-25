@@ -140,8 +140,11 @@ JS_EXTRACT = r"""
     }
 
     // ── 7. Filtrar registros en ventana + vencidos pendientes ────────────────
-    var registros = [];   // dentro de la semana actual (excepto Despachado)
-    var vencidos  = [];   // fecha < lunes actual, Estado=Pendiente
+    var registros   = [];   // dentro de la semana actual (excepto Despachado)
+    var vencidos    = [];   // fecha < lunes actual, Estado=Pendiente
+    var despachados = [];   // Estado=Despachado, últimos 90 días
+    var limite90    = new Date(hoy.getTime() - 90 * 86400000);
+
     if (solIdx >= 0 && campoFecha) {
         var tblSol = AppModel.Tables[solIdx];
         Object.values(tblSol.Rows).forEach(function(row) {
@@ -152,18 +155,29 @@ JS_EXTRACT = r"""
 
             var est1 = String(row['Estado']   || '').trim().toLowerCase();
             var est2 = String(row['Estado 2'] || '').trim().toLowerCase();
-            // Nunca incluir los ya completamente despachados
-            if (est1 === 'despachado' || est2 === 'despachado') return;
-
-            var idB      = String(row['ID_Benef'] || row['ID_benef'] || '');
-            var idP      = String(row['ID_proy']  || row['ID_Proy']  || '');
-            var tipo     = campoTipo ? String(row[campoTipo] || '').trim() : '';
-            var ben      = benMap[idB] || {};
-            var nom      = String(row['Nombre'] || ben.nombre || idB).trim();
+            var idB  = String(row['ID_Benef'] || row['ID_benef'] || '');
+            var idP  = String(row['ID_proy']  || row['ID_Proy']  || '');
+            var tipo = campoTipo ? String(row[campoTipo] || '').trim() : '';
+            var ben  = benMap[idB] || {};
+            var nom  = String(row['Nombre'] || ben.nombre || idB).trim();
             if (!nom) nom = ben.nombre || idB;
             if (!idP && ben.ID_proy) idP = ben.ID_proy;
             var fechaStr = fd.toISOString().substring(0, 10);
             var desc     = String(row['Elemento pendiente'] || row['elemento_pendiente'] || '').trim();
+
+            if (est1 === 'despachado' || est2 === 'despachado') {
+                // Recopilar despachados recientes para limpiar proyecciones [MC]
+                if (fd >= limite90) {
+                    despachados.push({
+                        ID_Benef: idB,
+                        ID_proy:  idP,
+                        nombre:   nom,
+                        tipo:     tipo,
+                        fecha:    fechaStr
+                    });
+                }
+                return;
+            }
 
             if (fd >= limIni && fd <= limFin) {
                 // Despacho programado para esta semana
@@ -200,7 +214,8 @@ JS_EXTRACT = r"""
         limIni:            limIni ? limIni.toISOString().substring(0,10) : null,
         limFin:            limFin ? limFin.toISOString().substring(0,10) : null,
         registros:         registros,
-        vencidos:          vencidos
+        vencidos:          vencidos,
+        despachados:       despachados
     };
 }
 """
@@ -385,6 +400,31 @@ def construir_payload(registros: list, vencidos: list, cap_map: dict, ventana_di
 
 # ── Firebase ──────────────────────────────────────────────────────────────────
 
+def escribir_despachados_firebase(despachados: list) -> bool:
+    """Escribe /sol_despachados/{pid} = [{nombre, etapa}] en Firebase."""
+    payload: dict = {}
+    for r in despachados:
+        pid = r.get("ID_proy", "")
+        if not pid:
+            continue
+        if pid not in payload:
+            payload[pid] = []
+        for et in _normalizar_tipo(r.get("tipo", "")):
+            payload[pid].append({"nombre": r["nombre"], "etapa": et})
+    if not payload:
+        log.info("Sin despachados recientes para escribir en Firebase")
+        return True
+    try:
+        resp = requests.put(f"{FIREBASE_URL}/sol_despachados.json", json=payload, timeout=30)
+        resp.raise_for_status()
+        n = sum(len(v) for v in payload.values())
+        log.info(f"Firebase /sol_despachados actualizado: {len(payload)} proyectos, {n} etapas despachadas")
+        return True
+    except Exception as e:
+        log.error(f"ERROR Firebase /sol_despachados: {e}")
+        return False
+
+
 def escribir_firebase(payload: dict) -> bool:
     try:
         resp = requests.put(f"{FIREBASE_URL}/despachos_data.json", json=payload, timeout=30)
@@ -434,7 +474,8 @@ def main():
             sys.exit(1)
         return
 
-    log.info(f"Vencidos encontrados:  {len(data.get('vencidos', []))}")
+    log.info(f"Vencidos encontrados:    {len(data.get('vencidos', []))}")
+    log.info(f"Despachados encontrados: {len(data.get('despachados', []))}")
     cap_map = _cargar_capataz_map()
     payload = construir_payload(data["registros"], data.get("vencidos", []), cap_map, args.ventana)
     n_bens  = sum(len(v["beneficiarios"]) for v in payload.values())
@@ -444,6 +485,7 @@ def main():
         log.info(f"  {pid}: {len(v['beneficiarios'])} beneficiarios")
 
     ok = escribir_firebase(payload)
+    escribir_despachados_firebase(data.get("despachados", []))
     print(json.dumps({
         "status":       "ok" if ok else "error",
         "proyectos":    len(payload),
