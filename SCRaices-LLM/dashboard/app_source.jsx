@@ -11909,7 +11909,8 @@ const App = () => {
                                     const bens = BENEFICIARIOS_DATA.filter(b => String(b.ID_Proy) === String(p.ID_proy));
                                     const nCerradas = bens.filter(b => b.fecha_recepcion || cierresForzados[b.ID_Benef]).length;
                                     const fin = p.estado === 'finalizado' || (bens.length > 0 && nCerradas === bens.length);
-                                    return <span className="flex-1 truncate">{fin ? '✓ ' : ''}{p.ID_proy} · {p.NOMBRE_PROYECTO} — {p.COMUNA} ({bens.length} viv.)</span>;
+                                    const parcial = !fin && nCerradas > 0;
+                                    return <span className="flex-1 truncate">{fin ? <span style={{color:"#16a34a",marginRight:"4px"}}>✓</span> : parcial ? <span style={{color:"#ca8a04",marginRight:"4px"}}>✓</span> : null}{p.ID_proy} · {p.NOMBRE_PROYECTO} — {p.COMUNA} ({bens.length} viv.)</span>;
                                 })()}
                                 <svg style={{flexShrink:0,transition:"transform 0.15s",transform:proyOpen?"rotate(180deg)":"rotate(0deg)"}} width="14" height="14" viewBox="0 0 20 20" fill="none"><path d="M5 7.5l5 5 5-5" stroke="#9ca3af" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
                             </div>
@@ -11944,6 +11945,7 @@ const App = () => {
                                         const bens = BENEFICIARIOS_DATA.filter(b => String(b.ID_Proy) === String(p.ID_proy));
                                         const nCerradas = bens.filter(b => b.fecha_recepcion || cierresForzados[b.ID_Benef]).length;
                                         const fin = p.estado === 'finalizado' || (bens.length > 0 && nCerradas === bens.length);
+                                        const parcial = !fin && nCerradas > 0;
                                         const sel = String(p.ID_proy) === String(proyectoSel);
                                         return <div
                                             key={p.ID_proy}
@@ -11951,7 +11953,7 @@ const App = () => {
                                             className={`px-3 py-2 text-sm cursor-pointer flex items-center gap-2 ${sel ? "bg-violet-50 text-violet-700 font-semibold" : "text-gray-700 hover:bg-gray-50"}`}
                                         >
                                             <span className="text-xs font-mono text-gray-400 w-10 shrink-0">{p.ID_proy}</span>
-                                            <span className="flex-1 truncate">{fin ? <span className="text-green-600 mr-1">✓</span> : null}{p.NOMBRE_PROYECTO}</span>
+                                            <span className="flex-1 truncate">{fin ? <span style={{color:"#16a34a",marginRight:"4px"}}>✓</span> : parcial ? <span style={{color:"#ca8a04",marginRight:"4px"}}>✓</span> : null}{p.NOMBRE_PROYECTO}</span>
                                             <span className="text-xs text-gray-400 shrink-0">{p.COMUNA} · {bens.length}v</span>
                                         </div>;
                                     })}
