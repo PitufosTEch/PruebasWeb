@@ -6817,6 +6817,7 @@ ${_buildPersonalBanda(personalObraRaw[obra.ID_proy] || {})}
                 h += `Estados de Pago</div>`;
                 if (mProy > 0) {
                     h += `<div class="summary-grid" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px;margin-bottom:10px;">
+<div class="summary-card" style="border-color:#1d4ed8;padding:7px 10px;"><div class="summary-card-label">Total Contrato</div><div style="font-size:12px;font-weight:500;color:#1d4ed8;">${fmtUF(mProy)}</div><div class="summary-card-detail">${vivProy} viviendas</div></div>
 <div class="summary-card" style="border-color:#8b5cf6;padding:7px 10px;"><div class="summary-card-label">Total por cobrar</div><div style="font-size:12px;font-weight:500;color:#7c3aed;">${fmtUF(mProy)}</div><div class="summary-card-detail">${vivProy} viviendas</div></div>
 <div class="summary-card" style="border-color:#16a34a;padding:7px 10px;"><div class="summary-card-label">Pagado (cobrado)</div><div style="font-size:12px;font-weight:500;color:#16a34a;">${fmtUF(mPag)}</div><div class="summary-card-detail">${pct(mPag,mProy)}% del proyecto</div></div>
 <div class="summary-card" style="border-color:#ca8a04;padding:7px 10px;"><div class="summary-card-label">Ingresado (en trámite)</div><div style="font-size:12px;font-weight:500;color:#b45309;">${fmtUF(mIng)}</div><div class="summary-card-detail">${pct(mIng,mProy)}% · en tramitación</div></div>
