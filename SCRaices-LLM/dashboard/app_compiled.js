@@ -315,7 +315,7 @@ const CURVAS_S_CONFIG = {
         { id: '1sMwEFkuDIbfe6NKK58aBaW1q_wAsKx6_', label: 'Total Proyecto · Ñuke Mapu' },
         { id: '1tfwDLNhuLCOcz3_LYE9mNvDCigYj2vPR', label: 'Todos los Grupos · Ñuke Mapu' },
         { id: '1ewR1kQJ68dknIMYffAXLa7g4Ph24tVtd', label: 'Grupo 1 · Ñuke Mapu' },
-        { id: '1HUl6UOVWJaC9pMvN-HrTPfNQ0B7n7BAp', label: 'Grupo 2 · Ñuke Mapu' },
+        { id: '1DAVSvAUL0sFTphkKWetIg-NS59kZ_llJ', label: 'Grupo 2 · Ñuke Mapu' },
         { id: '16ftmww-ZBUN01cB_QCoilvvlnKetuGGv', label: 'Grupo 3 · Ñuke Mapu' },
         { id: '1FXUybw0eGJoafnNnHz9XCdtwv2G51zrG', label: 'Grupo 4 · Ñuke Mapu' },
         { id: '1OuexQ54vBTluFgUOYTTO6_CMgb-oIKYQ', label: 'Grupo 5 · Ñuke Mapu' },
