@@ -10862,7 +10862,7 @@ const SparklineS = ({ serie, w = 96, h = 26, color = '#7c3aed' }) => {
     );
 };
 
-function buildAlertasGlobales() {
+function buildAlertasGlobales(cierresForzados = {}) {
     const cfg = ALERTA_CFG;
     const hoy = _hoyISO();
     const mesActual = hoy.substring(0, 7);
@@ -10884,13 +10884,15 @@ function buildAlertasGlobales() {
         const terminada = finalizado || (nViv > 0 && recep === nViv);
         const av = AVANCE_MENSUAL_DATA[pid] || null;
         const _rawPct = AVANCE_GANTT_DATA[pid] != null ? AVANCE_GANTT_DATA[pid].pct : null;
-        const todosConRecepDom = nViv > 0 && vivs.every(v => {
+        const todosTerminados = nViv > 0 && vivs.every(v => {
+            if (v.fecha_recepcion) return true;
+            if (cierresForzados[v.ID_Benef]) return true;
             const seg = SEGUIMIENTO_DATA[String(v.ID_Benef)];
             return seg && seg._has && seg._has.recepcion_dom;
         });
         const avance = (terminada && _rawPct == null) ? 100
             : (_rawPct != null ? _rawPct
-            : (todosConRecepDom ? 100 : 0));
+            : (todosTerminados ? 100 : 0));
         const serie = av ? av.serie : [];
         const montoProy = (MONTOS_PROY_DATA[pid] || {}).total || 0;
         const pagado = pagadoByProy[pid] || 0;
@@ -10949,8 +10951,8 @@ function buildAlertasGlobales() {
     });
 }
 
-const AlertasGlobales = ({ onClose, onSelectProyecto }) => {
-    const data = React.useMemo(() => buildAlertasGlobales(), []);
+const AlertasGlobales = ({ onClose, onSelectProyecto, cierresForzados = {} }) => {
+    const data = React.useMemo(() => buildAlertasGlobales(cierresForzados), [cierresForzados]);
     const [filtro, setFiltro] = React.useState('todas'); // todas | critica | <tipo>
     const [ocultarTerminados, setOcultarTerminados] = React.useState(true);
     const [orden, setOrden] = React.useState('urgencia');
@@ -11252,7 +11254,7 @@ const App = () => {
     const [showAlertas, setShowAlertas] = React.useState(false);
     // Total de obras NO terminadas con alertas (para el badge del boton global,
     // consistente con el panel que por defecto oculta terminados)
-    const obrasConAlertas = React.useMemo(() => { try { return buildAlertasGlobales().filter(d => !d.finalizado && d.alertas.length > 0).length; } catch (_) { return 0; } }, []);
+    const obrasConAlertas = React.useMemo(() => { try { return buildAlertasGlobales(cierresForzados).filter(d => !d.finalizado && d.alertas.length > 0).length; } catch (_) { return 0; } }, [cierresForzados]);
     const [showTE1, setShowTE1] = React.useState(false);
     const [te1Data, setTe1Data] = React.useState(null);
     const [te1Loading, setTe1Loading] = React.useState(false);
@@ -12488,6 +12490,7 @@ const App = () => {
                     <AlertasGlobales
                         onClose={() => setShowAlertas(false)}
                         onSelectProyecto={(pid) => { setProyectoSel(pid); setShowAlertas(false); setTab('estado_general'); }}
+                        cierresForzados={cierresForzados}
                     />
                 )}
                 {showValidacion && (
