@@ -8535,7 +8535,7 @@ ${viewerCss}</style>
         );
         return viviendas.map(v => {
             const seg = SEGUIMIENTO_DATA[String(v.ID_Benef)] || { _has: {}, obs: '' };
-            const flags = {
+            const rawFlags = {
                 hpc: !!v.habil,
                 te1: !!v.has_te1,
                 visita_as:     !!seg._has.visita_as,
@@ -8549,6 +8549,11 @@ ${viewerCss}</style>
                 recepcion_dom: !!seg._has.recepcion_dom,
                 fecha_recep:   !!(v.fecha_recepcion || seg._has.fecha_recep)
             };
+            // Cierre forzado = todos los checkpoints se consideran resueltos
+            const isCF = !!cierresForzados[v.ID_Benef];
+            const flags = isCF
+                ? Object.fromEntries(Object.keys(rawFlags).map(k => [k, true]))
+                : rawFlags;
             const completados = Object.values(flags).filter(Boolean).length;
             const insp = getInspeccion(v.ID_Benef);
             const pctTotal = insp ? insp.pct_total : null;
@@ -8564,7 +8569,7 @@ ${viewerCss}</style>
                 numComentarios: obsPublicas.length
             };
         });
-    }, [viviendas, observaciones, resumenComentarios, proyectoSel]);
+    }, [viviendas, observaciones, resumenComentarios, proyectoSel, cierresForzados]);
 
     // Listado único de capataces del proyecto (declarado después de datos para evitar TDZ)
     const capataces = React.useMemo(() => {
