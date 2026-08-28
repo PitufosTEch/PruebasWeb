@@ -313,39 +313,23 @@ const ETAPAS_CONFIG_FULL = {
     }
 
     async function fetchAllData() {
-        // Lotes secuenciales con pausa entre cada uno para evitar saturar
-        // la cuota del Apps Script (cuenta consumer) que bajo carga concurrente
-        // devuelve 404 transitorios. El costo es ~2-3 s extra de carga.
-        const delay = ms => new Promise(r => setTimeout(r, ms));
-        let r1, r2, r5, r4;
+        updateLoading('Descargando datos...', 7, 'Lotes en paralelo');
+        let r4;
+        const [r1, r2, r5] = await Promise.all([
+            fetchBatch('Proyectos,Beneficiario,Tipologias,Maestros,controlBGB,controlEEPP,Seguimiento,Seguimiento Cierre de Obras,Seguimiento_Cierre,SeguimientoCierre,documentacion,Documentacion', 'Lote 1: Proyectos+Benef'),
+            fetchBatch('Despacho,soldepacho,Tabla_pago,Montos', 'Lote 2: Despachos'),
+            fetchBatch('Solpago', 'Lote 3: Pagos'),
+        ]);
+
+        // Comentarios separados — no bloquea si falla
         try {
-            updateLoading('Descargando Lote 1/4...', 7, 'Proyectos + Beneficiarios');
-            r1 = await fetchBatch('Proyectos,Beneficiario,Tipologias,Maestros,controlBGB,controlEEPP,Seguimiento,Seguimiento Cierre de Obras,Seguimiento_Cierre,SeguimientoCierre,documentacion,Documentacion', 'Lote 1: Proyectos+Benef');
-
-            await delay(400);
-            updateLoading('Descargando Lote 2/4...', 14, 'Despachos');
-            r2 = await fetchBatch('Despacho,soldepacho,Tabla_pago,Montos', 'Lote 2: Despachos');
-
-            await delay(400);
-            updateLoading('Descargando Lote 3/3...', 22, 'Pagos');
-            r5 = await fetchBatch('Solpago', 'Lote 5: Pagos');
-        } catch (e) {
-            throw new Error('Error al descargar datos: ' + e.message);
-        }
-
-        // Lote comentarios separado y no bloquea si falla
-        try {
-            await delay(400);
-            updateLoading('Descargando comentarios...', 29, 'Lote 4: Comentarios');
             r4 = await fetchBatch('combenef', 'Lote 4: Comentarios Benef');
         } catch (e) {
             console.warn('[LIVE] Lote 4 (comentarios) fallo:', e.message);
             r4 = { combenef: { rows: [] } };
         }
 
-        // Nota: Ejecucion (Inspecciones) se omite del fetch vivo — la tabla superó
-        // el límite de respuesta del Apps Script. INSPECCIONES_DATA y AVANCE_MENSUAL_DATA
-        // se preservan del snapshot (≤15 min de antigüedad), que es suficiente para estos datos.
+        // Ejecucion omitido: tabla supera límite Apps Script → snapshot preserva INSPECCIONES_DATA
         updateLoading('Combinando datos...', 30, 'Todos los lotes recibidos');
         return { ...r1, ...r2, ...r5, ...r4 };
     }
