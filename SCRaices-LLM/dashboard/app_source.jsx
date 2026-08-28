@@ -317,7 +317,7 @@ const ETAPAS_CONFIG_FULL = {
         // la cuota del Apps Script (cuenta consumer) que bajo carga concurrente
         // devuelve 404 transitorios. El costo es ~2-3 s extra de carga.
         const delay = ms => new Promise(r => setTimeout(r, ms));
-        let r1, r2, r3, r5, r4;
+        let r1, r2, r5, r4;
         try {
             updateLoading('Descargando Lote 1/4...', 7, 'Proyectos + Beneficiarios');
             r1 = await fetchBatch('Proyectos,Beneficiario,Tipologias,Maestros,controlBGB,controlEEPP,Seguimiento,Seguimiento Cierre de Obras,Seguimiento_Cierre,SeguimientoCierre,documentacion,Documentacion', 'Lote 1: Proyectos+Benef');
@@ -327,11 +327,7 @@ const ETAPAS_CONFIG_FULL = {
             r2 = await fetchBatch('Despacho,soldepacho,Tabla_pago,Montos', 'Lote 2: Despachos');
 
             await delay(400);
-            updateLoading('Descargando Lote 3/4...', 21, 'Inspecciones');
-            r3 = await fetchBatch('Ejecucion', 'Lote 3: Inspecciones');
-
-            await delay(400);
-            updateLoading('Descargando Lote 4/4...', 26, 'Pagos');
+            updateLoading('Descargando Lote 3/3...', 22, 'Pagos');
             r5 = await fetchBatch('Solpago', 'Lote 5: Pagos');
         } catch (e) {
             throw new Error('Error al descargar datos: ' + e.message);
@@ -347,8 +343,11 @@ const ETAPAS_CONFIG_FULL = {
             r4 = { combenef: { rows: [] } };
         }
 
+        // Nota: Ejecucion (Inspecciones) se omite del fetch vivo — la tabla superó
+        // el límite de respuesta del Apps Script. INSPECCIONES_DATA y AVANCE_MENSUAL_DATA
+        // se preservan del snapshot (≤15 min de antigüedad), que es suficiente para estos datos.
         updateLoading('Combinando datos...', 30, 'Todos los lotes recibidos');
-        return { ...r1, ...r2, ...r3, ...r5, ...r4 };
+        return { ...r1, ...r2, ...r5, ...r4 };
     }
 
     // Descarga el snapshot PROCESADO pre-generado (CDN GitHub). Mismo formato
@@ -558,6 +557,8 @@ const ETAPAS_CONFIG_FULL = {
         updateLoading('Procesando inspecciones...', 60);
 
         // 5. INSPECCIONES (Ejecucion - sumar deltas)
+        // Si Ejecucion no viene en raw (se eliminó del fetch vivo por límite de tamaño),
+        // se preservan INSPECCIONES_DATA y AVANCE_MENSUAL_DATA del snapshot/cache.
         function parseInspVal(val) {
             if (val === null || val === undefined || val === '' || val === 'nan') return 0;
             if (typeof val === 'number') return val <= 1.5 ? val : val / 100;
@@ -568,6 +569,9 @@ const ETAPAS_CONFIG_FULL = {
         }
 
         const ejRaw = raw.Ejecucion?.rows || [];
+        if (ejRaw.length === 0) {
+            console.log('[LIVE] Ejecucion no disponible → INSPECCIONES_DATA y AVANCE_MENSUAL_DATA preservados del snapshot');
+        }
         const inspMap = {};
         const hasBarno = ejRaw.length > 0 && 'A_Art_Bano' in ejRaw[0] && !('A_Art_Baño' in ejRaw[0]);
         const sampleRow = ejRaw.length > 0 ? ejRaw[0] : {};
@@ -623,7 +627,7 @@ const ETAPAS_CONFIG_FULL = {
             });
         });
 
-        INSPECCIONES_DATA = Object.values(inspMap).map(insp => {
+        if (ejRaw.length > 0) INSPECCIONES_DATA = Object.values(inspMap).map(insp => {
             let pct_viv = 0;
             Object.entries(VIV_COLUMNS).forEach(([col, info]) => {
                 pct_viv += Math.min(1, Math.max(0, insp.partidas[info.short] || 0)) * info.weight;
@@ -653,12 +657,10 @@ const ETAPAS_CONFIG_FULL = {
         });
 
         // 5.5 RECONSTRUCCION DE AVANCE MENSUAL (curva por proyecto desde deltas fechados)
-        // Reproduce los deltas de Ejecucion en orden de fecha aplicando el tope por
-        // partida (igual que INSPECCIONES_DATA) y toma una foto del pct_total acumulado
-        // al cierre de cada mes. avance(mes) = promedio sobre TODAS las viviendas del proyecto.
+        // Solo si Ejecucion está disponible; si no, se preserva del snapshot/cache.
         updateLoading('Reconstruyendo avance mensual...', 68);
+        if (ejRaw.length > 0) try {
         AVANCE_MENSUAL_DATA = {};
-        try {
             const mesKey = (iso) => { const s = parseDate(iso); return s ? s.substring(0, 7) : null; };
             // agrupar filas por beneficiario (con mes valido)
             const rowsByBenef = {};
@@ -721,7 +723,7 @@ const ETAPAS_CONFIG_FULL = {
         } catch (err) {
             console.warn('[AVANCE MENSUAL] Error reconstruyendo:', err.message);
             AVANCE_MENSUAL_DATA = {};
-        }
+        } // end if ejRaw.length > 0
 
         updateLoading('Procesando pagos...', 70);
 
