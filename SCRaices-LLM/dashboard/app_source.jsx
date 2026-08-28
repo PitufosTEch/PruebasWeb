@@ -10884,7 +10884,13 @@ function buildAlertasGlobales() {
         const terminada = finalizado || (nViv > 0 && recep === nViv);
         const av = AVANCE_MENSUAL_DATA[pid] || null;
         const _rawPct = AVANCE_GANTT_DATA[pid] != null ? AVANCE_GANTT_DATA[pid].pct : null;
-        const avance = (terminada && _rawPct == null) ? 100 : (_rawPct != null ? _rawPct : 0);
+        const todosConRecepDom = nViv > 0 && vivs.every(v => {
+            const seg = SEGUIMIENTO_DATA[String(v.ID_Benef)];
+            return seg && seg._has && seg._has.recepcion_dom;
+        });
+        const avance = (terminada && _rawPct == null) ? 100
+            : (_rawPct != null ? _rawPct
+            : (todosConRecepDom ? 100 : 0));
         const serie = av ? av.serie : [];
         const montoProy = (MONTOS_PROY_DATA[pid] || {}).total || 0;
         const pagado = pagadoByProy[pid] || 0;
