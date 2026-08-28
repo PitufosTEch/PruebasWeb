@@ -313,28 +313,34 @@ const ETAPAS_CONFIG_FULL = {
     }
 
     async function fetchAllData() {
-        updateLoading('Descargando datos...', 5, 'Conectando a Google Sheets (4 lotes en paralelo)');
-
-        // Lotes paralelos para evitar timeout. Ejecucion y Solpago van
-        // SEPARADOS: juntos (~40k filas / ~55MB en una sola respuesta) el
-        // navegador headless del generador de snapshot y los moviles fallan
-        // con "Failed to fetch". Divididos, cada respuesta es manejable.
-        const batch1 = fetchBatch('Proyectos,Beneficiario,Tipologias,Maestros,controlBGB,controlEEPP,Seguimiento,Seguimiento Cierre de Obras,Seguimiento_Cierre,SeguimientoCierre,documentacion,Documentacion', 'Lote 1: Proyectos+Benef');
-        const batch2 = fetchBatch('Despacho,soldepacho,Tabla_pago,Montos', 'Lote 2: Despachos');
-        const batch3 = fetchBatch('Ejecucion', 'Lote 3: Inspecciones');
-        const batch5 = fetchBatch('Solpago', 'Lote 5: Pagos');
-
+        // Lotes secuenciales con pausa entre cada uno para evitar saturar
+        // la cuota del Apps Script (cuenta consumer) que bajo carga concurrente
+        // devuelve 404 transitorios. El costo es ~2-3 s extra de carga.
+        const delay = ms => new Promise(r => setTimeout(r, ms));
         let r1, r2, r3, r5, r4;
         try {
-            updateLoading('Descargando lotes principales...', 10, 'Lotes principales en paralelo');
-            [r1, r2, r3, r5] = await Promise.all([batch1, batch2, batch3, batch5]);
+            updateLoading('Descargando Lote 1/4...', 7, 'Proyectos + Beneficiarios');
+            r1 = await fetchBatch('Proyectos,Beneficiario,Tipologias,Maestros,controlBGB,controlEEPP,Seguimiento,Seguimiento Cierre de Obras,Seguimiento_Cierre,SeguimientoCierre,documentacion,Documentacion', 'Lote 1: Proyectos+Benef');
+
+            await delay(400);
+            updateLoading('Descargando Lote 2/4...', 14, 'Despachos');
+            r2 = await fetchBatch('Despacho,soldepacho,Tabla_pago,Montos', 'Lote 2: Despachos');
+
+            await delay(400);
+            updateLoading('Descargando Lote 3/4...', 21, 'Inspecciones');
+            r3 = await fetchBatch('Ejecucion', 'Lote 3: Inspecciones');
+
+            await delay(400);
+            updateLoading('Descargando Lote 4/4...', 26, 'Pagos');
+            r5 = await fetchBatch('Solpago', 'Lote 5: Pagos');
         } catch (e) {
             throw new Error('Error al descargar datos: ' + e.message);
         }
 
-        // Lote 4 (comentarios) separado y no bloquea si falla
+        // Lote comentarios separado y no bloquea si falla
         try {
-            updateLoading('Descargando comentarios...', 25, 'Lote 4: Comentarios');
+            await delay(400);
+            updateLoading('Descargando comentarios...', 29, 'Lote 4: Comentarios');
             r4 = await fetchBatch('combenef', 'Lote 4: Comentarios Benef');
         } catch (e) {
             console.warn('[LIVE] Lote 4 (comentarios) fallo:', e.message);
