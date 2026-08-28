@@ -314,24 +314,26 @@ const ETAPAS_CONFIG_FULL = {
 
     async function fetchAllData() {
         updateLoading('Descargando datos...', 7, 'Lotes en paralelo');
-        let r4;
-        const [r1, r2, r5] = await Promise.all([
-            fetchBatch('Proyectos,Beneficiario,Tipologias,Maestros,controlBGB,controlEEPP,Seguimiento,Seguimiento Cierre de Obras,Seguimiento_Cierre,SeguimientoCierre,documentacion,Documentacion', 'Lote 1: Proyectos+Benef'),
-            fetchBatch('Despacho,soldepacho,Tabla_pago,Montos', 'Lote 2: Despachos'),
-            fetchBatch('Solpago', 'Lote 3: Pagos'),
+        let r6;
+        const [r1, r2, r3, r4, r5] = await Promise.all([
+            fetchBatch('Proyectos,Tipologias,Maestros,controlBGB,controlEEPP', 'Lote 1: Proyectos+Maestros'),
+            fetchBatch('Beneficiario,Seguimiento', 'Lote 2: Beneficiarios+Seguimiento'),
+            fetchBatch('Seguimiento Cierre de Obras,Seguimiento_Cierre,SeguimientoCierre,documentacion,Documentacion', 'Lote 3: Seguimiento Cierre+Docs'),
+            fetchBatch('Despacho,soldepacho,Tabla_pago,Montos', 'Lote 4: Despachos'),
+            fetchBatch('Solpago', 'Lote 5: Pagos'),
         ]);
 
         // Comentarios separados — no bloquea si falla
         try {
-            r4 = await fetchBatch('combenef', 'Lote 4: Comentarios Benef');
+            r6 = await fetchBatch('combenef', 'Lote 6: Comentarios Benef');
         } catch (e) {
-            console.warn('[LIVE] Lote 4 (comentarios) fallo:', e.message);
-            r4 = { combenef: { rows: [] } };
+            console.warn('[LIVE] Lote 6 (comentarios) fallo:', e.message);
+            r6 = { combenef: { rows: [] } };
         }
 
         // Ejecucion omitido: tabla supera límite Apps Script → snapshot preserva INSPECCIONES_DATA
         updateLoading('Combinando datos...', 30, 'Todos los lotes recibidos');
-        return { ...r1, ...r2, ...r5, ...r4 };
+        return { ...r1, ...r2, ...r3, ...r4, ...r5, ...r6 };
     }
 
     // Descarga el snapshot PROCESADO pre-generado (CDN GitHub). Mismo formato
