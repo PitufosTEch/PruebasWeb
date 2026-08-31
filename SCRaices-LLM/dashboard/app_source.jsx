@@ -9577,7 +9577,7 @@ const SVG_LINAJE_CONTENT = `<svg viewBox="0 0 1140 430"
 <!-- E2: curvas_automatico_*.py -->
 <rect x="258" y="118" width="205" height="78" rx="6" fill="var(--etl-fill)" stroke="var(--etl-s)" stroke-width="1.5"/>
 <text x="360" y="136" text-anchor="middle" font-size="11"  font-weight="700" fill="var(--etl-t)">curvas_automatico_*.py</text>
-<text x="360" y="149" text-anchor="middle" font-size="9"   fill="var(--etl-t)">× 10 scripts — uno por proyecto</text>
+<text x="360" y="149" text-anchor="middle" font-size="9"   fill="var(--etl-t)">× 11 scripts — uno por proyecto</text>
 <line x1="268" y1="155" x2="453" y2="155" stroke="var(--etl-s)" stroke-width=".5" opacity=".35"/>
 <text x="360" y="167" text-anchor="middle" font-size="9"   fill="var(--etl-t)" opacity=".85">genera PNG Curva S por grupo</text>
 <text x="360" y="180" text-anchor="middle" font-size="9"   fill="var(--etl-t)" opacity=".85">tooltip: Prog desde «Programa de obra»</text>
@@ -9819,13 +9819,13 @@ const SVG_LINAJE_CONTENT = `<svg viewBox="0 0 1140 430"
 
 </svg>`;
 const FIG_LINAJE_CONTENT = `<figcaption>
-  <strong>Fuentes primarias:</strong> Google Sheets (Gantt de Control, 10 proyectos) y 8 vistas de AppSheet «Seguimiento» — cada vista alimenta un módulo distinto del dashboard. Los datos de AppSheet se escriben en Google Sheets; el dashboard los lee vía Apps Script.
+  <strong>Fuentes primarias:</strong> Google Sheets (Gantt de Control, 11 proyectos) y 8 vistas de AppSheet «Seguimiento» — cada vista alimenta un módulo distinto del dashboard. Los datos de AppSheet se escriben en Google Sheets; el dashboard los lee vía Apps Script.
   <br>
   <strong>Carga en vivo (E3):</strong> al abrir el dashboard el browser hace un fetch directo a Apps Script, que devuelve las tablas (Seguimiento, Despacho, Pagos, Beneficiarios, etc.) sin sync intermedio AppSheet→Firebase. <code>generar_snapshot.py</code> captura el estado procesado cada 15 min y lo publica en la rama <code>data-snapshot</code> para carga instantánea.
   <br>
   <strong>Checkpoints:</strong> HPC · VAS · RAS · VF1 · F1 · Artef. · Recep. vienen de <em>Seguimiento cierre de obras</em>; TE1 y Empalme (solicitud de conexión) vienen del módulo <em>Eléctrico</em>. Se computan en el browser a partir de los datos descargados vía Apps Script.
   <br>
-  <strong>Curvas S → Dashboard:</strong> los 10 scripts (<code>curvas_automatico_*.py</code>) y <code>calcular_avance_gantt.py</code> corren diariamente a las 11:00 UTC (08:00 Chile) vía <code>curvas_semanal.yml</code>. Generan PNG, los suben a Drive y guardan Drive IDs en <code>/curvas_drive_ids</code>. El browser carga las imágenes desde Drive vía URL de thumbnail (línea punteada).
+  <strong>Curvas S → Dashboard:</strong> los 11 scripts (<code>curvas_automatico*.py</code>) y <code>calcular_avance_gantt.py</code> corren diariamente a las 11:00 UTC (08:00 Chile) vía <code>curvas_semanal.yml</code>. Generan PNG, los suben a Drive y guardan Drive IDs en <code>/curvas_drive_ids</code>. El browser carga las imágenes desde Drive vía URL de thumbnail (línea punteada).
   <br>
   <strong>Informes Semanales:</strong> cada lunes a las 14:00 UTC (10:00 AM Chile) el workflow <code>informes_lunes.yml</code> captura el dashboard con Playwright y envía el informe por Gmail SMTP a los destinatarios registrados en Firebase <code>personal_global</code>.
 </figcaption>`;
