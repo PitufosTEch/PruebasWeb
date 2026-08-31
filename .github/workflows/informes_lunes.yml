@@ -8,7 +8,8 @@ name: Informes Semanales — Lunes
 
 on:
   schedule:
-    - cron: '0 13 * * 1'   # Lunes 13:00 UTC = 10:00 AM Chile
+    - cron: '0 14 * * 1'   # Lunes 14:00 UTC = 10:00 AM Chile (CLT invierno UTC-4)
+                            # En verano CLST (UTC-3) llega a las 11 AM — aceptable
   workflow_dispatch:
     inputs:
       dry_run:
