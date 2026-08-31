@@ -56,7 +56,12 @@ const BENEF_CON_TE1 = new Set(["60","147","6UoQ2g6T","116","0a44325e","e84c74db"
 
 <script>
 if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').catch(() => {});
+    // Limpiar registraciones antiguas (sw.js?v=X) antes de registrar la actual
+    navigator.serviceWorker.getRegistrations().then(regs => {
+        regs.forEach(reg => { if (reg.scope.includes('pitufostech') || reg.scope.includes('localhost')) reg.unregister(); });
+    }).finally(() => {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+    });
 }
 </script>
 
