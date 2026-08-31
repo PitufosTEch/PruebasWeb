@@ -56,7 +56,7 @@ const BENEF_CON_TE1 = new Set(["60","147","6UoQ2g6T","116","0a44325e","e84c74db"
 
 <script>
 if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=10').then(reg => reg.update()).catch(() => {});
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
 }
 </script>
 
