@@ -178,6 +178,7 @@ const ETAPAS_CONFIG_FULL = {
     // IMPORTANTE: cualquier deployment nuevo DEBE publicarse como "Cualquier
     // persona", no "Cualquier usuario".
     const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzFnaEA4Y091ONtYUwB3KqRASnDKc6yXRzcvUaiYXFUqx_KuPa2R97zzoOIGDHbLXm1/exec";
+    const LIVE_FETCH_ENABLED = false; // Google eliminó acceso anónimo — usar snapshot
     const TABLES_TO_FETCH = "Proyectos,Beneficiario,Despacho,soldepacho,Ejecucion,Solpago,Maestros,Tabla_pago,Tipologias,controlBGB,controlEEPP,Seguimiento";
     // Snapshot crudo pre-generado cada 15 min por el workflow data_snapshot.yml.
     // Se sirve desde el CDN de GitHub (rama dedicada data-snapshot) para el
@@ -313,6 +314,7 @@ const ETAPAS_CONFIG_FULL = {
     }
 
     async function fetchAllData() {
+        if (!LIVE_FETCH_ENABLED) throw new Error('Live fetch desactivado — usando snapshot');
         updateLoading('Descargando datos...', 7, 'Lotes en paralelo');
         let r6;
         const [r1, r2, r3, r4, r5] = await Promise.all([
