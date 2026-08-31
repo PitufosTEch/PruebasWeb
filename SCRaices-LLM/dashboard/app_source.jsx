@@ -288,9 +288,6 @@ const ETAPAS_CONFIG_FULL = {
         const url = APPS_SCRIPT_URL + '?tables=' + encodeURIComponent(tables);
         console.log('[LIVE] Fetching:', label);
         try {
-            // El deployment publico de Apps Script responde con CORS
-            // Access-Control-Allow-Origin:* tras el redirect a
-            // googleusercontent, por lo que fetch() funciona cross-origin.
             const response = await fetch(url, { redirect: 'follow' });
             if (!response.ok) throw new Error(`Error ${response.status} al cargar ${label}`);
             const data = await response.json();

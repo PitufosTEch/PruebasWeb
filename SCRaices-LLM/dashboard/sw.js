@@ -1,5 +1,5 @@
 // Service Worker - SCRaices Dashboard PWA
-const CACHE_NAME = 'scraices-v7';
+const CACHE_NAME = 'scraices-v12';
 
 // Solo cachear assets estáticos, los datos siempre se cargan frescos
 const STATIC_ASSETS = [
@@ -32,7 +32,8 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Siempre network-first para datos frescos, fallback a cache solo para assets
+  // No interceptar requests externos — el browser los maneja con sus cookies de sesión
+  if (new URL(event.request.url).origin !== self.location.origin) return;
   event.respondWith(
     fetch(event.request)
       .then((response) => {
