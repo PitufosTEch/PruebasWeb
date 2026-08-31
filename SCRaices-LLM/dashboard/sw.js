@@ -1,5 +1,5 @@
 // Service Worker - SCRaices Dashboard PWA
-const CACHE_NAME = 'scraices-v8';
+const CACHE_NAME = 'scraices-v9';
 
 // Solo cachear assets estáticos, los datos siempre se cargan frescos
 const STATIC_ASSETS = [
@@ -32,9 +32,11 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // No interceptar requests a orígenes externos (Apps Script, Firebase, etc.)
-  // — dejarlos pasar directamente al browser evita errores CORS desde el SW
-  if (new URL(event.request.url).origin !== self.location.origin) return;
+  // En localhost el browser no puede resolver CORS para orígenes externos
+  // (Apps Script, Firebase), así que los dejamos pasar sin interceptar.
+  // En GitHub Pages el SW puede re-fetchear sin problema — no saltar.
+  const isLocalhost = ['localhost', '127.0.0.1'].includes(self.location.hostname);
+  if (isLocalhost && new URL(event.request.url).origin !== self.location.origin) return;
 
   event.respondWith(
     fetch(event.request)
