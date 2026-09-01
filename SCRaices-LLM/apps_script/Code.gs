@@ -26,6 +26,20 @@ function doGet(e) {
     callback = (e && e.parameter && e.parameter.callback) ? String(e.parameter.callback) : null;
     var action = (e && e.parameter && e.parameter.action) ? e.parameter.action : '';
     var sheetId = (e && e.parameter && e.parameter.sheetId) ? e.parameter.sheetId : SPREADSHEET_ID;
+
+    // Accion especial: push_snapshot → lee hojas y sube a GitHub
+    // Protegida con token secreto almacenado en Script Properties (clave PUSH_TOKEN).
+    // Llamar con: ?action=push_snapshot&token=TU_TOKEN
+    if (action === 'push_snapshot') {
+      var expectedToken = PropertiesService.getScriptProperties().getProperty('PUSH_TOKEN');
+      var givenToken    = (e && e.parameter && e.parameter.token) ? e.parameter.token : '';
+      if (!expectedToken || givenToken !== expectedToken) {
+        return respond({ error: 'token invalido' }, null);
+      }
+      pushSnapshot();
+      return respond({ ok: true, ts: new Date().toISOString() }, null);
+    }
+
     var ss = SpreadsheetApp.openById(sheetId);
 
     // Manifest: returns row counts per table (lightweight, for smart sync)
