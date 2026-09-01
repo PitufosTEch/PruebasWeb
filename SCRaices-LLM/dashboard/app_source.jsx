@@ -1355,7 +1355,14 @@ const ETAPAS_CONFIG_FULL = {
             try {
                 updateLoading('Cargando datos pre-cargados...', 15, 'Snapshot (CDN)');
                 const snap = await fetchSnapshot();
-                restoreFromCache(snap);
+                // Soporta dos formatos:
+                // - Procesado (legacy Playwright): tiene PROYECTOS_DATA
+                // - Crudo (Apps Script → GitHub): tiene tablas como Proyectos, Beneficiario, etc.
+                if (snap.PROYECTOS_DATA !== undefined) {
+                    restoreFromCache(snap);
+                } else {
+                    processRawData(snap);
+                }
                 saveProcessedCache();
                 renderApp();
                 snapshotOk = true;
