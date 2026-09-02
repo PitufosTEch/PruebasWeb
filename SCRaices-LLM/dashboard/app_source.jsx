@@ -177,7 +177,7 @@ const ETAPAS_CONFIG_FULL = {
     // congelando el snapshot.
     // IMPORTANTE: cualquier deployment nuevo DEBE publicarse como "Cualquier
     // persona", no "Cualquier usuario".
-    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby1f4xWDM-DRMc3g6RyQua1CLZUvI22DVEWvFwVX_DeYc-sVDSshNiLfTLNMVNaL9FINQ/exec";
+    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxcJowX3a3XBmSNiKOCesj1jRkQWS1VIsMbvdt-x7ckK8ZXMauI6gRgCGsoT77xYxpP/exec";
     const LIVE_FETCH_ENABLED = true;
     const TABLES_TO_FETCH = "Proyectos,Beneficiario,Despacho,soldepacho,Ejecucion,Solpago,Maestros,Tabla_pago,Tipologias,controlBGB,controlEEPP,Seguimiento";
     // Snapshot crudo pre-generado cada 15 min por el workflow data_snapshot.yml.
