@@ -553,9 +553,14 @@ const ETAPAS_CONFIG_FULL = {
             return n > 1.5 ? n / 100 : n;
         }
 
-        const ejRaw = raw.Ejecucion?.rows || [];
+        // Si Python inyectó filas de Ejecucion antes de capturar el snapshot, usarlas
+        const ejRaw = raw.Ejecucion?.rows
+            || (window.__EJECUCION_ROWS__?.length > 0 ? window.__EJECUCION_ROWS__ : null)
+            || [];
         if (ejRaw.length === 0) {
             console.log('[LIVE] Ejecucion no disponible → INSPECCIONES_DATA y AVANCE_MENSUAL_DATA preservados del snapshot');
+        } else if (window.__EJECUCION_ROWS__?.length > 0 && !raw.Ejecucion?.rows) {
+            console.log(`[LIVE] Ejecucion inyectada externamente: ${ejRaw.length} filas`);
         }
         const inspMap = {};
         const hasBarno = ejRaw.length > 0 && 'A_Art_Bano' in ejRaw[0] && !('A_Art_Baño' in ejRaw[0]);
