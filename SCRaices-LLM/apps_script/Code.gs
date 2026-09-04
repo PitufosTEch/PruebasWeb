@@ -54,6 +54,44 @@ function doGet(e) {
       return respond({ tables: tables, timestamp: new Date().toISOString() }, callback);
     }
 
+    // Accion especial: ejecucion_chunk → devuelve un rango de filas de Ejecucion
+    // Uso: ?action=ejecucion_chunk&start=0&count=300
+    // Permite paginar la tabla Ejecucion que es demasiado grande para una sola peticion.
+    if (action === 'ejecucion_chunk') {
+      var start = parseInt((e && e.parameter && e.parameter.start) ? e.parameter.start : '0', 10) || 0;
+      var count = parseInt((e && e.parameter && e.parameter.count) ? e.parameter.count : '300', 10) || 300;
+      if (count > 500) count = 500; // limite de seguridad
+      try {
+        var ss2 = SpreadsheetApp.openById(sheetId);
+        var sheet2 = ss2.getSheetByName('Ejecucion');
+        if (!sheet2) return respond({ error: 'Hoja Ejecucion no encontrada' }, callback);
+        var lastRow = sheet2.getLastRow();
+        var headers2 = sheet2.getRange(1, 1, 1, sheet2.getLastColumn()).getValues()[0];
+        var dataStart = start + 2; // fila 1 = headers, filas de datos desde fila 2
+        var rowsToRead = Math.min(count, lastRow - start);
+        if (rowsToRead <= 0) {
+          return respond({ headers: headers2, rows: [], total: lastRow - 1, start: start, done: true }, callback);
+        }
+        var rawData = sheet2.getRange(dataStart, 1, rowsToRead, headers2.length).getValues();
+        var rows2 = [];
+        for (var r2 = 0; r2 < rawData.length; r2++) {
+          var row2 = {};
+          for (var c2 = 0; c2 < headers2.length; c2++) {
+            var val2 = rawData[r2][c2];
+            if (val2 instanceof Date) {
+              val2 = Utilities.formatDate(val2, ss2.getSpreadsheetTimeZone(), "yyyy-MM-dd'T'HH:mm:ss");
+            }
+            row2[headers2[c2]] = val2;
+          }
+          rows2.push(row2);
+        }
+        var done2 = (start + rowsToRead) >= (lastRow - 1);
+        return respond({ headers: headers2, rows: rows2, total: lastRow - 1, start: start, count: rowsToRead, done: done2 }, callback);
+      } catch (err2) {
+        return respond({ error: err2.message }, callback);
+      }
+    }
+
     var tablesParam = (e && e.parameter && e.parameter.tables) ? e.parameter.tables : '';
 
     if (!tablesParam) {
