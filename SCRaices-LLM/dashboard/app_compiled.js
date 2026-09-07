@@ -306,13 +306,13 @@ const gridY=[pad.top,pad.top+ih/2,pad.top+ih];return/*#__PURE__*/React.createEle
 //   - NO se muestran observaciones de AppSheet (campos internos operativos)
 const CURVAS_S_CONFIG = {
     'P119': [
-        { id: '1sMwEFkuDIbfe6NKK58aBaW1q_wAsKx6_', label: 'Total Proyecto · Ñuke Mapu' },
-        { id: '1tfwDLNhuLCOcz3_LYE9mNvDCigYj2vPR', label: 'Todos los Grupos · Ñuke Mapu' },
-        { id: '1ewR1kQJ68dknIMYffAXLa7g4Ph24tVtd', label: 'Grupo 1 · Ñuke Mapu' },
-        { id: '1DAVSvAUL0sFTphkKWetIg-NS59kZ_llJ', label: 'Grupo 2 · Ñuke Mapu' },
-        { id: '16ftmww-ZBUN01cB_QCoilvvlnKetuGGv', label: 'Grupo 3 · Ñuke Mapu' },
-        { id: '1FXUybw0eGJoafnNnHz9XCdtwv2G51zrG', label: 'Grupo 4 · Ñuke Mapu' },
-        { id: '1OuexQ54vBTluFgUOYTTO6_CMgb-oIKYQ', label: 'Grupo 5 · Ñuke Mapu' },
+        { id: '1Wk-xygCVq2IghVMF-EjibA8Hn-YbpNDk', label: 'Total Proyecto · Ñuke Mapu' },
+        { id: '1cyk521bLp-XZdZFRQtwwuR8c23w5ltua', label: 'Todos los Grupos · Ñuke Mapu' },
+        { id: '1g5RsRSogLMlbC0dGFaifSylRoVdZfqzq', label: 'Grupo 1 · Ñuke Mapu' },
+        { id: '1ByVfuexIB4hvCquPrQuGjrWxSc_CUehd', label: 'Grupo 2 · Ñuke Mapu' },
+        { id: '19HHqJqsKeIJUARO0YdUp1K6JnbYs-3Sx', label: 'Grupo 3 · Ñuke Mapu' },
+        { id: '1HV6u7-vhhJlX_2FiaduESxUpW_LSQ_0n', label: 'Grupo 4 · Ñuke Mapu' },
+        { id: '1VL4TCWeoPlwyA47zxqzWjWDw58qk3Web', label: 'Grupo 5 · Ñuke Mapu' },
     ],
     'P38': [
         { id: '18fNqtEHY8hNFKX1o0AgPfPR_-H4tpLXZ', label: 'Total Proyecto · Aliwen' },
