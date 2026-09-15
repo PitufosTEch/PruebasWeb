@@ -328,25 +328,24 @@ const CURVAS_S_CONFIG = {
         { id: '1GymHwYsYX2irdSgiIj_cvOHjN2OfeMGM', label: 'Total Proyecto · El Coihue' },
         { id: '1dkQlZeBYkKqMQqp196VM-Sz3iyaoIdS6', label: 'Todos los Grupos · El Coihue' },
     ],
+    'P127': [
+        { id: '1zf4uHy7Yop89INuc4cUG9vvcvU3L_Gi0', label: 'Grupo 1 · Nuevo Cunco' },
+        { id: '19tqHKbnV7nhw9DV3TrdWVHiup_h6H0NT', label: 'Grupo 2 · Nuevo Cunco' },
+        { id: '1raLIEwzEThb_Q2I3JVVaxkCpcIRxvz_a', label: 'Grupo 3 · Nuevo Cunco' },
+        { id: '1PAHB0xOTwlQlnvSxOeAkapDG1nJtfPid', label: 'Grupo 4 · Nuevo Cunco' },
+        { id: '1NdskA09o4KWiq3YAZlxLlGGxkM8LuUWx', label: 'Total Proyecto · Nuevo Cunco' },
+        { id: '1HfNXh0cyNr2_Sh4fVQQ3KHeU-APGH1Jt', label: 'Todos los Grupos · Nuevo Cunco' },
+    ],
     'P12': [
         { id: '13i8lu9UvfYUW7qegil9plwJDvh3aVnTI', label: 'Grupo 1 · Juan Huilcan Tolten' },
         { id: '1wAyWKyEkViu78nVmXUVHED9xvaCEz-Qr', label: 'Total Proyecto · Juan Huilcan Tolten' },
         { id: '11mHuPTKKJBrhJU26o09vw88FShNRRB8-', label: 'Todos los Grupos · Juan Huilcan Tolten' },
     ],
-    'P14': [
-        { id: '1hBvSvP99b4jOfHHimiZItCdtVTOOP_Yp', label: 'Grupo 1 · Com. Madihue' },
-        { id: '1yZnzlq3vOW-MiLJDnvP5VeNNbAtL9eiV', label: 'Total Proyecto · Com. Madihue' },
-        { id: '1qcDQKBearDhbo0TpsMY6ptIgEQjbpVdb', label: 'Todos los Grupos · Com. Madihue' },
-    ],
-    'P126': [
-        { id: '1EvgNfaF4lvzFXcCTzPpy02wQHF4tbO8N', label: 'Grupo 1 · El Maitén' },
-        { id: '18vDEyjt8pPxoEX-e--4FgJlRGKZ4P4Sw', label: 'Grupo 2 · El Maitén' },
-        { id: '1PofF-GULLracNmYBlfJA1wniqrgAao_S', label: 'Grupo 3 · El Maitén' },
-        { id: '1uSq5eb6ZmQXcCJhuWG_aN-YdmQDf0ZeR', label: 'Grupo 4 · El Maitén' },
-        { id: '1kudPrKi3yPnxMfp4qPv8LrRx1__uAnMx', label: 'Grupo 5 · El Maitén' },
-        { id: '13IxkPDk4MDXeVfVBQMBmR08aiF8g_HDg', label: 'Grupo Rezagados · El Maitén' },
-        { id: '1nCqU2fFea490RK8BYDEg5l61Du5qBY-F', label: 'Total Proyecto · El Maitén' },
-        { id: '1dgr2Wj_TGG_DgG_HdPWerPh-YNDEz0mY', label: 'Todos los Grupos · El Maitén' },
+    'P131': [
+        { id: '1UO5oPkN1EMy7J-gjb1yFtM-BFHKjzhcf', label: 'Grupo 1 · Raíces de Melipeuco' },
+        { id: '1AZIhN6boXyDszwdB_oDpUGVMDptNraCr', label: 'Grupo 2 · Raíces de Melipeuco' },
+        { id: '1xQGMxD9GJzk9VDX9T7Vqg7o59EoO0sFb', label: 'Total Proyecto · Raíces de Melipeuco' },
+        { id: '1Uyol-_XZywWPIgfSDhQOEiLbVaHKlOdE', label: 'Todos los Grupos · Raíces de Melipeuco' },
     ],
 };const EstadoGeneralTab=({viviendas,observaciones,grupos,resumenComentarios,proyectoSel,proy,garantiasProy=[],muestrasProy=[],muestrasResumen=null,kpis=null,cierresForzados={}})=>{const[expandida,setExpandida]=React.useState(null);const[busqueda,setBusqueda]=React.useState("");const[filtro,setFiltro]=React.useState("todas");// todas | pendientes | recepcionadas
 const[grupoColapsado,setGrupoColapsado]=React.useState({});// {grupoId: true/false}
