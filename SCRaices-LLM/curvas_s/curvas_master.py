@@ -258,7 +258,8 @@ def fusionar_datos(beneficiarios: list, avance_web: dict) -> list:
 # ─── PASO 5: GENERAR IMÁGENES PNG ────────────────────────────────────────────
 def _fecha_inicio(b: dict):
     try:
-        partes = b["inicio"].split("/")
+        raw = b["inicio"].replace("-", "/")
+        partes = raw.split("/")
         if len(partes) == 3:
             return date(int(partes[2]), int(partes[1]), int(partes[0]))
     except Exception:
