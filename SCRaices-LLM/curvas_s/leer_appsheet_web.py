@@ -277,15 +277,17 @@ def _filtrar_por_proyecto(page, nombre_panel: str, project_id: str):
     () => {{
         const nombre = "{nombre_js}";
         const palabras = nombre.split(' ');
+        // Prefijo: primeras 2 palabras si las hay, o la primera sola (sin espacio trailing)
         const prefijo = palabras.length >= 2
-            ? palabras[0] + ' ' + palabras[1].slice(0, 4)
-            : palabras[0] + ' ';
+            ? (palabras[0] + ' ' + palabras[1].slice(0, 4)).toLowerCase()
+            : palabras[0].toLowerCase();
 
         const items = Array.from(document.querySelectorAll('*'));
         for (const el of items) {{
             if (el.children.length > 2) continue;
-            const t = (el.textContent || '').trim();
-            if (!t.toLowerCase().startsWith(prefijo.toLowerCase())) continue;
+            // Normalizar: colapsar saltos de línea/espacios múltiples
+            const t = (el.textContent || '').replace(/\\s+/g, ' ').trim();
+            if (!t.toLowerCase().startsWith(prefijo)) continue;
             if (t.length > 80) continue;
             const r = el.getBoundingClientRect();
             if (r.width < 20 || r.height < 8 || r.x > 320) continue;
