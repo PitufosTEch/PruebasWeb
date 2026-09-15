@@ -315,6 +315,12 @@ const CURVAS_S_CONFIG = {
         { id: '1sfeZLClJaMD-zpLEArTNPPj7v8eHsSUD', label: 'Total Proyecto · Ñuke Mapu' },
         { id: '1tkjzugkqW9CFdGqWOb_ZUBGJfA3JbQnd', label: 'Todos los Grupos · Ñuke Mapu' },
     ],
+    'P38': [
+        { id: '15GI7HlQWaoExmcN3aXoHSPRuZ83lbVrJ', label: 'Grupo 1 · Aliwen' },
+        { id: '1tbopAbnRdfNnIeaDylSlkvbVViRCoQMk', label: 'Grupo 2 · Aliwen' },
+        { id: '1BxaRevd_IzStjkcCqUEvfuA0RMSEmyfP', label: 'Total Proyecto · Aliwen' },
+        { id: '1XcYK5LfNVlK6IRWw9Z4Y1Lx_C7mLGMGw', label: 'Todos los Grupos · Aliwen' },
+    ],
 };const EstadoGeneralTab=({viviendas,observaciones,grupos,resumenComentarios,proyectoSel,proy,garantiasProy=[],muestrasProy=[],muestrasResumen=null,kpis=null,cierresForzados={}})=>{const[expandida,setExpandida]=React.useState(null);const[busqueda,setBusqueda]=React.useState("");const[filtro,setFiltro]=React.useState("todas");// todas | pendientes | recepcionadas
 const[grupoColapsado,setGrupoColapsado]=React.useState({});// {grupoId: true/false}
 const[showCapatazMenu,setShowCapatazMenu]=React.useState(false);const[avanceGanttData,setAvanceGanttData]=React.useState({});React.useEffect(()=>{fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/avance_gantt.json').then(r=>r.json()).then(d=>{AVANCE_GANTT_DATA=d||{};setAvanceGanttData(d||{});}).catch(()=>{});fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/avance_benef.json').then(r=>r.json()).then(d=>{AVANCE_BENEF_DATA=d||{};}).catch(()=>{});},[]);// ── Generador de Informe Semanal ────────────────────────────────────────
