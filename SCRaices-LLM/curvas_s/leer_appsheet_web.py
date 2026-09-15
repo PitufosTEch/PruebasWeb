@@ -152,23 +152,59 @@ def _verificar_login(page):
 
 def _navegar_a_total_avances(page, project_id: str):
     """
-    Navega a la vista 'Total Avances' desde cualquier pantalla de AppSheet.
-    La nav izquierda muestra solo íconos. El texto "Total Avances [En Ejecución]"
-    existe en el DOM como span oculto dentro del ícono padre.
-    Estrategia: click en el ancestor visible del span que contiene "Total Avances".
+    Navega a 'Obras → Total Avances' (muestra TODOS los proyectos en el panel).
+    La vista '[En Ejecución]' solo muestra un subconjunto, por eso usamos 'Obras'.
+
+    Flujo:
+    1. Click en 'Obras' en la nav izquierda (ícono de casas)
+    2. Esperar que aparezca la sub-vista 'Total Avances' dentro de Obras
+    3. Click en 'Total Avances'
     """
-    # Estrategia 1: JavaScript — click en el ancestor visible del span "Total Avances"
-    clicado = page.evaluate("""
+    # Paso 1: Click en "Obras" (leaf node con texto exacto "Obras")
+    clicado_obras = page.evaluate("""
     () => {
-        // Buscar span con texto "Total Avances" (puede ser "Total Avances [En Ejecución]")
         const spans = Array.from(document.querySelectorAll('span, div, a, li'));
         const found = spans.find(el =>
-            el.textContent.trim().startsWith('Total Avances') &&
+            el.textContent.trim() === 'Obras' &&
             el.children.length === 0
         );
+        if (!found) return 'no_obras_span';
+        let el = found.parentElement;
+        for (let i = 0; i < 8; i++) {
+            if (!el) break;
+            const style = window.getComputedStyle(el);
+            const rect  = el.getBoundingClientRect();
+            if (rect.width > 0 && rect.height > 0 &&
+                style.display !== 'none' && style.visibility !== 'hidden') {
+                el.click();
+                return 'clicked_obras:' + el.tagName + '.' + (el.className || '').slice(0, 40);
+            }
+            el = el.parentElement;
+        }
+        return 'no_clickable_obras';
+    }
+    """)
+    log.info(f"[{project_id}] nav Obras: {clicado_obras}")
+    page.wait_for_timeout(2_000)
+
+    # Paso 2: Dentro de Obras, buscar y clicar "Total Avances" (exacto, sin "[En Ejecución]")
+    clicado = page.evaluate("""
+    () => {
+        const spans = Array.from(document.querySelectorAll('span, div, a, li'));
+        // Primero buscar "Total Avances" exacto (sin "[En Ejecución]")
+        let found = spans.find(el =>
+            el.textContent.trim() === 'Total Avances' &&
+            el.children.length === 0
+        );
+        // Si no existe exacto, buscar el que empieza con "Total Avances" (cualquier variante)
+        if (!found) {
+            found = spans.find(el =>
+                el.textContent.trim().startsWith('Total Avances') &&
+                el.children.length === 0
+            );
+        }
         if (!found) return 'no_span';
 
-        // Subir por el árbol hasta encontrar el primer elemento visible clicable
         let el = found.parentElement;
         for (let i = 0; i < 8; i++) {
             if (!el) break;
@@ -185,13 +221,13 @@ def _navegar_a_total_avances(page, project_id: str):
         return 'no_clickable_ancestor';
     }
     """)
-    log.info(f"[{project_id}] nav JS: {clicado}")
+    log.info(f"[{project_id}] nav Total Avances: {clicado}")
 
-    # Esperar que la vista "Total Avances" cargue (hasta 15s)
-    for wait_sel in ["text=Total Avances", "text=Todo"]:
+    # Esperar que la vista cargue el panel izquierdo con proyectos
+    for wait_sel in ["text=Todo", "text=Total Avances"]:
         try:
             page.wait_for_selector(wait_sel, timeout=15_000)
-            log.info(f"[{project_id}] Vista 'Total Avances' lista ('{wait_sel}')")
+            log.info(f"[{project_id}] Vista 'Obras>Total Avances' lista ('{wait_sel}')")
             page.wait_for_timeout(1_500)
             return
         except PWTimeout:
