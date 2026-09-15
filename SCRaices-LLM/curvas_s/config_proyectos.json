@@ -1,0 +1,87 @@
+{
+  "appsheet_url": "https://www.appsheet.com/start/e07d4aa1-e59e-4b9b-bf4c-32582e74e8fc?platform=desktop",
+  "output_dir": "G:\\.shortcut-targets-by-id\\11lBqk00ApGZmO32OhDCJ6yjoOnzZniOI\\Coordinacion de Obras\\SEGUIMIENTO DE OBRA\\GANTT\\Archivos de trabajo",
+  "gantt_dir":  "G:\\.shortcut-targets-by-id\\11lBqk00ApGZmO32OhDCJ6yjoOnzZniOI\\Coordinacion de Obras\\SEGUIMIENTO DE OBRA\\GANTT",
+  "auth_file":  "C:\\Users\\rodri\\.claude\\appsheet_auth.json",
+  "token_file": "C:\\Users\\rodri\\.claude\\sheets_drive_token.json",
+  "drive_ids_file": "C:\\Users\\rodri\\OneDrive\\Documentos Claude Code\\drive_ids.json",
+  "proyectos": [
+    {
+      "id": "P119",
+      "nombre": "Ñuke Mapu",
+      "appsheet_nombre": "Ñuke Mapu",
+      "spreadsheet_id": "1t_1j62f_3l1nrlufmvhnV-o1WTplv0OnQL_JdVaWgKA",
+      "gantt_archivo": "Gantt control Ñuke Mapu"
+    },
+    {
+      "id": "P38",
+      "nombre": "Aliwen",
+      "appsheet_nombre": "Aliwen",
+      "spreadsheet_id": "151wIDnZn8_b7egJKLQKUcD6QDCflEWF5OlAU9KWgc-M",
+      "gantt_archivo": "Gantt control Aliwen"
+    },
+    {
+      "id": "P39",
+      "nombre": "El Coihue",
+      "appsheet_nombre": "El Coihue",
+      "spreadsheet_id": "1GiaZ1i3BN3mbgFmg16Ze5E25R0jEmYULtCWRy6cKaHo",
+      "gantt_archivo": "Gantt control El Coihue"
+    },
+    {
+      "id": "P127",
+      "nombre": "Nuevo Cunco",
+      "appsheet_nombre": "Nuevo Cunco",
+      "spreadsheet_id": "1bgT-83Aea0DlyeQ6OvitGDZfm3jLRQUV0GooVP-G8EI",
+      "gantt_archivo": "Gantt control Nuevo Cunco"
+    },
+    {
+      "id": "P12",
+      "nombre": "Juan Huilcan Tolten",
+      "appsheet_nombre": "Juan Huilcan Tolten",
+      "spreadsheet_id": "1SLu5lQTAzhHOUuorM3jbxSBes7vMyIB9mMXCihQ6A40",
+      "gantt_archivo": "Gantt control Juan Huilcan Tolten"
+    },
+    {
+      "id": "P14",
+      "nombre": "Com. Madihue",
+      "appsheet_nombre": "Com. Madihue",
+      "spreadsheet_id": "1B4wO-UkIDDyFvwRYjMAGksJvKqtNblwl_IirLl3qA6E",
+      "gantt_archivo": "Gantt control Com.Madihue"
+    },
+    {
+      "id": "P126",
+      "nombre": "El Maitén",
+      "appsheet_nombre": "El Maitén",
+      "spreadsheet_id": "1IwBN7CpDvKVAvaRuYHNUfkQ0e98cJMVFDKFrntv3oNw",
+      "gantt_archivo": "Gantt control El Maitén"
+    },
+    {
+      "id": "P131",
+      "nombre": "Raíces de Melipeuco",
+      "appsheet_nombre": "Raices de Melipeuco",
+      "spreadsheet_id": "1n5F-P5cy8Wj5BujllzdnwCrKwGsfIkdvHxcyd6YwscU",
+      "gantt_archivo": "Gantt control Raices de Melipeuco"
+    },
+    {
+      "id": "P28",
+      "nombre": "Elsa Pinchulaf",
+      "appsheet_nombre": "Elsa Pinchulaf",
+      "spreadsheet_id": "18XkRb7RAF52Aqj4immGebME-d9sODY0HgxIKWcBGrlg",
+      "gantt_archivo": "Gantt control Elsa Pinchulaf"
+    },
+    {
+      "id": "P116",
+      "nombre": "Sonia Quilaleo",
+      "appsheet_nombre": "Individual Sonia Quilaleo",
+      "spreadsheet_id": "1z9kNq9uo363NrWqCojGfGpP326FDj3V60irWxtMMbU8",
+      "gantt_archivo": "Gantt control Sonia Quilaleo"
+    },
+    {
+      "id": "P31",
+      "nombre": "Trovolhue",
+      "appsheet_nombre": "Trovolhue",
+      "spreadsheet_id": "1kgroktRIto3gGGnvmXGMgoetXT-Rv8JFue1K9eNlNMg",
+      "gantt_archivo": "Gantt control Trovolhue"
+    }
+  ]
+}

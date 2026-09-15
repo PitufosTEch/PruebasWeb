@@ -1,14 +1,13 @@
-name: Actualización Curvas S Diaria
+name: Actualización Curvas S
 
-# Cada proyecto corre en un runner paralelo independiente (matrix strategy).
-# Tiempo estimado: ~10-15 min (el proyecto más lento) en vez de 60-90 min en serie.
-# Post-proceso (sincronizar_dashboard, gantt, avance) corre al terminar todos.
+# Un runner por proyecto, todos en paralelo.
+# Post-proceso sincroniza dashboard y Firebase al finalizar todos.
 #
-# Horario: 11:00 UTC = 08:00 Chile verano (UTC-3, oct-abr) / 07:00 Chile invierno (UTC-4, may-sep)
+# Horario: 11:00 UTC = 08:00 Chile verano (UTC-3) / 07:00 Chile invierno (UTC-4)
 
 on:
   schedule:
-    - cron: '0 11 * * *'   # Todos los días 11:00 UTC (08:00 Chile verano / 07:00 Chile invierno)
+    - cron: '0 11 * * *'
   workflow_dispatch: {}
 
 permissions:
@@ -19,51 +18,28 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # ── Job 1: Un runner por proyecto, todos en paralelo ─────────────────────
+  # ── Job 1: Un runner por proyecto (paralelo) ─────────────────────────────
   curvas-proyecto:
     name: "Curvas — ${{ matrix.label }}"
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
-      fail-fast: false      # Si un proyecto falla, los demás siguen
+      fail-fast: false
       matrix:
         include:
-          - { label: "P119 Ñuke Mapu",        script: curvas_automatico,           delay: 0   }
-          - { label: "P38  Aliwen",            script: curvas_automatico_aliwen,    delay: 15  }
-          - { label: "P39  El Coihue",         script: curvas_automatico_coihue,    delay: 30  }
-          - { label: "P127 Nuevo Cunco",       script: curvas_automatico_cunco,     delay: 45  }
-          - { label: "P12  Juan Huilcan",      script: curvas_automatico_huilcan,   delay: 60  }
-          - { label: "P14  Com. Madihue",      script: curvas_automatico_madihue,   delay: 75  }
-          - { label: "P126 El Maitén",         script: curvas_automatico_maiten,    delay: 90  }
-          - { label: "P131 Raíces Melipeuco",  script: curvas_automatico_melipeuco, delay: 105 }
-          - { label: "P116 Sonia Quilaleo",    script: curvas_automatico_quilaleo,  delay: 120 }
-          - { label: "P31  Trovolhue",         script: curvas_automatico_trovolhue, delay: 135 }
-          - { label: "P28  Elsa Pinchulaf",    script: curvas_automatico_pinchulaf, delay: 150 }
-          # ── Proyectos futuros — descomentar cuando tengan script y carta Gantt ──────
-          # Rural Araucanía 2024
-          # - { label: "P118 El Canelo",               script: curvas_automatico_el_canelo }
-          # - { label: "P123 Peumayen 2023",           script: curvas_automatico_peumayen_2023 }
-          # - { label: "P128 Com. José Carvajal",      script: curvas_automatico_jose_carvajal }
-          # - { label: "P129 Nuevo Gorbea",            script: curvas_automatico_nuevo_gorbea }
-          # - { label: "P132 Com. Fermín Manquilef",   script: curvas_automatico_fermin_manquilef }
-          # Rural Araucanía 2025
-          # - { label: "P145 Perkenko 2025",           script: curvas_automatico_perkenko }
-          # - { label: "P146 Demanda Villarrica 2025", script: curvas_automatico_villarrica_2025 }
-          # - { label: "P147 Ruka Antü",               script: curvas_automatico_ruka_antu }
-          # - { label: "P150 Llaima Antu",             script: curvas_automatico_llaima_antu }
-          # - { label: "P152 Ayün Ruka",               script: curvas_automatico_ayun_ruka }
-          # - { label: "P153 Vilcún Mapu",             script: curvas_automatico_vilcun_mapu }
-          # - { label: "P154 Com. José Carvajal 2",    script: curvas_automatico_carvajal_2 }
-          # - { label: "P155 Los Arrayanes",           script: curvas_automatico_arrayanes }
-          # - { label: "P156 Poyen Ruka",              script: curvas_automatico_poyen_ruka }
-          # Rural Araucanía 2026
-          # - { label: "P164 Conún Huenu",             script: curvas_automatico_conun_huenu }
-          # - { label: "P166 Malalhue",                script: curvas_automatico_malalhue }
-          # - { label: "P167 Witran Donguil",          script: curvas_automatico_witran_donguil }
-          # - { label: "P168 Raíces de Perquenco",     script: curvas_automatico_perquenco }
-          # - { label: "P170 Los Copihues de Cunco",   script: curvas_automatico_copihues_cunco }
-          # - { label: "P171 Raíces de Trovolhue",     script: curvas_automatico_trovolhue_2026 }
-          # - { label: "P172 Raíces Costeras",         script: curvas_automatico_raices_costeras }
+          - { label: "P119 Ñuke Mapu",        id: P119,  delay: 0   }
+          - { label: "P38  Aliwen",            id: P38,   delay: 15  }
+          - { label: "P39  El Coihue",         id: P39,   delay: 30  }
+          - { label: "P127 Nuevo Cunco",       id: P127,  delay: 45  }
+          - { label: "P12  Juan Huilcan",      id: P12,   delay: 60  }
+          - { label: "P14  Com. Madihue",      id: P14,   delay: 75  }
+          - { label: "P126 El Maitén",         id: P126,  delay: 90  }
+          - { label: "P131 Raíces Melipeuco",  id: P131,  delay: 105 }
+          - { label: "P116 Sonia Quilaleo",    id: P116,  delay: 120 }
+          - { label: "P31  Trovolhue",         id: P31,   delay: 135 }
+          - { label: "P28  Elsa Pinchulaf",    id: P28,   delay: 150 }
+          # ── Proyectos futuros — agregar aquí cuando tengan Gantt ──────────
+          # - { label: "P118 El Canelo",        id: P118,  delay: 165 }
 
     steps:
       - uses: actions/checkout@v4
@@ -76,15 +52,16 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: curvas-pip-${{ hashFiles('SCRaices-LLM/curvas_s/requirements.txt') }}
+          key: curvas-pip-${{ runner.os }}-${{ hashFiles('SCRaices-LLM/curvas_s/requirements.txt') }}
           restore-keys: curvas-pip-
 
       - name: Instalar dependencias Python
         run: |
           pip install --upgrade pip
           pip install \
-            matplotlib scipy Pillow numpy requests psutil \
-            google-auth google-auth-httplib2 google-api-python-client
+            matplotlib scipy Pillow numpy requests \
+            google-auth google-auth-httplib2 google-api-python-client \
+            playwright
 
       - name: Cache Playwright browsers
         uses: actions/cache@v4
@@ -93,26 +70,26 @@ jobs:
           key: playwright-chromium-${{ runner.os }}
           restore-keys: playwright-chromium-
 
-      - name: Instalar Playwright + Chromium
-        run: pip install playwright && playwright install chromium --with-deps
+      - name: Instalar Playwright Chromium
+        run: playwright install chromium --with-deps
 
-      - name: "Esperar ${{ matrix.delay }}s (escalonamiento API)"
+      - name: "Esperar ${{ matrix.delay }}s (escalonamiento AppSheet)"
         run: sleep ${{ matrix.delay }}
 
       - name: "Ejecutar Curvas S — ${{ matrix.label }}"
         working-directory: SCRaices-LLM/curvas_s
         env:
-          GOOGLE_REFRESH_TOKEN:  ${{ secrets.GOOGLE_REFRESH_TOKEN }}
-          GOOGLE_CLIENT_ID:      ${{ secrets.GOOGLE_CLIENT_ID }}
-          GOOGLE_CLIENT_SECRET:  ${{ secrets.GOOGLE_CLIENT_SECRET }}
-          GITHUB_TOKEN:          ${{ secrets.GITHUB_TOKEN }}
-          FIREBASE_URL:          https://scraices-dashboard-default-rtdb.firebaseio.com
-          APPSHEET_COOKIES_B64:  ${{ secrets.APPSHEET_COOKIES_B64 }}
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          GOOGLE_CLIENT_ID:     ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GITHUB_TOKEN:         ${{ secrets.GITHUB_TOKEN }}
+          FIREBASE_URL:         https://scraices-dashboard-default-rtdb.firebaseio.com
+          APPSHEET_COOKIES_B64: ${{ secrets.APPSHEET_COOKIES_B64 }}
         run: |
           for intento in 1 2 3; do
-            python ${{ matrix.script }}.py && break
+            python curvas_master.py ${{ matrix.id }} && break
             if [ "$intento" -eq 3 ]; then
-              echo "::error::Los 3 intentos fallaron para ${{ matrix.label }}"
+              echo "::error::3 intentos fallaron para ${{ matrix.label }}"
               exit 1
             fi
             echo "Intento $intento fallido — reintentando en 60s..."
@@ -121,15 +98,15 @@ jobs:
 
       - name: Resumen en caso de error
         if: failure()
-        run: echo "::error::Curvas S fallaron para ${{ matrix.label }}. Revisa el log."
+        run: echo "::error::Curvas S fallaron para ${{ matrix.label }}"
 
-  # ── Job 2: Post-proceso — corre cuando TODOS los proyectos terminan ───────
+  # ── Job 2: Post-proceso — dashboard y Firebase ────────────────────────────
   post-proceso:
     name: Sincronizar Dashboard y Firebase
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: curvas-proyecto
-    if: always()    # Corre aunque algún proyecto haya fallado
+    if: always()
 
     steps:
       - uses: actions/checkout@v4
@@ -142,27 +119,27 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: curvas-pip-${{ hashFiles('SCRaices-LLM/curvas_s/requirements.txt') }}
+          key: curvas-pip-${{ runner.os }}-${{ hashFiles('SCRaices-LLM/curvas_s/requirements.txt') }}
           restore-keys: curvas-pip-
 
       - name: Instalar dependencias Python
         run: |
           pip install --upgrade pip
           pip install \
-            matplotlib scipy Pillow numpy requests psutil \
+            matplotlib scipy Pillow numpy requests \
             google-auth google-auth-httplib2 google-api-python-client
 
       - name: Sincronizar dashboard (CURVAS_S_CONFIG → GitHub Pages)
         working-directory: SCRaices-LLM/curvas_s
         env:
-          GOOGLE_REFRESH_TOKEN:  ${{ secrets.GOOGLE_REFRESH_TOKEN }}
-          GOOGLE_CLIENT_ID:      ${{ secrets.GOOGLE_CLIENT_ID }}
-          GOOGLE_CLIENT_SECRET:  ${{ secrets.GOOGLE_CLIENT_SECRET }}
-          GITHUB_TOKEN:          ${{ secrets.GITHUB_TOKEN }}
-          FIREBASE_URL:          https://scraices-dashboard-default-rtdb.firebaseio.com
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          GOOGLE_CLIENT_ID:     ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GITHUB_TOKEN:         ${{ secrets.GITHUB_TOKEN }}
+          FIREBASE_URL:         https://scraices-dashboard-default-rtdb.firebaseio.com
         run: |
           for intento in 1 2 3; do
-            python sincronizar_dashboard.py && break
+            python curvas_master.py --sync-dashboard && break
             if [ "$intento" -eq 3 ]; then exit 1; fi
             echo "Intento $intento fallido — reintentando en 30s..."
             sleep 30
@@ -171,33 +148,33 @@ jobs:
       - name: Actualizar programa Gantt en Firebase
         working-directory: SCRaices-LLM/curvas_s
         env:
-          GOOGLE_REFRESH_TOKEN:  ${{ secrets.GOOGLE_REFRESH_TOKEN }}
-          GOOGLE_CLIENT_ID:      ${{ secrets.GOOGLE_CLIENT_ID }}
-          GOOGLE_CLIENT_SECRET:  ${{ secrets.GOOGLE_CLIENT_SECRET }}
-          FIREBASE_URL:          https://scraices-dashboard-default-rtdb.firebaseio.com
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          GOOGLE_CLIENT_ID:     ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          FIREBASE_URL:         https://scraices-dashboard-default-rtdb.firebaseio.com
         run: python actualizar_gantt_programa.py
 
       - name: Calcular avance Gantt en Firebase
         working-directory: SCRaices-LLM/curvas_s
         env:
-          GOOGLE_REFRESH_TOKEN:  ${{ secrets.GOOGLE_REFRESH_TOKEN }}
-          GOOGLE_CLIENT_ID:      ${{ secrets.GOOGLE_CLIENT_ID }}
-          GOOGLE_CLIENT_SECRET:  ${{ secrets.GOOGLE_CLIENT_SECRET }}
-          FIREBASE_URL:          https://scraices-dashboard-default-rtdb.firebaseio.com
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          GOOGLE_CLIENT_ID:     ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          FIREBASE_URL:         https://scraices-dashboard-default-rtdb.firebaseio.com
         run: python calcular_avance_gantt.py
 
       - name: Resumen en caso de error
         if: failure()
-        run: echo "::error::Post-proceso falló. Revisa el log completo."
+        run: echo "::error::Post-proceso falló"
 
-  # ── Job 3: Sincronizar despachos futuros AppSheet → Firebase ─────────────
+  # ── Job 3: Sincronizar despachos AppSheet → Firebase ─────────────────────
   sincronizar-despachos:
     name: Sincronizar Despachos AppSheet → Firebase
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: curvas-proyecto
     if: always()
-    continue-on-error: true   # cookies expiradas no deben bloquear el envío de informes
+    continue-on-error: true
 
     steps:
       - uses: actions/checkout@v4
@@ -223,10 +200,10 @@ jobs:
           key: playwright-chromium-${{ runner.os }}
           restore-keys: playwright-chromium-
 
-      - name: Instalar Playwright + Chromium
+      - name: Instalar Playwright Chromium
         run: playwright install chromium --with-deps
 
-      - name: Sincronizar despachos futuros → Firebase /despachos_data
+      - name: Sincronizar despachos futuros → Firebase
         working-directory: SCRaices-LLM/curvas_s
         env:
           APPSHEET_COOKIES_B64: ${{ secrets.APPSHEET_COOKIES_B64 }}
@@ -235,4 +212,4 @@ jobs:
 
       - name: Resumen en caso de error
         if: failure()
-        run: echo "::error::Sincronización de despachos falló. Revisa el log."
+        run: echo "::error::Sincronización de despachos falló"
