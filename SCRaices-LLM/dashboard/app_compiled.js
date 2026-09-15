@@ -321,6 +321,13 @@ const CURVAS_S_CONFIG = {
         { id: '1BxaRevd_IzStjkcCqUEvfuA0RMSEmyfP', label: 'Total Proyecto · Aliwen' },
         { id: '1XcYK5LfNVlK6IRWw9Z4Y1Lx_C7mLGMGw', label: 'Todos los Grupos · Aliwen' },
     ],
+    'P39': [
+        { id: '1BZckaeDEl1MDjBK3wndsx1gM-2p8e9Ns', label: 'Grupo 1 · El Coihue' },
+        { id: '1AMXhV1MMrLlagG1hnRbR_eI6E4hYa4Zi', label: 'Grupo 2 · El Coihue' },
+        { id: '1DQLG7NL99A1VnSoyNLhxRO9hDnLcO58g', label: 'Grupo 3 · El Coihue' },
+        { id: '1GymHwYsYX2irdSgiIj_cvOHjN2OfeMGM', label: 'Total Proyecto · El Coihue' },
+        { id: '1dkQlZeBYkKqMQqp196VM-Sz3iyaoIdS6', label: 'Todos los Grupos · El Coihue' },
+    ],
 };const EstadoGeneralTab=({viviendas,observaciones,grupos,resumenComentarios,proyectoSel,proy,garantiasProy=[],muestrasProy=[],muestrasResumen=null,kpis=null,cierresForzados={}})=>{const[expandida,setExpandida]=React.useState(null);const[busqueda,setBusqueda]=React.useState("");const[filtro,setFiltro]=React.useState("todas");// todas | pendientes | recepcionadas
 const[grupoColapsado,setGrupoColapsado]=React.useState({});// {grupoId: true/false}
 const[showCapatazMenu,setShowCapatazMenu]=React.useState(false);const[avanceGanttData,setAvanceGanttData]=React.useState({});React.useEffect(()=>{fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/avance_gantt.json').then(r=>r.json()).then(d=>{AVANCE_GANTT_DATA=d||{};setAvanceGanttData(d||{});}).catch(()=>{});fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/avance_benef.json').then(r=>r.json()).then(d=>{AVANCE_BENEF_DATA=d||{};}).catch(()=>{});},[]);// ── Generador de Informe Semanal ────────────────────────────────────────
