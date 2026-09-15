@@ -347,10 +347,10 @@ const CURVAS_S_CONFIG = {
         { id: '1xQGMxD9GJzk9VDX9T7Vqg7o59EoO0sFb', label: 'Total Proyecto · Raíces de Melipeuco' },
         { id: '1Uyol-_XZywWPIgfSDhQOEiLbVaHKlOdE', label: 'Todos los Grupos · Raíces de Melipeuco' },
     ],
-    'P116': [
-        { id: '1o5r-jF1DcVNbaC_M2Dur6GivYp2VO34K', label: 'Grupo 1 · Sonia Quilaleo' },
-        { id: '1ZK51WIwV57iM3Ed9fajBx-OSXlE7TnaU', label: 'Total Proyecto · Sonia Quilaleo' },
-        { id: '16ustScgOrRUBOWf1QrfyFcX_FegSV9qb', label: 'Todos los Grupos · Sonia Quilaleo' },
+    'P31': [
+        { id: '1oSyAEEXRrOf0kEoRslATx2Nz7d59Ozbt', label: 'Grupo 1 · Trovolhue' },
+        { id: '1CKIL59pY7-Le25q6aw3kWqhwKtvzeU5T', label: 'Total Proyecto · Trovolhue' },
+        { id: '1DVBxVRu6ikvpvYHTNTaN_AyFbo8FoFbF', label: 'Todos los Grupos · Trovolhue' },
     ],
 };const EstadoGeneralTab=({viviendas,observaciones,grupos,resumenComentarios,proyectoSel,proy,garantiasProy=[],muestrasProy=[],muestrasResumen=null,kpis=null,cierresForzados={}})=>{const[expandida,setExpandida]=React.useState(null);const[busqueda,setBusqueda]=React.useState("");const[filtro,setFiltro]=React.useState("todas");// todas | pendientes | recepcionadas
 const[grupoColapsado,setGrupoColapsado]=React.useState({});// {grupoId: true/false}
