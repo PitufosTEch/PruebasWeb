@@ -153,89 +153,61 @@ def _verificar_login(page):
 def _navegar_a_total_avances(page, project_id: str):
     """
     Navega a 'Obras → Total Avances' (muestra TODOS los proyectos en el panel).
-    La vista '[En Ejecución]' solo muestra un subconjunto, por eso usamos 'Obras'.
 
-    Flujo:
-    1. Click en 'Obras' en la nav izquierda (ícono de casas)
-    2. Esperar que aparezca la sub-vista 'Total Avances' dentro de Obras
-    3. Click en 'Total Avances'
+    Estructura AppSheet confirmada por diagnóstico:
+    - Sidebar: íconos de nav. "Obras" ícono → abre gallery de Obras.
+    - Gallery de Obras: ASTappable DeckRow con texto "Total Avances" → vista con todos los proyectos.
+    - CRÍTICO: AppSheet requiere page.mouse.click() con coordenadas reales.
+      JS .click() y Playwright locator.click() NO despachan los eventos correctos.
     """
-    # Paso 1: Click en "Obras" (leaf node con texto exacto "Obras")
-    clicado_obras = page.evaluate("""
+    # Paso 1: coordenadas de "Obras" nav icon y click con mouse real
+    pos_obras = page.evaluate("""
     () => {
-        const spans = Array.from(document.querySelectorAll('span, div, a, li'));
-        const found = spans.find(el =>
-            el.textContent.trim() === 'Obras' &&
-            el.children.length === 0
-        );
-        if (!found) return 'no_obras_span';
+        const todos = Array.from(document.querySelectorAll('span, div, a, li'));
+        const found = todos.find(el => el.children.length === 0 && el.textContent.trim() === 'Obras');
+        if (!found) return null;
         let el = found.parentElement;
-        for (let i = 0; i < 8; i++) {
+        for (let i = 0; i < 10; i++) {
             if (!el) break;
-            const style = window.getComputedStyle(el);
-            const rect  = el.getBoundingClientRect();
-            if (rect.width > 0 && rect.height > 0 &&
-                style.display !== 'none' && style.visibility !== 'hidden') {
-                el.click();
-                return 'clicked_obras:' + el.tagName + '.' + (el.className || '').slice(0, 40);
-            }
+            const r = el.getBoundingClientRect();
+            if (r.width > 0 && r.height > 0) return {x: r.x + r.width / 2, y: r.y + r.height / 2};
             el = el.parentElement;
         }
-        return 'no_clickable_obras';
+        return null;
     }
     """)
-    log.info(f"[{project_id}] nav Obras: {clicado_obras}")
-    page.wait_for_timeout(2_000)
+    if pos_obras:
+        page.mouse.click(pos_obras['x'], pos_obras['y'])
+        log.info(f"[{project_id}] nav Obras: mouse.click({pos_obras['x']:.0f},{pos_obras['y']:.0f})")
+    else:
+        log.warning(f"[{project_id}] nav Obras: coordenadas no encontradas")
 
-    # Paso 2: Dentro de Obras, buscar y clicar "Total Avances" (exacto, sin "[En Ejecución]")
-    clicado = page.evaluate("""
+    # Esperar que cargue la gallery de Obras
+    try:
+        page.wait_for_selector("text=Total Avances", timeout=15_000)
+    except PWTimeout:
+        log.warning(f"[{project_id}] Timeout esperando gallery de Obras")
+    page.wait_for_timeout(1_000)
+
+    # Paso 2: coordenadas de la fila "Total Avances" (ASTappable DeckRow) y click con mouse real
+    pos_ta = page.evaluate("""
     () => {
-        const spans = Array.from(document.querySelectorAll('span, div, a, li'));
-        // Primero buscar "Total Avances" exacto (sin "[En Ejecución]")
-        let found = spans.find(el =>
-            el.textContent.trim() === 'Total Avances' &&
-            el.children.length === 0
-        );
-        // Si no existe exacto, buscar el que empieza con "Total Avances" (cualquier variante)
-        if (!found) {
-            found = spans.find(el =>
-                el.textContent.trim().startsWith('Total Avances') &&
-                el.children.length === 0
-            );
-        }
-        if (!found) return 'no_span';
-
-        let el = found.parentElement;
-        for (let i = 0; i < 8; i++) {
-            if (!el) break;
-            const style = window.getComputedStyle(el);
-            const rect  = el.getBoundingClientRect();
-            if (rect.width > 0 && rect.height > 0 &&
-                style.display !== 'none' && style.visibility !== 'hidden' &&
-                style.pointerEvents !== 'none') {
-                el.click();
-                return 'clicked:' + el.tagName + '.' + (el.className || '').slice(0, 40);
-            }
-            el = el.parentElement;
-        }
-        return 'no_clickable_ancestor';
+        const rows = Array.from(document.querySelectorAll('.ASTappable'));
+        const row = rows.find(el => (el.innerText || el.textContent || '').trim() === 'Total Avances');
+        if (!row) return null;
+        const r = row.getBoundingClientRect();
+        return {x: r.x + r.width / 2, y: r.y + r.height / 2};
     }
     """)
-    log.info(f"[{project_id}] nav Total Avances: {clicado}")
+    if pos_ta:
+        page.mouse.click(pos_ta['x'], pos_ta['y'])
+        log.info(f"[{project_id}] nav Total Avances: mouse.click({pos_ta['x']:.0f},{pos_ta['y']:.0f})")
+    else:
+        log.warning(f"[{project_id}] nav Total Avances: ASTappable no encontrado")
 
-    # Esperar que la vista cargue el panel izquierdo con proyectos
-    for wait_sel in ["text=Todo", "text=Total Avances"]:
-        try:
-            page.wait_for_selector(wait_sel, timeout=15_000)
-            log.info(f"[{project_id}] Vista 'Obras>Total Avances' lista ('{wait_sel}')")
-            page.wait_for_timeout(1_500)
-            return
-        except PWTimeout:
-            continue
-
-    # Fallback: probar íconos si el JS click no funcionó
-    if "no_" in str(clicado):
-        _click_nav_icon_hasta_total_avances(page, project_id)
+    # Esperar que cargue la vista con todos los proyectos en el panel izquierdo
+    page.wait_for_timeout(4_000)
+    log.info(f"[{project_id}] nav completo — panel de proyectos visible")
 
 
 def _click_nav_icon_hasta_total_avances(page, project_id: str):
@@ -294,41 +266,90 @@ def _click_nav_icon_hasta_total_avances(page, project_id: str):
 def _filtrar_por_proyecto(page, nombre_panel: str, project_id: str):
     """
     Hace click en el nombre del proyecto en el panel izquierdo.
-    El panel muestra "El Maitén 49,50%" — buscamos las primeras palabras del nombre.
+    La vista 'Total Avances' tiene 50+ proyectos con scroll virtual — hay que
+    hacer scroll del contenedor izquierdo hasta que el proyecto aparezca en el DOM.
     """
     log.info(f"[{project_id}] Filtrando por '{nombre_panel}' en panel izquierdo...")
 
-    # Buscar por JavaScript usando la mayor parte del nombre para evitar falsas coincidencias
     nombre_js = nombre_panel.replace('"', '').replace("'", "\\'")
-    clicado = page.evaluate(f"""
+
+    js_buscar_y_clicar = f"""
     () => {{
         const nombre = "{nombre_js}";
-        // Usar prefijo de 2 palabras para evitar coincidencias falsas (ej. "El" vs "Electrico")
         const palabras = nombre.split(' ');
         const prefijo = palabras.length >= 2
-            ? palabras[0] + ' ' + palabras[1].slice(0, 4)  // "El Mait"
-            : palabras[0] + ' ';                            // "Aliwen " (con espacio)
+            ? palabras[0] + ' ' + palabras[1].slice(0, 4)
+            : palabras[0] + ' ';
 
         const items = Array.from(document.querySelectorAll('*'));
         for (const el of items) {{
-            // Aceptar nodos con pocos hijos también (el texto puede estar en un span hijo)
             if (el.children.length > 2) continue;
             const t = (el.textContent || '').trim();
-            // Debe contener el prefijo y tener texto razonable (no un botón gigante)
             if (!t.toLowerCase().startsWith(prefijo.toLowerCase())) continue;
             if (t.length > 80) continue;
             const r = el.getBoundingClientRect();
-            // Debe ser visible y estar en el panel izquierdo (x < 320px)
             if (r.width < 20 || r.height < 8 || r.x > 320) continue;
             el.click();
             return 'clicked:' + t.slice(0, 50);
         }}
         return 'not_found';
     }}
-    """)
-    log.info(f"[{project_id}] Filtro JS: {clicado}")
-    page.wait_for_timeout(3_000)  # Esperar que el filtro actualice las tarjetas
+    """
 
+    # Intento directo (para proyectos visibles sin scroll)
+    clicado = page.evaluate(js_buscar_y_clicar)
+    if clicado != 'not_found':
+        log.info(f"[{project_id}] Filtro JS: {clicado}")
+        page.wait_for_timeout(3_000)
+        _screenshot_debug(page, project_id, "post_filtro")
+        return
+
+    # El proyecto está fuera de la pantalla — hacer scroll del panel izquierdo
+    log.info(f"[{project_id}] Panel: no visible, haciendo scroll del panel izquierdo...")
+    # Encontrar el contenedor scrollable del panel izquierdo (x < 200, overflow scroll/auto)
+    panel_scroll = page.evaluate("""
+    () => {
+        const all = Array.from(document.querySelectorAll('*'));
+        for (const el of all) {
+            const r = el.getBoundingClientRect();
+            if (r.x > 200 || r.width < 30) continue;
+            const style = window.getComputedStyle(el);
+            if ((style.overflowY === 'auto' || style.overflowY === 'scroll')
+                && el.scrollHeight > el.clientHeight + 50) {
+                return {found: true, scrollHeight: el.scrollHeight, clientHeight: el.clientHeight};
+            }
+        }
+        return {found: false};
+    }
+    """)
+    log.info(f"[{project_id}] Panel scroll container: {panel_scroll}")
+
+    for scroll_step in range(10):  # máx ~4000px de scroll (10 × 400px)
+        # Scroll del panel izquierdo vía JS en el contenedor scrollable
+        page.evaluate("""
+        () => {
+            const all = Array.from(document.querySelectorAll('*'));
+            for (const el of all) {
+                const r = el.getBoundingClientRect();
+                if (r.x > 200 || r.width < 30) continue;
+                const style = window.getComputedStyle(el);
+                if ((style.overflowY === 'auto' || style.overflowY === 'scroll')
+                    && el.scrollHeight > el.clientHeight + 50) {
+                    el.scrollTop += 400;
+                    return;
+                }
+            }
+        }
+        """)
+        page.wait_for_timeout(400)
+        clicado = page.evaluate(js_buscar_y_clicar)
+        if clicado != 'not_found':
+            log.info(f"[{project_id}] Filtro JS (scroll {scroll_step+1}): {clicado}")
+            page.wait_for_timeout(3_000)
+            _screenshot_debug(page, project_id, "post_filtro")
+            return
+
+    log.warning(f"[{project_id}] Filtro JS: not_found (incluso con scroll)")
     _screenshot_debug(page, project_id, "post_filtro")
 
 
