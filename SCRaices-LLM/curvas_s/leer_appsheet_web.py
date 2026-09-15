@@ -417,11 +417,8 @@ def _leer_beneficiarios(page, project_id: str, nombre_panel: str) -> dict:
     except PWTimeout:
         log.warning(f"[{project_id}] No se detectaron badges SVG — intentando igualmente")
 
-    # Scroll para cargar todos los beneficiarios (AppSheet puede tener scroll infinito)
-    _scroll_completo(page, project_id)
-
-    # Estrategia 1: Extraer datos de las tarjetas directamente (rápido)
-    resultados = _extraer_de_tarjetas(page, project_id)
+    # Scroll acumulando badges en cada paso (scroll virtual puede remover DOM superior)
+    resultados = _scroll_y_acumular(page, project_id)
     if resultados:
         log.info(f"[{project_id}] Estrategia 1 (tarjetas): {len(resultados)} leídos")
         return resultados
@@ -432,27 +429,56 @@ def _leer_beneficiarios(page, project_id: str, nombre_panel: str) -> dict:
     return resultados
 
 
-def _scroll_completo(page, project_id: str, max_scrolls: int = 20):
-    """Hace scroll hacia abajo hasta que no aparezcan más tarjetas nuevas."""
-    prev_count = 0
-    for i in range(max_scrolls):
-        page.keyboard.press("End")
-        page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-        page.wait_for_timeout(900)
+def _scroll_y_acumular(page, project_id: str, max_scrolls: int = 30) -> dict:
+    """
+    Scroll con acumulación de badges en cada paso.
+    AppSheet usa scroll virtual — remueve DOM superior al bajar, por lo que
+    leer solo al final pierde los items del top. Aquí extraemos en cada iteración
+    y fusionamos; paramos cuando el total acumulado deja de crecer.
+    """
+    # Ir al top primero para capturar desde el inicio de la lista
+    page.keyboard.press("Home")
+    page.evaluate("window.scrollTo(0, 0)")
+    page.wait_for_timeout(1_500)
 
-        # Contar badges SVG con % (AppSheet usa data-testonly-src con SVG incrustado)
-        count = page.evaluate(r"""
+    acumulado: dict = {}
+    prev_total = -1
+    stalled = 0
+
+    for i in range(max_scrolls):
+        batch = _extraer_de_tarjetas(page, project_id)
+        acumulado.update(batch)   # actualiza % si el mismo nombre reaparece
+        total = len(acumulado)
+
+        if total == prev_total and total > 0:
+            stalled += 1
+            if stalled >= 3:
+                break
+        else:
+            stalled = 0
+        prev_total = total
+
+        # Scroll: End key + body scroll + scroll incremental del contenedor overflow real
+        page.keyboard.press("End")
+        page.evaluate("""
         () => {
-            return Array.from(document.querySelectorAll('[data-testonly-src]')).filter(el =>
-                />(\d{1,3})%</.test(el.getAttribute('data-testonly-src') || '')
-            ).length;
+            window.scrollTo(0, document.body.scrollHeight);
+            // Detectar el contenedor con overflow real (mismo criterio que antes,
+            // pero scrollBy incremental en vez de saltar a scrollHeight)
+            const scrollable = Array.from(document.querySelectorAll('*')).find(el => {
+                const s = window.getComputedStyle(el);
+                const r = el.getBoundingClientRect();
+                return (s.overflow === 'auto' || s.overflowY === 'auto' ||
+                        s.overflow === 'scroll' || s.overflowY === 'scroll')
+                       && r.x > 200 && el.scrollHeight > el.clientHeight + 50;
+            });
+            if (scrollable) scrollable.scrollBy(0, 400);
         }
         """)
-        if count == prev_count and count > 0:
-            break
-        prev_count = count
+        page.wait_for_timeout(1_500)
 
-    log.info(f"[{project_id}] Scroll completado — ~{prev_count} badges % visibles")
+    log.info(f"[{project_id}] Scroll completado — ~{len(acumulado)} badges acumulados")
+    return acumulado
 
 
 def _extraer_de_tarjetas(page, project_id: str) -> dict:

@@ -212,6 +212,12 @@ def leer_avance_appsheet(project_id: str, debug: bool = False) -> dict:
 
 # ─── PASO 4: FUSIONAR DATOS ───────────────────────────────────────────────────
 def fusionar_datos(beneficiarios: list, avance_web: dict) -> list:
+    # Índice frozenset para resolver diferencia de orden NOMBRE/APELLIDO entre
+    # Sheets ("INES DEL CARMEN HERNANDEZ CASTRO") y AppSheet ("HERNANDEZ CASTRO INES DEL CARMEN")
+    palabras_a_pct: dict[frozenset, tuple] = {
+        frozenset(k.split()): (k, v) for k, v in avance_web.items()
+    }
+
     sin_match = []
     resultado = []
     for b in beneficiarios:
@@ -219,11 +225,23 @@ def fusionar_datos(beneficiarios: list, avance_web: dict) -> list:
         pct = avance_web.get(nombre_norm)
 
         if pct is None:
-            primer_apellido = nombre_norm.split()[0]
-            for nombre_web, pct_web in avance_web.items():
-                if nombre_web.startswith(primer_apellido):
+            # Comparar conjuntos completos (orden NOMBRE/APELLIDO diferente)
+            palabras = frozenset(nombre_norm.split())
+            match = palabras_a_pct.get(palabras)
+            if match:
+                nombre_web, pct = match
+                log.info(f"  Match por palabras: '{nombre_norm}' → '{nombre_web}'")
+
+        if pct is None:
+            # Subconjunto bidireccional:
+            #   - AppSheet omite palabra de Sheets → palabras_web ⊆ palabras
+            #   - AppSheet tiene extra palabra    → palabras ⊆ palabras_web
+            palabras = frozenset(nombre_norm.split())
+            for palabras_web, (nombre_web, pct_web) in palabras_a_pct.items():
+                if (palabras_web.issubset(palabras) or palabras.issubset(palabras_web)) \
+                        and len(palabras_web) >= 2 and len(palabras) >= 2:
                     pct = pct_web
-                    log.warning(f"  Match parcial: '{nombre_norm}' → '{nombre_web}'")
+                    log.info(f"  Match subconjunto: '{nombre_norm}' → '{nombre_web}'")
                     break
 
         if pct is None:
