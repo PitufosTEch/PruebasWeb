@@ -328,6 +328,11 @@ const CURVAS_S_CONFIG = {
         { id: '1GymHwYsYX2irdSgiIj_cvOHjN2OfeMGM', label: 'Total Proyecto · El Coihue' },
         { id: '1dkQlZeBYkKqMQqp196VM-Sz3iyaoIdS6', label: 'Todos los Grupos · El Coihue' },
     ],
+    'P12': [
+        { id: '13i8lu9UvfYUW7qegil9plwJDvh3aVnTI', label: 'Grupo 1 · Juan Huilcan Tolten' },
+        { id: '1wAyWKyEkViu78nVmXUVHED9xvaCEz-Qr', label: 'Total Proyecto · Juan Huilcan Tolten' },
+        { id: '11mHuPTKKJBrhJU26o09vw88FShNRRB8-', label: 'Todos los Grupos · Juan Huilcan Tolten' },
+    ],
 };const EstadoGeneralTab=({viviendas,observaciones,grupos,resumenComentarios,proyectoSel,proy,garantiasProy=[],muestrasProy=[],muestrasResumen=null,kpis=null,cierresForzados={}})=>{const[expandida,setExpandida]=React.useState(null);const[busqueda,setBusqueda]=React.useState("");const[filtro,setFiltro]=React.useState("todas");// todas | pendientes | recepcionadas
 const[grupoColapsado,setGrupoColapsado]=React.useState({});// {grupoId: true/false}
 const[showCapatazMenu,setShowCapatazMenu]=React.useState(false);const[avanceGanttData,setAvanceGanttData]=React.useState({});React.useEffect(()=>{fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/avance_gantt.json').then(r=>r.json()).then(d=>{AVANCE_GANTT_DATA=d||{};setAvanceGanttData(d||{});}).catch(()=>{});fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/avance_benef.json').then(r=>r.json()).then(d=>{AVANCE_BENEF_DATA=d||{};}).catch(()=>{});},[]);// ── Generador de Informe Semanal ────────────────────────────────────────
