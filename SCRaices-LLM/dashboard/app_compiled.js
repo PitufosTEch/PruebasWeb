@@ -347,6 +347,11 @@ const CURVAS_S_CONFIG = {
         { id: '1xQGMxD9GJzk9VDX9T7Vqg7o59EoO0sFb', label: 'Total Proyecto · Raíces de Melipeuco' },
         { id: '1Uyol-_XZywWPIgfSDhQOEiLbVaHKlOdE', label: 'Todos los Grupos · Raíces de Melipeuco' },
     ],
+    'P28': [
+        { id: '14AcVtTn0tkn9ulUd7zYsvzBvnOZTFubV', label: 'Grupo 1 · Elsa Pinchulaf' },
+        { id: '1bjtceyoJ4r759ZYX9BZcV9getXZG8vMD', label: 'Total Proyecto · Elsa Pinchulaf' },
+        { id: '1xrbAx0qp60k81N45bSbiM-s-5Do2uWI_', label: 'Todos los Grupos · Elsa Pinchulaf' },
+    ],
     'P31': [
         { id: '1oSyAEEXRrOf0kEoRslATx2Nz7d59Ozbt', label: 'Grupo 1 · Trovolhue' },
         { id: '1CKIL59pY7-Le25q6aw3kWqhwKtvzeU5T', label: 'Total Proyecto · Trovolhue' },
