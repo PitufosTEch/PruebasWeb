@@ -347,6 +347,11 @@ const CURVAS_S_CONFIG = {
         { id: '1xQGMxD9GJzk9VDX9T7Vqg7o59EoO0sFb', label: 'Total Proyecto · Raíces de Melipeuco' },
         { id: '1Uyol-_XZywWPIgfSDhQOEiLbVaHKlOdE', label: 'Todos los Grupos · Raíces de Melipeuco' },
     ],
+    'P116': [
+        { id: '1o5r-jF1DcVNbaC_M2Dur6GivYp2VO34K', label: 'Grupo 1 · Sonia Quilaleo' },
+        { id: '1ZK51WIwV57iM3Ed9fajBx-OSXlE7TnaU', label: 'Total Proyecto · Sonia Quilaleo' },
+        { id: '16ustScgOrRUBOWf1QrfyFcX_FegSV9qb', label: 'Todos los Grupos · Sonia Quilaleo' },
+    ],
 };const EstadoGeneralTab=({viviendas,observaciones,grupos,resumenComentarios,proyectoSel,proy,garantiasProy=[],muestrasProy=[],muestrasResumen=null,kpis=null,cierresForzados={}})=>{const[expandida,setExpandida]=React.useState(null);const[busqueda,setBusqueda]=React.useState("");const[filtro,setFiltro]=React.useState("todas");// todas | pendientes | recepcionadas
 const[grupoColapsado,setGrupoColapsado]=React.useState({});// {grupoId: true/false}
 const[showCapatazMenu,setShowCapatazMenu]=React.useState(false);const[avanceGanttData,setAvanceGanttData]=React.useState({});React.useEffect(()=>{fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/avance_gantt.json').then(r=>r.json()).then(d=>{AVANCE_GANTT_DATA=d||{};setAvanceGanttData(d||{});}).catch(()=>{});fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/avance_benef.json').then(r=>r.json()).then(d=>{AVANCE_BENEF_DATA=d||{};}).catch(()=>{});},[]);// ── Generador de Informe Semanal ────────────────────────────────────────
