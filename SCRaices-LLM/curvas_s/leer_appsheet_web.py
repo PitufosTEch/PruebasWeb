@@ -276,15 +276,12 @@ def _filtrar_por_proyecto(page, nombre_panel: str, project_id: str):
     js_buscar_y_clicar = f"""
     () => {{
         const nombre = "{nombre_js}";
-        const palabras = nombre.split(' ');
-        // Prefijo: primeras 2 palabras si las hay, o la primera sola (sin espacio trailing)
-        const prefijo = palabras.length >= 2
-            ? (palabras[0] + ' ' + palabras[1].slice(0, 4)).toLowerCase()
-            : palabras[0].toLowerCase();
+        // Usar nombre completo como prefijo para evitar falsos positivos entre proyectos similares
+        const prefijo = nombre.toLowerCase();
 
         const items = Array.from(document.querySelectorAll('*'));
         for (const el of items) {{
-            if (el.children.length > 2) continue;
+            if (el.children.length > 6) continue;  // tolerar hasta 6 hijos (iconos, badges)
             // Normalizar: colapsar saltos de línea/espacios múltiples
             const t = (el.textContent || '').replace(/\\s+/g, ' ').trim();
             if (!t.toLowerCase().startsWith(prefijo)) continue;
@@ -326,24 +323,27 @@ def _filtrar_por_proyecto(page, nombre_panel: str, project_id: str):
     """)
     log.info(f"[{project_id}] Panel scroll container: {panel_scroll}")
 
-    for scroll_step in range(10):  # máx ~4000px de scroll (10 × 400px)
-        # Scroll del panel izquierdo vía JS en el contenedor scrollable
-        page.evaluate("""
-        () => {
-            const all = Array.from(document.querySelectorAll('*'));
-            for (const el of all) {
-                const r = el.getBoundingClientRect();
-                if (r.x > 200 || r.width < 30) continue;
-                const style = window.getComputedStyle(el);
-                if ((style.overflowY === 'auto' || style.overflowY === 'scroll')
-                    && el.scrollHeight > el.clientHeight + 50) {
-                    el.scrollTop += 400;
-                    return;
-                }
+    js_scroll_panel = """
+    () => {
+        const all = Array.from(document.querySelectorAll('*'));
+        for (const el of all) {
+            const r = el.getBoundingClientRect();
+            if (r.x > 200 || r.width < 30) continue;
+            const style = window.getComputedStyle(el);
+            if ((style.overflowY === 'auto' || style.overflowY === 'scroll')
+                && el.scrollHeight > el.clientHeight + 50) {
+                el.scrollTop += 300;
+                return el.scrollTop;
             }
         }
-        """)
-        page.wait_for_timeout(400)
+        return -1;
+    }
+    """
+
+    for scroll_step in range(15):  # máx 15 × 300px = 4500px de scroll
+        # Scroll del panel izquierdo y esperar re-render del scroll virtual
+        page.evaluate(js_scroll_panel)
+        page.wait_for_timeout(800)   # AppSheet scroll virtual necesita ~800ms para re-renderizar
         clicado = page.evaluate(js_buscar_y_clicar)
         if clicado != 'not_found':
             log.info(f"[{project_id}] Filtro JS (scroll {scroll_step+1}): {clicado}")
@@ -352,6 +352,51 @@ def _filtrar_por_proyecto(page, nombre_panel: str, project_id: str):
             return
 
     log.warning(f"[{project_id}] Filtro JS: not_found (incluso con scroll)")
+
+    # Dump de los items visibles en el panel para diagnóstico
+    items_panel = page.evaluate("""
+    () => {
+        const all = Array.from(document.querySelectorAll('*'));
+        const found = [];
+        const seen = new Set();
+        for (const el of all) {
+            const r = el.getBoundingClientRect();
+            if (r.x > 250 || r.width < 20 || r.height < 5) continue;
+            const t = (el.textContent || '').replace(/\s+/g, ' ').trim();
+            if (t.length < 2 || t.length > 60 || seen.has(t)) continue;
+            seen.add(t);
+            found.push(t);
+        }
+        return found;
+    }
+    """)
+    log.warning(f"[{project_id}] Panel items visibles: {items_panel[:30]}")
+
+    # Fallback: buscar por project_id ("P12", "P28", etc.) en el texto del panel
+    pid_js = project_id.replace('"', '')
+    clicado_pid = page.evaluate(f"""
+    () => {{
+        const pid = "{pid_js}".toLowerCase();
+        const items = Array.from(document.querySelectorAll('*'));
+        for (const el of items) {{
+            const r = el.getBoundingClientRect();
+            if (r.x > 320 || r.width < 20 || r.height < 8) continue;
+            const t = (el.textContent || '').replace(/\\s+/g, ' ').trim().toLowerCase();
+            if (t.length < 2 || t.length > 80) continue;
+            if (t.includes(pid)) {{
+                el.click();
+                return 'clicked_by_pid:' + t.slice(0, 50);
+            }}
+        }}
+        return 'not_found';
+    }}
+    """)
+    if clicado_pid != 'not_found':
+        log.info(f"[{project_id}] Filtro por código: {clicado_pid}")
+        page.wait_for_timeout(3_000)
+    else:
+        log.warning(f"[{project_id}] No encontrado ni por nombre ni por código — usando vista sin filtro")
+
     _screenshot_debug(page, project_id, "post_filtro")
 
 
