@@ -51,19 +51,28 @@ def _proyecto_por_id(project_id: str) -> dict:
 
 
 # ─── AUTENTICACIÓN ────────────────────────────────────────────────────────────
+def _launch_browser(playwright, headless: bool):
+    """Lanza browser: Chromium descargado por Playwright o Chrome del sistema como fallback."""
+    try:
+        return playwright.chromium.launch(headless=headless)
+    except Exception:
+        # Fallback: Chrome real instalado en el sistema (Windows)
+        return playwright.chromium.launch(channel="chrome", headless=headless)
+
+
 def _get_context(playwright, headless: bool = True):
     """Crea contexto Playwright con sesión guardada (cookies de AppSheet)."""
     # Modo cloud: cookies desde env var
     cookies_b64 = os.environ.get("APPSHEET_COOKIES_B64", "").strip()
     if cookies_b64:
         cookies = json.loads(base64.b64decode(cookies_b64).decode())
-        ctx = playwright.chromium.launch(headless=headless).new_context()
+        ctx = _launch_browser(playwright, headless).new_context()
         ctx.add_cookies(cookies)
         return ctx
 
     # Modo local: sesión guardada en JSON
     if Path(AUTH_FILE).exists():
-        browser = playwright.chromium.launch(headless=headless)
+        browser = _launch_browser(playwright, headless)
         return browser.new_context(storage_state=AUTH_FILE)
 
     raise RuntimeError(
@@ -96,16 +105,28 @@ def leer_proyecto(project_id: str, headless: bool = True) -> dict:
         page.goto(appsheet_url, wait_until="domcontentloaded", timeout=90_000)
         _verificar_login(page)
 
-        # 2. Esperar que la app cargue (buscar texto "Total Avances" o similar)
+        # 2. Esperar que la app cargue — probar selectores en secuencia
         log.info(f"[{project_id}] Esperando carga de la app...")
-        try:
-            page.wait_for_selector("text=Total Avances", timeout=60_000)
-        except PWTimeout:
+        cargado = False
+        for sel in ["text=Inicio", "text=SG Raíces", "[class*='appbody']", "[class*='app-body']"]:
+            try:
+                page.wait_for_selector(sel, timeout=60_000)
+                cargado = True
+                log.info(f"[{project_id}] App lista (selector: {sel})")
+                break
+            except PWTimeout:
+                continue
+        if not cargado:
             _screenshot_debug(page, project_id, "carga")
-            raise RuntimeError(f"[{project_id}] AppSheet no cargó 'Total Avances' en 60s")
+            raise RuntimeError(f"[{project_id}] AppSheet no cargó en 60s")
 
-        # 3. Navegar a la vista "Total Avances" si no estamos en ella
+        page.wait_for_timeout(2_000)  # Dejar que el nav se estabilice
+
+        # 3. Navegar a la vista "Total Avances"
         _navegar_a_total_avances(page, project_id)
+
+        # Screenshot post-navegación (siempre, para diagnóstico)
+        _screenshot_debug(page, project_id, "post_nav")
 
         # 4. Filtrar por proyecto en el panel izquierdo
         _filtrar_por_proyecto(page, nombre_panel, project_id)
@@ -130,44 +151,149 @@ def _verificar_login(page):
 
 
 def _navegar_a_total_avances(page, project_id: str):
-    """Hace click en 'Total Avances' en la navegación si no estamos ahí."""
-    try:
-        # Esperar que el menú lateral cargue
-        page.wait_for_selector("text=Obras", timeout=15_000)
-        # Click en "Total Avances" en el menú
-        nav = page.locator("text=Total Avances").first
-        if nav.is_visible():
-            nav.click()
-            page.wait_for_timeout(2_000)
-            log.info(f"[{project_id}] Navegado a 'Total Avances'")
-    except Exception as e:
-        log.warning(f"[{project_id}] No se pudo navegar a 'Total Avances': {e}")
+    """
+    Navega a la vista 'Total Avances' desde cualquier pantalla de AppSheet.
+    La nav izquierda muestra solo íconos. El texto "Total Avances [En Ejecución]"
+    existe en el DOM como span oculto dentro del ícono padre.
+    Estrategia: click en el ancestor visible del span que contiene "Total Avances".
+    """
+    # Estrategia 1: JavaScript — click en el ancestor visible del span "Total Avances"
+    clicado = page.evaluate("""
+    () => {
+        // Buscar span con texto "Total Avances" (puede ser "Total Avances [En Ejecución]")
+        const spans = Array.from(document.querySelectorAll('span, div, a, li'));
+        const found = spans.find(el =>
+            el.textContent.trim().startsWith('Total Avances') &&
+            el.children.length === 0
+        );
+        if (!found) return 'no_span';
+
+        // Subir por el árbol hasta encontrar el primer elemento visible clicable
+        let el = found.parentElement;
+        for (let i = 0; i < 8; i++) {
+            if (!el) break;
+            const style = window.getComputedStyle(el);
+            const rect  = el.getBoundingClientRect();
+            if (rect.width > 0 && rect.height > 0 &&
+                style.display !== 'none' && style.visibility !== 'hidden' &&
+                style.pointerEvents !== 'none') {
+                el.click();
+                return 'clicked:' + el.tagName + '.' + (el.className || '').slice(0, 40);
+            }
+            el = el.parentElement;
+        }
+        return 'no_clickable_ancestor';
+    }
+    """)
+    log.info(f"[{project_id}] nav JS: {clicado}")
+
+    # Esperar que la vista "Total Avances" cargue (hasta 15s)
+    for wait_sel in ["text=Total Avances", "text=Todo"]:
+        try:
+            page.wait_for_selector(wait_sel, timeout=15_000)
+            log.info(f"[{project_id}] Vista 'Total Avances' lista ('{wait_sel}')")
+            page.wait_for_timeout(1_500)
+            return
+        except PWTimeout:
+            continue
+
+    # Fallback: probar íconos si el JS click no funcionó
+    if "no_" in str(clicado):
+        _click_nav_icon_hasta_total_avances(page, project_id)
+
+
+def _click_nav_icon_hasta_total_avances(page, project_id: str):
+    """
+    Fallback: hace click en cada ícono de la barra lateral hasta que la vista
+    actual muestre "Total Avances" en el título/breadcrumb.
+    """
+    # Los íconos de nav en AppSheet son elementos con clase b-jss* en el sidebar
+    nav_icons = page.evaluate("""
+    () => {
+        // Buscar todos los elementos clicables en la barra lateral izquierda
+        const sidebar = document.querySelector('[class*="app-nav"], [class*="appnav"], [class*="sidebar"]');
+        if (!sidebar) return [];
+        const items = Array.from(sidebar.querySelectorAll('[role="button"], [role="menuitem"], li, a'));
+        return items.map((el, i) => ({
+            idx: i,
+            tag: el.tagName,
+            cls: (el.className || '').slice(0, 60),
+            text: el.textContent.trim().slice(0, 50),
+            visible: el.getBoundingClientRect().width > 0,
+        }));
+    }
+    """)
+    log.info(f"[{project_id}] Fallback: {len(nav_icons)} ítems en sidebar")
+
+    for item in nav_icons:
+        if not item.get("visible"):
+            continue
+        try:
+            # Click por índice usando el selector CSS
+            page.evaluate(f"""
+            () => {{
+                const sidebar = document.querySelector('[class*="app-nav"], [class*="appnav"], [class*="sidebar"]');
+                if (!sidebar) return;
+                const items = Array.from(sidebar.querySelectorAll('[role="button"], [role="menuitem"], li, a'));
+                const el = items[{item['idx']}];
+                if (el) el.click();
+            }}
+            """)
+            page.wait_for_timeout(1_200)
+
+            # ¿Estamos en Total Avances?
+            try:
+                page.wait_for_selector("text=Total Avances", timeout=2_000)
+                log.info(f"[{project_id}] Ícono {item['idx']} ('{item['text']}') → Total Avances")
+                return
+            except PWTimeout:
+                continue
+        except Exception:
+            continue
+
+    _screenshot_debug(page, project_id, "nav_fallo")
+    log.warning(f"[{project_id}] No se encontró 'Total Avances' tras probar todos los íconos")
 
 
 def _filtrar_por_proyecto(page, nombre_panel: str, project_id: str):
-    """Hace click en el nombre del proyecto en el panel izquierdo para filtrar."""
+    """
+    Hace click en el nombre del proyecto en el panel izquierdo.
+    El panel muestra "El Maitén 49,50%" — buscamos las primeras palabras del nombre.
+    """
     log.info(f"[{project_id}] Filtrando por '{nombre_panel}' en panel izquierdo...")
 
-    # Intentar encontrar el proyecto en el panel izquierdo (coincidencia parcial)
-    # El panel muestra "Ñuke Mapu 85.91%" — buscamos el texto del nombre
-    try:
-        # Primero intentar click exacto en panel izquierdo
-        panel_items = page.locator(f"text={nombre_panel}").all()
-        if not panel_items:
-            # Buscar por primera parte del nombre (puede estar truncado)
-            primera_parte = nombre_panel.split()[0]
-            panel_items = page.locator(f"text={primera_parte}").all()
+    # Buscar por JavaScript usando la mayor parte del nombre para evitar falsas coincidencias
+    nombre_js = nombre_panel.replace('"', '').replace("'", "\\'")
+    clicado = page.evaluate(f"""
+    () => {{
+        const nombre = "{nombre_js}";
+        // Usar prefijo de 2 palabras para evitar coincidencias falsas (ej. "El" vs "Electrico")
+        const palabras = nombre.split(' ');
+        const prefijo = palabras.length >= 2
+            ? palabras[0] + ' ' + palabras[1].slice(0, 4)  // "El Mait"
+            : palabras[0] + ' ';                            // "Aliwen " (con espacio)
 
-        if not panel_items:
-            log.warning(f"[{project_id}] No encontrado '{nombre_panel}' en panel, continuando sin filtro")
-            return
+        const items = Array.from(document.querySelectorAll('*'));
+        for (const el of items) {{
+            // Aceptar nodos con pocos hijos también (el texto puede estar en un span hijo)
+            if (el.children.length > 2) continue;
+            const t = (el.textContent || '').trim();
+            // Debe contener el prefijo y tener texto razonable (no un botón gigante)
+            if (!t.toLowerCase().startsWith(prefijo.toLowerCase())) continue;
+            if (t.length > 80) continue;
+            const r = el.getBoundingClientRect();
+            // Debe ser visible y estar en el panel izquierdo (x < 320px)
+            if (r.width < 20 || r.height < 8 || r.x > 320) continue;
+            el.click();
+            return 'clicked:' + t.slice(0, 50);
+        }}
+        return 'not_found';
+    }}
+    """)
+    log.info(f"[{project_id}] Filtro JS: {clicado}")
+    page.wait_for_timeout(3_000)  # Esperar que el filtro actualice las tarjetas
 
-        # Hacer click en el primer elemento que coincida
-        panel_items[0].click()
-        page.wait_for_timeout(2_500)  # Esperar actualización de la lista
-        log.info(f"[{project_id}] Filtro aplicado")
-    except Exception as e:
-        log.warning(f"[{project_id}] Error al filtrar: {e} — continuando sin filtro")
+    _screenshot_debug(page, project_id, "post_filtro")
 
 
 def _leer_beneficiarios(page, project_id: str, nombre_panel: str) -> dict:
@@ -178,11 +304,14 @@ def _leer_beneficiarios(page, project_id: str, nombre_panel: str) -> dict:
     """
     resultados = {}
 
-    # Esperar que aparezcan tarjetas de beneficiarios
+    # Esperar badges SVG (AppSheet incrusta el % en data-testonly-src como SVG)
     try:
-        page.wait_for_selector("[class*='approw'], [class*='list-item'], [class*='card']", timeout=15_000)
+        page.wait_for_function(
+            r"() => Array.from(document.querySelectorAll('[data-testonly-src]')).some(el => />(\d{1,3})%</.test(el.getAttribute('data-testonly-src')||''))",
+            timeout=15_000
+        )
     except PWTimeout:
-        log.warning(f"[{project_id}] No se detectaron tarjetas — intentando lectura de texto bruto")
+        log.warning(f"[{project_id}] No se detectaron badges SVG — intentando igualmente")
 
     # Scroll para cargar todos los beneficiarios (AppSheet puede tener scroll infinito)
     _scroll_completo(page, project_id)
@@ -203,81 +332,87 @@ def _scroll_completo(page, project_id: str, max_scrolls: int = 20):
     """Hace scroll hacia abajo hasta que no aparezcan más tarjetas nuevas."""
     prev_count = 0
     for i in range(max_scrolls):
-        # Scroll hacia abajo en el área de contenido
         page.keyboard.press("End")
         page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-        page.wait_for_timeout(800)
+        page.wait_for_timeout(900)
 
-        # Contar tarjetas visibles
-        count = page.evaluate("""
+        # Contar badges SVG con % (AppSheet usa data-testonly-src con SVG incrustado)
+        count = page.evaluate(r"""
         () => {
-            const sels = ['[class*="approw"]', '[class*="list-item"]', '[class*="card-row"]'];
-            for (const s of sels) {
-                const els = document.querySelectorAll(s);
-                if (els.length > 2) return els.length;
-            }
-            return 0;
+            return Array.from(document.querySelectorAll('[data-testonly-src]')).filter(el =>
+                />(\d{1,3})%</.test(el.getAttribute('data-testonly-src') || '')
+            ).length;
         }
         """)
         if count == prev_count and count > 0:
             break
         prev_count = count
 
-    log.info(f"[{project_id}] Scroll completado — {prev_count} tarjetas visibles")
+    log.info(f"[{project_id}] Scroll completado — ~{prev_count} badges % visibles")
 
 
 def _extraer_de_tarjetas(page, project_id: str) -> dict:
     """
-    Intenta extraer nombre+% directamente del DOM de las tarjetas.
-    Retorna dict o {} si no puede determinar la estructura.
+    Extrae nombre+% de las tarjetas de beneficiarios.
+
+    AppSheet renderiza el badge de avance como una imagen SVG data URI en el
+    atributo `data-testonly-src` del elemento `.ImageWithSpinner`.
+    El % aparece dentro del SVG como <text>100%</text> — no como texto DOM.
+
+    Estrategia:
+    1. Busca todos los [data-testonly-src] que contengan SVG con texto de %
+    2. Parsea el porcentaje del SVG con regex
+    3. Sube al contenedor de la tarjeta para obtener el nombre
     """
     datos = page.evaluate(r"""
     () => {
         const resultado = [];
+        const vistos = new Set();
 
-        // Intentar múltiples selectores de tarjeta
-        const selectorsTarjeta = [
-            '[class*="approw-box"]',
-            '[class*="list-item-container"]',
-            '[class*="card-container"]',
-            '[class*="approw"]',
-        ];
+        // Buscar elementos con data-testonly-src que contengan SVG
+        const badgeEls = Array.from(document.querySelectorAll('[data-testonly-src]'));
 
-        let tarjetas = [];
-        for (const sel of selectorsTarjeta) {
-            const found = Array.from(document.querySelectorAll(sel));
-            // Filtrar elementos con al menos algún texto sustancial
-            const validos = found.filter(el => el.textContent.trim().length > 10);
-            if (validos.length > 2) {
-                tarjetas = validos;
-                break;
-            }
-        }
+        for (const badgeEl of badgeEls) {
+            const src = badgeEl.getAttribute('data-testonly-src') || '';
+            // El porcentaje está como >XX%< en el SVG embebido
+            const m = src.match(/>(\d{1,3})%</);
+            if (!m) continue;
+            const pct = parseFloat(m[1]);
+            if (isNaN(pct)) continue;
 
-        if (tarjetas.length === 0) return [];
-
-        for (const tarjeta of tarjetas) {
-            const texto = tarjeta.innerText || tarjeta.textContent || "";
-            const lineas = texto.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-
+            // Subir hasta el contenedor de la tarjeta para extraer el nombre
+            let container = badgeEl.parentElement;
             let nombre = null;
-            let pct    = null;
 
-            for (const linea of lineas) {
-                // Detectar porcentaje: "100%", "85,91%", "34.5%"
-                const mPct = linea.match(/^(\d{1,3}[.,]\d{1,2})%$|^(\d{1,3})%$/);
-                if (mPct) {
-                    const raw = mPct[1] || mPct[2];
-                    pct = parseFloat(raw.replace(',', '.'));
+            for (let i = 0; i < 10; i++) {
+                if (!container) break;
+                const rect = container.getBoundingClientRect();
+
+                if (rect.width > 100 && rect.height > 40) {
+                    const inner = (container.innerText || container.textContent || '');
+                    const lineas = inner.split(/\n|\r/).map(l => l.trim()).filter(l => l.length > 0);
+
+                    for (const linea of lineas) {
+                        if (linea.replace(/\s+/g, '').includes('%')) continue;
+                        if (linea.length < 6) continue;
+                        const palabras = linea.trim().split(/\s+/);
+                        if (palabras.length < 2) continue;
+                        if (!palabras.some(p => p.length >= 2)) continue;
+                        if (palabras.every(p => p.length <= 1)) continue;
+                        if (!/[A-Za-záéíóúñüÁÉÍÓÚÑÜ]/.test(linea)) continue;
+                        if (/^\d/.test(linea)) continue;
+
+                        nombre = linea.toUpperCase().trim();
+                        break;
+                    }
+
+                    if (nombre) break;
                 }
-                // Detectar nombre: línea con 2+ palabras en mayúsculas
-                if (!nombre && /^[A-ZÁÉÍÓÚÑÜA-Z][A-ZÁÉÍÓÚÑÜA-Za-záéíóúñü ]{4,}$/.test(linea)
-                    && linea.split(' ').length >= 2) {
-                    nombre = linea.toUpperCase().trim();
-                }
+                container = container.parentElement;
             }
 
-            if (nombre && pct !== null) {
+            if (nombre && !vistos.has(nombre)) {
+                vistos.add(nombre);
                 resultado.push({ nombre, pct });
             }
         }
@@ -305,36 +440,50 @@ def _extraer_por_click(page, project_id: str) -> dict:
     """
     resultados = {}
 
-    # Obtener todos los enlaces/botones de tarjeta que se puedan clicar
-    tarjetas = page.locator("[class*='approw'], [class*='list-item']").all()
-    if not tarjetas:
-        log.warning(f"[{project_id}] No se encontraron tarjetas clicables")
+    # Obtener posiciones de los badges SVG (data-testonly-src con % en SVG)
+    posiciones = page.evaluate(r"""
+    () => {
+        const badges = Array.from(document.querySelectorAll('[data-testonly-src]')).filter(el =>
+            />(\d{1,3})%</.test(el.getAttribute('data-testonly-src') || '')
+        );
+        return badges.map(el => {
+            const r = el.getBoundingClientRect();
+            return { x: Math.round(r.left + r.width/2), y: Math.round(r.top + r.height/2) };
+        }).filter(p => p.x > 0 && p.y > 0);
+    }
+    """)
+    if not posiciones:
+        log.warning(f"[{project_id}] No se encontraron tarjetas clicables por badges")
         return {}
 
-    log.info(f"[{project_id}] Procesando {len(tarjetas)} tarjetas por click...")
+    tarjetas = posiciones  # Usaremos coordenadas para click
 
-    for i, tarjeta in enumerate(tarjetas):
+    log.info(f"[{project_id}] Procesando {len(tarjetas)} tarjetas por click en badge...")
+
+    for i, pos in enumerate(tarjetas):
         try:
-            # Leer texto de la tarjeta (nombre)
-            texto_tarjeta = (tarjeta.inner_text() or "").strip()
-            nombre_raw = _extraer_nombre_de_texto(texto_tarjeta)
-            if not nombre_raw:
-                continue
-
-            # Click en la tarjeta para abrir detalle
-            tarjeta.click()
-            page.wait_for_timeout(1_500)
+            # Click en el badge de % para abrir detalle
+            page.mouse.click(pos["x"], pos["y"])
+            page.wait_for_timeout(1_800)
 
             # Leer "Avance" del panel de detalle
-            pct = _leer_avance_detalle(page, project_id, nombre_raw)
+            pct = _leer_avance_detalle(page, project_id, f"tarjeta_{i}")
             if pct is not None:
-                nombre_norm = _normalizar(nombre_raw)
-                resultados[nombre_norm] = round(pct, 2)
-                log.info(f"[{project_id}] {nombre_norm}: {pct}%")
+                # Intentar extraer el nombre del panel de detalle
+                nombre_raw = page.evaluate(r"""
+                () => {
+                    const lines = (document.body.innerText || '').split('\n').map(l => l.trim()).filter(l => l);
+                    return lines.find(l => !l.includes('%') && l.split(' ').length >= 2 && l.length > 8 && /[A-Za-záéíóúñüÁÉÍÓÚÑÜ]/.test(l)) || null;
+                }
+                """)
+                if nombre_raw:
+                    nombre_norm = _normalizar(nombre_raw)
+                    resultados[nombre_norm] = round(pct, 2)
+                    log.info(f"[{project_id}] {nombre_norm}: {pct}%")
 
-            # Volver a la lista (Escape o botón atrás)
+            # Volver a la lista
             page.keyboard.press("Escape")
-            page.wait_for_timeout(500)
+            page.wait_for_timeout(600)
 
         except Exception as e:
             log.warning(f"[{project_id}] Error en tarjeta {i}: {e}")

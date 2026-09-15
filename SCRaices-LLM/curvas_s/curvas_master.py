@@ -187,15 +187,18 @@ def leer_beneficiarios_gantt(sheets_svc, spreadsheet_id: str) -> list:
 # ─── PASO 2: % PROGRAMADO DESDE GANTT ────────────────────────────────────────
 def leer_pct_programado(sheets_svc, spreadsheet_id: str, control_date: date) -> dict:
     """Retorna { 'GRUPO 1': 55.3, ..., 'GRUPO REZAGADOS': 80.1, 'TOTAL': 26.85 }"""
-    raw = _ccu.leer_pct_gantt_grupos(sheets_svc, spreadsheet_id, control_date)
+    hoja = "Programa de obra"
+    raw = _ccu.leer_pct_prog_por_grupo(sheets_svc, spreadsheet_id, hoja, control_date)
     result = {}
     for k, v in raw.items():
-        if k == "TOTAL":
-            result["TOTAL"] = v
-        elif "REZAG" in k:
+        if "REZAG" in k.upper():
             result["GRUPO REZAGADOS"] = v
         else:
             result[k] = v
+    # % total del programa
+    total_pct = _ccu.leer_pct_programa_gantt(sheets_svc, spreadsheet_id, hoja)
+    if total_pct is not None:
+        result["TOTAL"] = total_pct
     log.info(f"  % programado {control_date}: {result}")
     return result
 
