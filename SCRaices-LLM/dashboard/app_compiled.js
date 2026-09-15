@@ -328,15 +328,18 @@ const CURVAS_S_CONFIG = {
         { id: '1GymHwYsYX2irdSgiIj_cvOHjN2OfeMGM', label: 'Total Proyecto · El Coihue' },
         { id: '1dkQlZeBYkKqMQqp196VM-Sz3iyaoIdS6', label: 'Todos los Grupos · El Coihue' },
     ],
+    'P127': [
+        { id: '1zf4uHy7Yop89INuc4cUG9vvcvU3L_Gi0', label: 'Grupo 1 · Nuevo Cunco' },
+        { id: '19tqHKbnV7nhw9DV3TrdWVHiup_h6H0NT', label: 'Grupo 2 · Nuevo Cunco' },
+        { id: '1raLIEwzEThb_Q2I3JVVaxkCpcIRxvz_a', label: 'Grupo 3 · Nuevo Cunco' },
+        { id: '1PAHB0xOTwlQlnvSxOeAkapDG1nJtfPid', label: 'Grupo 4 · Nuevo Cunco' },
+        { id: '1NdskA09o4KWiq3YAZlxLlGGxkM8LuUWx', label: 'Total Proyecto · Nuevo Cunco' },
+        { id: '1HfNXh0cyNr2_Sh4fVQQ3KHeU-APGH1Jt', label: 'Todos los Grupos · Nuevo Cunco' },
+    ],
     'P12': [
         { id: '13i8lu9UvfYUW7qegil9plwJDvh3aVnTI', label: 'Grupo 1 · Juan Huilcan Tolten' },
         { id: '1wAyWKyEkViu78nVmXUVHED9xvaCEz-Qr', label: 'Total Proyecto · Juan Huilcan Tolten' },
         { id: '11mHuPTKKJBrhJU26o09vw88FShNRRB8-', label: 'Todos los Grupos · Juan Huilcan Tolten' },
-    ],
-    'P14': [
-        { id: '1hBvSvP99b4jOfHHimiZItCdtVTOOP_Yp', label: 'Grupo 1 · Com. Madihue' },
-        { id: '1yZnzlq3vOW-MiLJDnvP5VeNNbAtL9eiV', label: 'Total Proyecto · Com. Madihue' },
-        { id: '1qcDQKBearDhbo0TpsMY6ptIgEQjbpVdb', label: 'Todos los Grupos · Com. Madihue' },
     ],
 };const EstadoGeneralTab=({viviendas,observaciones,grupos,resumenComentarios,proyectoSel,proy,garantiasProy=[],muestrasProy=[],muestrasResumen=null,kpis=null,cierresForzados={}})=>{const[expandida,setExpandida]=React.useState(null);const[busqueda,setBusqueda]=React.useState("");const[filtro,setFiltro]=React.useState("todas");// todas | pendientes | recepcionadas
 const[grupoColapsado,setGrupoColapsado]=React.useState({});// {grupoId: true/false}
