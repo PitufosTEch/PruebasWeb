@@ -346,6 +346,16 @@ const CURVAS_S_CONFIG = {
         { id: '1FCcSnB6oGKY9SBQ5dpfCL5b0SxoUBuU8', label: 'Total Proyecto · Com. Madihue' },
         { id: '1_azv-LSj9C8_r6rAjd1NEp6l0GGUSC2h', label: 'Todos los Grupos · Com. Madihue' },
     ],
+    'P126': [
+        { id: '1zm70oy2XH4q537Limr0FlBuxDdKO3w99', label: 'Grupo 1 · El Maitén' },
+        { id: '1CxSUbJCcu5wj4QgfEELUuUEtG4_J2MaE', label: 'Grupo 2 · El Maitén' },
+        { id: '1uDaXlWoFvtXBMND5LN4SFeku4GRTt89i', label: 'Grupo 3 · El Maitén' },
+        { id: '1MUsDlZk2yBiuZh5mQYSXW5ulJbMk6-KT', label: 'Grupo 4 · El Maitén' },
+        { id: '1fYus1gc1AgESGRr675Mwcex53Kg3QpRW', label: 'Grupo 5 · El Maitén' },
+        { id: '1JFMFo-gHnSfyvnGAmhKQhFSeLp-bYgG3', label: 'Grupo Rezagados · El Maitén' },
+        { id: '1EDScbAriCEmDb6LknQggZgWJaj4U5_ET', label: 'Total Proyecto · El Maitén' },
+        { id: '1sLKsgHNJki1DSNA_0OsTsgZyzmWagYHY', label: 'Todos los Grupos · El Maitén' },
+    ],
     'P131': [
         { id: '1UO5oPkN1EMy7J-gjb1yFtM-BFHKjzhcf', label: 'Grupo 1 · Raíces de Melipeuco' },
         { id: '1AZIhN6boXyDszwdB_oDpUGVMDptNraCr', label: 'Grupo 2 · Raíces de Melipeuco' },
