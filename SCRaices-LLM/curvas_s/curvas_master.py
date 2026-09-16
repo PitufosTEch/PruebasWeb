@@ -510,6 +510,7 @@ def actualizar_firebase(project_id: str, beneficiarios: list,
         return
     pct_total = round(sum(b["pct_real"] for b in beneficiarios) / n, 2)
     payload = {
+        "pct":      pct_total,   # campo que lee el dashboard
         "pct_real": pct_total,
         "pct_prog": round(pcts_prog.get("TOTAL", 0.0), 2),
         "fecha":    control_date.isoformat(),
