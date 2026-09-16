@@ -341,6 +341,11 @@ const CURVAS_S_CONFIG = {
         { id: '1wAyWKyEkViu78nVmXUVHED9xvaCEz-Qr', label: 'Total Proyecto · Juan Huilcan Tolten' },
         { id: '11mHuPTKKJBrhJU26o09vw88FShNRRB8-', label: 'Todos los Grupos · Juan Huilcan Tolten' },
     ],
+    'P14': [
+        { id: '1g3Aum5BehVJNUjJt1mlvPpiOkjyAStxh', label: 'Grupo 1 · Com. Madihue' },
+        { id: '1FCcSnB6oGKY9SBQ5dpfCL5b0SxoUBuU8', label: 'Total Proyecto · Com. Madihue' },
+        { id: '1_azv-LSj9C8_r6rAjd1NEp6l0GGUSC2h', label: 'Todos los Grupos · Com. Madihue' },
+    ],
     'P131': [
         { id: '1UO5oPkN1EMy7J-gjb1yFtM-BFHKjzhcf', label: 'Grupo 1 · Raíces de Melipeuco' },
         { id: '1AZIhN6boXyDszwdB_oDpUGVMDptNraCr', label: 'Grupo 2 · Raíces de Melipeuco' },
