@@ -666,6 +666,8 @@ def actualizar_dashboard(all_drive_ids: dict):
     cfg = _cargar_config()
 
     # Construir nuevo bloque CURVAS_S_CONFIG
+    import time as _time
+    ts = int(_time.time())  # timestamp para cache-busting de thumbnails Drive
     lines = ["const CURVAS_S_CONFIG = {"]
     for proy in cfg["proyectos"]:
         pid    = proy["id"]
@@ -688,7 +690,7 @@ def actualizar_dashboard(all_drive_ids: dict):
             else:
                 num = key.replace("GRUPO ", "")
                 label = f"Grupo {num} · {nombre}"
-            lines.append(f"        {{ id: '{fid}', label: '{label}' }},")
+            lines.append(f"        {{ id: '{fid}', label: '{label}', v: '{ts}' }},")
         lines.append("    ],")
     lines.append("};")
     nuevo_config = "\n".join(lines)
