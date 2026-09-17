@@ -33,6 +33,7 @@ from collections import defaultdict
 from datetime import date, timedelta
 from pathlib import Path
 
+import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -281,26 +282,105 @@ def _interpolar(fechas: list, pcts: list, target: date):
     return pcts[-1] if pcts else None
 
 
-def _curva_real_grupo(beneficiarios: list, control_date: date):
-    fecha_ini = None
-    for b in beneficiarios:
-        fi = _fecha_inicio(b)
-        if fi and (fecha_ini is None or fi < fecha_ini):
-            fecha_ini = fi
-    if not fecha_ini:
-        return [], []
+def _s_curve_real(t_days: int, pct_real: float, t_control: int) -> float:
+    """Modelo logístico: crece de 0 a pct_real en t_control días."""
+    if t_control <= 0 or pct_real == 0:
+        return 0.0
+    t_norm = t_days / t_control
+    k = 5.0
+    v     = 1.0 / (1.0 + np.exp(-k * (t_norm - 0.5)))
+    v_max = 1.0 / (1.0 + np.exp(-k *  0.5))
+    v_min = 1.0 / (1.0 + np.exp(-k * -0.5))
+    return float(np.clip((v - v_min) / (v_max - v_min) * pct_real, 0.0, pct_real))
 
-    n_total = len(beneficiarios)
-    fechas, pcts = [], []
-    for semana in range(0, 40):
-        f = fecha_ini + timedelta(weeks=semana)
-        activos = [b for b in beneficiarios if _fecha_inicio(b) is not None and _fecha_inicio(b) <= f]
-        pct = round(sum(b["pct_real"] for b in activos) / n_total, 2) if activos else 0.0
-        fechas.append(f)
-        pcts.append(pct)
-        if pct >= 99.9:
-            break
-    return fechas, pcts
+
+def _fin_proyectado_benef(b: dict, control_date: date) -> date:
+    """Fecha estimada de término de un beneficiario al ritmo actual."""
+    fi = _fecha_inicio(b)
+    if fi is None:
+        return control_date + timedelta(days=245)
+    pct = b["pct_real"]
+    # Para avance muy bajo (<= 10%) la extrapolación lineal es poco confiable;
+    # usar la duración nominal de obra (igual que hacía el script original).
+    if pct <= 10:
+        return fi + timedelta(days=245)
+    dias_trans = max(1, (control_date - fi).days)
+    tasa = pct / dias_trans
+    dias_rest = (100.0 - pct) / tasa
+    # Cap: nunca proyectar más de 3 años desde la fecha de control
+    dias_rest = min(dias_rest, 3 * 365)
+    return control_date + timedelta(days=int(dias_rest))
+
+
+def _curva_real_grupo(beneficiarios: list, control_date: date):
+    """
+    Retorna (fechas_hist, pcts_hist, fechas_proj, pcts_proj).
+    - hist: desde fecha_ini hasta control_date, curva sigmoide por beneficiario.
+    - proj: desde control_date hasta fin proyectado, extrapolación lineal.
+    """
+    fechas_ini_validas = [_fecha_inicio(b) for b in beneficiarios if _fecha_inicio(b)]
+    if not fechas_ini_validas:
+        return [], [], [], []
+
+    fecha_ini = min(fechas_ini_validas)
+    n_total   = len(beneficiarios)
+
+    # Fin proyectado: el más tardío entre todos los beneficiarios
+    fin_proy = max(_fin_proyectado_benef(b, control_date) for b in beneficiarios)
+    fin_proy = max(fin_proy, control_date + timedelta(days=30))
+
+    # ── Curva histórica (hasta control_date, sigmoide) ──
+    fechas_hist, pcts_hist = [], []
+    f = fecha_ini
+    while f <= control_date:
+        valores = []
+        for b in beneficiarios:
+            fi = _fecha_inicio(b)
+            if fi is None or fi > f:
+                continue
+            t_dias    = max(0, (f - fi).days)
+            t_control = max(1, (control_date - fi).days)
+            valores.append(_s_curve_real(t_dias, b["pct_real"], t_control))
+        pct_avg = round(sum(valores) / n_total, 2) if valores else 0.0
+        fechas_hist.append(f)
+        pcts_hist.append(pct_avg)
+        f += timedelta(weeks=1)
+
+    # Asegurar que el último punto histórico es exactamente control_date
+    if fechas_hist and fechas_hist[-1] != control_date:
+        valores_ctrl = []
+        for b in beneficiarios:
+            fi = _fecha_inicio(b)
+            if fi is None or fi > control_date:
+                continue
+            t_control = max(1, (control_date - fi).days)
+            valores_ctrl.append(_s_curve_real(t_control, b["pct_real"], t_control))
+        pct_ctrl = round(sum(valores_ctrl) / n_total, 2) if valores_ctrl else pcts_hist[-1]
+        fechas_hist.append(control_date)
+        pcts_hist.append(pct_ctrl)
+
+    # ── Curva proyectada (desde control_date hasta fin_proy) ──
+    fechas_proj, pcts_proj = [], []
+    pct_en_ctrl = pcts_hist[-1] if pcts_hist else 0.0
+    f = control_date
+    while f <= fin_proy:
+        valores = []
+        for b in beneficiarios:
+            fi = _fecha_inicio(b)
+            if fi is None or fi > control_date:
+                continue
+            if b["pct_real"] <= 0:
+                continue
+            t_control = max(1, (control_date - fi).days)
+            tasa = b["pct_real"] / t_control
+            v = min(100.0, b["pct_real"] + tasa * (f - control_date).days)
+            valores.append(v)
+        pct_avg = round(sum(valores) / n_total, 2) if valores else pct_en_ctrl
+        fechas_proj.append(f)
+        pcts_proj.append(pct_avg)
+        f += timedelta(weeks=1)
+
+    return fechas_hist, pcts_hist, fechas_proj, pcts_proj
 
 
 def _curva_prog_lineal(beneficiarios: list, pct_prog: float, control_date: date):
@@ -326,47 +406,75 @@ def _setup_ax(ax, titulo: str, control_date: date):
     ax.set_facecolor("#f8f9fa")
     ax.set_title(titulo, fontsize=12, fontweight="bold", pad=8)
     ax.set_ylabel("% Avance", fontsize=9)
-    ax.set_ylim(0, 110)
+    ax.set_ylim(-2, 108)
     ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f"{x:.0f}%"))
-    ax.xaxis.set_major_formatter(mdates.DateFormatter("%d/%m"))
-    ax.xaxis.set_major_locator(mdates.WeekdayLocator(byweekday=0, interval=2))
-    plt.xticks(rotation=45, ha="right", fontsize=7)
-    ax.grid(True, alpha=0.3, linestyle="--")
-    for y in range(0, 110, 10):
-        ax.axhline(y, color="#dddddd", lw=0.5, zorder=1)
-    ax.axvline(control_date, color="#cc0000", lw=1.2, linestyle=":", zorder=4)
-    ax.text(0.99, 0.02, control_date.strftime("%d/%m/%Y"),
-            transform=ax.transAxes, ha="right", va="bottom", fontsize=7, color="#888888")
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%b %Y"))
+    ax.xaxis.set_major_locator(mdates.MonthLocator())
+    plt.xticks(rotation=45, ha="right", fontsize=8)
+    ax.grid(axis="y", alpha=0.4, linestyle="--")
+    ax.grid(axis="x", alpha=0.2, linestyle=":")
+    ax.axvline(control_date, color="#ff7f0e", lw=2, linestyle="-.", zorder=4,
+               label=f"Fecha Control ({control_date.strftime('%d/%m/%Y')})")
 
 
 def generar_imagen_grupo(beneficiarios: list, grupo: str, proyecto_nombre: str,
                          pct_prog, output_path: Path, control_date: date):
     color = _color_grupo(grupo, 0)
-    fechas_real, pcts_real = _curva_real_grupo(beneficiarios, control_date)
+    fechas_hist, pcts_hist, fechas_proj, pcts_proj = _curva_real_grupo(beneficiarios, control_date)
 
     fig, ax = plt.subplots(figsize=(10, 5.1), dpi=200)
     fig.patch.set_facecolor("white")
     _setup_ax(ax, f"Curva S — {grupo}  ·  {proyecto_nombre}", control_date)
 
+    # Curva programada (lineal de referencia)
+    ppc = None
     if pct_prog is not None:
         fp, pp = _curva_prog_lineal(beneficiarios, pct_prog, control_date)
         if fp:
             ax.plot(fp, pp, color="#888888", lw=1.5, linestyle="--", label="Programado", zorder=2)
             ppc = _interpolar(fp, pp, control_date)
-            if ppc is not None:
-                ax.plot(control_date, ppc, "s", color="#888888", markersize=7, zorder=5)
-                ax.annotate(f"{ppc:.1f}%", (control_date, ppc),
-                            textcoords="offset points", xytext=(8, -12), fontsize=9, color="#555555")
 
-    if fechas_real:
-        ax.plot(fechas_real, pcts_real, color=color, lw=2.5, marker="o", markersize=4,
+    # Curva real histórica (sigmoide)
+    prc = None
+    if fechas_hist:
+        ax.plot(fechas_hist, pcts_hist, color=color, lw=2.5, marker="o", markersize=3,
                 label="Real", zorder=3)
-        prc = _interpolar(fechas_real, pcts_real, control_date)
-        if prc is not None:
-            ax.plot(control_date, prc, "o", color=color, markersize=8, zorder=5)
-            ax.annotate(f"{prc:.1f}%", (control_date, prc),
-                        textcoords="offset points", xytext=(8, 4),
-                        fontsize=10, fontweight="bold", color=color)
+        ax.axvspan(fechas_hist[0], control_date, alpha=0.04, color="green", zorder=0)
+        prc = pcts_hist[-1]
+
+    # Curva proyectada (punteada)
+    if fechas_proj and len(fechas_proj) > 1:
+        ax.plot(fechas_proj, pcts_proj, color=color, lw=1.8, linestyle=":",
+                label="Proyectado", zorder=2, alpha=0.8)
+        ax.axvspan(control_date, fechas_proj[-1], alpha=0.03, color="red", zorder=0)
+
+    # Marcador y anotación en fecha de control
+    if prc is not None:
+        ax.plot(control_date, prc, "o", color=color, markersize=8, zorder=6)
+
+    # Cuadro resumen Prog / Real / Desv
+    if prc is not None:
+        pct_p_display = ppc if ppc is not None else 0.0
+        diff = prc - pct_p_display
+        signo = "+" if diff >= 0 else ""
+        txt = f"Prog: {pct_p_display:.1f}%\nReal: {prc:.1f}%\nDesv: {signo}{diff:.1f}%"
+        ax.annotate(txt,
+                    xy=(control_date, prc),
+                    xycoords="data",
+                    xytext=(0.97, 0.06),
+                    textcoords="axes fraction",
+                    fontsize=10, color="#111111", fontweight="bold",
+                    ha="right", va="bottom",
+                    arrowprops=dict(arrowstyle="->", color="#ff7f0e", lw=1.0),
+                    bbox=dict(boxstyle="round,pad=0.4", facecolor="#fffbe6",
+                              edgecolor="#ff7f0e", lw=1.0, alpha=0.95))
+
+    # Acotar el eje X: desde la primera fecha hasta fin proyectado (o max 3 años)
+    todas_fechas = (fechas_hist or []) + (fechas_proj or [])
+    if todas_fechas:
+        x_ini = todas_fechas[0] - timedelta(days=7)
+        x_fin = todas_fechas[-1] + timedelta(days=14)
+        ax.set_xlim(x_ini, x_fin)
 
     ax.legend(loc="upper left", fontsize=8, framealpha=0.8)
     plt.tight_layout()
@@ -388,13 +496,32 @@ def generar_imagen_todos_grupos(grupos_data: dict, proyecto_nombre: str,
         if not benef:
             continue
         color = _color_grupo(grupo, i)
-        fechas, pcts = _curva_real_grupo(benef, control_date)
-        if fechas:
-            ax.plot(fechas, pcts, color=color, lw=2.0, marker="o", markersize=3)
+        fechas_hist, pcts_hist, fechas_proj, pcts_proj = _curva_real_grupo(benef, control_date)
+        if fechas_hist:
+            ax.plot(fechas_hist, pcts_hist, color=color, lw=2.0, marker="o", markersize=3)
             handles.append(Line2D([0], [0], color=color, lw=2, label=grupo))
+        if fechas_proj and len(fechas_proj) > 1:
+            ax.plot(fechas_proj, pcts_proj, color=color, lw=1.5, linestyle=":", alpha=0.7)
 
+    legend_extra = [
+        Line2D([0], [0], color="gray", lw=1.8, linestyle=":",  label="Proyectado"),
+    ]
     if handles:
-        ax.legend(handles=handles, loc="upper left", fontsize=7, framealpha=0.8)
+        ax.legend(handles=handles + legend_extra, loc="upper left", fontsize=7, framealpha=0.8)
+
+    # Acotar eje X al rango útil de los grupos mostrados
+    todas_fechas_g = []
+    for grupo in grupos_ordenados:
+        benef = grupos_data.get(grupo, [])
+        if not benef:
+            continue
+        fh, _, fp, _ = _curva_real_grupo(benef, control_date)
+        todas_fechas_g.extend(fh or [])
+        todas_fechas_g.extend(fp or [])
+    if todas_fechas_g:
+        ax.set_xlim(min(todas_fechas_g) - timedelta(days=7),
+                    max(todas_fechas_g) + timedelta(days=14))
+
     plt.tight_layout()
     plt.savefig(output_path, dpi=200, bbox_inches="tight", facecolor="white")
     plt.close()
