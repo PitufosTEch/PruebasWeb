@@ -42,7 +42,6 @@ from matplotlib.lines import Line2D
 
 import curvas_cloud_utils as _ccu
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload
 
 # ─── RUTAS ────────────────────────────────────────────────────────────────────
 _BASE          = Path(__file__).parent
@@ -528,23 +527,6 @@ def generar_imagen_todos_grupos(grupos_data: dict, proyecto_nombre: str,
     log.info(f"  PNG: {output_path.name}")
 
 
-# ─── PASO 6: SUBIR A DRIVE ────────────────────────────────────────────────────
-def subir_imagen_drive(drive_svc, ruta_png: Path, file_id_existente, nombre_archivo: str) -> str:
-    media = MediaFileUpload(str(ruta_png), mimetype="image/png", resumable=False)
-
-    if file_id_existente:
-        drive_svc.files().update(fileId=file_id_existente, media_body=media).execute()
-        log.info(f"  Drive actualizado: {nombre_archivo}")
-        return file_id_existente
-
-    meta = {"name": nombre_archivo}
-    f = drive_svc.files().create(body=meta, media_body=media, fields="id").execute()
-    new_id = f["id"]
-    drive_svc.permissions().create(
-        fileId=new_id, body={"type": "anyone", "role": "reader"},
-    ).execute()
-    log.info(f"  Drive creado: {nombre_archivo} → {new_id[:12]}...")
-    return new_id
 
 
 # ─── PASO 7: ACTUALIZAR HOJA CURVAS S ────────────────────────────────────────
@@ -783,9 +765,10 @@ def procesar_proyecto(project_id: str, debug: bool = False):
     beneficiarios = fusionar_datos(beneficiarios, avance_web)
 
     # 5. Imágenes
-    output_dir    = Path(_ccu.get_output_dir())
+    obra_folder   = proy["drive_folder"]
+    nombre_ccu    = proy["nombre_ccu"]
+    output_dir    = Path(_ccu.get_output_dir_obra(obra_folder))
     all_drive_ids = _cargar_drive_ids()
-    ids_proy      = all_drive_ids.get(project_id, {})
 
     grupos_unicos = sorted(set(b["grupo"] for b in beneficiarios))
     if "GRUPO REZAGADOS" in grupos_unicos:
@@ -796,27 +779,34 @@ def procesar_proyecto(project_id: str, debug: bool = False):
     for b in beneficiarios:
         grupos_data[b["grupo"]].append(b)
 
-    safe_nombre = re.sub(r"[^A-Za-z0-9]", "_", nombre)
-    nuevos_ids  = {}
+    safe_nombre  = re.sub(r"[^A-Za-z0-9]", "_", nombre)
+    png_to_group: dict = {}   # {filename: group_key}
 
     for grupo in grupos_unicos:
         benef  = grupos_data[grupo]
         safe_g = re.sub(r"[^A-Za-z0-9]", "_", grupo.replace(" ", "_"))
         png    = output_dir / f"CurvaS_{safe_g}_{safe_nombre}.png"
         generar_imagen_grupo(benef, grupo, nombre, pcts_prog.get(grupo), png, control_date)
-        nuevos_ids[grupo] = subir_imagen_drive(drive_svc, png, ids_proy.get(grupo), png.name)
+        png_to_group[png.name] = grupo
 
     # TOTAL (todos los beneficiarios juntos)
     png_total = output_dir / f"CurvaS_TOTAL_{safe_nombre}.png"
     generar_imagen_grupo(list(beneficiarios), f"Total · {nombre}", nombre,
                          pcts_prog.get("TOTAL"), png_total, control_date)
-    nuevos_ids["TOTAL"] = subir_imagen_drive(drive_svc, png_total, ids_proy.get("TOTAL"), png_total.name)
+    png_to_group[png_total.name] = "TOTAL"
 
     # TODOS_GRUPOS (overlay)
     png_todos = output_dir / f"CurvaS_Todos_Grupos_{safe_nombre}.png"
     generar_imagen_todos_grupos(grupos_data, nombre, png_todos, control_date, grupos_unicos)
-    nuevos_ids["TODOS_GRUPOS"] = subir_imagen_drive(
-        drive_svc, png_todos, ids_proy.get("TODOS_GRUPOS"), png_todos.name)
+    png_to_group[png_todos.name] = "TODOS_GRUPOS"
+
+    # Subir a Drive en carpeta correcta: Archivos Dashboard/Curvas PNG/{obra_folder}/
+    drive_result = _ccu.actualizar_drive_organizado(
+        drive_svc, str(output_dir), list(png_to_group.keys()), obra_folder, nombre_ccu
+    )
+    nuevos_ids = {group_key: drive_result[fname]
+                  for fname, group_key in png_to_group.items()
+                  if fname in drive_result}
 
     # 6. Guardar IDs
     all_drive_ids[project_id] = nuevos_ids

@@ -11,77 +11,99 @@
       "nombre": "Ñuke Mapu",
       "appsheet_nombre": "Ñuke Mapu",
       "spreadsheet_id": "1t_1j62f_3l1nrlufmvhnV-o1WTplv0OnQL_JdVaWgKA",
-      "gantt_archivo": "Gantt control Ñuke Mapu"
+      "gantt_archivo": "Gantt control Ñuke Mapu",
+      "drive_folder": "Nuke Mapu",
+      "nombre_ccu": "nuke_mapu"
     },
     {
       "id": "P38",
       "nombre": "Aliwen",
       "appsheet_nombre": "Aliwen",
       "spreadsheet_id": "151wIDnZn8_b7egJKLQKUcD6QDCflEWF5OlAU9KWgc-M",
-      "gantt_archivo": "Gantt control Aliwen"
+      "gantt_archivo": "Gantt control Aliwen",
+      "drive_folder": "Aliwen",
+      "nombre_ccu": "aliwen"
     },
     {
       "id": "P39",
       "nombre": "El Coihue",
       "appsheet_nombre": "El Coihue",
       "spreadsheet_id": "1GiaZ1i3BN3mbgFmg16Ze5E25R0jEmYULtCWRy6cKaHo",
-      "gantt_archivo": "Gantt control El Coihue"
+      "gantt_archivo": "Gantt control El Coihue",
+      "drive_folder": "El Coihue",
+      "nombre_ccu": "coihue"
     },
     {
       "id": "P127",
       "nombre": "Nuevo Cunco",
       "appsheet_nombre": "Nuevo Cunco",
       "spreadsheet_id": "1bgT-83Aea0DlyeQ6OvitGDZfm3jLRQUV0GooVP-G8EI",
-      "gantt_archivo": "Gantt control Nuevo Cunco"
+      "gantt_archivo": "Gantt control Nuevo Cunco",
+      "drive_folder": "Nuevo Cunco",
+      "nombre_ccu": "cunco"
     },
     {
       "id": "P12",
       "nombre": "Juan Huilcan Tolten",
       "appsheet_nombre": "Com. Juan Huilcan Tolten",
       "spreadsheet_id": "1SLu5lQTAzhHOUuorM3jbxSBes7vMyIB9mMXCihQ6A40",
-      "gantt_archivo": "Gantt control Juan Huilcan Tolten"
+      "gantt_archivo": "Gantt control Juan Huilcan Tolten",
+      "drive_folder": "Juan Huilcan",
+      "nombre_ccu": "huilcan"
     },
     {
       "id": "P14",
       "nombre": "Com. Madihue",
       "appsheet_nombre": "Com. Madihue",
       "spreadsheet_id": "1B4wO-UkIDDyFvwRYjMAGksJvKqtNblwl_IirLl3qA6E",
-      "gantt_archivo": "Gantt control Com.Madihue"
+      "gantt_archivo": "Gantt control Com.Madihue",
+      "drive_folder": "Madihue",
+      "nombre_ccu": "madihue"
     },
     {
       "id": "P126",
       "nombre": "El Maitén",
       "appsheet_nombre": "El Maitén",
       "spreadsheet_id": "1IwBN7CpDvKVAvaRuYHNUfkQ0e98cJMVFDKFrntv3oNw",
-      "gantt_archivo": "Gantt control El Maitén"
+      "gantt_archivo": "Gantt control El Maitén",
+      "drive_folder": "El Maiten",
+      "nombre_ccu": "maiten"
     },
     {
       "id": "P131",
       "nombre": "Raíces de Melipeuco",
       "appsheet_nombre": "Las raíces de Melipeuco",
       "spreadsheet_id": "1n5F-P5cy8Wj5BujllzdnwCrKwGsfIkdvHxcyd6YwscU",
-      "gantt_archivo": "Gantt control Raices de Melipeuco"
+      "gantt_archivo": "Gantt control Raices de Melipeuco",
+      "drive_folder": "Melipeuco",
+      "nombre_ccu": "melipeuco"
     },
     {
       "id": "P28",
       "nombre": "Elsa Pinchulaf",
       "appsheet_nombre": "Peumayen 2020-2",
       "spreadsheet_id": "18XkRb7RAF52Aqj4immGebME-d9sODY0HgxIKWcBGrlg",
-      "gantt_archivo": "Gantt control Elsa Pinchulaf"
+      "gantt_archivo": "Gantt control Elsa Pinchulaf",
+      "drive_folder": "Pinchulaf",
+      "nombre_ccu": "pinchulaf"
     },
     {
       "id": "P116",
       "nombre": "Sonia Quilaleo",
       "appsheet_nombre": "Individual Sonia Quilaleo",
       "spreadsheet_id": "1z9kNq9uo363NrWqCojGfGpP326FDj3V60irWxtMMbU8",
-      "gantt_archivo": "Gantt control Sonia Quilaleo"
+      "gantt_archivo": "Gantt control Sonia Quilaleo",
+      "drive_folder": "Quilaleo",
+      "nombre_ccu": "quilaleo"
     },
     {
       "id": "P31",
       "nombre": "Trovolhue",
       "appsheet_nombre": "Trovolhue",
       "spreadsheet_id": "1kgroktRIto3gGGnvmXGMgoetXT-Rv8JFue1K9eNlNMg",
-      "gantt_archivo": "Gantt control Trovolhue"
+      "gantt_archivo": "Gantt control Trovolhue",
+      "drive_folder": "Trovolhue",
+      "nombre_ccu": "trovolhue"
     }
   ]
 }
