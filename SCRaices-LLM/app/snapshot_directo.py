@@ -443,6 +443,61 @@ def fetch_current_snapshot() -> dict | None:
         return None
 
 
+def _parse_monto_uf(raw) -> float:
+    s = str(raw or "0").strip()
+    if not s or s in ("nan", "None"):
+        return 0.0
+    if "," in s and "." in s:
+        try:
+            return round(float(s.replace(".", "").replace(",", ".")) * 100) / 100
+        except ValueError:
+            return 0.0
+    elif "," in s:
+        try:
+            return round(float(s.replace(",", ".")) * 100) / 100
+        except ValueError:
+            return 0.0
+    else:
+        try:
+            return round((float(s) if s else 0.0) * 100) / 100
+        except ValueError:
+            return 0.0
+
+
+def build_eepp_data_py(eepp_rows: list, ids_proy_activos: set) -> list:
+    """Replica la lógica JS de procesamiento de controlEEPP para EEPP_DATA."""
+    result = []
+    for ep in eepp_rows:
+        if str(ep.get("ID_Proy", "")) not in ids_proy_activos:
+            continue
+        result.append({
+            "ID_Proy":  str(ep.get("ID_Proy", "")),
+            "ID_Benef": str(ep.get("ID_Benef", "")),
+            "Num_EP":   str(ep.get("Num_EP", "")),
+            "Monto":    _parse_monto_uf(ep.get("Monto")),
+            "Estado":   str(ep.get("Estado", "")),
+            "Fecha":    _parse_date_ej(ep.get("Fecha") or ""),
+        })
+    return result
+
+
+def fetch_control_eepp() -> list | None:
+    """Descarga la tabla controlEEPP desde Apps Script."""
+    print("Descargando controlEEPP desde Apps Script...")
+    t0 = time.time()
+    try:
+        r = requests.get(f"{APPS_SCRIPT_URL}?tables=controlEEPP", timeout=120)
+        if r.status_code != 200:
+            print(f"  ERROR HTTP {r.status_code}")
+            return None
+        rows = r.json().get("controlEEPP", {}).get("rows", [])
+        print(f"  ✓ {len(rows)} EPs en {time.time() - t0:.0f}s")
+        return rows
+    except Exception as e:
+        print(f"  ERROR: {e}")
+        return None
+
+
 def main() -> int:
     print("=" * 60)
     print("snapshot_directo.py — captura + push a GitHub")
@@ -460,12 +515,31 @@ def main() -> int:
         if ids_benef:
             current_snap = fetch_current_snapshot()
             if current_snap:
+                # Patch INSPECCIONES_DATA
                 new_insp = build_inspecciones_data_py(ej_rows, ids_benef)
                 con_cierre = sum(1 for r in new_insp if r.get("cierre"))
                 current_snap["INSPECCIONES_DATA"] = new_insp
+                print(f"✓ INSPECCIONES_DATA: {len(new_insp)} registros, {con_cierre} con cierre")
+
+                # Patch EEPP_DATA
+                eepp_rows = fetch_control_eepp()
+                if eepp_rows is not None:
+                    ids_proy_activos = {
+                        str(p.get("ID_proy") or p.get("ID_Proy") or "")
+                        for p in current_snap.get("PROYECTOS_DATA", [])
+                        if p.get("ID_proy") or p.get("ID_Proy")
+                    }
+                    new_eepp = build_eepp_data_py(eepp_rows, ids_proy_activos)
+                    current_snap["EEPP_DATA"] = new_eepp
+                    estados = {}
+                    for ep in new_eepp:
+                        estados[ep["Estado"]] = estados.get(ep["Estado"], 0) + 1
+                    print(f"✓ EEPP_DATA: {len(new_eepp)} EPs — {estados}")
+                else:
+                    print("  AVISO: controlEEPP no disponible, EEPP_DATA sin cambios")
+
                 current_snap["ts"] = int(time.time() * 1000)
                 snapshot_str = json.dumps(current_snap, ensure_ascii=False)
-                print(f"✓ INSPECCIONES_DATA: {len(new_insp)} registros, {con_cierre} con cierre")
                 print(f"  Tamaño snapshot: {len(snapshot_str)//1024} KB")
 
     # Fallback: browser-based (por si el flujo Python falla)
