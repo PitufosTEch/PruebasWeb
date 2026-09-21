@@ -464,14 +464,21 @@ def _parse_monto_uf(raw) -> float:
             return 0.0
 
 
+def _norm_proy_id(raw) -> str:
+    """Normaliza IDs numéricos: '122' → 'P122' (igual que el JS)."""
+    s = str(raw or "").strip()
+    return "P" + s if s.isdigit() else s
+
+
 def build_eepp_data_py(eepp_rows: list, ids_proy_activos: set) -> list:
     """Replica la lógica JS de procesamiento de controlEEPP para EEPP_DATA."""
     result = []
     for ep in eepp_rows:
-        if str(ep.get("ID_Proy", "")) not in ids_proy_activos:
+        id_proy = _norm_proy_id(ep.get("ID_Proy", ""))
+        if id_proy not in ids_proy_activos:
             continue
         result.append({
-            "ID_Proy":  str(ep.get("ID_Proy", "")),
+            "ID_Proy":  id_proy,
             "ID_Benef": str(ep.get("ID_Benef", "")),
             "Num_EP":   str(ep.get("Num_EP", "")),
             "Monto":    _parse_monto_uf(ep.get("Monto")),
