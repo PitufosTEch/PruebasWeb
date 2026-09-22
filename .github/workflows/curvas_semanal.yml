@@ -39,6 +39,7 @@ jobs:
           - { label: "P31  Trovolhue",         id: P31,   delay: 135 }
           - { label: "P28  Elsa Pinchulaf",    id: P28,   delay: 150 }
           - { label: "P123 Peumayen 2023",      id: P123,  delay: 165 }
+          - { label: "P128 Com. J. Carvajal",  id: P128,  delay: 180 }
           # ── Proyectos futuros — agregar aquí cuando tengan Gantt ──────────
           # - { label: "P118 El Canelo",        id: P118,  delay: 180 }
 

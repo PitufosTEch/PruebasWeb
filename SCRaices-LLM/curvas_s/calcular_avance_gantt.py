@@ -50,7 +50,7 @@ PROYECTOS = {
     # ── Proyectos futuros — descomentar y reemplazar TODO con el ID de la planilla Gantt ──
     # "P118": "TODO",  # El Canelo             — Rural Araucanía 2024
     "P123": "1EEQF-RqP9DKosnaedwL79dXD9GXwBY8S8idkjF5S-2I",  # Peumayen 2023 — Rural Araucanía 2024
-    # "P128": "TODO",  # Com. José Carvajal     — Rural Araucanía 2024
+    "P128": "17kDRj0ycP-dgTwkM0DHKes6bpUNOa8Peo6uS_r3XeVY",  # Com. José Carvajal — Rural Araucanía 2024
     # "P129": "TODO",  # Nuevo Gorbea           — Rural Araucanía 2024
     # "P132": "TODO",  # Com. Fermín Manquilef  — Rural Araucanía 2024
     # "P145": "TODO",  # Perkenko 2025          — Rural Araucanía 2025
