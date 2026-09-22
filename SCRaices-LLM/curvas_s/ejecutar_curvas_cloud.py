@@ -72,7 +72,7 @@ SCRIPTS_EN_ORDEN = [
     # ("P150 - Llaima Antu",            "curvas_automatico_llaima_antu"),        # Rural Araucanía 2025
     # ("P152 - Ayün Ruka",              "curvas_automatico_ayun_ruka"),          # Rural Araucanía 2025
     # ("P153 - Vilcún Mapu",            "curvas_automatico_vilcun_mapu"),        # Rural Araucanía 2025
-    # ("P154 - Com. José Carvajal 2",   "curvas_automatico_carvajal_2"),         # Rural Araucanía 2025
+    ("P154 - Com. José Carvajal 2",   "curvas_automatico_carvajal_2"),         # Rural Araucanía 2025
     # ("P155 - Los Arrayanes",          "curvas_automatico_arrayanes"),          # Rural Araucanía 2025
     # ("P156 - Poyen Ruka",             "curvas_automatico_poyen_ruka"),         # Rural Araucanía 2025
     # ("P164 - Conún Huenu",            "curvas_automatico_conun_huenu"),        # Rural Araucanía 2026

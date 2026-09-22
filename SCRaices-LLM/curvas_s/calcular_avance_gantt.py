@@ -59,7 +59,7 @@ PROYECTOS = {
     # "P150": "TODO",  # Llaima Antu            — Rural Araucanía 2025
     # "P152": "TODO",  # Ayun Ruka              — Rural Araucanía 2025
     # "P153": "TODO",  # Vilcun Mapu            — Rural Araucanía 2025
-    # "P154": "TODO",  # Com. José Carvajal 2   — Rural Araucanía 2025
+    "P154": "1nK8xaHlASKxmoGD0RPqpZdSMPMPL-bLM2MvnhBAqGHE",  # Com. José Carvajal 2 — Rural Araucanía 2025
     # "P155": "TODO",  # Los Arrayanes          — Rural Araucanía 2025
     # "P156": "TODO",  # Poyen Ruka             — Rural Araucanía 2025
     # "P164": "TODO",  # Conun Huenu            — Rural Araucanía 2026
