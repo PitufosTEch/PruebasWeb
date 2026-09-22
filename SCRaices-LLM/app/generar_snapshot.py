@@ -84,6 +84,14 @@ def main() -> int:
         print("ERROR: no se obtuvo cache procesado FRESCO del dashboard")
         return 1
 
+    # Normalizar ID_Proy numérico en EEPP_DATA ('122' → 'P122'), igual que el JS.
+    def _norm_id(raw):
+        s = str(raw or "").strip()
+        return "P" + s if s.isdigit() else s
+
+    for ep in payload.get("EEPP_DATA", []):
+        ep["ID_Proy"] = _norm_id(ep.get("ID_Proy", ""))
+
     n_proy = len(payload.get("PROYECTOS_DATA", []))
     n_benef = len(payload.get("BENEFICIARIOS_DATA", []))
     if n_proy < 1:
