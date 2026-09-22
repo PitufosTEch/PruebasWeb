@@ -428,6 +428,13 @@ const CURVAS_S_CONFIG = {
         { id: '1DZZkuZslmCk1acgWPYdt1N7lYzOB7WDq', label: 'Grupo 2 · Com. José Carvajal' },
         { id: '1-3axlkgqgKkgX49ZhPoJqYjtI1FnqBfV', label: 'Grupo 3 · Com. José Carvajal' },
     ],
+    'P154': [
+        { id: '1hjp6FLWDphRY1QBRbA_s_3t_h404CqVy', label: 'Total Proyecto · Com. José Carvajal 2' },
+        { id: '17HYLOBHTF02oQD9CJoSnoDO0-ZFdMU22', label: 'Todos los Grupos · Com. José Carvajal 2' },
+        { id: '1cRwvCg0dfYBkMw-u__v-gF7YHn0CL83f', label: 'Grupo 1 · Com. José Carvajal 2' },
+        { id: '1zYoD52AVkbhSp4vRvSe_7UT2D6sq8gXv', label: 'Grupo 2 · Com. José Carvajal 2' },
+        { id: '1aF0AK2EEuOHEYyDs9e7SiB5ZqXFns2IV', label: 'Grupo 3 · Com. José Carvajal 2' },
+    ],
 };const EstadoGeneralTab=({viviendas,observaciones,grupos,resumenComentarios,proyectoSel,proy,garantiasProy=[],muestrasProy=[],muestrasResumen=null,kpis=null,cierresForzados={}})=>{const[expandida,setExpandida]=React.useState(null);const[busqueda,setBusqueda]=React.useState("");const[filtro,setFiltro]=React.useState("todas");// todas | pendientes | recepcionadas
 const[grupoColapsado,setGrupoColapsado]=React.useState({});// {grupoId: true/false}
 const[showCapatazMenu,setShowCapatazMenu]=React.useState(false);const[avanceGanttData,setAvanceGanttData]=React.useState({});React.useEffect(()=>{fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/avance_gantt.json').then(r=>r.json()).then(d=>{AVANCE_GANTT_DATA=d||{};setAvanceGanttData(d||{});}).catch(()=>{});fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/avance_benef.json').then(r=>r.json()).then(d=>{AVANCE_BENEF_DATA=d||{};}).catch(()=>{});},[]);// ── Generador de Informe Semanal ────────────────────────────────────────
