@@ -1483,7 +1483,7 @@ const barCol=pctCobrado>=80?'#16a34a':pctCobrado>=40?'#2563eb':pctCobrado>0?'#f5
 <div style="margin:18px 0 4px;">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;"><span style="font-size:10px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.5px;">% Cobrado</span><span style="font-size:11px;font-weight:700;color:${barCol};">${pctCobrado}%</span></div>
   <div style="background:#e5e7eb;border-radius:6px;height:9px;overflow:hidden;margin-bottom:9px;">
-    <div style="height:100%;width:${pctEmitido}%;background:#bfdbfe;border-radius:6px;position:relative;"><div style="height:100%;width:${totalEP>0?Math.round(totalPagado/totalEP*100):0}%;background:${barCol};border-radius:6px;"></div></div>
+    <div style="height:100%;width:${pctCobrado}%;background:${barCol};border-radius:6px;"></div>
   </div>
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;"><span style="font-size:10px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.5px;">% Avance de contrato</span><span style="font-size:11px;font-weight:700;color:#2563eb;">${pctEmitido}%</span></div>
   <div style="background:#e5e7eb;border-radius:6px;height:9px;overflow:hidden;margin-bottom:9px;">
