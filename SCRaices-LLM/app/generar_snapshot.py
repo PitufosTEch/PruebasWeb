@@ -92,6 +92,12 @@ def main() -> int:
     for ep in payload.get("EEPP_DATA", []):
         ep["ID_Proy"] = _norm_id(ep.get("ID_Proy", ""))
 
+    # Normalizar claves numéricas en MONTOS_PROY_DATA ('122' → 'P122').
+    montos = payload.get("MONTOS_PROY_DATA", {})
+    payload["MONTOS_PROY_DATA"] = {
+        (_norm_id(k) if k.isdigit() else k): v for k, v in montos.items()
+    }
+
     n_proy = len(payload.get("PROYECTOS_DATA", []))
     n_benef = len(payload.get("BENEFICIARIOS_DATA", []))
     if n_proy < 1:
