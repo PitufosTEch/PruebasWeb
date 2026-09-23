@@ -442,6 +442,14 @@ const CURVAS_S_CONFIG = {
         { id: '1Wv5K4kxT0JO_NOrEniDOAiUXD6DeM1hW', label: 'Grupo 2 · Com. Fermín Manquilef' },
         { id: '1Q2qbNc5nBavIKNOmYWjlbSMmqrb4TsqI', label: 'Grupo 3 · Com. Fermín Manquilef' },
     ],
+    'P129': [
+        { id: '1gzKS-fTcQd5yWjkVn3tXaUe1Pz_w3fXt', label: 'Total Proyecto · Nuevo Gorbea' },
+        { id: '1h3_4i8Lnf8bndax_YhjT-5XX4vPA6NNx', label: 'Todos los Grupos · Nuevo Gorbea' },
+        { id: '1BV3y2cM_zJdvnGFG3JnhqjGjgLtc8b6s', label: 'Grupo 1 · Nuevo Gorbea' },
+        { id: '1OLvFzIhpl_oq4Qh9OD76p7Ani5wukpi4', label: 'Grupo 2 · Nuevo Gorbea' },
+        { id: '1sLk6uLjiBXDmOeXHznO-XuqHRkFhGU6V', label: 'Grupo 3 · Nuevo Gorbea' },
+        { id: '1GBVBqgIkYTz4E-CjF9XRo2jVDM-jJix6', label: 'Grupo 4 · Nuevo Gorbea' },
+    ],
 };const EstadoGeneralTab=({viviendas,observaciones,grupos,resumenComentarios,proyectoSel,proy,garantiasProy=[],muestrasProy=[],muestrasResumen=null,kpis=null,cierresForzados={}})=>{const[expandida,setExpandida]=React.useState(null);const[busqueda,setBusqueda]=React.useState("");const[filtro,setFiltro]=React.useState("todas");// todas | pendientes | recepcionadas
 const[grupoColapsado,setGrupoColapsado]=React.useState({});// {grupoId: true/false}
 const[showCapatazMenu,setShowCapatazMenu]=React.useState(false);const[avanceGanttData,setAvanceGanttData]=React.useState({});React.useEffect(()=>{fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/avance_gantt.json').then(r=>r.json()).then(d=>{AVANCE_GANTT_DATA=d||{};setAvanceGanttData(d||{});}).catch(()=>{});fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/avance_benef.json').then(r=>r.json()).then(d=>{AVANCE_BENEF_DATA=d||{};}).catch(()=>{});},[]);// ── Generador de Informe Semanal ────────────────────────────────────────
