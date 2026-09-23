@@ -65,7 +65,7 @@ SCRIPTS_EN_ORDEN = [
     ("P123 - Peumayen 2023",          "curvas_automatico_peumayen"),           # Rural Araucanía 2024
     ("P128 - Com. José Carvajal",     "curvas_automatico_carvajal"),           # Rural Araucanía 2024
     # ("P129 - Nuevo Gorbea",           "curvas_automatico_nuevo_gorbea"),       # Rural Araucanía 2024
-    # ("P132 - Com. Fermín Manquilef",  "curvas_automatico_fermin_manquilef"),   # Rural Araucanía 2024
+    ("P132 - Com. Fermín Manquilef",     "curvas_automatico_fermin_manquilef"),  # Rural Araucanía 2024
     # ("P145 - Perkenko 2025",          "curvas_automatico_perkenko"),           # Rural Araucanía 2025
     # ("P146 - Demanda Villarrica 2025","curvas_automatico_villarrica_2025"),    # Rural Araucanía 2025
     # ("P147 - Ruka Antü",              "curvas_automatico_ruka_antu"),          # Rural Araucanía 2025
