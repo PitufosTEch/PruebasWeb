@@ -42,6 +42,7 @@ jobs:
           - { label: "P128 Com. J. Carvajal",  id: P128,  delay: 180 }
           - { label: "P154 Carvajal 2",        id: P154,  delay: 195 }
           - { label: "P132 Fermin Manquilef",  id: P132,  delay: 210 }
+          - { label: "P129 Nuevo Gorbea",      id: P129,  delay: 225 }
           # ── Proyectos futuros — agregar aquí cuando tengan Gantt ──────────
           # - { label: "P118 El Canelo",        id: P118,  delay: 180 }
 

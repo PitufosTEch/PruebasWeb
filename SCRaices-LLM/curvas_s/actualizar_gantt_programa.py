@@ -55,7 +55,7 @@ PROYECTOS = {
     # "P118": "TODO",  # El Canelo             — Rural Araucanía 2024
     "P123": "1EEQF-RqP9DKosnaedwL79dXD9GXwBY8S8idkjF5S-2I",  # Peumayen 2023 — Rural Araucanía 2024
     "P128": "17kDRj0ycP-dgTwkM0DHKes6bpUNOa8Peo6uS_r3XeVY",  # Com. José Carvajal — Rural Araucanía 2024
-    # "P129": "TODO",  # Nuevo Gorbea           — Rural Araucanía 2024
+    "P129": "1M8nyOgKhawPfHMEylHHxJWlz_YqR0M7eVxAqVaOp98E",  # Nuevo Gorbea — Rural Araucanía 2024
     "P132": "1RTWSEQRggmcQCepGnXohJrYtH1xC_WgTrfB88Bip5KY",  # Com. Fermín Manquilef — Rural Araucanía 2024
     # "P145": "TODO",  # Perkenko 2025          — Rural Araucanía 2025
     # "P146": "TODO",  # Demanda Villarrica 2025
