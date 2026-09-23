@@ -361,6 +361,100 @@ def get_github_token() -> str | None:
 
 
 # ─── LECTURA % PROG DESDE GANTT ───────────────────────────────────────────────
+def leer_pct_gantt_grupos(sheets_svc, spreadsheet_id, control_date,
+                          gantt_sheet="Programa de obra"):
+    """
+    Lee el % programado de cada grupo directamente desde la fila
+    'Programa Grupo X' del Gantt (hoja 'Programa de obra').
+
+    Retorna dict con claves en mayúsculas, ej.:
+        {"GRUPO 1": 100.0, "GRUPO 2": 81.0, "REZAGADOS": 88.9}
+    Devuelve {} si la hoja no existe o no se encuentran las filas.
+    """
+    from datetime import date as _date
+    import logging
+    _log = logging.getLogger(__name__)
+
+    try:
+        r1 = sheets_svc.spreadsheets().values().get(
+            spreadsheetId=spreadsheet_id,
+            range=f"'{gantt_sheet}'!A1:BT1",
+            valueRenderOption="FORMATTED_VALUE",
+        ).execute()
+        fila1 = r1.get("values", [[]])[0]
+
+        col_idx = None
+        ultima_col_antes = None
+        for i, v in enumerate(fila1):
+            if not v:
+                continue
+            try:
+                parts = v.split("/")
+                d = _date(int(parts[2]), int(parts[1]), int(parts[0]))
+                if d == control_date:
+                    col_idx = i
+                    break
+                elif d < control_date:
+                    ultima_col_antes = i
+            except Exception:
+                pass
+
+        if col_idx is None:
+            col_idx = ultima_col_antes
+        if col_idx is None:
+            _log.warning(f"  [gantt_pct] No se encontró columna para {control_date} en '{gantt_sheet}'")
+            return {}
+
+        r_all = sheets_svc.spreadsheets().values().get(
+            spreadsheetId=spreadsheet_id,
+            range=f"'{gantt_sheet}'!A1:BT60",
+            valueRenderOption="FORMATTED_VALUE",
+        ).execute()
+        rows = r_all.get("values", [])
+
+        result = {}
+        for row in rows:
+            if len(row) < 11:
+                continue
+            for check_idx in range(min(len(row), 13)):
+                cell = str(row[check_idx]).strip().upper()
+                if not cell.startswith("PROGRAMA"):
+                    continue
+                nombre = cell.replace("PROGRAMA", "").strip()
+                if "REZAG" in nombre:
+                    key = "REZAGADOS"
+                elif nombre.startswith("GRUPO"):
+                    key = nombre
+                elif nombre == "":
+                    key = "TOTAL"
+                else:
+                    key = nombre
+                val = ""
+                search_col = min(col_idx, len(row) - 1)
+                while search_col >= 0:
+                    candidate = str(row[search_col]).replace("%", "").replace(",", ".").strip()
+                    try:
+                        float(candidate)
+                        val = row[search_col]
+                        break
+                    except (ValueError, TypeError):
+                        search_col -= 1
+                try:
+                    pct = float(str(val).replace("%", "").replace(",", ".").strip())
+                    result[key] = pct
+                except (ValueError, TypeError):
+                    pass
+                break
+
+        _log.info(f"  [gantt_pct] Grupos leídos desde '{gantt_sheet}': {result}")
+        return result
+
+    except Exception as exc:
+        import logging as _l
+        _l.getLogger(__name__).warning(f"  [gantt_pct] Error leyendo Gantt: {exc}")
+        return {}
+
+
 def leer_pct_programa_gantt(sheets_svc, spreadsheet_id, hoja="Programa de obra"):
     """
     Lee el % programado del inicio de la semana actual desde la fila 'Programa'
