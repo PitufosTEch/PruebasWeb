@@ -435,6 +435,13 @@ const CURVAS_S_CONFIG = {
         { id: '1zYoD52AVkbhSp4vRvSe_7UT2D6sq8gXv', label: 'Grupo 2 · Com. José Carvajal 2' },
         { id: '1aF0AK2EEuOHEYyDs9e7SiB5ZqXFns2IV', label: 'Grupo 3 · Com. José Carvajal 2' },
     ],
+    'P132': [
+        { id: '1HKu8QI1x3HBX_PW6BgVweXP9taUY0GEk', label: 'Total Proyecto · Com. Fermín Manquilef' },
+        { id: '1FgevwWFfO49h3JwLA8pz6mmZqDSaNKAN', label: 'Todos los Grupos · Com. Fermín Manquilef' },
+        { id: '1Py1e7TBmOUeJ70CGE_MW5yuep1hdgD37', label: 'Grupo 1 · Com. Fermín Manquilef' },
+        { id: '1Wv5K4kxT0JO_NOrEniDOAiUXD6DeM1hW', label: 'Grupo 2 · Com. Fermín Manquilef' },
+        { id: '1Q2qbNc5nBavIKNOmYWjlbSMmqrb4TsqI', label: 'Grupo 3 · Com. Fermín Manquilef' },
+    ],
 };const EstadoGeneralTab=({viviendas,observaciones,grupos,resumenComentarios,proyectoSel,proy,garantiasProy=[],muestrasProy=[],muestrasResumen=null,kpis=null,cierresForzados={}})=>{const[expandida,setExpandida]=React.useState(null);const[busqueda,setBusqueda]=React.useState("");const[filtro,setFiltro]=React.useState("todas");// todas | pendientes | recepcionadas
 const[grupoColapsado,setGrupoColapsado]=React.useState({});// {grupoId: true/false}
 const[showCapatazMenu,setShowCapatazMenu]=React.useState(false);const[avanceGanttData,setAvanceGanttData]=React.useState({});React.useEffect(()=>{fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/avance_gantt.json').then(r=>r.json()).then(d=>{AVANCE_GANTT_DATA=d||{};setAvanceGanttData(d||{});}).catch(()=>{});fetch('https://scraices-dashboard-default-rtdb.firebaseio.com/avance_benef.json').then(r=>r.json()).then(d=>{AVANCE_BENEF_DATA=d||{};}).catch(()=>{});},[]);// ── Generador de Informe Semanal ────────────────────────────────────────
