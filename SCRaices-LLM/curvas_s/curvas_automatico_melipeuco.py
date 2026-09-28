@@ -464,14 +464,37 @@ def _estimar_inicio_efectivo(control, pct_real):
     return control - timedelta(days=int(DURACION_DIAS * 0.9))
 
 
-def proyectar_fin(inicio, pct_real, control):
-    if pct_real <= 10:
-        return inicio + timedelta(days=DURACION_DIAS)
-    inicio_ef  = min(inicio, control)
-    dias_trans = max(1, (control - inicio_ef).days)
-    tasa       = pct_real / dias_trans
-    dias_rest  = (100 - pct_real) / tasa
-    return control + timedelta(days=int(dias_rest))
+def proyectar_fin_grupo(beneficiarios, control):
+    """SPI (EVM): fin = control + dias_prog_restantes / SPI"""
+    pcts = [b[2] for b in beneficiarios]
+    pct_real = sum(pcts) / len(pcts)
+
+    if pct_real >= 99:
+        return control
+
+    inicio_grupo = min(b[1] for b in beneficiarios)
+    dias_trans = max(1, (control - inicio_grupo).days)
+
+    semanas = dias_trans / 7.0
+    idx = int(semanas)
+    if idx >= len(PCT_SEMANA) - 1:
+        pct_prog = PCT_SEMANA[-1]
+    else:
+        frac = semanas - idx
+        pct_prog = PCT_SEMANA[idx] + frac * (PCT_SEMANA[idx + 1] - PCT_SEMANA[idx])
+    pct_prog = max(1.0, pct_prog)
+
+    if pct_real <= 0:
+        return inicio_grupo + timedelta(days=DURACION_DIAS)
+
+    SPI = pct_real / pct_prog
+    dias_prog_restantes = max(0, DURACION_DIAS - dias_trans)
+
+    if dias_prog_restantes == 0:
+        tasa = pct_real / dias_trans
+        return control + timedelta(days=int((100 - pct_real) / max(tasa, 0.01)))
+
+    return control + timedelta(days=max(0, int(dias_prog_restantes / SPI)))
 
 
 def _fmt_date(d):
@@ -490,7 +513,7 @@ def build_group_curves(beneficiarios, control):
 
     inicio_grupo   = min(b[1] for b in beneficiarios)
     fin_proyecto   = max(b[1] + timedelta(days=DURACION_DIAS) for b in beneficiarios)
-    fin_proyectado = max(proyectar_fin(b[1], b[2], control) for b in beneficiarios)
+    fin_proyectado = proyectar_fin_grupo(beneficiarios, control)
     fecha_fin      = max(fin_proyecto, fin_proyectado) + timedelta(days=14)
     fechas         = [inicio_grupo + timedelta(days=d) for d in range((fecha_fin - inicio_grupo).days + 1)]
 
