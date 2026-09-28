@@ -381,7 +381,8 @@ def _leer_datos_control(sheets_svc, spreadsheet_id, pid) -> dict | None:
         return None
 
     hoja = None
-    for nombre in ["Datos Control", "datos control", "DatosControl"]:
+    for nombre in ["Datos Control", "datos control", "DatosControl",
+                    "Datos de control", "datos de control"]:
         if nombre in sheet_names:
             hoja = nombre
             break
