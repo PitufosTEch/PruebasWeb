@@ -42,7 +42,7 @@ from playwright.async_api import async_playwright
 # ── Configuración ──────────────────────────────────────────────────────────
 FIREBASE_URL  = (os.environ.get('FIREBASE_URL') or
                  'https://scraices-dashboard-default-rtdb.firebaseio.com').rstrip('/')
-GMAIL_USER    = 'rodrigolagoslira@gmail.com'
+GMAIL_USER    = os.environ.get('GMAIL_USER', 'rodrigolagoslira@gmail.com')
 GMAIL_PASS    = os.environ.get('GMAIL_APP_PASSWORD', '')
 DRY_RUN       = os.environ.get('DRY_RUN', 'false').lower() != 'false'
 TEST_EMAIL    = os.environ.get('TEST_EMAIL', '').strip()
